@@ -39,8 +39,8 @@ import org.jetbrains.annotations.Nullable;
  * </pre>
  *
  * <p>Will be replaced by <a href=
- * "https://github.com/apache/stormcrawler/issues/711">MetadataFilter to filter based on
- * multiple key values</a>
+ * "https://github.com/apache/stormcrawler/issues/711">MetadataFilter to filter based on multiple
+ * key values</a>
  *
  * @since 1.14
  */
