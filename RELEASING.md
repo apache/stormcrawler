@@ -88,6 +88,7 @@ export GPG_TTY=$(tty)
 - Execute a complete test: `mvn test` 
   - Ensure to have a working Docker environment on your release machine. Otherwise, coverage computation goes wrong and the build will fail.
 - Check the current results of the last GitHub action runs.
+- Upgrade to the latest version of StormCrawler in the README files
 - Do a trial build: `mvn package -Papache-release,apache-gpg`
 - Switch to a new branch with a format like **rel-stormcrawler-x.y.z-RC?**
 - Prepare the release: `mvn release:prepare -Papache-release,apache-gpg` Answer the questions appropriately. The tag name format should be *stormcrawler-x.y.z*. **DO NOT INCLUDE `-rcX` in the tag**
