@@ -127,7 +127,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
             doc.setField("nextFetchDate", nextFetch.get());
         }
 
-        connection.getUpdateClient().add(doc);
+        connection.addAsync(doc);
 
         super.ack(t, url);
     }
