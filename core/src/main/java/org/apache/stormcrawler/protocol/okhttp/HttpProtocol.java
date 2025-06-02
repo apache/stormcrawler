@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
@@ -292,46 +293,50 @@ public class HttpProtocol extends AbstractHttpProtocol {
         // conditionally add a dynamic proxy
         if (proxyManager != null) {
             // retrieve proxy from proxy manager
-            SCProxy prox = proxyManager.getProxy(metadata);
+            Optional<SCProxy> proxOptional = proxyManager.getProxy(metadata);
 
-            // conditionally configure proxy authentication
-            if (StringUtils.isNotBlank(prox.getAddress())) {
-                // format SCProxy into native Java proxy
-                Proxy proxy =
-                        new Proxy(
-                                Proxy.Type.valueOf(prox.getProtocol().toUpperCase(Locale.ROOT)),
-                                new InetSocketAddress(
-                                        prox.getAddress(), Integer.parseInt(prox.getPort())));
+            if (proxOptional.isPresent()) {
+                SCProxy prox = proxOptional.get();
+                // conditionally configure proxy authentication
+                if (StringUtils.isNotBlank(prox.getAddress())) {
+                    // format SCProxy into native Java proxy
+                    Proxy proxy =
+                            new Proxy(
+                                    Proxy.Type.valueOf(prox.getProtocol().toUpperCase(Locale.ROOT)),
+                                    new InetSocketAddress(
+                                            prox.getAddress(), Integer.parseInt(prox.getPort())));
 
-                // set proxy in builder
-                builder.proxy(proxy);
+                    // set proxy in builder
+                    builder.proxy(proxy);
 
-                // conditionally add proxy authentication
-                if (StringUtils.isNotBlank(prox.getUsername())) {
-                    // add proxy authentication header to builder
-                    builder.proxyAuthenticator(
-                            (Route route, Response response) -> {
-                                String credential =
-                                        Credentials.basic(prox.getUsername(), prox.getPassword());
-                                return response.request()
-                                        .newBuilder()
-                                        .header("Proxy-Authorization", credential)
-                                        .build();
-                            });
+                    // conditionally add proxy authentication
+                    if (StringUtils.isNotBlank(prox.getUsername())) {
+                        // add proxy authentication header to builder
+                        builder.proxyAuthenticator(
+                                (Route route, Response response) -> {
+                                    String credential =
+                                            Credentials.basic(
+                                                    prox.getUsername(), prox.getPassword());
+                                    return response.request()
+                                            .newBuilder()
+                                            .header("Proxy-Authorization", credential)
+                                            .build();
+                                });
+                    }
                 }
+
+                // save start time for debugging speed impact of client build
+                long buildStart = System.currentTimeMillis();
+
+                // create new local client from builder using proxy
+                localClient = builder.build();
+
+                LOG.debug(
+                        "time to build okhttp client with proxy: {}ms",
+                        System.currentTimeMillis() - buildStart);
+
+                LOG.debug("fetching with proxy {} - {} ", url, prox.toString());
             }
-
-            // save start time for debugging speed impact of client build
-            long buildStart = System.currentTimeMillis();
-
-            // create new local client from builder using proxy
-            localClient = builder.build();
-
-            LOG.debug(
-                    "time to build okhttp client with proxy: {}ms",
-                    System.currentTimeMillis() - buildStart);
-
-            LOG.debug("fetching with proxy {} - {} ", url, prox.toString());
         }
 
         final Builder rb = new Request.Builder().url(url);
