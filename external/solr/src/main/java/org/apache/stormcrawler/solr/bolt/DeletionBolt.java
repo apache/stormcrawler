@@ -71,13 +71,7 @@ public class DeletionBolt extends BaseRichBolt {
     @Override
     public void execute(Tuple tuple) {
         String url = tuple.getStringByField("url");
-        try {
-            connection.getUpdateClient().deleteById(url);
-        } catch (SolrServerException | IOException e) {
-            _collector.fail(tuple);
-            LOG.error("Exception caught while deleting", e);
-            return;
-        }
+        connection.deleteByIdAsync(url);
         _collector.ack(tuple);
     }
 
