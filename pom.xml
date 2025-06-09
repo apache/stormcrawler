@@ -64,7 +64,7 @@ under the License.
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<additionalparam>-Xdoclint:none</additionalparam>
 		<!-- dependency versions -->
-		<junit.version>5.13.0</junit.version>
+		<junit.version>5.13.1</junit.version>
 		<storm-client.version>2.8.0</storm-client.version>
 		<jackson.version>2.18.1</jackson.version>
 		<tika.version>3.1.0</tika.version>
