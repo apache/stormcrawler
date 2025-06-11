@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -208,7 +209,7 @@ public class MultiProxyManager implements ProxyManager {
     }
 
     @Override
-    public SCProxy getProxy(Metadata metadata) {
+    public Optional<SCProxy> getProxy(Metadata metadata) {
         // create a variable to hold the proxy generated in the following switch statement
         SCProxy proxy;
 
@@ -228,6 +229,6 @@ public class MultiProxyManager implements ProxyManager {
         proxy.incrementUsage();
 
         // return proxy
-        return proxy;
+        return Optional.of(proxy);
     }
 }

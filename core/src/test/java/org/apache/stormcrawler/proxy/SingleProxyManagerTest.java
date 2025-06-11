@@ -16,6 +16,7 @@
  */
 package org.apache.stormcrawler.proxy;
 
+import java.util.Optional;
 import org.apache.storm.Config;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,9 @@ class SingleProxyManagerTest {
         config.put("http.proxy.pass", "pass1");
         SingleProxyManager pm = new SingleProxyManager();
         pm.configure(config);
-        SCProxy proxy = pm.getProxy(null);
+        Optional<SCProxy> proxyOptional = pm.getProxy(null);
+        Assertions.assertTrue(proxyOptional.isPresent());
+        SCProxy proxy = proxyOptional.get();
         Assertions.assertEquals(proxy.getProtocol(), "http");
         Assertions.assertEquals(proxy.getAddress(), "example.com");
         Assertions.assertEquals(proxy.getPort(), "8080");
