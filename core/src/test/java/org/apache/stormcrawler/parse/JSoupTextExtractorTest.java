@@ -27,13 +27,13 @@ import org.jsoup.nodes.Document;
 import org.jsoup.parser.Parser;
 import org.junit.jupiter.api.Test;
 
-class TextExtractorTest {
+class JSoupTextExtractorTest {
 
     @Test
     void testMainContent() throws IOException {
         Config conf = new Config();
-        conf.put(TextExtractor.INCLUDE_PARAM_NAME, "DIV[id=\"maincontent\"]");
-        TextExtractor extractor = new TextExtractor(conf);
+        conf.put(JSoupTextExtractor.INCLUDE_PARAM_NAME, "DIV[id=\"maincontent\"]");
+        JSoupTextExtractor extractor = new JSoupTextExtractor(conf);
         String content =
                 "<html>the<div id='maincontent'>main<div>content</div></div>of the page</html>";
         Document jsoupDoc = Parser.htmlParser().parseInput(content, "http://stormcrawler.net");
@@ -44,8 +44,8 @@ class TextExtractorTest {
     @Test
     void testExclusion() throws IOException {
         Config conf = new Config();
-        conf.put(TextExtractor.EXCLUDE_PARAM_NAME, "STYLE");
-        TextExtractor extractor = new TextExtractor(conf);
+        conf.put(JSoupTextExtractor.EXCLUDE_PARAM_NAME, "STYLE");
+        JSoupTextExtractor extractor = new JSoupTextExtractor(conf);
         String content = "<html>the<style>main</style>content of the page</html>";
         Document jsoupDoc = Parser.htmlParser().parseInput(content, "http://stormcrawler.net");
         String text = extractor.text(jsoupDoc.body());
@@ -55,8 +55,8 @@ class TextExtractorTest {
     @Test
     void testExclusionCase() throws IOException {
         Config conf = new Config();
-        conf.put(TextExtractor.EXCLUDE_PARAM_NAME, "style");
-        TextExtractor extractor = new TextExtractor(conf);
+        conf.put(JSoupTextExtractor.EXCLUDE_PARAM_NAME, "style");
+        JSoupTextExtractor extractor = new JSoupTextExtractor(conf);
         String content = "<html>the<STYLE>main</STYLE>content of the page</html>";
         Document jsoupDoc = Parser.htmlParser().parseInput(content, "http://stormcrawler.net");
         String text = extractor.text(jsoupDoc.body());
@@ -68,14 +68,14 @@ class TextExtractorTest {
         Config conf = new Config();
         List<String> listinc = new LinkedList<>();
         listinc.add("ARTICLE");
-        conf.put(TextExtractor.INCLUDE_PARAM_NAME, listinc);
+        conf.put(JSoupTextExtractor.INCLUDE_PARAM_NAME, listinc);
         List<String> listex = new LinkedList<>();
         listex.add("STYLE");
         listex.add("SCRIPT");
-        conf.put(TextExtractor.EXCLUDE_PARAM_NAME, listex);
+        conf.put(JSoupTextExtractor.EXCLUDE_PARAM_NAME, listex);
         // set a limit
-        conf.put(TextExtractor.TEXT_MAX_TEXT_PARAM_NAME, 5123900);
-        TextExtractor extractor = new TextExtractor(conf);
+        conf.put(JSoupTextExtractor.TEXT_MAX_TEXT_PARAM_NAME, 5123900);
+        JSoupTextExtractor extractor = new JSoupTextExtractor(conf);
         String filename = "longtext.html";
         Document jsoupDoc =
                 Jsoup.parse(
