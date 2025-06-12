@@ -244,6 +244,7 @@ config:
   detect.mimetype: true
   detect.charset.maxlength: 10000
 
+  #textextractor.class: "org.apache.stormcrawler.parse.JSoupTextExtractor"
   textextractor.skip.after: -1
 
   # filters URLs in sitemaps based on their modified Date (if any)

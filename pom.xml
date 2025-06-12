@@ -497,6 +497,7 @@ under the License.
                                 <exclude>**/README.md</exclude>
                                 <exclude>**/target/**</exclude>
                                 <exclude>**/warc.inputs</exclude>
+                                <exclude>**/llm-default-prompt.txt</exclude>
                                 <exclude>LICENSE</exclude>
                                 <exclude>NOTICE</exclude>
                                 <exclude>DISCLAIMER</exclude>
@@ -593,6 +594,12 @@ under the License.
 				<version>${jackson.version}</version>
 			</dependency>
 
+			<dependency>
+				<groupId>com.fasterxml.jackson.core</groupId>
+				<artifactId>jackson-core</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
+
 			<!-- https://mvnrepository.com/artifact/org.jetbrains/annotations -->
 			<dependency>
 				<groupId>org.jetbrains</groupId>
@@ -615,6 +622,7 @@ under the License.
 	<modules>
 		<module>core</module>
 		<module>external</module>
+		<module>external/ai</module>
 		<module>external/aws</module>
 		<module>external/langid</module>
 		<module>external/opensearch</module>

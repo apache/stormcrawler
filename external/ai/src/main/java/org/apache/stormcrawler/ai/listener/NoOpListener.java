@@ -14,14 +14,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.stormcrawler.parse;
+package org.apache.stormcrawler.ai.listener;
 
-public interface TextExtractor {
+/**
+ * A no-op implementation of {@link LlmResponseListener} that ignores all responses and failures.
+ *
+ * <p>This is useful as a default listener when no specific behavior is needed for handling LLM
+ * outputs or errors.
+ */
+public class NoOpListener implements LlmResponseListener {
 
-    String INCLUDE_PARAM_NAME = "textextractor.include.pattern";
-    String EXCLUDE_PARAM_NAME = "textextractor.exclude.tags";
-    String NO_TEXT_PARAM_NAME = "textextractor.no.text";
-    String TEXT_MAX_TEXT_PARAM_NAME = "textextractor.skip.after";
+    /**
+     * Does nothing when a response is received.
+     *
+     * @param o the response object (ignored)
+     */
+    @Override
+    public void onResponse(Object o) {
+        // No-op
+    }
 
-    String text(Object element);
+    /**
+     * Does nothing when a failure occurs.
+     *
+     * @param context the context of the failure (ignored)
+     * @param e the exception thrown (ignored)
+     */
+    @Override
+    public void onFailure(Object context, Exception e) {
+        // No-op
+    }
 }
