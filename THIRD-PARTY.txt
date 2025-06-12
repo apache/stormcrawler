@@ -14,11 +14,7 @@ List of third-party dependencies grouped by their license type.
 
     AL 2.0, GPL v2, MPL 2.0
 
-        * RabbitMQ Java Client (com.rabbitmq:amqp-client:5.23.0 - https://www.rabbitmq.com)
-
-    Apache License
-
-        * Log4j Implemented Over SLF4J (org.slf4j:log4j-over-slf4j:2.0.16 - http://www.slf4j.org)
+        * RabbitMQ Java Client (com.rabbitmq:amqp-client:5.24.0 - https://www.rabbitmq.com)
 
     Apache License, Version 2.0
 
@@ -44,20 +40,20 @@ List of third-party dependencies grouped by their license type.
         * Apache FontBox (org.apache.pdfbox:fontbox:3.0.5 - http://pdfbox.apache.org/)
         * Apache Hadoop Client API (org.apache.hadoop:hadoop-client-api:3.4.1 - no url defined)
         * Apache Hadoop Client Runtime (org.apache.hadoop:hadoop-client-runtime:3.4.1 - no url defined)
-        * Apache HBase - Client (org.apache.hbase:hbase-client:2.6.1-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-client)
-        * Apache HBase - Common (org.apache.hbase:hbase-common:2.6.1-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-common)
-        * Apache HBase - Hadoop Compatibility (org.apache.hbase:hbase-hadoop-compat:2.6.1-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-hadoop-compat)
-        * Apache HBase - Hadoop Two Compatibility (org.apache.hbase:hbase-hadoop2-compat:2.6.1-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-hadoop2-compat)
-        * Apache HBase - Logging (org.apache.hbase:hbase-logging:2.6.1-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-logging)
-        * Apache HBase - Metrics API (org.apache.hbase:hbase-metrics-api:2.6.1-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-metrics-api)
-        * Apache HBase - Metrics Implementation (org.apache.hbase:hbase-metrics:2.6.1-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-metrics)
-        * Apache HBase Patched and Relocated (Shaded) Protobuf (org.apache.hbase.thirdparty:hbase-shaded-protobuf:4.1.9 - https://hbase.apache.org/hbase-shaded-protobuf)
-        * Apache HBase - Protocol (org.apache.hbase:hbase-protocol:2.6.1-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-protocol)
-        * Apache HBase Relocated (Shaded) GSON Libs (org.apache.hbase.thirdparty:hbase-shaded-gson:4.1.9 - https://hbase.apache.org/hbase-shaded-gson)
-        * Apache HBase Relocated (Shaded) Netty Libs (org.apache.hbase.thirdparty:hbase-shaded-netty:4.1.9 - https://hbase.apache.org/hbase-shaded-netty)
-        * Apache HBase Relocated (Shaded) Third-party Miscellaneous Libs (org.apache.hbase.thirdparty:hbase-shaded-miscellaneous:4.1.9 - https://hbase.apache.org/hbase-shaded-miscellaneous)
-        * Apache HBase - Shaded Protocol (org.apache.hbase:hbase-protocol-shaded:2.6.1-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-protocol-shaded)
-        * Apache HBase Unsafe Wrapper (org.apache.hbase.thirdparty:hbase-unsafe:4.1.9 - https://hbase.apache.org/hbase-unsafe)
+        * Apache HBase - Client (org.apache.hbase:hbase-client:2.6.2-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-client)
+        * Apache HBase - Common (org.apache.hbase:hbase-common:2.6.2-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-common)
+        * Apache HBase - Hadoop Compatibility (org.apache.hbase:hbase-hadoop-compat:2.6.2-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-hadoop-compat)
+        * Apache HBase - Hadoop Two Compatibility (org.apache.hbase:hbase-hadoop2-compat:2.6.2-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-hadoop2-compat)
+        * Apache HBase - Logging (org.apache.hbase:hbase-logging:2.6.2-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-logging)
+        * Apache HBase - Metrics API (org.apache.hbase:hbase-metrics-api:2.6.2-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-metrics-api)
+        * Apache HBase - Metrics Implementation (org.apache.hbase:hbase-metrics:2.6.2-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-metrics)
+        * Apache HBase Patched and Relocated (Shaded) Protobuf (org.apache.hbase.thirdparty:hbase-shaded-protobuf:4.1.10 - https://hbase.apache.org/hbase-shaded-protobuf)
+        * Apache HBase - Protocol (org.apache.hbase:hbase-protocol:2.6.2-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-protocol)
+        * Apache HBase Relocated (Shaded) GSON Libs (org.apache.hbase.thirdparty:hbase-shaded-gson:4.1.10 - https://hbase.apache.org/hbase-shaded-gson)
+        * Apache HBase Relocated (Shaded) Netty Libs (org.apache.hbase.thirdparty:hbase-shaded-netty:4.1.10 - https://hbase.apache.org/hbase-shaded-netty)
+        * Apache HBase Relocated (Shaded) Third-party Miscellaneous Libs (org.apache.hbase.thirdparty:hbase-shaded-miscellaneous:4.1.10 - https://hbase.apache.org/hbase-shaded-miscellaneous)
+        * Apache HBase - Shaded Protocol (org.apache.hbase:hbase-protocol-shaded:2.6.2-hadoop3 - https://hbase.apache.org/hbase-build-configuration/hbase-protocol-shaded)
+        * Apache HBase Unsafe Wrapper (org.apache.hbase.thirdparty:hbase-unsafe:4.1.10 - https://hbase.apache.org/hbase-unsafe)
         * Apache HttpAsyncClient (org.apache.httpcomponents:httpasyncclient:4.1.5 - http://hc.apache.org/httpcomponents-asyncclient)
         * Apache HttpClient (org.apache.httpcomponents:httpclient:4.5.14 - http://hc.apache.org/httpcomponents-client-ga)
         * Apache HttpClient Mime (org.apache.httpcomponents:httpmime:4.5.14 - http://hc.apache.org/httpcomponents-client-ga)
@@ -140,12 +136,11 @@ List of third-party dependencies grouped by their license type.
         * error-prone annotations (com.google.errorprone:error_prone_annotations:2.38.0 - https://errorprone.info/error_prone_annotations)
         * FindBugs-jsr305 (com.google.code.findbugs:jsr305:3.0.2 - http://findbugs.sourceforge.net/)
         * Google Android Annotations Library (com.google.android:annotations:4.1.1.4 - http://source.android.com/)
-        * Graphite Integration for Metrics (io.dropwizard.metrics:metrics-graphite:4.2.29 - https://metrics.dropwizard.io/metrics-graphite)
+        * Graphite Integration for Metrics (io.dropwizard.metrics:metrics-graphite:4.2.30 - https://metrics.dropwizard.io/metrics-graphite)
         * Gson (com.google.code.gson:gson:2.11.0 - https://github.com/google/gson)
         * Gson (com.google.code.gson:gson:2.12.1 - https://github.com/google/gson)
         * Guava: Google Core Libraries for Java (com.google.guava:guava:18.0 - http://code.google.com/p/guava-libraries/guava)
         * Guava: Google Core Libraries for Java (com.google.guava:guava:33.2.1-android - https://github.com/google/guava)
-        * Guava: Google Core Libraries for Java (com.google.guava:guava:33.4.0-jre - https://github.com/google/guava)
         * Guava: Google Core Libraries for Java (com.google.guava:guava:33.4.8-jre - https://github.com/google/guava)
         * Guava InternalFutureFailureAccess and InternalFutures (com.google.guava:failureaccess:1.0.2 - https://github.com/google/guava/failureaccess)
         * Guava InternalFutureFailureAccess and InternalFutures (com.google.guava:failureaccess:1.0.3 - https://github.com/google/guava/failureaccess)
@@ -180,7 +175,7 @@ List of third-party dependencies grouped by their license type.
         * Joda-Time (joda-time:joda-time:2.12.7 - https://www.joda.org/joda-time/)
         * jsonic (net.arnx:jsonic:1.2.11 - http://jsonic.sourceforge.jp/)
         * JSpecify annotations (org.jspecify:jspecify:1.0.0 - http://jspecify.org/)
-        * JVM Integration for Metrics (io.dropwizard.metrics:metrics-jvm:4.2.29 - https://metrics.dropwizard.io/metrics-jvm)
+        * JVM Integration for Metrics (io.dropwizard.metrics:metrics-jvm:4.2.30 - https://metrics.dropwizard.io/metrics-jvm)
         * jwarc (org.netpreserve:jwarc:0.31.1 - https://github.com/iipc/jwarc)
         * Kotlin Stdlib (org.jetbrains.kotlin:kotlin-stdlib:1.8.21 - https://kotlinlang.org/)
         * Kotlin Stdlib Common (org.jetbrains.kotlin:kotlin-stdlib-common:1.9.10 - https://kotlinlang.org/)
@@ -188,9 +183,10 @@ List of third-party dependencies grouped by their license type.
         * Kotlin Stdlib Jdk8 (org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.21 - https://kotlinlang.org/)
         * lang-mustache (org.opensearch.plugin:lang-mustache-client:2.19.1 - https://github.com/opensearch-project/OpenSearch.git)
         * language-detector (com.optimaize.languagedetector:language-detector:0.6 - https://github.com/optimaize/language-detector)
+        * Log4j Implemented Over SLF4J (org.slf4j:log4j-over-slf4j:2.0.17 - http://www.slf4j.org)
         * mapper-extras (org.opensearch.plugin:mapper-extras-client:2.19.1 - https://github.com/opensearch-project/OpenSearch.git)
-        * Metrics Core (io.dropwizard.metrics:metrics-core:4.2.29 - https://metrics.dropwizard.io/metrics-core)
-        * Metrics Integration with JMX (io.dropwizard.metrics:metrics-jmx:4.2.29 - https://metrics.dropwizard.io/metrics-jmx)
+        * Metrics Core (io.dropwizard.metrics:metrics-core:4.2.30 - https://metrics.dropwizard.io/metrics-core)
+        * Metrics Integration with JMX (io.dropwizard.metrics:metrics-jmx:4.2.30 - https://metrics.dropwizard.io/metrics-jmx)
         * Netty/Buffer (io.netty:netty-buffer:4.1.105.Final - https://netty.io/netty-buffer/)
         * Netty/Codec (io.netty:netty-codec:4.1.105.Final - https://netty.io/netty-codec/)
         * Netty/Common (io.netty:netty-common:4.1.105.Final - https://netty.io/netty-common/)
@@ -286,12 +282,9 @@ List of third-party dependencies grouped by their license type.
 
     Bouncy Castle Licence
 
-        * Bouncy Castle ASN.1 Extension and Utility APIs (org.bouncycastle:bcutil-jdk18on:1.79 - https://www.bouncycastle.org/java.html)
         * Bouncy Castle ASN.1 Extension and Utility APIs (org.bouncycastle:bcutil-jdk18on:1.80 - https://www.bouncycastle.org/download/bouncy-castle-java/)
         * Bouncy Castle JavaMail Jakarta S/MIME APIs (org.bouncycastle:bcjmail-jdk18on:1.80 - https://www.bouncycastle.org/download/bouncy-castle-java/)
-        * Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs (org.bouncycastle:bcpkix-jdk18on:1.79 - https://www.bouncycastle.org/java.html)
         * Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs (org.bouncycastle:bcpkix-jdk18on:1.80 - https://www.bouncycastle.org/download/bouncy-castle-java/)
-        * Bouncy Castle Provider (org.bouncycastle:bcprov-jdk18on:1.79 - https://www.bouncycastle.org/java.html)
         * Bouncy Castle Provider (org.bouncycastle:bcprov-jdk18on:1.80 - https://www.bouncycastle.org/download/bouncy-castle-java/)
 
     BSD-2-Clause, Public Domain, per Creative Commons CC0
@@ -362,7 +355,6 @@ List of third-party dependencies grouped by their license type.
 
         * Animal Sniffer Annotations (org.codehaus.mojo:animal-sniffer-annotations:1.24 - https://www.mojohaus.org/animal-sniffer/animal-sniffer-annotations)
         * Checker Qual (org.checkerframework:checker-qual:3.42.0 - https://checkerframework.org/)
-        * Checker Qual (org.checkerframework:checker-qual:3.43.0 - https://checkerframework.org/)
         * dd-plist (com.googlecode.plist:dd-plist:1.28 - http://www.github.com/3breadt/dd-plist)
         * JCodings (org.jruby.jcodings:jcodings:1.0.58 - http://nexus.sonatype.org/oss-repository-hosting.html/jcodings)
         * Joni (org.jruby.joni:joni:2.2.1 - http://nexus.sonatype.org/oss-repository-hosting.html/joni)
@@ -373,7 +365,7 @@ List of third-party dependencies grouped by their license type.
         * SLF4J API Module (org.slf4j:slf4j-api:1.7.36 - http://www.slf4j.org)
         * SLF4J API Module (org.slf4j:slf4j-api:1.7.6 - http://www.slf4j.org)
         * SLF4J API Module (org.slf4j:slf4j-api:2.0.13 - http://www.slf4j.org)
-        * SLF4J API Module (org.slf4j:slf4j-api:2.0.16 - http://www.slf4j.org)
+        * SLF4J API Module (org.slf4j:slf4j-api:2.0.17 - http://www.slf4j.org)
         * xsoup (us.codecraft:xsoup:0.3.7 - https://github.com/code4craft/xsoup/)
 
     Similar to Apache License but with the acknowledgment clause removed
