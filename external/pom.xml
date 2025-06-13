@@ -32,7 +32,7 @@ under the License.
 	<artifactId>stormcrawler-external</artifactId>
 	<packaging>pom</packaging>
 
-	<dependencies>
+    <dependencies>
 		<dependency>
 			<groupId>org.apache.storm</groupId>
 			<artifactId>storm-client</artifactId>
