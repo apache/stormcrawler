@@ -124,7 +124,7 @@ public class IndexerBolt extends AbstractIndexerBolt {
                 }
             }
 
-            connection.getUpdateClient().add(doc);
+            connection.addAsync(doc);
 
             eventCounter.scope("Indexed").incrBy(1);
 

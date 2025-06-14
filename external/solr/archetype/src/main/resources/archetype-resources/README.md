@@ -12,7 +12,10 @@ You need to have Apache Storm (2.8.1) installed, as well as a running instance o
 
 ### Solr configuration file `solr-conf.yaml`
 
-For configuring the connection with the Solr server, the following parameters are available: `solr.TYPE.url`, `solr.TYPE.zkhost`, `solr.TYPE.collection`.
+For configuring the connection with the Solr server, the following parameters are available:
+- `solr.TYPE.url`
+- `solr.TYPE.zkhost`
+- `solr.TYPE.collection`
 
 In the previous example `TYPE` can be one of the following values:
 
@@ -82,6 +85,10 @@ To use a SolrCloud cluster instead of a single Solr server, you must use the fol
 * `solr.TYPE.zkhost`: URL of the Zookeeper host that holds the information regarding the SolrCloud cluster.
 
 * `solr.TYPE.collection`: Name of the collection that you wish to use.
+
+When using Solr in cloud mode, one can configure additional properties, related to the batching of update requests:
+- `solr.TYPE.batchUpdateSize`: Number of updates queued (per shard) until an actual update request is sent to Solr. The default is 10.
+- `solr.TYPE.flushAfterNoUpdatesMillis`: Maximum allowed time (in milliseconds) without incoming updates before all pending updates are flushed to Solr. The default value is 20000 (20 seconds).
 
 ### Collection configuration files
 
