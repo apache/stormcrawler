@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Optional;
+import java.util.function.Supplier;
 import org.apache.storm.Config;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -83,8 +85,7 @@ class MultiProxyManagerTest {
         MultiProxyManager pm = new MultiProxyManager();
         pm.configure(MultiProxyManager.ProxyRotation.RANDOM, proxyStrings);
         for (int i = 0; i < 1000; i++) {
-            SCProxy proxy = pm.getProxy(null);
-            Assertions.assertTrue(proxy.toString().length() > 0);
+            assertAndGetProxyCreation(() -> pm.getProxy(null), true);
         }
     }
 
@@ -100,9 +101,9 @@ class MultiProxyManagerTest {
         };
         MultiProxyManager pm = new MultiProxyManager();
         pm.configure(MultiProxyManager.ProxyRotation.ROUND_ROBIN, proxyStrings);
-        SCProxy proxy1 = pm.getProxy(null);
-        SCProxy proxy2 = pm.getProxy(null);
-        SCProxy proxy3 = pm.getProxy(null);
+        SCProxy proxy1 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
+        SCProxy proxy2 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
+        SCProxy proxy3 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
         Assertions.assertNotEquals(proxy1.toString(), proxy2.toString());
         Assertions.assertNotEquals(proxy1.toString(), proxy3.toString());
         Assertions.assertNotEquals(proxy2.toString(), proxy1.toString());
@@ -112,9 +113,9 @@ class MultiProxyManagerTest {
         for (int i = 0; i < 3; i++) {
             pm.getProxy(null);
         }
-        SCProxy proxy4 = pm.getProxy(null);
-        SCProxy proxy5 = pm.getProxy(null);
-        SCProxy proxy6 = pm.getProxy(null);
+        SCProxy proxy4 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
+        SCProxy proxy5 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
+        SCProxy proxy6 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
         Assertions.assertNotEquals(proxy4.toString(), proxy5.toString());
         Assertions.assertNotEquals(proxy4.toString(), proxy6.toString());
         Assertions.assertNotEquals(proxy5.toString(), proxy4.toString());
@@ -138,9 +139,9 @@ class MultiProxyManagerTest {
         };
         MultiProxyManager pm = new MultiProxyManager();
         pm.configure(MultiProxyManager.ProxyRotation.LEAST_USED, proxyStrings);
-        SCProxy proxy1 = pm.getProxy(null);
-        SCProxy proxy2 = pm.getProxy(null);
-        SCProxy proxy3 = pm.getProxy(null);
+        SCProxy proxy1 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
+        SCProxy proxy2 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
+        SCProxy proxy3 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
         Assertions.assertNotEquals(proxy1.toString(), proxy2.toString());
         Assertions.assertNotEquals(proxy1.toString(), proxy3.toString());
         Assertions.assertNotEquals(proxy2.toString(), proxy1.toString());
@@ -153,9 +154,9 @@ class MultiProxyManagerTest {
         for (int i = 0; i < 3; i++) {
             pm.getProxy(null);
         }
-        SCProxy proxy4 = pm.getProxy(null);
-        SCProxy proxy5 = pm.getProxy(null);
-        SCProxy proxy6 = pm.getProxy(null);
+        SCProxy proxy4 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
+        SCProxy proxy5 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
+        SCProxy proxy6 = assertAndGetProxyCreation(() -> pm.getProxy(null), false);
         Assertions.assertNotEquals(proxy4.toString(), proxy5.toString());
         Assertions.assertNotEquals(proxy4.toString(), proxy6.toString());
         Assertions.assertNotEquals(proxy5.toString(), proxy4.toString());
@@ -168,5 +169,16 @@ class MultiProxyManagerTest {
         Assertions.assertEquals(proxy1.toString(), proxy4.toString());
         Assertions.assertEquals(proxy2.toString(), proxy5.toString());
         Assertions.assertEquals(proxy3.toString(), proxy6.toString());
+    }
+
+    private SCProxy assertAndGetProxyCreation(
+            Supplier<Optional<SCProxy>> proxySupplier, boolean validateProxyContent) {
+        Optional<SCProxy> proxyOptional = proxySupplier.get();
+        Assertions.assertTrue(proxyOptional.isPresent());
+        SCProxy proxy = proxyOptional.get();
+        if (validateProxyContent) {
+            Assertions.assertFalse(proxy.toString().isEmpty());
+        }
+        return proxy;
     }
 }
