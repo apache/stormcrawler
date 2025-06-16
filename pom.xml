@@ -627,6 +627,7 @@ under the License.
 		<module>archetype</module>
 		<module>external/opensearch/archetype</module>
 		<module>external/solr/archetype</module>
-    </modules>
+		<module>docs</module>
+	</modules>
 
 </project>

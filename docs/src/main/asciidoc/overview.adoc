@@ -1,0 +1,61 @@
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+== Overview
+:imagesdir: images
+
+Apache StormCrawler is an open source collection of resources for building low-latency, scalable web crawlers on link:http://storm.apache.org/[Apache Storm]. It is provided under the link:http://www.apache.org/licenses/LICENSE-2.0[Apache License] and is written mostly in Java.
+
+The aims of StormCrawler are to help build web crawlers that are:
+
+* Scalable
+* Low latency
+* Easy to extend
+* Polite yet efficient
+
+StormCrawler is both a library and a collection of reusable components designed to help developers build custom web crawlers with ease.
+Getting started is simple — the Maven archetypes allow you to quickly scaffold a new project, which you can then adapt to fit your specific needs.
+
+In addition to its core modules, StormCrawler offers a range of external resources that can be easily integrated into your project.
+These include spouts and bolts for OpenSearch, as well as a ParserBolt that leverages Apache Tika to handle various document formats and many more.
+
+StormCrawler is well-suited for scenarios where URLs to fetch and parse arrive as continuous streams, but it also performs exceptionally in large-scale, recursive crawls where low latency is essential.
+The project is actively maintained, widely adopted in production environments, and supported by an engaged community.
+
+You can find links to recent talks and demos later in this document, showcasing real-world applications and use cases.
+
+== Key Features
+
+Here is a short list of provided features:
+
+* Integration with link:https://github.com/crawler-commons/url-frontier[URLFrontier] for distributed URL management
+* Pluggable components (Spouts and Bolts from Apache Storm) for flexibility and modularity — adding custom components is straightforward
+* Support for link:https://tika.apache.org/[Apache Tika] for document parsing via `ParserBolt`
+* Integration with OpenSearch and Apache Solr for indexing and status storage
+* Option to store crawled data as WARC (Web ARChive) files
+* Support for headless crawling using Playwright
+* Optional GenAI-based modules for advanced text extraction
+* Proxy support for distributed and controlled crawling
+* Flexible and pluggable filtering mechanisms:
+** URL Filters for pre-fetch filtering
+** Parse Filters for post-fetch content filtering
+* Built-in support for crawl metrics and monitoring
+* Configurable politeness policies (e.g., crawl delay, user agent management)
+* Robust HTTP fetcher based on Apache HttpComponents
+* MIME type detection and response-based filtering
+* Support for parsing and honoring `robots.txt` and sitemaps
+* Stream-based, real-time architecture using Apache Storm — suitable for both recursive and one-shot crawling tasks
+* Can run in both local and distributed environments
+* Maven archetypes for quickly bootstrapping new crawler projects
+* Actively developed and used in production by multiple organizations
