@@ -15,3 +15,5 @@
 == Understanding StormCrawler's Architecture
 :imagesdir: images
 
+TODO: Architecture similar to JMIR Paper with abstraction towards url frontier and storage
+Explain concept of URL Fitlers and PArse Filters
