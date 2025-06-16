@@ -1,0 +1,43 @@
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+== Companies & Projects Using StormCrawler
+:imagesdir: images
+
+* link:http://www.careerbuilder.com/[CareerBuilder]
+* link:http://www.stolencamerafinder.com/[StolenCameraFinder]
+* link:http://www.weborama.com/[Weborama]
+* link:http://www.ontopic.io/[Ontopic]
+* link:http://www.shopstyle.com/[ShopStyle]
+* link:http://www.wombatsoftware.de/[Wombat Software]
+* link:http://commoncrawl.org/2016/10/news-dataset-available/[CommonCrawl]
+* link:https://webfinery.com/[WebFinery]
+* link:http://www.reportlinker.com/[ReportLinker]
+* link:http://www.tokenmill.lt/[TokenMill]
+* link:http://www.polecat.com/[Polecat]
+* link:http://www.wizenoze.com/en/[WizeNoze]
+* link:http://iproduct.io/[IProduct.io]
+* link:https://www.cgi.com/[CGI]
+* link:https://github.com/miras-tech/MirasText[MirasText]
+* link:https://www.g2webservices.com/[G2 Web Services]
+* link:https://www.gov.nt.ca/[Government of Northwest Territories]
+* link:https://digitalpebble.blogspot.com/2019/02/meet-stormcrawler-users-q-with-pixray.html[Pixray]
+* link:https://www.cameraforensics.com/[CameraForensics]
+* link:https://gagepiracy.com/[Gage Piracy]
+* link:https://www.clarin.eu/[Clarin ERIC]
+* link:https://openwebsearch.eu/owler/[OpenWebSearch]
+* link:https://shc-info.zml.hs-heilbronn.de/[Heilbronn University]
+* link:https://www.contexity.com[Contexity]
+* link:https://https://www.kodis.iao.fraunhofer.de/de/projekte/SPIDERWISE.html[Fraunhofer IAO - KODIS]
+
+Drop us a line at mailto:dev@stormcrawler.apache.org[dev@stormcrawler.apache.org] if you want to be added to this page.

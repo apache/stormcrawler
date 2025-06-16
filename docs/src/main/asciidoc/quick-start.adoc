@@ -1,0 +1,217 @@
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+== Quick Start
+
+These instructions should help you get Apache StormCrawler up and running in 5 to 15 minutes.
+
+=== Prerequisites
+
+To run StormCrawler, you will need Java SE 17 or later.
+
+Additionally, since we'll be running the required Apache Storm cluster using Docker Compose,
+make sure Docker is installed on your operating system.
+
+=== Terminology
+
+Before starting, we will give a quick overview of **central** Storm concepts and terminology, you need to know before starting with StormCrawler:
+
+- *Topology*: A topology is the overall data processing graph in Storm, consisting of spouts and bolts connected together to perform continuous, real-time computations.
+
+- *Spout*: A spout is a source component in a Storm topology that emits streams of data into the processing pipeline.
+
+- *Bolt*: A bolt processes, transforms, or routes data streams emitted by spouts or other bolts within the topology.
+
+- *Flux*: In Apache Storm, Flux is a declarative configuration framework that enables you to define and run Storm topologies using YAML files instead of writing Java code. This simplifies topology management and deployment.
+
+- *Frontier*: In the context of a web crawler, the Frontier is the component responsible for managing and prioritizing the list of URLs to be fetched next.
+
+- *Seed*: In web crawling, a Seed is an initial URL or set of URLs from which the crawler starts its discovery and fetching process.
+
+=== Bootstrapping a StormCrawler Project
+
+You can quickly generate a new StormCrawler project using the Maven archetype:
+
+[source,shell]
+----
+mvn archetype:generate -DarchetypeGroupId=org.apache.stormcrawler \
+                       -DarchetypeArtifactId=stormcrawler-archetype \
+                       -DarchetypeVersion=3.3.0
+----
+
+During the process, you’ll be prompted to provide the following:
+
+* `groupId` (e.g. `com.mycompany.crawler`)
+* `artifactId` (e.g. `stormcrawler`)
+* Version
+* Package name
+* User agent details
+
+IMPORTANT: Specifying a user agent is important for crawler ethics because it identifies your crawler to websites, promoting transparency and allowing site owners to manage or block requests if needed. Be sure to provide a crawler information website as well.
+
+The archetype will generate a fully-structured project including:
+
+* A pre-configured `pom.xml` with the necessary dependencies
+* Default resource files
+* A sample `crawler.flux` configuration
+* A basic configuration file
+
+After generation, navigate into the newly created directory (named after the `artifactId` you specified).
+
+TIP: You can learn more about the architecture and how each component works together if you look into link:architecture.adoc[the architecture documentation].
+By exploring that part of the documentation, you can gain a better understanding of how StormCrawler performs crawling and how bolts, spouts, as well as parse and URL filters, collaborate in the process.
+
+==== Docker Compose Setup
+
+Below is a simple `docker-compose.yaml` configuration to spin up URLFrontier, Zookeeper, Storm Nimbus, Storm Supervisor, and the Storm UI:
+
+[source,yaml]
+----
+services:
+  zookeeper:
+    image: zookeeper:3.9.3
+    container_name: zookeeper
+    restart: always
+
+  nimbus:
+    image: storm:latest
+    container_name: nimbus
+    hostname: nimbus
+    command: storm nimbus
+    depends_on:
+      - zookeeper
+    restart: always
+
+  supervisor:
+    image: storm:latest
+    container_name: supervisor
+    command: storm supervisor -c worker.childopts=-Xmx%HEAP-MEM%m
+    depends_on:
+      - nimbus
+      - zookeeper
+    restart: always
+
+  ui:
+    image: storm:latest
+    container_name: ui
+    command: storm ui
+    depends_on:
+      - nimbus
+    restart: always
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  urlfrontier:
+    image: crawlercommons/url-frontier:latest
+    container_name: urlfrontier
+    restart: always
+    ports:
+      - "127.0.0.1:7071:7071"
+----
+
+Notes:
+
+- This example Docker Compose uses the official Storm and Zookeeper images.
+- URLFrontier is an additional service used by StormCrawler to act as Frontier. Please note, that we also offer other Frontier implementations like OpenSearch or Apache Solr.
+- Ports may need adjustment depending on your environment.
+- The Storm UI runs on port 8080 by default.
+- Ensure network connectivity between services; Docker Compose handles this by default.
+
+After setting up your Docker Compose, you should start it up:
+
+[source,shell]
+----
+docker compose up -d
+----
+
+Check the logs and see, if every service is up and running:
+
+[source,shell]
+----
+docker compose logs -f
+----
+
+Next, access the Storm UI via `http://localhost:8080` and check, that a Storm Nimbus as well as a Storm Supervisor is available.
+
+==== Compile
+
+Build the generated archetype by running
+
+[source,shell]
+----
+mvn package
+----
+
+This will create a uberjar named `${artifactId}-${version}.jar` (matches the artifact id and the version specified during the archetype generation) in your `target` directory.
+
+==== Inject Your First Seeds
+
+Now you are ready to insert your first seeds into URLFrontier. To do so, create a file `seeds.txt` containing your seeds:
+
+[source,text]
+----
+https://stormcrawler.apache.org
+----
+
+After you have saved it, we need to inject the seeds into URLFrontier. This can be done by running URLFrontiers client:
+
+[source,shell]
+----
+java -cp target/${artifactId}-${version}.jar crawlercommons.urlfrontier.client.Client PutURLs -f seeds.txt
+----
+
+where _seeds.txt_ is the previously created file containing URLs to inject, with one URL per line.
+
+==== Run Your First Crawl
+
+Now it is time to run our first crawl. To do so, we need to start our crawler topolog in distributed mode and deploy it on our Storm Cluster.
+
+[source,shell]
+----
+docker run --network ${NETWORK} -it \
+--rm \
+-v "$(pwd)/crawler-conf.yaml:/apache-storm/crawler-conf.yaml" \
+-v "$(pwd)/crawler.flux:/apache-storm/crawler.flux" \
+-v "$(pwd)/${artifactId}-${version}.jar:/apache-storm/${artifactId}-${version}.jar" \
+storm:latest \
+storm jar ${artifactId}-${version}.jar org.apache.storm.flux.Flux --remote crawler.flux
+----
+
+where `${NETWORK}` is the name of the Docker network of the previously started Docker Compose. You can find this name by running
+
+[source,shell]
+----
+docker network ls
+----
+
+After running the `storm jar` command, you should carefully monitor the logs via
+
+[source,shell]
+----
+docker compose logs -f
+----
+
+as well as the Storm UI. It should now list a running topology.
+
+In the default archetype, the fetched content is printed out to the default system out print stream.
+
+NOTE: In a Storm topology defined with Flux, parallelism specifies the number of tasks or instances of a spout or bolt to run concurrently, enabling scalable and efficient processing of data streams. In the archetype every component is set to a parallelism of **1**.
+
+Congratulations! You learned how to start your first simple crawl using StormCrawler.
+
+Feel free to explore the rest of our documentation to build more complex crawler topologies.
+
+=== Summary
+
+This document shows how simple it is to get Apache StormCrawler up and running and to run a simple crawl.
