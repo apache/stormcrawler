@@ -21,6 +21,7 @@ import static org.apache.stormcrawler.Constants.StatusStreamName;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -44,6 +45,7 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.parse.DocumentFragmentBuilder;
 import org.apache.stormcrawler.parse.JSoupFilter;
 import org.apache.stormcrawler.parse.JSoupFilters;
+import org.apache.stormcrawler.parse.JSoupTextExtractor;
 import org.apache.stormcrawler.parse.Outlink;
 import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
@@ -161,7 +163,28 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         ignoreMetaRedirections =
                 ConfUtils.getBoolean(conf, "jsoup.ignore.meta.redirections", false);
 
-        textExtractor = new TextExtractor(conf);
+        final String clazz =
+                ConfUtils.getString(
+                        conf, "textextractor.class", JSoupTextExtractor.class.getName());
+        try {
+            textExtractor =
+                    (TextExtractor)
+                            Class.forName(clazz)
+                                    .getDeclaredConstructor(Map.class)
+                                    .newInstance(conf);
+        } catch (ClassNotFoundException e) {
+            LOG.warn("Could not load configured textextractor.class '{}'.", clazz, e);
+            throw new RuntimeException(e);
+        } catch (NoSuchMethodException e) {
+            LOG.warn(
+                    "Configured textextractor.class '{}' does not provide a Map argument constructor.",
+                    clazz,
+                    e);
+            throw new RuntimeException(e);
+        } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
+            LOG.warn("Cannot instantiazr textextractor.class '{}'.", clazz, e);
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

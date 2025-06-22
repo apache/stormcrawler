@@ -72,7 +72,7 @@ under the License.
 		<jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
 		<commons.io.version>2.17.0</commons.io.version>
 		<git-code-format-maven-plugin.version>5.3</git-code-format-maven-plugin.version>
-		<testcontainers.version>1.21.1</testcontainers.version>
+		<testcontainers.version>1.21.2</testcontainers.version>
 		<maven.mojo.license.plugin>2.6.0</maven.mojo.license.plugin>
 		<jacoco.maven.plugin>0.8.13</jacoco.maven.plugin>
 		<jacoco.haltOnFailure>false</jacoco.haltOnFailure>
@@ -497,6 +497,7 @@ under the License.
                                 <exclude>**/README.md</exclude>
                                 <exclude>**/target/**</exclude>
                                 <exclude>**/warc.inputs</exclude>
+                                <exclude>**/llm-default-prompt.txt</exclude>
                                 <exclude>LICENSE</exclude>
                                 <exclude>NOTICE</exclude>
                                 <exclude>DISCLAIMER</exclude>
@@ -593,6 +594,12 @@ under the License.
 				<version>${jackson.version}</version>
 			</dependency>
 
+			<dependency>
+				<groupId>com.fasterxml.jackson.core</groupId>
+				<artifactId>jackson-core</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
+
 			<!-- https://mvnrepository.com/artifact/org.jetbrains/annotations -->
 			<dependency>
 				<groupId>org.jetbrains</groupId>
@@ -615,6 +622,7 @@ under the License.
 	<modules>
 		<module>core</module>
 		<module>external</module>
+		<module>external/ai</module>
 		<module>external/aws</module>
 		<module>external/langid</module>
 		<module>external/opensearch</module>
