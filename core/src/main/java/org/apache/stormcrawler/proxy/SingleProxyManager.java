@@ -17,6 +17,7 @@
 package org.apache.stormcrawler.proxy;
 
 import java.util.Locale;
+import java.util.Optional;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.util.ConfUtils;
@@ -60,7 +61,7 @@ public class SingleProxyManager implements ProxyManager {
     }
 
     @Override
-    public SCProxy getProxy(Metadata metadata) {
-        return proxy;
+    public Optional<SCProxy> getProxy(Metadata metadata) {
+        return Optional.of(proxy);
     }
 }

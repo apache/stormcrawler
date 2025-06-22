@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.mutable.MutableBoolean;
 import org.apache.http.Header;
@@ -164,39 +165,42 @@ public class HttpProtocol extends AbstractHttpProtocol
         // conditionally add a dynamic proxy
         if (proxyManager != null) {
             // retrieve proxy from proxy manager
-            SCProxy prox = proxyManager.getProxy(md);
+            Optional<SCProxy> proxOptional = proxyManager.getProxy(md);
+            if (proxOptional.isPresent()) {
+                SCProxy prox = proxOptional.get();
+                // conditionally configure proxy authentication
+                if (StringUtils.isNotBlank(prox.getUsername())) {
+                    List<String> authSchemes = new ArrayList<>();
 
-            // conditionally configure proxy authentication
-            if (StringUtils.isNotBlank(prox.getUsername())) {
-                List<String> authSchemes = new ArrayList<>();
+                    // Can make configurable and add more in future
+                    authSchemes.add(AuthSchemes.BASIC);
+                    requestConfigBuilder.setProxyPreferredAuthSchemes(authSchemes);
 
-                // Can make configurable and add more in future
-                authSchemes.add(AuthSchemes.BASIC);
-                requestConfigBuilder.setProxyPreferredAuthSchemes(authSchemes);
+                    BasicCredentialsProvider basicAuthCreds = new BasicCredentialsProvider();
+                    basicAuthCreds.setCredentials(
+                            new AuthScope(prox.getAddress(), Integer.parseInt(prox.getPort())),
+                            new UsernamePasswordCredentials(
+                                    prox.getUsername(), prox.getPassword()));
+                    builder.setDefaultCredentialsProvider(basicAuthCreds);
+                }
 
-                BasicCredentialsProvider basicAuthCreds = new BasicCredentialsProvider();
-                basicAuthCreds.setCredentials(
-                        new AuthScope(prox.getAddress(), Integer.parseInt(prox.getPort())),
-                        new UsernamePasswordCredentials(prox.getUsername(), prox.getPassword()));
-                builder.setDefaultCredentialsProvider(basicAuthCreds);
+                HttpHost proxy = new HttpHost(prox.getAddress(), Integer.parseInt(prox.getPort()));
+                DefaultProxyRoutePlanner routePlanner = new DefaultProxyRoutePlanner(proxy);
+                builder.setRoutePlanner(routePlanner);
+
+                // save start time for debugging speed impact of request config
+                // build
+                long buildStart = System.currentTimeMillis();
+
+                // set request config to new configuration with dynamic proxy
+                reqConfig = requestConfigBuilder.build();
+
+                LOG.debug(
+                        "time to build http request config with proxy: {}ms",
+                        System.currentTimeMillis() - buildStart);
+
+                LOG.debug("fetching with " + prox.toString());
             }
-
-            HttpHost proxy = new HttpHost(prox.getAddress(), Integer.parseInt(prox.getPort()));
-            DefaultProxyRoutePlanner routePlanner = new DefaultProxyRoutePlanner(proxy);
-            builder.setRoutePlanner(routePlanner);
-
-            // save start time for debugging speed impact of request config
-            // build
-            long buildStart = System.currentTimeMillis();
-
-            // set request config to new configuration with dynamic proxy
-            reqConfig = requestConfigBuilder.build();
-
-            LOG.debug(
-                    "time to build http request config with proxy: {}ms",
-                    System.currentTimeMillis() - buildStart);
-
-            LOG.debug("fetching with " + prox.toString());
         }
 
         HttpRequestBase request = new HttpGet(url);

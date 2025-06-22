@@ -16,6 +16,7 @@
  */
 package org.apache.stormcrawler.proxy;
 
+import java.util.Optional;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 
@@ -26,5 +27,5 @@ import org.apache.stormcrawler.Metadata;
 public interface ProxyManager {
     void configure(Config conf);
 
-    SCProxy getProxy(Metadata metadata);
+    Optional<SCProxy> getProxy(Metadata metadata);
 }

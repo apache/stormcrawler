@@ -113,7 +113,7 @@ public class MetricsConsumer implements IMetricsConsumer {
                 doc.addField(ttlField, ttl);
             }
 
-            connection.getUpdateClient().add(doc);
+            connection.addAsync(doc);
         } catch (Exception e) {
             LOG.error("Problem building a document to Solr", e);
         }
