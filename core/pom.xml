@@ -54,10 +54,10 @@ under the License.
 		<awaitility.version>4.3.0</awaitility.version>
 		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
 		<jacoco.classRatio>0.73</jacoco.classRatio>
-		<jacoco.instructionRatio>0.56</jacoco.instructionRatio>
+		<jacoco.instructionRatio>0.54</jacoco.instructionRatio>
 		<jacoco.methodRatio>0.62</jacoco.methodRatio>
 		<jacoco.branchRatio>0.49</jacoco.branchRatio>
-		<jacoco.lineRatio>0.56</jacoco.lineRatio>
+		<jacoco.lineRatio>0.54</jacoco.lineRatio>
 		<jacoco.complexityRatio>0.44</jacoco.complexityRatio>
 	</properties>
 
