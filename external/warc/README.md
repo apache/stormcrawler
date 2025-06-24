@@ -30,7 +30,7 @@ To configure the WARCHdfsBolt, include the following snippet in your crawl topol
                 .withPath(warcFilePath);
 
         Map<String,String> fields = new HashMap<>();
-        fields.put("software:", "Apache StormCrawler 3.3.0 http://stormcrawler.net/");
+        fields.put("software:", "Apache StormCrawler 3.4.0 http://stormcrawler.net/");
         fields.put("format", "WARC File Format 1.0");
         fields.put("conformsTo:",
                 "https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.0/");
@@ -80,7 +80,7 @@ components:
       - name: "put"
         args:
          - "software"
-         - "Apache StormCrawler 3.3.0 http://stormcrawler.net/"
+         - "Apache StormCrawler 3.4.0 http://stormcrawler.net/"
       - name: "put"
         args:
          - "format"
