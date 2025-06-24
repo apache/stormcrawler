@@ -89,7 +89,6 @@ under the License.
 		<maven.compiler.target>17</maven.compiler.target>
 
 		<apache-jar-resource-bundle.version>1.7</apache-jar-resource-bundle.version>
-		<apache-incubator-disclaimer-resource-bundle.version>1.7</apache-incubator-disclaimer-resource-bundle.version>
 	</properties>
 
 	<build>
@@ -271,7 +270,6 @@ under the License.
 							</properties>
 							<resourceBundles>
 								<resourceBundle>org.apache.apache.resources:apache-jar-resource-bundle:${apache-jar-resource-bundle.version}</resourceBundle>
-								<resourceBundle>org.apache.apache.resources:apache-incubator-disclaimer-resource-bundle:${apache-incubator-disclaimer-resource-bundle.version}</resourceBundle>
 							</resourceBundles>
 						</configuration>
 					</execution>
@@ -500,7 +498,6 @@ under the License.
                                 <exclude>**/llm-default-prompt.txt</exclude>
                                 <exclude>LICENSE</exclude>
                                 <exclude>NOTICE</exclude>
-                                <exclude>DISCLAIMER</exclude>
                                 <exclude>CONTRIBUTING.md</exclude>
                                 <exclude>RELEASING.md</exclude>
 								<exclude>external/opensearch/dashboards/**</exclude>
@@ -538,7 +535,7 @@ under the License.
 									<goal>single</goal>
 								</goals>
 								<configuration>
-									<finalName>apache-stormcrawler-${project.version}-incubating</finalName>
+									<finalName>apache-stormcrawler-${project.version}</finalName>
 									<descriptors>
 										<descriptor>assembly.xml</descriptor>
 									</descriptors>
