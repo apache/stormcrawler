@@ -25,7 +25,7 @@ pgp -kxa <your name> and append it to this file.
 ```
 
 - In a local temp folder, svn checkout the StormCrawler artifacts and update the KEYS file
-- Note: This can only be done by an IPMC member. If you are a committer acting as a release manager, ask an IPMC member to add your key.
+- Note: This can only be done by an PMC member. If you are a committer acting as a release manager, ask an PMC member to add your key.
 
 ```
 svn co https://dist.apache.org/repos/dist/release/stormcrawler
