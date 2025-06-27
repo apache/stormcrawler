@@ -1,0 +1,15 @@
+default_language_version:
+  python: python3.12
+repos:
+  - repo: https://github.com/eclipse-csi/octopin
+    rev: 88826108188acef07eefab3bd6f04d9acd4b2cc2 # v0.1.3
+    hooks:
+      - id: pin-versions
+        name: pin-versions
+        description: Pins versions of GitHub Actions to their SHA-1 hashes.
+        language: python
+        entry: octopin
+        args: [pin, --inplace]
+        files: ^\.github/workflows/
+        exclude: ^(?!.github/workflows/).*$
+        types: [file]
