@@ -66,6 +66,7 @@ under the License.
 		<!-- dependency versions -->
 		<junit.version>5.13.2</junit.version>
 		<storm-client.version>2.8.1</storm-client.version>
+		<!-- Jackson's version should be in-line with the one in Storm -->
 		<jackson.version>2.18.1</jackson.version>
 		<tika.version>3.2.0</tika.version>
 		<mockito.version>5.18.0</mockito.version>
