@@ -32,6 +32,7 @@ import org.apache.commons.lang.mutable.MutableBoolean;
 import org.apache.http.Header;
 import org.apache.http.HeaderIterator;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
@@ -59,7 +60,6 @@ import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
-import org.apache.stormcrawler.protocol.HttpHeaders;
 import org.apache.stormcrawler.protocol.Protocol;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.proxy.SCProxy;
@@ -107,7 +107,7 @@ public class HttpProtocol extends AbstractHttpProtocol
 
         String accept = ConfUtils.getString(conf, "http.accept");
         if (StringUtils.isNotBlank(accept)) {
-            defaultHeaders.add(new BasicHeader("Accept", accept));
+            defaultHeaders.add(new BasicHeader(HttpHeaders.ACCEPT, accept));
         }
 
         customHeaders.forEach(
@@ -125,12 +125,12 @@ public class HttpProtocol extends AbstractHttpProtocol
                             .encodeToString(
                                     (basicAuthUser + ":" + basicAuthPass)
                                             .getBytes(StandardCharsets.UTF_8));
-            defaultHeaders.add(new BasicHeader("Authorization", "Basic " + encoding));
+            defaultHeaders.add(new BasicHeader(HttpHeaders.AUTHORIZATION, "Basic " + encoding));
         }
 
         String acceptLanguage = ConfUtils.getString(conf, "http.accept.language");
         if (StringUtils.isNotBlank(acceptLanguage)) {
-            defaultHeaders.add(new BasicHeader("Accept-Language", acceptLanguage));
+            defaultHeaders.add(new BasicHeader(HttpHeaders.ACCEPT_LANGUAGE, acceptLanguage));
         }
 
         builder =
@@ -217,22 +217,22 @@ public class HttpProtocol extends AbstractHttpProtocol
 
             String lastModified = md.getFirstValue(HttpHeaders.LAST_MODIFIED);
             if (StringUtils.isNotBlank(lastModified)) {
-                request.addHeader("If-Modified-Since", HttpHeaders.formatHttpDate(lastModified));
+                request.addHeader(HttpHeaders.IF_MODIFIED_SINCE, formatHttpDate(lastModified));
             }
 
-            String ifNoneMatch = md.getFirstValue("etag", protocolMDprefix);
+            String ifNoneMatch = md.getFirstValue(HttpHeaders.ETAG, protocolMDprefix);
             if (StringUtils.isNotBlank(ifNoneMatch)) {
-                request.addHeader("If-None-Match", ifNoneMatch);
+                request.addHeader(HttpHeaders.IF_NONE_MATCH, ifNoneMatch);
             }
 
             String accept = md.getFirstValue("http.accept");
             if (StringUtils.isNotBlank(accept)) {
-                request.setHeader(new BasicHeader("Accept", accept));
+                request.setHeader(new BasicHeader(HttpHeaders.ACCEPT, accept));
             }
 
             String acceptLanguage = md.getFirstValue("http.accept.language");
             if (StringUtils.isNotBlank(acceptLanguage)) {
-                request.setHeader(new BasicHeader("Accept-Language", acceptLanguage));
+                request.setHeader(new BasicHeader(HttpHeaders.ACCEPT_LANGUAGE, acceptLanguage));
             }
 
             String pageMaxContentStr = md.getFirstValue("http.content.limit");

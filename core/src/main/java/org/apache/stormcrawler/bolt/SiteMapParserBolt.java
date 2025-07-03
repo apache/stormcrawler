@@ -43,6 +43,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 import org.apache.commons.lang.StringUtils;
+import org.apache.http.HttpHeaders;
 import org.apache.storm.metric.api.MeanReducer;
 import org.apache.storm.metric.api.ReducedMetric;
 import org.apache.storm.task.OutputCollector;
@@ -59,7 +60,6 @@ import org.apache.stormcrawler.parse.ParseFilters;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.persistence.DefaultScheduler;
 import org.apache.stormcrawler.persistence.Status;
-import org.apache.stormcrawler.protocol.HttpHeaders;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.LoggerFactory;
 

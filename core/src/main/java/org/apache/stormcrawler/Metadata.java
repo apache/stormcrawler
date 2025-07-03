@@ -89,7 +89,7 @@ public class Metadata {
      * @return the first value for the key or null if it does not exist *
      */
     public String getFirstValue(String key) {
-        String[] values = md.get(key);
+        String[] values = getValues(key);
         if (values == null) return null;
         if (values.length == 0) return null;
         return values[0];
@@ -109,14 +109,15 @@ public class Metadata {
     }
 
     public String[] getValues(String key) {
-        String[] values = md.get(key);
+        if (key == null || key.isEmpty()) return null;
+        String[] values = md.getOrDefault(key, md.get(key.toLowerCase()));
         if (values == null) return null;
         if (values.length == 0) return null;
         return values;
     }
 
     public boolean containsKey(String key) {
-        return md.containsKey(key);
+        return md.containsKey(key) || md.containsKey(key.toLowerCase());
     }
 
     public boolean containsKeyWithValue(String key, String value) {

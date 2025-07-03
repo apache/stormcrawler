@@ -23,10 +23,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TimeZone;
+import org.apache.http.HttpHeaders;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.parse.filter.MD5SignatureParseFilter;
-import org.apache.stormcrawler.protocol.HttpHeaders;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.LoggerFactory;
 

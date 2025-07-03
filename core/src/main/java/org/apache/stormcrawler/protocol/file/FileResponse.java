@@ -27,9 +27,9 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import org.apache.commons.io.IOUtils;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.stormcrawler.Metadata;
-import org.apache.stormcrawler.protocol.HttpHeaders;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.slf4j.LoggerFactory;
 

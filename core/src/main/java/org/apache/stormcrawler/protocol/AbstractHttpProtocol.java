@@ -17,8 +17,14 @@
 package org.apache.stormcrawler.protocol;
 
 import crawlercommons.robots.BaseRobotRules;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import org.apache.commons.lang.StringUtils;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.proxy.ProxyManager;
@@ -29,6 +35,27 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractHttpProtocol implements Protocol {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(AbstractHttpProtocol.class);
+
+    /**
+     * Formatter for dates in HTTP headers, used to fill the &quot;If-Modified-Since&quot; request
+     * header field, e.g.
+     *
+     * <pre>
+     * Sun, 06 Nov 1994 08:49:37 GMT
+     * </pre>
+     *
+     * See <a href= "https://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.3.1">sec. 3.3.1 in
+     * RFC 2616</a> and <a href="https://tools.ietf.org/html/rfc7231#section-7.1.1.1">sec. 7.1.1.1
+     * in RFC 7231</a>. The latter specifies the format defined in RFC 1123 as the
+     * &quot;preferred&quot; format.
+     */
+    private static final DateTimeFormatter HTTP_DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ROOT)
+                    .withZone(ZoneId.of(ZoneOffset.UTC.toString()));
+
+    /** Formatter to parse ISO-formatted dates persisted in status index */
+    private static final DateTimeFormatter ISO_INSTANT_FORMATTER =
+            DateTimeFormatter.ISO_INSTANT.withZone(ZoneId.of(ZoneOffset.UTC.toString()));
 
     private org.apache.stormcrawler.protocol.HttpRobotRulesParser robots;
 
@@ -188,5 +215,30 @@ public abstract class AbstractHttpProtocol implements Protocol {
         }
 
         return buf.toString();
+    }
+
+    /**
+     * Format an ISO date string as HTTP date used in HTTP headers, e.g.,
+     *
+     * <pre>
+     * 1994-11-06T08:49:37.000Z
+     * </pre>
+     *
+     * is formatted to
+     *
+     * <pre>
+     * Sun, 06 Nov 1994 08:49:37 GMT
+     * </pre>
+     *
+     * See {@link #HTTP_DATE_FORMATTER}
+     */
+    protected static String formatHttpDate(String isoDate) {
+        try {
+            ZonedDateTime date = ISO_INSTANT_FORMATTER.parse(isoDate, ZonedDateTime::from);
+            return HTTP_DATE_FORMATTER.format(date);
+        } catch (DateTimeParseException e) {
+            // not an ISO date
+            return "";
+        }
     }
 }

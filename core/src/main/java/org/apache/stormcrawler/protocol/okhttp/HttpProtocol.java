@@ -62,12 +62,12 @@ import okhttp3.brotli.BrotliInterceptor;
 import okio.BufferedSource;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.mutable.MutableObject;
+import org.apache.http.HttpHeaders;
 import org.apache.http.cookie.Cookie;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
-import org.apache.stormcrawler.protocol.HttpHeaders;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.ProtocolResponse.TrimmedContentReason;
 import org.apache.stormcrawler.proxy.SCProxy;
@@ -189,17 +189,17 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         final String userAgent = getAgentString(conf);
         if (StringUtils.isNotBlank(userAgent)) {
-            customRequestHeaders.add(new KeyValue("User-Agent", userAgent));
+            customRequestHeaders.add(new KeyValue(HttpHeaders.USER_AGENT, userAgent));
         }
 
         final String accept = ConfUtils.getString(conf, "http.accept");
         if (StringUtils.isNotBlank(accept)) {
-            customRequestHeaders.add(new KeyValue("Accept", accept));
+            customRequestHeaders.add(new KeyValue(HttpHeaders.ACCEPT, accept));
         }
 
         final String acceptLanguage = ConfUtils.getString(conf, "http.accept.language");
         if (StringUtils.isNotBlank(acceptLanguage)) {
-            customRequestHeaders.add(new KeyValue("Accept-Language", acceptLanguage));
+            customRequestHeaders.add(new KeyValue(HttpHeaders.ACCEPT_LANGUAGE, acceptLanguage));
         }
 
         final String basicAuthUser = ConfUtils.getString(conf, "http.basicauth.user", null);
@@ -212,7 +212,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                             .encodeToString(
                                     (basicAuthUser + ":" + basicAuthPass)
                                             .getBytes(StandardCharsets.UTF_8));
-            customRequestHeaders.add(new KeyValue("Authorization", "Basic " + encoding));
+            customRequestHeaders.add(new KeyValue(HttpHeaders.AUTHORIZATION, "Basic " + encoding));
         }
 
         customHeaders.forEach(customRequestHeaders::add);
@@ -319,7 +319,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                                     prox.getUsername(), prox.getPassword());
                                     return response.request()
                                             .newBuilder()
-                                            .header("Proxy-Authorization", credential)
+                                            .header(HttpHeaders.PROXY_AUTHORIZATION, credential)
                                             .build();
                                 });
                     }
@@ -352,22 +352,22 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
             final String lastModified = metadata.getFirstValue(HttpHeaders.LAST_MODIFIED);
             if (StringUtils.isNotBlank(lastModified)) {
-                rb.header("If-Modified-Since", HttpHeaders.formatHttpDate(lastModified));
+                rb.header(HttpHeaders.IF_MODIFIED_SINCE, formatHttpDate(lastModified));
             }
 
-            final String ifNoneMatch = metadata.getFirstValue("etag", protocolMDprefix);
+            final String ifNoneMatch = metadata.getFirstValue(HttpHeaders.ETAG, protocolMDprefix);
             if (StringUtils.isNotBlank(ifNoneMatch)) {
-                rb.header("If-None-Match", ifNoneMatch);
+                rb.header(HttpHeaders.IF_NONE_MATCH, ifNoneMatch);
             }
 
             final String accept = metadata.getFirstValue("http.accept");
             if (StringUtils.isNotBlank(accept)) {
-                rb.header("Accept", accept);
+                rb.header(HttpHeaders.ACCEPT, accept);
             }
 
             final String acceptLanguage = metadata.getFirstValue("http.accept.language");
             if (StringUtils.isNotBlank(acceptLanguage)) {
-                rb.header("Accept-Language", acceptLanguage);
+                rb.header(HttpHeaders.ACCEPT_LANGUAGE, acceptLanguage);
             }
 
             final String pageMaxContentStr = metadata.getFirstValue("http.content.limit");

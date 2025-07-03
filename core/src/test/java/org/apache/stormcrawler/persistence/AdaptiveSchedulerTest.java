@@ -30,8 +30,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TimeZone;
 import org.apache.commons.lang.time.DateUtils;
+import org.apache.http.HttpHeaders;
 import org.apache.stormcrawler.Metadata;
-import org.apache.stormcrawler.protocol.HttpHeaders;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
