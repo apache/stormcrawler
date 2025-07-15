@@ -17,7 +17,6 @@
 package org.apache.stormcrawler.protocol;
 
 import crawlercommons.robots.BaseRobotRules;
-
 import java.net.URL;
 import java.util.List;
 
