@@ -17,6 +17,8 @@
 package org.apache.stormcrawler.protocol;
 
 import crawlercommons.robots.BaseRobotRules;
+
+import java.net.URL;
 import java.util.List;
 
 /**
@@ -35,6 +37,11 @@ public class RobotRules extends crawlercommons.robots.BaseRobotRules {
 
     @Override
     public boolean isAllowed(String url) {
+        return base.isAllowed(url);
+    }
+
+    @Override
+    public boolean isAllowed(URL url) {
         return base.isAllowed(url);
     }
 
