@@ -44,11 +44,22 @@ public class SQLSpout extends AbstractQueryingSpout {
     private static final Scheme SCHEME = new StringTabScheme();
 
     private String tableName;
+
     private Connection connection;
+
+    /**
+     * If more than one instance of the spout exist, each one is in charge of a separate bucket
+     * value. This is used to ensure a good diversity of URLs.
+     */
     private int bucketNum = -1;
+
+    /** Used to distinguish between instances in the logs */
     protected String logIdprefix = "";
+
     private int maxDocsPerBucket;
+
     private int maxNumResults;
+
     private Instant lastNextFetchDate = null;
 
     @Override
@@ -68,6 +79,7 @@ public class SQLSpout extends AbstractQueryingSpout {
             throw new RuntimeException(ex);
         }
 
+        // Determine bucket this spout instance will be in charge of
         int totalTasks = context.getComponentTasks(context.getThisComponentId()).size();
         if (totalTasks > 1) {
             logIdprefix =
@@ -107,9 +119,13 @@ public class SQLSpout extends AbstractQueryingSpout {
         ResultSet rs = null;
 
         try {
+            // Select entries from MySQL
+            // https://mariadb.com/kb/en/library/window-functions-overview/
+            // http://www.mysqltutorial.org/mysql-window-functions/mysql-rank-function/
             StringBuilder queryBuilder = new StringBuilder();
             queryBuilder.append("SELECT * FROM (");
-            queryBuilder.append("SELECT RANK() OVER (PARTITION BY host ORDER BY nextfetchdate DESC, url) AS ranking, ");
+            queryBuilder.append(
+                    "SELECT RANK() OVER (PARTITION BY host ORDER BY nextfetchdate DESC, url) AS ranking, ");
             queryBuilder.append("url, metadata, nextfetchdate FROM ").append(tableName);
             queryBuilder.append(" WHERE nextfetchdate <= ?");
             if (bucketNum >= 0) {
@@ -149,6 +165,7 @@ public class SQLSpout extends AbstractQueryingSpout {
                 String url = rs.getString("url");
                 numhits++;
 
+                // Already processed? Skip
                 if (beingProcessed.containsKey(url)) {
                     alreadyprocessed++;
                     continue;
@@ -167,6 +184,7 @@ public class SQLSpout extends AbstractQueryingSpout {
                 buffer.add(url, (Metadata) v.get(1));
             }
 
+            // No results? Reset the date
             if (numhits == 0) {
                 lastNextFetchDate = null;
             }
