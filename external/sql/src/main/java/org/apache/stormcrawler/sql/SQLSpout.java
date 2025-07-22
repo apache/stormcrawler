@@ -19,9 +19,9 @@ package org.apache.stormcrawler.sql;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -44,22 +44,11 @@ public class SQLSpout extends AbstractQueryingSpout {
     private static final Scheme SCHEME = new StringTabScheme();
 
     private String tableName;
-
     private Connection connection;
-
-    /**
-     * if more than one instance of the spout exist, each one is in charge of a separate bucket
-     * value. This is used to ensure a good diversity of URLs.
-     */
     private int bucketNum = -1;
-
-    /** Used to distinguish between instances in the logs * */
     protected String logIdprefix = "";
-
     private int maxDocsPerBucket;
-
     private int maxNumResults;
-
     private Instant lastNextFetchDate = null;
 
     @Override
@@ -69,9 +58,7 @@ public class SQLSpout extends AbstractQueryingSpout {
         super.open(conf, context, collector);
 
         maxDocsPerBucket = ConfUtils.getInt(conf, Constants.SQL_MAX_DOCS_BUCKET_PARAM_NAME, 5);
-
         tableName = ConfUtils.getString(conf, Constants.SQL_STATUS_TABLE_PARAM_NAME, "urls");
-
         maxNumResults = ConfUtils.getInt(conf, Constants.SQL_MAXRESULTS_PARAM_NAME, 100);
 
         try {
@@ -81,7 +68,6 @@ public class SQLSpout extends AbstractQueryingSpout {
             throw new RuntimeException(ex);
         }
 
-        // determine bucket this spout instance will be in charge of
         int totalTasks = context.getComponentTasks(context.getThisComponentId()).size();
         if (totalTasks > 1) {
             logIdprefix =
@@ -113,73 +99,74 @@ public class SQLSpout extends AbstractQueryingSpout {
             }
         }
 
-        // select entries from mysql
-        // https://mariadb.com/kb/en/library/window-functions-overview/
-        // http://www.mysqltutorial.org/mysql-window-functions/mysql-rank-function/
-
-        String query =
-                "SELECT * from (select rank() over (partition by host order by nextfetchdate desc, url) as ranking, url, metadata, nextfetchdate from "
-                        + tableName;
-
-        query +=
-                " WHERE nextfetchdate <= '" + new Timestamp(lastNextFetchDate.toEpochMilli()) + "'";
-
-        // constraint on bucket num
-        if (bucketNum >= 0) {
-            query += " AND bucket = '" + bucketNum + "'";
-        }
-
-        query +=
-                ") as urls_ranks where (urls_ranks.ranking <= "
-                        + maxDocsPerBucket
-                        + ") order by ranking";
-
-        if (maxNumResults != -1) {
-            query += " LIMIT " + this.maxNumResults;
-        }
-
         int alreadyprocessed = 0;
         int numhits = 0;
-
         long timeStartQuery = System.currentTimeMillis();
 
-        // create the java statement
-        Statement st = null;
+        PreparedStatement pstmt = null;
         ResultSet rs = null;
+
         try {
-            st = this.connection.createStatement();
+            StringBuilder queryBuilder = new StringBuilder();
+            queryBuilder.append("SELECT * FROM (");
+            queryBuilder.append("SELECT RANK() OVER (PARTITION BY host ORDER BY nextfetchdate DESC, url) AS ranking, ");
+            queryBuilder.append("url, metadata, nextfetchdate FROM ").append(tableName);
+            queryBuilder.append(" WHERE nextfetchdate <= ?");
+            if (bucketNum >= 0) {
+                queryBuilder.append(" AND bucket = ?");
+            }
+            queryBuilder.append(") AS urls_ranks WHERE urls_ranks.ranking <= ? ");
+            if (maxNumResults != -1) {
+                queryBuilder.append("ORDER BY ranking LIMIT ?");
+            } else {
+                queryBuilder.append("ORDER BY ranking");
+            }
 
-            // dump query to log
-            LOG.debug("{} SQL query {}", logIdprefix, query);
+            String query = queryBuilder.toString();
+            LOG.debug("{} SQL query: {}", logIdprefix, query);
 
-            // execute the query, and get a java resultset
-            rs = st.executeQuery(query);
+            pstmt = connection.prepareStatement(query);
+
+            int paramIndex = 1;
+            pstmt.setTimestamp(paramIndex++, new Timestamp(lastNextFetchDate.toEpochMilli()));
+
+            if (bucketNum >= 0) {
+                pstmt.setInt(paramIndex++, bucketNum);
+            }
+
+            pstmt.setInt(paramIndex++, maxDocsPerBucket);
+
+            if (maxNumResults != -1) {
+                pstmt.setInt(paramIndex++, maxNumResults);
+            }
+
+            rs = pstmt.executeQuery();
 
             long timeTaken = System.currentTimeMillis() - timeStartQuery;
             queryTimes.addMeasurement(timeTaken);
 
-            // iterate through the java resultset
             while (rs.next()) {
                 String url = rs.getString("url");
                 numhits++;
-                // already processed? skip
+
                 if (beingProcessed.containsKey(url)) {
                     alreadyprocessed++;
                     continue;
                 }
+
                 String metadata = rs.getString("metadata");
                 if (metadata == null) {
                     metadata = "";
                 } else if (!metadata.startsWith("\t")) {
                     metadata = "\t" + metadata;
                 }
+
                 String URLMD = url + metadata;
                 List<Object> v =
                         SCHEME.deserialize(ByteBuffer.wrap(URLMD.getBytes(StandardCharsets.UTF_8)));
                 buffer.add(url, (Metadata) v.get(1));
             }
 
-            // no results? reset the date
             if (numhits == 0) {
                 lastNextFetchDate = null;
             }
@@ -204,9 +191,9 @@ public class SQLSpout extends AbstractQueryingSpout {
                 LOG.error("Exception closing resultset", e);
             }
             try {
-                if (st != null) st.close();
+                if (pstmt != null) pstmt.close();
             } catch (SQLException e) {
-                LOG.error("Exception closing statement", e);
+                LOG.error("Exception closing prepared statement", e);
             }
         }
     }
