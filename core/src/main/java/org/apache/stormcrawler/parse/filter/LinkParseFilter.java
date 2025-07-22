@@ -64,7 +64,7 @@ public class LinkParseFilter extends XPathFilter {
         ParseData parseData = parse.get(URL);
         Metadata metadata = parseData.getMetadata();
 
-        Map<String, Outlink> dedup = new HashMap<String, Outlink>();
+        Map<String, Outlink> dedup = new HashMap<>();
 
         for (Outlink o : parse.getOutlinks()) {
             dedup.put(o.getTargetURL(), o);

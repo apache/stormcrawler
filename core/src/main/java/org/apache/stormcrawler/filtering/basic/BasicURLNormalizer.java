@@ -291,7 +291,7 @@ public class BasicURLNormalizer extends URLFilter {
     }
 
     Comparator<NameValuePair> comp =
-            new Comparator<NameValuePair>() {
+            new Comparator<>() {
                 @Override
                 public int compare(NameValuePair p1, NameValuePair p2) {
                     return p1.getName().compareTo(p2.getName());

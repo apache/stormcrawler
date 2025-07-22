@@ -330,7 +330,7 @@ public class HttpProtocol extends AbstractHttpProtocol
 
     private ResponseHandler<ProtocolResponse> getResponseHandlerWithContentLimit(
             int pageMaxContent) {
-        return new ResponseHandler<ProtocolResponse>() {
+        return new ResponseHandler<>() {
             public ProtocolResponse handleResponse(final HttpResponse response) throws IOException {
                 return handleResponseWithContentLimit(response, pageMaxContent);
             }

@@ -81,7 +81,7 @@ public abstract class AbstractURLBuffer implements URLBuffer {
 
         // create the queue if it does not exist
         // and add the url
-        queues.computeIfAbsent(key, k -> new LinkedList<URLMetadata>())
+        queues.computeIfAbsent(key, k -> new LinkedList<>())
                 .add(new URLMetadata(URL, m));
         return in_buffer.add(URL);
     }
