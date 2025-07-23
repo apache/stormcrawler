@@ -52,10 +52,10 @@ public class ParsingTester {
     }
 
     protected void prepareParserBolt(String configFile) {
-        prepareParserBolt(configFile, new HashMap());
+        prepareParserBolt(configFile, new HashMap<>());
     }
 
-    protected void prepareParserBolt(String configFile, Map parserConfig) {
+    protected void prepareParserBolt(String configFile, Map<String, Object> parserConfig) {
         parserConfig.put("parsefilters.config.file", configFile);
         bolt.prepare(
                 parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));

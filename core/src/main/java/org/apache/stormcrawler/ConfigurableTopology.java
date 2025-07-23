@@ -36,7 +36,8 @@ public abstract class ConfigurableTopology {
 
     public static void start(ConfigurableTopology topology, String args[]) {
         // loads the default configuration file
-        Map defaultSCConfig = Utils.findAndReadConfigFile("crawler-default.yaml", false);
+        Map<String, Object> defaultSCConfig =
+                Utils.findAndReadConfigFile("crawler-default.yaml", false);
         topology.conf.putAll(ConfUtils.extractConfigElement(defaultSCConfig));
 
         String[] remainingArgs = topology.parse(args);

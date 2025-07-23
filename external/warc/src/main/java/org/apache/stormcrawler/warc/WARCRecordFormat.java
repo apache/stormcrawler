@@ -28,7 +28,6 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -112,7 +111,7 @@ public class WARCRecordFormat implements RecordFormat {
 
     /** Generates a WARC info entry which can be stored at the beginning of each WARC file. */
     public static byte[] generateWARCInfo(Map<String, String> fields) {
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder buffer = new StringBuilder();
         buffer.append(WARC_VERSION);
         buffer.append(CRLF);
 
@@ -140,9 +139,7 @@ public class WARCRecordFormat implements RecordFormat {
 
         // add WARC fields
         // http://bibnum.bnf.fr/warc/WARC_ISO_28500_version1_latestdraft.pdf
-        Iterator<Entry<String, String>> iter = fields.entrySet().iterator();
-        while (iter.hasNext()) {
-            Entry<String, String> entry = iter.next();
+        for (Entry<String, String> entry : fields.entrySet()) {
             String key = entry.getKey();
             if (key.startsWith("WARC-")) continue;
             fieldsBuffer.append(key).append(": ").append(entry.getValue()).append(CRLF);

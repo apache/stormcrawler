@@ -100,7 +100,7 @@ public class URLPartitioner {
         return getPartition(url, metadata, mode);
     }
 
-    public void configure(Map stormConf) {
+    public void configure(Map<String, Object> stormConf) {
 
         mode =
                 ConfUtils.getString(

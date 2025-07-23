@@ -19,7 +19,6 @@ package org.apache.stormcrawler.persistence;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -67,9 +66,7 @@ public class DefaultScheduler extends Scheduler {
         // e.g. fetchInterval.FETCH_ERROR.isFeed=true
         Map<String, CustomInterval> intervals = new HashMap<>();
         Pattern pattern = Pattern.compile("^fetchInterval(\\..+?)?\\.(.+)=(.+)");
-        Iterator<String> keyIter = stormConf.keySet().iterator();
-        while (keyIter.hasNext()) {
-            String key = keyIter.next();
+        for (String key : stormConf.keySet()) {
             Matcher m = pattern.matcher(key);
             if (!m.matches()) {
                 continue;

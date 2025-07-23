@@ -39,7 +39,7 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testEmptyCanonicalURL() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
         config.put(AbstractIndexerBolt.canonicalMetadataParamName, "canonical");
         prepareIndexerBolt(config);
@@ -51,7 +51,7 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testCanonicalURL() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
         config.put(AbstractIndexerBolt.canonicalMetadataParamName, "canonical");
         Metadata metadata = new Metadata();
@@ -67,7 +67,7 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testRelativeCanonicalURL() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
         config.put(AbstractIndexerBolt.canonicalMetadataParamName, "canonical");
         Metadata metadata = new Metadata();
@@ -83,7 +83,7 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testBadCanonicalURL() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
         config.put(AbstractIndexerBolt.canonicalMetadataParamName, "canonical");
         Metadata metadata = new Metadata();
@@ -99,7 +99,7 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testOtherHostCanonicalURL() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
         config.put(AbstractIndexerBolt.canonicalMetadataParamName, "canonical");
         Metadata metadata = new Metadata();
@@ -115,7 +115,7 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testMissingCanonicalParamConfiguration() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
         Metadata metadata = new Metadata();
         metadata.setValue("canonical", "https://stormcrawler.apache.org/");
@@ -130,7 +130,7 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testFilterDocumentWithMetadata() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
         config.put(AbstractIndexerBolt.metadataFilterParamName, "key1=value1");
         Metadata metadata = new Metadata();
@@ -146,7 +146,7 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testFilterDocumentWithoutMetadata() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
         config.put(AbstractIndexerBolt.metadataFilterParamName, "key1=value1");
         prepareIndexerBolt(config);
@@ -160,9 +160,9 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testFilterMetadata() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
-        final List vector = new ArrayList();
+        final List<String> vector = new ArrayList<>();
         vector.add("parse.title=title");
         vector.add("parse.keywords=keywords");
         config.put(AbstractIndexerBolt.metadata2fieldParamName, vector);
@@ -181,7 +181,7 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testEmptyFilterMetadata() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
         prepareIndexerBolt(config);
         Metadata metadata = new Metadata();
@@ -198,7 +198,7 @@ class BasicIndexingTest extends IndexerTester {
 
     @Test
     void testGlobFilterMetadata() throws Exception {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");
         List<String> listKV = new ArrayList<>();
         listKV.add("parse.*");

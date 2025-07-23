@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -69,7 +68,7 @@ public class MetricsConsumer implements IMetricsConsumer {
 
     @Override
     public void prepare(
-            Map stormConf,
+            Map<String, Object> stormConf,
             Object registrationArgument,
             TopologyContext context,
             IErrorReporter errorReporter) {
@@ -112,14 +111,12 @@ public class MetricsConsumer implements IMetricsConsumer {
         if (value instanceof Number) {
             indexDataPoint(taskInfo, now, nameprefix, ((Number) value).doubleValue());
         } else if (value instanceof Map) {
-            Iterator<Entry> keyValiter = ((Map) value).entrySet().iterator();
-            while (keyValiter.hasNext()) {
-                Entry entry = keyValiter.next();
+            for (Entry<String, Object> entry : ((Map<String, Object>) value).entrySet()) {
                 String newnameprefix = nameprefix + "." + entry.getKey();
                 handleDataPoints(taskInfo, newnameprefix, entry.getValue(), now);
             }
         } else if (value instanceof Collection) {
-            for (Object collectionObj : (Collection) value) {
+            for (Object collectionObj : (Collection<Object>) value) {
                 handleDataPoints(taskInfo, nameprefix, collectionObj, now);
             }
         } else {

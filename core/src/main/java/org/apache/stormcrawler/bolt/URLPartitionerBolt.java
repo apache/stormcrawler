@@ -163,7 +163,7 @@ public class URLPartitionerBolt extends BaseRichBolt {
 
         final int MAX_ENTRIES = 500;
         cache =
-                new LinkedHashMap(MAX_ENTRIES + 1, .75F, true) {
+                new LinkedHashMap<>(MAX_ENTRIES + 1, .75F, true) {
                     // This method is called just after a new entry has been added
                     @Override
                     public boolean removeEldestEntry(Map.Entry eldest) {

@@ -48,7 +48,7 @@ public class DomainParseFilter extends ParseFilter {
         }
 
         partitioner = new URLPartitioner();
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put(Constants.PARTITION_MODEParamName, partitionMode);
         partitioner.configure(config);
     }

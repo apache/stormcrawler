@@ -31,7 +31,7 @@ class TestMetadataSerialization {
 
     @Test
     void testSerialization() throws IOException {
-        Map conf = Utils.readDefaultConfig();
+        Map<String, Object> conf = Utils.readDefaultConfig();
         Config.registerSerialization(conf, Metadata.class);
         KryoValuesSerializer kvs = new KryoValuesSerializer(conf);
         Metadata md = new Metadata();

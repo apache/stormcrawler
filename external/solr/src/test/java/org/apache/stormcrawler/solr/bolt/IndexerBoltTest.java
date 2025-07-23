@@ -14,9 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.stormcrawler.solr.persistence;
+package org.apache.stormcrawler.solr.bolt;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -38,22 +38,21 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.indexing.AbstractIndexerBolt;
-import org.apache.stormcrawler.solr.bolt.IndexerBolt;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.stormcrawler.solr.SolrContainerTest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class IndexerBoltTest extends SolrContainerTest {
+class IndexerBoltTest extends SolrContainerTest {
     private IndexerBolt bolt;
     protected TestOutputCollector output;
 
     private static final Logger LOG = LoggerFactory.getLogger(IndexerBoltTest.class);
 
-    @Before
-    public void setup() throws IOException, InterruptedException {
-        container.start();
+    @BeforeEach
+    void setup() throws IOException, InterruptedException {
         createCollection("docs", 1);
 
         bolt = new IndexerBolt();
@@ -68,10 +67,9 @@ public class IndexerBoltTest extends SolrContainerTest {
         bolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
     }
 
-    @After
-    public void close() {
+    @AfterEach
+    void close() {
         LOG.info("Closing Solr container");
-        container.close();
         output = null;
     }
 
@@ -94,7 +92,7 @@ public class IndexerBoltTest extends SolrContainerTest {
     }
 
     @Test
-    public void basicTest()
+    void basicTest()
             throws SolrServerException,
                     IOException,
                     ExecutionException,

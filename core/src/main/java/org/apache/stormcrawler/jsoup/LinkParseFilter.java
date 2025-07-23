@@ -119,11 +119,11 @@ public class LinkParseFilter extends XPathFilter {
             }
         }
 
-        parse.setOutlinks(new ArrayList(dedup.values()));
+        parse.setOutlinks(new ArrayList<>(dedup.values()));
     }
 
     @Override
-    public void configure(@NotNull Map stormConf, @NotNull JsonNode filterParams) {
+    public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode filterParams) {
         super.configure(stormConf, filterParams);
         this.metadataTransfer = MetadataTransfer.getInstance(stormConf);
         this.urlFilters = URLFilters.fromConf(stormConf);

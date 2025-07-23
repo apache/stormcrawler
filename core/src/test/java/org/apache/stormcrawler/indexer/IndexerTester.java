@@ -49,7 +49,7 @@ public class IndexerTester {
         output = null;
     }
 
-    protected void prepareIndexerBolt(Map config) {
+    protected void prepareIndexerBolt(Map<String, Object> config) {
         bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
     }
 

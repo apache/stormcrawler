@@ -29,8 +29,8 @@ public abstract class AbstractOpenSearchTest {
 
     public static final String PASSWORD = "This1sAPassw0rd";
 
-    protected GenericContainer opensearchContainer =
-            new GenericContainer(
+    protected GenericContainer<?> opensearchContainer =
+            new GenericContainer<>(
                             DockerImageName.parse(
                                     "opensearchproject/opensearch:" + OPENSEARCH_VERSION))
                     .withExposedPorts(9200)

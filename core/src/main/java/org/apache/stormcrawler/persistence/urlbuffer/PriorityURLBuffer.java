@@ -19,7 +19,6 @@ package org.apache.stormcrawler.persistence.urlbuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -69,11 +68,7 @@ public class PriorityURLBuffer extends SimpleURLBuffer {
 
         List<QueueCount> sorted = new ArrayList<>();
 
-        // populate a sorted set with key - queues
-        Iterator<Entry<String, Queue<URLMetadata>>> i = queues.entrySet().iterator();
-
-        while (i.hasNext()) {
-            Entry<String, Queue<URLMetadata>> entry = i.next();
+        for (Entry<String, Queue<URLMetadata>> entry : queues.entrySet()) {
             String name = entry.getKey();
             int ackNum = ackCount.getOrDefault(name, new AtomicInteger(0)).get();
             QueueCount qc = new QueueCount(name, ackNum);

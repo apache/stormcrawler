@@ -44,7 +44,7 @@ class JSoupParserBoltTest extends ParsingTester {
      *
      * <META HTTP-EQUIV="Pragma" CONTENT="no-cache">
      */
-    Map stormConf = new HashMap();
+    Map<String, Object> stormConf = new HashMap<>();
 
     public static String[] tests = {
         "<html><head><title>test page</title>"
@@ -118,7 +118,7 @@ class JSoupParserBoltTest extends ParsingTester {
     /** Checks that content in script is not included in the text representation */
     void testNoScriptInText() throws IOException {
         bolt.prepare(
-                new HashMap(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+                new HashMap<>(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
         parse("https://stormcrawler.apache.org", "stormcrawler.apache.org.html");
         List<Object> parsedTuple = output.getEmitted().remove(0);
         // check in the metadata that the values match
@@ -132,7 +132,7 @@ class JSoupParserBoltTest extends ParsingTester {
     /** Checks that individual links marked as rel="nofollow" are not followed */
     void testNoFollowOutlinks() throws IOException {
         bolt.prepare(
-                new HashMap(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+                new HashMap<>(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
         parse("https://stormcrawler.apache.org", "stormcrawler.apache.org.html");
         List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
         Assertions.assertEquals(25, statusTuples.size());
@@ -141,7 +141,7 @@ class JSoupParserBoltTest extends ParsingTester {
     @Test
     void testHTTPRobots() throws IOException {
         bolt.prepare(
-                new HashMap(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+                new HashMap<>(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
         Metadata metadata = new Metadata();
         metadata.setValues("X-Robots-Tag", new String[] {"noindex", "nofollow"});
         parse("https://stormcrawler.apache.org", "stormcrawler.apache.org.html", metadata);
@@ -167,7 +167,7 @@ class JSoupParserBoltTest extends ParsingTester {
     @Test
     void testRobotsMetaProcessor() throws IOException {
         bolt.prepare(
-                new HashMap(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+                new HashMap<>(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
         for (int i = 0; i < tests.length; i++) {
             byte[] bytes = tests[i].getBytes(StandardCharsets.UTF_8);
             parse("https://stormcrawler.apache.org", bytes, new Metadata());
@@ -194,7 +194,7 @@ class JSoupParserBoltTest extends ParsingTester {
     @Test
     void testHTMLRedir() throws IOException {
         bolt.prepare(
-                new HashMap(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+                new HashMap<>(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
         parse("http://www.somesite.com", "redir.html");
         List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
         // one for the redir + one for the discovered

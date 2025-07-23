@@ -23,7 +23,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -194,9 +193,7 @@ public class Metadata {
     public String toString(String prefix) {
         StringBuilder sb = new StringBuilder();
         if (prefix == null) prefix = "";
-        Iterator<Entry<String, String[]>> iter = md.entrySet().iterator();
-        while (iter.hasNext()) {
-            Entry<String, String[]> entry = iter.next();
+        for (Entry<String, String[]> entry : md.entrySet()) {
             for (String val : entry.getValue()) {
                 sb.append(prefix).append(entry.getKey()).append(": ").append(val).append("\n");
             }

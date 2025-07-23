@@ -24,6 +24,9 @@ under the License.
 	</requestDispatcher>
 
 	<updateHandler class="solr.DirectUpdateHandler2">
+		<updateLog>
+			<str name="dir">${solr.ulog.dir:}</str>
+		</updateLog>
 		<autoCommit>
 			<maxDocs>10000</maxDocs>
 			<maxTime>10000</maxTime>

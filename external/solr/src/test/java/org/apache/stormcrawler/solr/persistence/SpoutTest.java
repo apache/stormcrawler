@@ -16,7 +16,8 @@
  */
 package org.apache.stormcrawler.solr.persistence;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,16 +36,18 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.persistence.Status;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.stormcrawler.solr.SolrContainerTest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Verifies that when having 2 Solr shards, documents will be processed by the 2 respective Spouts
  */
-public class SpoutTest extends SolrContainerTest {
+class SpoutTest extends SolrContainerTest {
 
     private StatusUpdaterBolt bolt;
     private SolrSpout spoutOne;
@@ -55,9 +58,8 @@ public class SpoutTest extends SolrContainerTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatusBoltTest.class);
 
-    @Before
-    public void setup() throws IOException, InterruptedException {
-        container.start();
+    @BeforeEach
+    void setup() throws IOException, InterruptedException {
         createCollection("status", 2);
 
         bolt = new StatusUpdaterBolt();
@@ -83,13 +85,12 @@ public class SpoutTest extends SolrContainerTest {
         spoutTwo.open(conf, getContextForTask(1), new SpoutOutputCollector(spoutTwoOutput));
     }
 
-    @After
-    public void close() {
+    @AfterEach
+    void close() {
         LOG.info("Closing updater bolt and SOLR container");
         bolt.cleanup();
         spoutOne.close();
         spoutTwo.close();
-        container.close();
         boltOutput = null;
         spoutOneOutput = null;
         spoutTwoOutput = null;
@@ -147,8 +148,9 @@ public class SpoutTest extends SolrContainerTest {
      * When using two shards,<br>
      * the status documents should be distributed among the two spouts
      */
-    @Test(timeout = 120000)
-    public void twoShardsTest() throws ExecutionException, InterruptedException, TimeoutException {
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void twoShardsTest() throws ExecutionException, InterruptedException, TimeoutException {
         int expected = 100;
 
         for (int i = 0; i < expected; i++) {

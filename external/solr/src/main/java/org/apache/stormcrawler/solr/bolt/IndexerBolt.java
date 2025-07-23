@@ -18,7 +18,6 @@ package org.apache.stormcrawler.solr.bolt;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
 
-import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.solr.common.SolrInputDocument;
@@ -113,9 +112,7 @@ public class IndexerBolt extends AbstractIndexerBolt {
             // select which metadata to index
             Map<String, String[]> keyVals = filterMetadata(metadata);
 
-            Iterator<String> iterator = keyVals.keySet().iterator();
-            while (iterator.hasNext()) {
-                String fieldName = iterator.next();
+            for (String fieldName : keyVals.keySet()) {
                 String[] values = keyVals.get(fieldName);
                 for (String value : values) {
                     if (!ignoreEmptyFields() || StringUtils.isNotBlank(value)) {

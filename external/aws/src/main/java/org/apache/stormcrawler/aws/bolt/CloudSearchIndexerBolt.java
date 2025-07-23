@@ -44,7 +44,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -142,9 +141,7 @@ public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
         // retrieve the domain name
         DescribeDomainsResult domains = cl.describeDomains(new DescribeDomainsRequest());
 
-        Iterator<DomainStatus> dsiter = domains.getDomainStatusList().iterator();
-        while (dsiter.hasNext()) {
-            DomainStatus ds = dsiter.next();
+        for (DomainStatus ds : domains.getDomainStatusList()) {
             if (ds.getDocService().getEndpoint().equals(endpoint)) {
                 domainName = ds.getDomainName();
                 break;

@@ -185,8 +185,8 @@ public class HybridSpout extends AggregationSpout implements EmptyQueueListener 
                 }
                 Object key_as_object = sourceAsMap.get(pfield);
                 if (key_as_object instanceof List) {
-                    if (((List) (key_as_object)).size() == 1)
-                        key = (String) ((List) key_as_object).get(0);
+                    if (((List<String>) (key_as_object)).size() == 1)
+                        key = ((List<String>) key_as_object).get(0);
                 } else {
                     key = key_as_object.toString();
                 }

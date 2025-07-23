@@ -19,7 +19,6 @@ package org.apache.stormcrawler.protocol.selenium;
 import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -39,9 +38,7 @@ public class RemoteDriverProtocol extends SeleniumProtocol {
     private void substituteUserAgent(Map<String, Object> keyvals, final String userAgentString) {
         if (keyvals == null) return;
 
-        Iterator<Entry<String, Object>> iter = keyvals.entrySet().iterator();
-        while (iter.hasNext()) {
-            Entry<String, Object> entry = iter.next();
+        for (Entry<String, Object> entry : keyvals.entrySet()) {
             Object val = entry.getValue();
             // substitute variable $useragent for the real value
             if (val instanceof String && val.toString().contains("$useragent")) {
@@ -50,7 +47,7 @@ public class RemoteDriverProtocol extends SeleniumProtocol {
             } else if (val instanceof Map<?, ?>) {
                 substituteUserAgent((Map<String, Object>) val, userAgentString);
             } else if (val instanceof List<?>) {
-                List newList = new ArrayList<String>();
+                List<String> newList = new ArrayList<>();
                 ((List<String>) val)
                         .forEach(
                                 s -> {

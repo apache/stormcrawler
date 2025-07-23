@@ -16,7 +16,7 @@
  */
 package org.apache.stormcrawler.solr.persistence;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -33,21 +33,21 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.persistence.Status;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.stormcrawler.solr.SolrContainerTest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class StatusBoltTest extends SolrContainerTest {
+class StatusBoltTest extends SolrContainerTest {
     private StatusUpdaterBolt bolt;
     protected TestOutputCollector output;
 
     private static final Logger LOG = LoggerFactory.getLogger(StatusBoltTest.class);
 
-    @Before
-    public void setup() throws IOException, InterruptedException {
-        container.start();
+    @BeforeEach
+    void setup() throws IOException, InterruptedException {
         createCollection("status", 4);
 
         bolt = new StatusUpdaterBolt();
@@ -61,11 +61,10 @@ public class StatusBoltTest extends SolrContainerTest {
         bolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
     }
 
-    @After
-    public void close() {
+    @AfterEach
+    void close() {
         LOG.info("Closing updater bolt and SOLR container");
         bolt.cleanup();
-        container.close();
         output = null;
     }
 
@@ -88,7 +87,7 @@ public class StatusBoltTest extends SolrContainerTest {
     }
 
     @Test
-    public void basicTest() throws ExecutionException, InterruptedException, TimeoutException {
+    void basicTest() throws ExecutionException, InterruptedException, TimeoutException {
 
         String url = "https://www.url.net/something";
 
@@ -102,7 +101,7 @@ public class StatusBoltTest extends SolrContainerTest {
     }
 
     @Test
-    public void errorTest() throws Exception {
+    void errorTest() throws Exception {
 
         String url = "https://www.url.net/something";
 

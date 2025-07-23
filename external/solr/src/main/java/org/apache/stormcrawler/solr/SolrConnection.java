@@ -353,18 +353,21 @@ public class SolrConnection {
         }
     }
 
+    public void commit() throws IOException, SolrServerException {
+        updateClient.commit();
+    }
+
     public void close() throws IOException, SolrServerException {
         executor.shutdown();
 
-        if (updateClient != null) {
-            if (cloud) {
-                flushAllUpdates(true);
-            }
-
-            client.commit();
-            updateClient.commit();
-            updateClient.close();
+        if (cloud) {
+            flushAllUpdates(true);
         }
+
+        commit();
+
+        client.close();
+        updateClient.close();
     }
 
     // Helper classes to hold pending updates

@@ -37,7 +37,6 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -208,9 +207,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
             // keep the subsitemaps as outlinks
             // they will be fetched and parsed in the following steps
-            Iterator<AbstractSiteMap> iter = subsitemaps.iterator();
-            while (iter.hasNext()) {
-                AbstractSiteMap asm = iter.next();
+            for (AbstractSiteMap asm : subsitemaps) {
                 String target = asm.getUrl().toExternalForm();
 
                 Date lastModified = asm.getLastModified();
@@ -261,10 +258,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
             SiteMap sm = (SiteMap) siteMap;
             // TODO see what we can do with the LastModified info
             Collection<SiteMapURL> sitemapURLs = sm.getSiteMapUrls();
-            Iterator<SiteMapURL> iter = sitemapURLs.iterator();
-            while (iter.hasNext()) {
-                SiteMapURL smurl = iter.next();
-
+            for (SiteMapURL smurl : sitemapURLs) {
                 // TODO handle priority in metadata
                 double priority = smurl.getPriority();
                 // TODO convert the frequency into a numerical value and handle

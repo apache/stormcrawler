@@ -28,7 +28,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -101,10 +100,7 @@ public class RegexURLNormalizer extends URLFilter {
     public @Nullable String filter(
             @Nullable URL sourceUrl, @Nullable Metadata sourceMetadata, @NotNull String urlString) {
 
-        Iterator<Rule> i = rules.iterator();
-        while (i.hasNext()) {
-            Rule r = i.next();
-
+        for (Rule r : rules) {
             Matcher matcher = r.pattern.matcher(urlString);
 
             urlString = matcher.replaceAll(r.substitution);

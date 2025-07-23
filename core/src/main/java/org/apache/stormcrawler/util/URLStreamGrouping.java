@@ -71,7 +71,7 @@ public class URLStreamGrouping implements CustomStreamGrouping, Serializable {
         this.targetTask = targetTasks;
         partitioner = new URLPartitioner();
         if (StringUtils.isNotBlank(partitionMode)) {
-            Map<String, String> conf = new HashMap<>();
+            Map<String, Object> conf = new HashMap<>();
             conf.put(Constants.PARTITION_MODEParamName, partitionMode);
             partitioner.configure(conf);
         }

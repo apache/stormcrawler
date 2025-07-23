@@ -17,7 +17,6 @@
 package org.apache.stormcrawler.solr.persistence;
 
 import java.util.Date;
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -106,9 +105,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
 
         doc.setField("status", status.name());
 
-        Iterator<String> keyIterator = metadata.keySet().iterator();
-        while (keyIterator.hasNext()) {
-            String key = keyIterator.next();
+        for (String key : metadata.keySet()) {
             String[] values = metadata.getValues(key);
             doc.setField(String.format(Locale.ROOT, "%s.%s", mdPrefix, key), values);
         }

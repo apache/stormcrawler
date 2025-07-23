@@ -14,32 +14,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.stormcrawler.solr.persistence;
+package org.apache.stormcrawler.solr;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
-import org.testcontainers.containers.Container;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
+import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
+@Testcontainers
+@Timeout(value = 120, unit = TimeUnit.SECONDS)
 public abstract class SolrContainerTest {
-    @Rule public Timeout globalTimeout = Timeout.seconds(120);
-
     protected static ExecutorService executorService;
 
-    private final DockerImageName image = DockerImageName.parse("solr:9.8.0");
+    private static final DockerImageName image = DockerImageName.parse("solr:9.8.1");
     private static final String configsetsPath = new File("configsets").getAbsolutePath();
 
-    @Rule
-    public GenericContainer<?> container =
+    @Container
+    static GenericContainer<?> container =
             new GenericContainer<>(image)
                     .withExposedPorts(8983)
                     .withCopyFileToContainer(
@@ -48,13 +50,13 @@ public abstract class SolrContainerTest {
                     .withCommand("solr-foreground -c")
                     .waitingFor(Wait.forHttp("/solr/admin/cores?action=STATUS").forStatusCode(200));
 
-    @BeforeClass
-    public static void beforeClass() {
+    @BeforeAll
+    static void before() {
         executorService = Executors.newFixedThreadPool(2);
     }
 
-    @AfterClass
-    public static void afterClass() {
+    @AfterAll
+    static void after() {
         executorService.shutdown();
         executorService = null;
     }
@@ -63,7 +65,7 @@ public abstract class SolrContainerTest {
         return "http://" + container.getHost() + ":" + container.getMappedPort(8983) + "/solr";
     }
 
-    protected Container.ExecResult createCollection(String collectionName, int shards)
+    protected ExecResult createCollection(String collectionName, int shards)
             throws IOException, InterruptedException {
 
         // Upload configuration to Zookeeper

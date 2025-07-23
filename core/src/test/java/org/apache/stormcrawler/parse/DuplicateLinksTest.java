@@ -39,7 +39,7 @@ class DuplicateLinksTest extends ParsingTester {
 
     @Test
     void testSitemapSubdocuments() throws IOException {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         // generate a dummy config file
         config.put("urlfilters.config.file", "basicurlnormalizer.json");
         bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));

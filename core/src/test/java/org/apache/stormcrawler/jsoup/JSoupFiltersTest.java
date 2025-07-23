@@ -37,7 +37,7 @@ class JSoupFiltersTest extends ParsingTester {
         setupParserBolt(bolt);
     }
 
-    protected void prepareParserBolt(String configFile, Map parserConfig) {
+    protected void prepareParserBolt(String configFile, Map<String, Object> parserConfig) {
         parserConfig.put("jsoup.filters.config.file", configFile);
         bolt.prepare(
                 parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));

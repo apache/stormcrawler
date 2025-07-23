@@ -18,7 +18,6 @@ package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import org.apache.stormcrawler.Metadata;
@@ -42,9 +41,8 @@ public class CommaSeparatedToMultivaluedMetadata extends ParseFilter {
             return;
         }
         if (node.isArray()) {
-            Iterator<JsonNode> iter = node.iterator();
-            while (iter.hasNext()) {
-                keys.add(iter.next().asText());
+            for (JsonNode jsonNode : node) {
+                keys.add(jsonNode.asText());
             }
         } else {
             keys.add(node.asText());

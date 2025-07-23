@@ -76,7 +76,7 @@ public class TestUtil {
                         });
         when(tuple.getValueByField(anyString()))
                 .thenAnswer(
-                        new Answer() {
+                        new Answer<>() {
                             @Override
                             public Object answer(InvocationOnMock invocation) throws Throwable {
                                 return tupleValues.get(invocation.getArgument(0, String.class));

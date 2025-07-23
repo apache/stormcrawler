@@ -27,16 +27,16 @@ public class SQLUtil {
 
     private SQLUtil() {}
 
-    public static Connection getConnection(Map stormConf) throws SQLException {
+    public static Connection getConnection(Map<String, Object> stormConf) throws SQLException {
         // SQL connection details
-        Map<String, String> sqlConf = (Map) stormConf.get("sql.connection");
+        Map<String, Object> sqlConf = (Map<String, Object>) stormConf.get("sql.connection");
 
         if (sqlConf == null) {
             throw new RuntimeException(
                     "Missing SQL connection config, add a section 'sql.connection' to the configuration");
         }
 
-        String url = sqlConf.get("url");
+        String url = (String) sqlConf.get("url");
         if (url == null) {
             throw new RuntimeException(
                     "Missing SQL url, add an entry 'url' to the section 'sql.connection' of the configuration");
@@ -44,8 +44,8 @@ public class SQLUtil {
 
         Properties props = new Properties();
 
-        for (Entry<String, String> entry : sqlConf.entrySet()) {
-            props.setProperty(entry.getKey(), entry.getValue());
+        for (Entry<String, Object> entry : sqlConf.entrySet()) {
+            props.setProperty(entry.getKey(), (String) entry.getValue());
         }
 
         return DriverManager.getConnection(url, props);

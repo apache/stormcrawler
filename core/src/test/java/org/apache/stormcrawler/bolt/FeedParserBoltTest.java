@@ -57,7 +57,7 @@ class FeedParserBoltTest extends ParsingTester {
 
     @Test
     void testFeedParsingNoMT() throws IOException {
-        Map parserConfig = new HashMap();
+        Map<String, Object> parserConfig = new HashMap<>();
         parserConfig.put("feed.sniffContent", true);
         parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
         parserConfig.put(ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "http.");
@@ -72,7 +72,7 @@ class FeedParserBoltTest extends ParsingTester {
 
     @Test
     void testFeedParsingDetextBytes() throws IOException {
-        Map parserConfig = new HashMap();
+        Map<String, Object> parserConfig = new HashMap<>();
         parserConfig.put("feed.sniffContent", true);
         parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
         bolt.prepare(

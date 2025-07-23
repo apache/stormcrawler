@@ -51,7 +51,7 @@ class ParserBoltTest extends ParsingTester {
      * @see https://issues.apache.org/jira/browse/TIKA-2096
      */
     void testRecursiveDoc() throws IOException {
-        Map conf = new HashMap();
+        Map<String, Object> conf = new HashMap<>();
         conf.put("parser.extract.embedded", true);
         bolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
         parse(
@@ -77,7 +77,7 @@ class ParserBoltTest extends ParsingTester {
      * @see https://github.com/apache/stormcrawler/issues/712
      */
     void testMimeTypeWhileList() throws IOException {
-        Map conf = new HashMap();
+        Map<String, Object> conf = new HashMap<>();
         conf.put("parser.mimetype.whitelist", "application/.+word.*");
         conf.put(ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "http.");
         bolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));

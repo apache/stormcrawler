@@ -53,7 +53,7 @@ abstract class AbstractFetcherBoltTest {
     @Test
     void testDodgyURL() throws IOException {
         TestOutputCollector output = new TestOutputCollector();
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put("http.agent.name", "this_is_only_a_test");
         bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
         Tuple tuple = mock(Tuple.class);
@@ -75,7 +75,7 @@ abstract class AbstractFetcherBoltTest {
     void test304(WireMockRuntimeInfo wmRuntimeInfo) {
         stubFor(get(urlMatching(".+")).willReturn(aResponse().withStatus(304)));
         TestOutputCollector output = new TestOutputCollector();
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put("http.agent.name", "this_is_only_a_test");
         bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
         Tuple tuple = mock(Tuple.class);

@@ -992,17 +992,13 @@ public class FetcherBolt extends StatusEmitterBolt {
         StringBuilder sb = new StringBuilder();
         synchronized (fetchQueues.queues) {
             sb.append("\nNum queues : ").append(fetchQueues.queues.size());
-            Iterator<Entry<String, FetchItemQueue>> iterator =
-                    fetchQueues.queues.entrySet().iterator();
-            while (iterator.hasNext()) {
-                Entry<String, FetchItemQueue> entry = iterator.next();
+            for (Entry<String, FetchItemQueue> entry : fetchQueues.queues.entrySet()) {
                 sb.append("\nQueue ID : ").append(entry.getKey());
                 FetchItemQueue fiq = entry.getValue();
                 sb.append("\t size : ").append(fiq.getQueueSize());
                 sb.append("\t in progress : ").append(fiq.getInProgressSize());
-                Iterator<FetchItem> urlsIter = fiq.queue.iterator();
-                while (urlsIter.hasNext()) {
-                    sb.append("\n\t").append(urlsIter.next().url);
+                for (FetchItem fetchItem : fiq.queue) {
+                    sb.append("\n\t").append(fetchItem.url);
                 }
             }
             LOG.info("Dumping queue content {}", sb.toString());

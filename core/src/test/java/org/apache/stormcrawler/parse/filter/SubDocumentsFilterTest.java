@@ -36,7 +36,7 @@ class SubDocumentsFilterTest extends ParsingTester {
 
     @Test
     void testSitemapSubdocuments() throws IOException {
-        Map config = new HashMap();
+        Map<String, Object> config = new HashMap<>();
         config.put("detect.mimetype", false);
         prepareParserBolt("test.subdocfilter.json", config);
         Metadata metadata = new Metadata();

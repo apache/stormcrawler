@@ -63,9 +63,8 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
         }
     }
 
-    @SuppressWarnings("rawtypes")
     @Override
-    public void configure(@NotNull Map stormConf, @NotNull JsonNode filterParams) {
+    public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode filterParams) {
         super.configure(stormConf, filterParams);
         java.util.Iterator<Entry<String, JsonNode>> iter = filterParams.fields();
         while (iter.hasNext()) {
@@ -101,9 +100,7 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
         Metadata metadata = parseData.getMetadata();
 
         // applies the XPATH expression in the order in which they are produced
-        java.util.Iterator<List<LabelledExpression>> iter = expressions.values().iterator();
-        while (iter.hasNext()) {
-            List<LabelledExpression> leList = iter.next();
+        for (List<LabelledExpression> leList : expressions.values()) {
             for (LabelledExpression le : leList) {
                 try {
                     List<String> values = le.evaluate(doc);

@@ -18,7 +18,6 @@ package org.apache.stormcrawler.indexing;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
 
-import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.storm.task.OutputCollector;
@@ -75,12 +74,10 @@ public class StdOutIndexer extends AbstractIndexerBolt {
         // which metadata to display?
         Map<String, String[]> keyVals = filterMetadata(metadata);
 
-        Iterator<String> iterator = keyVals.keySet().iterator();
-        while (iterator.hasNext()) {
-            String fieldName = iterator.next();
-            String[] values = keyVals.get(fieldName);
+        for (Map.Entry<String, String[]> entry : keyVals.entrySet()) {
+            String[] values = entry.getValue();
             for (String value : values) {
-                System.out.println(fieldName + "\t" + trimValue(value));
+                System.out.println(entry.getKey() + "\t" + trimValue(value));
             }
         }
 

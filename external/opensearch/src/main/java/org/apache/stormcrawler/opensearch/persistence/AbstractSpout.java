@@ -19,7 +19,6 @@ package org.apache.stormcrawler.opensearch.persistence;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -194,9 +193,7 @@ public abstract class AbstractSpout extends AbstractQueryingSpout {
         Map<String, List<String>> mdAsMap = (Map<String, List<String>>) keyValues.get("metadata");
         Metadata metadata = new Metadata();
         if (mdAsMap != null) {
-            Iterator<Entry<String, List<String>>> mdIter = mdAsMap.entrySet().iterator();
-            while (mdIter.hasNext()) {
-                Entry<String, List<String>> mdEntry = mdIter.next();
+            for (Entry<String, List<String>> mdEntry : mdAsMap.entrySet()) {
                 String key = mdEntry.getKey();
                 // periods are not allowed - replace with %2E
                 key = key.replaceAll("%2E", "\\.");

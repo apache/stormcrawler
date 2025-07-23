@@ -18,7 +18,6 @@ package org.apache.stormcrawler.solr.persistence;
 
 import java.time.Instant;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -253,18 +252,13 @@ public class SolrSpout extends AbstractQueryingSpout {
 
             Metadata metadata = new Metadata();
 
-            Iterator<String> keyIterators = doc.getFieldNames().iterator();
-            while (keyIterators.hasNext()) {
-                String key = keyIterators.next();
-
+            for (String key : doc.getFieldNames()) {
                 if (key.startsWith(prefix)) {
                     Collection<Object> values = doc.getFieldValues(key);
 
                     key = key.substring(prefix.length());
-                    Iterator<Object> valueIterator = values.iterator();
-                    while (valueIterator.hasNext()) {
-                        String value = (String) valueIterator.next();
-                        metadata.addValue(key, value);
+                    for (Object value : values) {
+                        metadata.addValue(key, (String) value);
                     }
                 }
             }

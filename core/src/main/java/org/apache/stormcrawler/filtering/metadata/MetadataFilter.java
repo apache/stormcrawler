@@ -18,7 +18,6 @@ package org.apache.stormcrawler.filtering.metadata;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.net.URL;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -54,9 +53,7 @@ public class MetadataFilter extends URLFilter {
             return urlToFilter;
         }
         // check whether any of the metadata can be found in the source
-        Iterator<String[]> iter = mdFilters.iterator();
-        while (iter.hasNext()) {
-            String[] kv = iter.next();
+        for (String[] kv : mdFilters) {
             String[] vals = sourceMetadata.getValues(kv[0]);
             if (vals == null) {
                 continue;
