@@ -44,7 +44,23 @@ public class URLUtil {
             return fixPureQueryTargets(base, target);
         }
 
-        return new URL(base, target);
+        return resolveURLInternal(base, target);
+    }
+
+    /**
+     * Refactor deprecated URL constructor to use the URI class for resolving relative URLs
+     *
+     * @param base the base URL
+     * @param target the target URL (may be relative)
+     * @return resolved absolute URL.
+     * @throws MalformedURLException if the URL is not well formed
+     */
+    private static URL resolveURLInternal(URL base, String target) throws MalformedURLException {
+        try {
+            return base.toURI().resolve(target).toURL();
+        } catch (Exception e) {
+            throw (MalformedURLException) new MalformedURLException(e.getMessage()).initCause(e);
+        }
     }
 
     /** Handle the case in RFC3986 section 5.4.1 example 7, and similar. */
@@ -55,7 +71,7 @@ public class URLUtil {
             final String baseRightMost = basePath.substring(baseRightMostIdx + 1);
             target = baseRightMost + target;
         }
-        return new URL(base, target);
+        return resolveURLInternal(base, target);
     }
 
     /**
@@ -77,7 +93,7 @@ public class URLUtil {
         // the target contains params information or the base doesn't then no
         // conversion necessary, return regular URL
         if (target.indexOf(';') >= 0 || base.toString().indexOf(';') == -1) {
-            return new URL(base, target);
+            return resolveURLInternal(base, target);
         }
 
         // get the base url and it params information
@@ -96,7 +112,7 @@ public class URLUtil {
             target += params;
         }
 
-        return new URL(base, target);
+        return resolveURLInternal(base, target);
     }
 
     private static Pattern IP_PATTERN = Pattern.compile("(\\d{1,3}\\.){3}(\\d{1,3})");

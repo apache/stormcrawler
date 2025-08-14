@@ -30,6 +30,7 @@ import org.apache.http.HttpHeaders;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.URLUtil;
 
 /**
  * This class is used for parsing robots for urls belonging to HTTP protocol. It extends the generic
@@ -128,7 +129,7 @@ public class HttpRobotRulesParser extends RobotRulesParser {
         LOG.debug("Cache miss {} for {}", cacheKey, url);
         List<Integer> bytesFetched = new LinkedList<>();
         try {
-            robotsUrl = new URL(url, "/robots.txt");
+            robotsUrl = URLUtil.resolveURL(url, "/robots.txt");
             ProtocolResponse response = http.getProtocolOutput(robotsUrl.toString(), fetchRobotsMd);
             int code = response.getStatusCode();
             bytesFetched.add(response.getContent() != null ? response.getContent().length : 0);
@@ -146,7 +147,7 @@ public class HttpRobotRulesParser extends RobotRulesParser {
                 String redirection = response.getMetadata().getFirstValue(HttpHeaders.LOCATION);
                 LOG.debug("Redirected from {} to {}", redir, redirection);
                 if (StringUtils.isNotBlank(redirection)) {
-                    redir = new URL(redir, redirection);
+                    redir = URLUtil.resolveURL(redir, redirection);
                     if (redir.getPath().equals("/robots.txt") && redir.getQuery() == null) {
                         // only if the path (including the query part) of the redirect target is
                         // `/robots.txt` we can get/put the rules from/to the cache under the host
