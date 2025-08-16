@@ -48,7 +48,11 @@ public class BasicURLFilter extends URLFilter {
     public final String filterPathRepeat(String urlToFilter) {
         // check whether a path element is repeated N times
         String[] paths = urlToFilter.split("/");
-        if (paths.length <= 4) return urlToFilter;
+
+        final int minimumPathLength = 5;
+        // e.g. http://www.example.com/path/path will need 5 parts to have a repetition
+
+        if (paths.length < minimumPathLength) return urlToFilter;
 
         Map<String, Integer> count = new HashMap<>();
         for (String s : paths) {
