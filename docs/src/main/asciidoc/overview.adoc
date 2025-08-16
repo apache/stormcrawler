@@ -15,7 +15,7 @@
 == Overview
 :imagesdir: images
 
-link:https://storm.apache.org/[Apache Storm]Crawler is an open source collection of resources for building low-latency, scalable web crawlers on link:http://storm.apache.org/[Apache Storm]. It is provided under the link:http://www.apache.org/licenses/LICENSE-2.0[Apache License] and is written mostly in Java.
+Apache StormCrawler is an open source collection of resources for building low-latency, scalable web crawlers on link:http://storm.apache.org/[Apache Storm]. It is provided under the link:http://www.apache.org/licenses/LICENSE-2.0[Apache License] and is written mostly in Java.
 
 The aims of StormCrawler are to help build web crawlers that are:
 

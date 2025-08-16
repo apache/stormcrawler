@@ -1,0 +1,163 @@
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+== Configuration
+
+=== User Agent Configuration
+
+Crawlers should always act responsibly and ethically when accessing websites. A key aspect of this is properly identifying themselves through the `User-Agent` header. By providing a clear and accurate user agent string, webmasters can understand who is visiting their site and why, and can apply rules in robots.txt accordingly. Respecting these rules, avoiding excessive request rates, and honoring content restrictions not only ensures legal compliance but also maintains a healthy relationship with the web community.
+Transparent identification is a fundamental part of ethical web crawling.
+
+The configuration of the link:https://www.w3.org/WAI/UA/work/wiki/Definition_of_User_Agent[user agent] in StormCrawler has two purposes:
+
+. Identification of the crawler for webmasters
+. Selection of rules from robots.txt
+
+==== Crawler Identification
+
+The politeness of a web crawler is not limited to how frequently it fetches pages from a site, but also in how it identifies itself to sites it crawls. This is done by setting the HTTP header `User-Agent`, just like link:https://www.whatismybrowser.com/detect/what-is-my-user-agent/[your web browser does].
+
+The full user agent string is built from the concatenation of the configuration elements:
+
+* `http.agent.name`: name of your crawler
+* `http.agent.version`: version of your crawler
+* `http.agent.description`: description of what it does
+* `http.agent.url`: URL webmasters can go to to learn about it
+* `http.agent.email`: an email so that they can get in touch with you
+
+Whereas StormCrawler used to provide a default value for these, this is not the case since version 2.11 and you will now be asked to provide a value.
+
+You can specify the user agent verbatim with the config `http.agent` but you will still need to provide a `http.agent.name` for parsing robots.txt files.
+
+==== Robots Exclusion Protocol
+
+This is also known as the robots.txt protocol, it is formalised in link:https://www.rfc-editor.org/rfc/rfc9309.html[RFC 9309]. Part of what the robots directives do is to define rules to specify which parts of a website (if any) are allowed to be crawled. The rules are organised by `User-Agent`, with a `*` to match any agent not otherwise specified explicitly, e.g.:
+
+----
+User-Agent: *
+Disallow: *.gif$
+Disallow: /example/
+Allow: /publications/
+----
+
+In the example above the rule allows access to the URLs with the _/publications/_ path prefix, and it restricts access to the URLs with the _/example/_ path prefix and to all URLs with a _.gif_ suffix. The `"*"` character designates any character, including the otherwise-required forward slash.
+
+The value of `http.agent.name` is what StormCrawler looks for in the robots.txt. It MUST contain only uppercase and lowercase letters ("a-z" and "A-Z"), underscores ("_"), and hyphens ("-").
+
+Unless you are running a well known web crawler, it is unlikely that its agent name will be listed explicitly in the robots.txt (if it is, well, congratulations!). While you want the agent name value to reflect who your crawler is, you might want to follow rules set for better known crawlers. For instance, if you were a responsible AI company crawling the web to build a dataset to train LLMs, you would want to follow the rules set for `Google-Extended` (see link:https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers[list of Google crawlers]) if any were found.
+
+This is what the configuration `http.robots.agents` allows you to do. It is a comma-separated string but can also take a list of values. By setting it alongside `http.agent.name` (which should also be the first value it contains), you are able to broaden the match rules based on the identity as well as the purpose of your crawler.
+
+=== Proxy 
+
+StormCrawler's proxy system is built on top of the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/proxy/SCProxy.java[SCProxy] class and the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/proxy/ProxyManager.java[ProxyManager] interface. Every proxy used in the system is formatted as a **SCProxy**. The **ProxyManager** implementations handle the management and delegation of their internal proxies. At the call of link:https://stormcrawler.net/docs/api/com/digitalpebble/stormcrawler/protocol/Protocol.html#getProtocolOutput-java.lang.String-org.apache.stormcrawler.Metadata-[HTTPProtocol.getProtocolOutput()], the link:https://stormcrawler.net/docs/api/com/digitalpebble/stormcrawler/proxy/ProxyManager.html#getProxy[ProxyManager.getProxy()] is called to retrieve a proxy for the individual request.
+
+The **ProxyManager** interface can be implemented in a custom class to create custom logic for proxy management and load balancing. The default **ProxyManager** implementation is **SingleProxyManager**. This ensures backwards compatibility for prior StormCrawler releases. To use **MultiProxyManager** or custom implementations, pass the class path and name via the config parameter `http.proxy.manager`:
+
+----
+http.proxy.manager: "org.apache.stormcrawler.proxy.MultiProxyManager"
+----
+
+StormCrawler implements two **ProxyManager** classes by default:
+
+* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/proxy/SingleProxyManager.java[SingleProxyManager]
+Manages a single proxy passed by the backwards compatible proxy fields in the configuration:
+
+  ----
+  http.proxy.host  
+  http.proxy.port  
+  http.proxy.type  
+  http.proxy.user (optional)  
+  http.proxy.pass (optional)  
+  ----
+
+* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/proxy/MultiProxyManager.java[MultiProxyManager]
+Manages multiple proxies passed through a TXT file. The file should contain connection strings for all proxies including the protocol and authentication (if needed). The file supports comment lines (`//` or `#`) and empty lines. The file path should be passed via the config at the below field. The TXT file must be available to all nodes participating in the topology:
+
+  ----
+  http.proxy.file
+  ----
+
+The **MultiProxyManager** load balances across proxies using one of the following schemes. The load balancing scheme can be passed via the config using `http.proxy.rotation`; the default value is `ROUND_ROBIN`:
+
+* ROUND_ROBIN
+Evenly distributes load across all proxies
+* RANDOM
+Randomly selects proxies using the native Java random number generator. RNG is seeded with the nanos at instantiation
+* LEAST_USED
+Selects the proxy with the least amount of usage. This is performed lazily for speed and therefore will not account for changes to usages during the selection process. If no custom implementations are made this should theoretically operate the same as **ROUND_ROBIN**
+
+The **SCProxy** class contains all of the information associated with proxy connection. In addition, it tracks the total usage of the proxy and optionally tracks the location of the proxy IP. Usage information is used for the **LEAST_USED** load balancing scheme. The location information is currently unused but left to enable custom implementations the ability to select proxies by location.
+
+=== Metadata
+
+==== Registering Metadata for Kryo Serialization
+
+If your Apache StormCrawler topology doesn't extend `org.apache.storm.crawler.ConfigurableTopology`, you will need to manually register StormCrawler's `Metadata` class for serialization in Storm. For more information on Kryo serialization in Apache Storm, you can refer to the link:https://storm.apache.org/documentation/Serialization.html[documentation].
+
+To register `Metadata` for serialization, you'll need to import `backtype.storm.Config` and `org.apache.storm.crawler.Metadata`. Then, in your topology class, you'll register the class with:
+
+[source,java]
+----
+Config.registerSerialization(conf, Metadata.class);
+----
+
+where `conf` is your Storm configuration for the topology.
+
+Alternatively, you can specify in the configuration file:
+
+[source,yaml]
+----
+topology.kryo.register:
+  - org.apache.storm.crawler.Metadata
+----
+
+==== MetadataTransfer
+
+The class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/util/MetadataTransfer.java[MetadataTransfer] is an important part of the framework and is used in key parts of a pipeline:
+
+* Fetching
+* Parsing
+* Updating bolts
+
+An instance (or extension) of **MetadataTransfer** gets created and configured with the method:
+
+[source,java]
+----
+public static MetadataTransfer getInstance(Map<String, Object> conf)
+----
+
+which takes as parameter the standard Storm [[Configuration]].
+
+A **MetadataTransfer** instance has mainly two methods, both returning `Metadata` objects:
+
+* `getMetaForOutlink(String targetURL, String sourceURL, Metadata parentMD)`
+* `filter(Metadata metadata)`
+
+The former is used when creating link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/Outlink.java[Outlinks], i.e., in the parsing bolts but also for handling redirections in the [[FetcherBolt(s)]].
+
+The latter is used by extensions of the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/AbstractStatusUpdaterBolt.java[AbstractStatusUpdaterBolt] class to determine which **Metadata** should be persisted.
+
+The behavior of the default **MetadataTransfer** class is driven by configuration only. It has the following options:
+
+* `metadata.transfer`:: list of metadata key values to filter or transfer to the outlinks. See link:https://github.com/DigitalPebble/storm-crawler/blob/master/core/src/main/resources/crawler-default.yaml#L23[crawler-default.yaml]
+* `metadata.persist`:: list of metadata key values to persist in the status storage. See link:https://github.com/DigitalPebble/storm-crawler/blob/master/core/src/main/resources/crawler-default.yaml#L28[crawler-default.yaml]
+* `metadata.track.path`:: whether to track the URL path or not. Boolean value, true by default.
+* `metadata.track.depth`:: whether to track the depth from seed. Boolean value, true by default.
+
+Note that the method `getMetaForOutlink` calls `filter` to determine which key values to keep.
+
+=== Configuration Options
+
+TODO

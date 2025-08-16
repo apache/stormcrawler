@@ -37,7 +37,7 @@ Before starting, we will give a quick overview of **central** Storm concepts and
 
 - *Frontier*: In the context of a web crawler, the Frontier is the component responsible for managing and prioritizing the list of URLs to be fetched next.
 
-- *Seed*: In web crawling, a Seed is an initial URL or set of URLs from which the crawler starts its discovery and fetching process.
+- *Seed*: In web crawling, a seed is an initial URL or set of URLs from which the crawler starts its discovery and fetching process.
 
 === Bootstrapping a StormCrawler Project
 
@@ -122,7 +122,7 @@ services:
 
 Notes:
 
-- This example Docker Compose uses the official Storm and Zookeeper images.
+- This example Docker Compose uses the official Apache Storm and Apache Zookeeper images.
 - URLFrontier is an additional service used by StormCrawler to act as Frontier. Please note, that we also offer other Frontier implementations like OpenSearch or Apache Solr.
 - Ports may need adjustment depending on your environment.
 - The Storm UI runs on port 8080 by default.
@@ -175,7 +175,7 @@ where _seeds.txt_ is the previously created file containing URLs to inject, with
 
 ==== Run Your First Crawl
 
-Now it is time to run our first crawl. To do so, we need to start our crawler topolog in distributed mode and deploy it on our Storm Cluster.
+Now it is time to run our first crawl. To do so, we need to start our crawler topology in distributed mode and deploy it on our Storm Cluster.
 
 [source,shell]
 ----
@@ -206,9 +206,9 @@ as well as the Storm UI. It should now list a running topology.
 
 In the default archetype, the fetched content is printed out to the default system out print stream.
 
-NOTE: In a Storm topology defined with Flux, parallelism specifies the number of tasks or instances of a spout or bolt to run concurrently, enabling scalable and efficient processing of data streams. In the archetype every component is set to a parallelism of **1**.
+NOTE: In a Storm topology defined with Flux, parallelism specifies the number of tasks or instances of a spout or bolt to run concurrently, enabling scalable and efficient processing. In the archetype every component is set to a parallelism of **1**.
 
-Congratulations! You learned how to start your first simple crawl using StormCrawler.
+Congratulations! You learned how to start your first simple crawl using Apache StormCrawler.
 
 Feel free to explore the rest of our documentation to build more complex crawler topologies.
 

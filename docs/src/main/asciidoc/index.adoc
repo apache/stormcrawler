@@ -28,4 +28,10 @@ include::quick-start.adoc[]
 
 include::architecture.adoc[]
 
+include::configuration.adoc[]
+
+include::debugging.adoc[]
+
 include::powered-by.adoc[]
+
+include::presentations.adoc[]
