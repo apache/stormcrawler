@@ -32,4 +32,4 @@
 * _**A quick introduction to Storm Crawler**_ link:http://www.slideshare.net/digitalpebble/j-nioche-apacheconeu2014fastfeather[slides], by Julien Nioche. ApacheCon Europe, Budapest, Nov 2014
 * _**StormCrawler in the wild**_ link:http://www.slideshare.net/digitalpebble/storm-crawler-ontopic20141113[slides], by Jake Dodd - link:http://www.ontopic.io/[Ontopic], ApacheCon Europe, Budapest, Nov 2014
 
-rop us a line at mailto:dev@stormcrawler.apache.org[dev@stormcrawler.apache.org] if you want to be added to this page.
+Drop us a line at mailto:dev@stormcrawler.apache.org[dev@stormcrawler.apache.org] if you want to be added to this page.
