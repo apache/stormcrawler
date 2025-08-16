@@ -31,6 +31,10 @@ public class BasicURLFilter extends URLFilter {
     private int maxPathRepetition = 3;
     private int maxLength = -1;
 
+    // Minimum number of path segments required before a repetition can occur
+    // e.g.http://www.example.com/path/path will need 5 parts to have a repetition
+    private static final int MINIMUM_PATH_LENGTH = 5;
+
     @Nullable
     public String filter(
             @Nullable URL sourceUrl,
@@ -49,10 +53,7 @@ public class BasicURLFilter extends URLFilter {
         // check whether a path element is repeated N times
         String[] paths = urlToFilter.split("/");
 
-        final int minimumPathLength = 5;
-        // e.g. http://www.example.com/path/path will need 5 parts to have a repetition
-
-        if (paths.length < minimumPathLength) return urlToFilter;
+        if (paths.length < MINIMUM_PATH_LENGTH) return urlToFilter;
 
         Map<String, Integer> count = new HashMap<>();
         for (String s : paths) {
