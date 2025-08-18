@@ -46,7 +46,7 @@ under the License.
 		<commons.lang.version>2.6</commons.lang.version>
 		<wiremock.version>3.13.1</wiremock.version>
 		<rometools.version>2.1.0</rometools.version>
-		<selenium.version>4.34.0</selenium.version>
+		<selenium.version>4.35.0</selenium.version>
 		<cli.version>1.10.0</cli.version>
 		<okhttp.version>5.1.0</okhttp.version>
 		<caffeine.version>3.2.2</caffeine.version>
