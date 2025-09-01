@@ -29,11 +29,11 @@ public class ParseResult implements Iterable<Map.Entry<String, ParseData>> {
     private final Map<String, ParseData> parseMap;
 
     public ParseResult() {
-        this(new HashMap<String, ParseData>(), new ArrayList<>());
+        this(new HashMap<>(), new ArrayList<>());
     }
 
     public ParseResult(List<Outlink> links) {
-        this(new HashMap<String, ParseData>(), links);
+        this(new HashMap<>(), links);
     }
 
     public ParseResult(Map<String, ParseData> map) {

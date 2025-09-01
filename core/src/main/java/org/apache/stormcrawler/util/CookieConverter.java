@@ -41,7 +41,7 @@ public class CookieConverter {
      * @return List off cookies to add to the request.
      */
     public static List<Cookie> getCookies(String[] cookiesStrings, URL targetURL) {
-        ArrayList<Cookie> list = new ArrayList<Cookie>();
+        ArrayList<Cookie> list = new ArrayList<>();
 
         for (String cs : cookiesStrings) {
             String name = null;

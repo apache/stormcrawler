@@ -200,7 +200,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
 
         // URL gets added to the cache in method ack
         // once this method has returned
-        List<Tuple> ll = new java.util.ArrayList<Tuple>();
+        List<Tuple> ll = new java.util.ArrayList<>();
         ll.add(t);
 
         waitingAck.put(url, ll);

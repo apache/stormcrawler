@@ -43,7 +43,7 @@ class WARCSpoutTest {
         java.io.File refInputFile = new java.io.File("src/test/resources/warc.inputs");
         Map<String, Object> hdfsConf = new HashMap<>();
         hdfsConf.put("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem");
-        conf = new HashMap<String, Object>();
+        conf = new HashMap<>();
         conf.put("hdfs", hdfsConf);
         spout = new WARCSpout(refInputFile.getAbsolutePath());
         spout.open(conf, TestUtil.getMockedTopologyContext(), new SpoutOutputCollector(output));

@@ -167,9 +167,7 @@ public class XPathFilter extends ParseFilter {
                         metadata.addValues(le.key, values);
                         break;
                     }
-                } catch (XPathExpressionException e) {
-                    LOG.error("Error evaluating {}: {}", le.key, e);
-                } catch (IOException e) {
+                } catch (XPathExpressionException | IOException e) {
                     LOG.error("Error evaluating {}: {}", le.key, e);
                 }
             }

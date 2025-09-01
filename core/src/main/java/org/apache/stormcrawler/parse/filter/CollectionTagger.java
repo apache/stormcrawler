@@ -69,7 +69,7 @@ public class CollectionTagger extends ParseFilter implements JSONResource {
     private static final Logger LOG = LoggerFactory.getLogger(CollectionTagger.class);
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final TypeReference<Collections> reference = new TypeReference<Collections>() {};
+    private static final TypeReference<Collections> reference = new TypeReference<>() {};
 
     private Collections collections = new Collections();
 
@@ -135,7 +135,7 @@ class Collections {
     }
 
     public String[] tag(String url) {
-        Set<String> tags = new HashSet<String>();
+        Set<String> tags = new HashSet<>();
         for (Collection collection : collections) {
             if (collection.matches(url)) {
                 tags.add(collection.getName());
