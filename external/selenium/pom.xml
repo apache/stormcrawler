@@ -34,7 +34,7 @@ under the License.
 
 	<name>stormcrawler-selenium</name>
 	<url>https://github.com/apache/stormcrawler/tree/master/external/selenium</url>
-	<description>selenium-based protocol for StormCrawler</description>
+	<description>Selenium-based Protocol for StormCrawler</description>
 
 	<properties>
 		<selenium.version>4.35.0</selenium.version>
