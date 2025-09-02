@@ -38,6 +38,7 @@ class MetadataFilterTest {
         return filter;
     }
 
+    // old filter mechanism (backward compatible)
     @Test
     void testFilterNoMD() throws MalformedURLException {
         URLFilter filter = createFilter("key", "val");
@@ -66,5 +67,202 @@ class MetadataFilterTest {
         metadata.addValue("key", "val3");
         String filterResult = filter.filter(url, metadata, url.toExternalForm());
         Assertions.assertEquals(url.toExternalForm(), filterResult);
+    }
+
+    // new filter mechanism
+    @Test
+    void testNewFilterWithEmptyFilterAndNullMetadata() throws MalformedURLException {
+        MetadataFilter filter = new MetadataFilter();
+        URL url = new URL("http://www.sourcedomain.com/");
+        String filterResult = filter.filter(url, null, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+    }
+
+    @Test
+    void testNewFilterWithEmptyFilterAndEmptyMetadata() throws MalformedURLException {
+        MetadataFilter filter = new MetadataFilter();
+        URL url = new URL("http://www.sourcedomain.com/");
+        Metadata metadata = new Metadata();
+        String filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+    }
+
+    @Test
+    void testNewFilterWithEmptyFilter() throws MalformedURLException {
+        MetadataFilter filter = new MetadataFilter();
+        URL url = new URL("http://www.sourcedomain.com/");
+        Metadata metadata = new Metadata();
+        metadata.addValue("key", "val");
+        String filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+    }
+
+    @Test
+    void testNewFilterWithEmptyMetadata() throws MalformedURLException {
+        MetadataFilter filter = new MetadataFilter();
+        filter.addFilter("key", "val");
+        URL url = new URL("http://www.sourcedomain.com/");
+        Metadata metadata = new Metadata();
+        String filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+    }
+
+    @Test
+    void testNewFilterWithSingleMatchingORFilter() throws MalformedURLException {
+        // Filter if key=>val match (OR operation)
+        MetadataFilter filter = new MetadataFilter();
+        filter.addFilter("key", "val");
+        URL url = new URL("http://www.sourcedomain.com/");
+        Metadata metadata = new Metadata();
+        metadata.addValue("key", "val");
+        String filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertNull(filterResult);
+    }
+
+    @Test
+    void testNewFilterWithSingleMatchingANDFilter() throws MalformedURLException {
+        // Filter if key=>val match (AND operation)
+        MetadataFilter filter = new MetadataFilter();
+        filter.addFilter("key", "val");
+        filter.setOperation(MetadataFilter.FilterOperation.AND);
+        URL url = new URL("http://www.sourcedomain.com/");
+        Metadata metadata = new Metadata();
+        metadata.addValue("key", "val");
+        String filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertNull(filterResult);
+    }
+
+    @Test
+    void testNewFilterWithOnlyOneMatchingORFilter() throws MalformedURLException {
+        // Filter if key=>val OR key2=>val2 match
+        MetadataFilter filter = new MetadataFilter();
+        filter.addFilter("key", "val");
+        filter.addFilter("key2", "val2");
+        URL url = new URL("http://www.sourcedomain.com/");
+        Metadata metadata = new Metadata();
+        metadata.addValue("key", "val");
+        String filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertNull(filterResult);
+    }
+
+    @Test
+    void testNewFilterWithOnlyOneMatchingANDFilter() throws MalformedURLException {
+        // Filter if key=>val AND key2=>val2 match
+        MetadataFilter filter = new MetadataFilter();
+        filter.addFilter("key", "val");
+        filter.addFilter("key2", "val2");
+        filter.setOperation(MetadataFilter.FilterOperation.AND);
+        URL url = new URL("http://www.sourcedomain.com/");
+        Metadata metadata = new Metadata();
+        metadata.addValue("key", "val");
+        String filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+    }
+
+    @Test
+    void testNewFilterWithAllMatchingANDFilter() throws MalformedURLException {
+        // Filter if key=>val AND key2=>val2 match
+        MetadataFilter filter = new MetadataFilter();
+        filter.addFilter("key", "val");
+        filter.addFilter("key2", "val2");
+        filter.setOperation(MetadataFilter.FilterOperation.AND);
+        URL url = new URL("http://www.sourcedomain.com/");
+        Metadata metadata = new Metadata();
+        metadata.addValue("key", "val");
+        metadata.addValue("key2", "val2");
+        String filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertNull(filterResult);
+    }
+
+    @Test
+    void testNewFilterWithComplexFilter() throws MalformedURLException {
+        // Filter if key=>val AND (key2=>val2 OR key3=>val3) match
+        MetadataFilter filter = new MetadataFilter();
+        filter.addFilter("key", "val");
+        filter.setOperation(MetadataFilter.FilterOperation.AND);
+        MetadataFilter.ComplexFilter filter2 = new MetadataFilter.ComplexFilter();
+        filter2.addFilter("key2", "val2");
+        filter2.addFilter("key3", "val3");
+        filter.addFilter(filter2);
+        URL url = new URL("http://www.sourcedomain.com/");
+
+        Metadata metadata = new Metadata();
+        metadata.addValue("key", "val");
+        String filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+
+        metadata = new Metadata();
+        metadata.addValue("key2", "val2");
+        filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+
+        metadata = new Metadata();
+        metadata.addValue("key", "val");
+        metadata.addValue("key2", "val2");
+        filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertNull(filterResult);
+
+        metadata = new Metadata();
+        metadata.addValue("key3", "val3");
+        filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+
+        metadata = new Metadata();
+        metadata.addValue("key", "val");
+        metadata.addValue("key3", "val3");
+        filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertNull(filterResult);
+
+        metadata = new Metadata();
+        metadata.addValue("key2", "val2");
+        metadata.addValue("key3", "val3");
+        filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+    }
+
+    @Test
+    void testNewFilterWithOtherComplexFilter() throws MalformedURLException {
+        // Filter if key=>val OR (key2=>val2 AND key3=>val3) match
+        MetadataFilter filter = new MetadataFilter();
+        filter.addFilter("key", "val");
+        MetadataFilter.ComplexFilter filter2 = new MetadataFilter.ComplexFilter();
+        filter2.addFilter("key2", "val2");
+        filter2.addFilter("key3", "val3");
+        filter2.setOperation(MetadataFilter.FilterOperation.AND);
+        filter.addFilter(filter2);
+        URL url = new URL("http://www.sourcedomain.com/");
+
+        Metadata metadata = new Metadata();
+        metadata.addValue("key", "val");
+        String filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertNull(filterResult);
+
+        metadata = new Metadata();
+        metadata.addValue("key2", "val2");
+        filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+
+        metadata = new Metadata();
+        metadata.addValue("key", "val");
+        metadata.addValue("key2", "val2");
+        filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertNull(filterResult);
+
+        metadata = new Metadata();
+        metadata.addValue("key3", "val3");
+        filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertEquals(url.toExternalForm(), filterResult);
+
+        metadata = new Metadata();
+        metadata.addValue("key", "val");
+        metadata.addValue("key3", "val3");
+        filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertNull(filterResult);
+
+        metadata = new Metadata();
+        metadata.addValue("key2", "val2");
+        metadata.addValue("key3", "val3");
+        filterResult = filter.filter(url, metadata, url.toExternalForm());
+        Assertions.assertNull(filterResult);
     }
 }
