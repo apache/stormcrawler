@@ -208,30 +208,6 @@ config:
   # or transferred protocol metadata must also be prefixed.
   protocol.md.prefix: "protocol."
 
-  # navigationfilters.config.file: "navigationfilters.json"
-  # selenium.addresses: "http://localhost:9515"
-
-  selenium.tracing: false
-
-  # rely on selenium's default values
-  # set to a value >= 0 to override
-  selenium.timeouts:
-    script: -1
-    pageLoad: -1
-    implicit: -1
-
-  # selenium.capabilities:
-    # a browser name is required
-    # browserName:"chrome"
-    # illustrates the use of the variable for user agent
-    # phantomjs.page.settings.userAgent: "$userAgent"
-    # ChromeDriver config
-    # goog:chromeOptions:
-    #   args: 
-    #      - "--headless"
-    #      - "--disable-gpu"
-    #      - "--mute-audio"
-
   # no url or parsefilters by default
   # parsefilters.config.file: "parsefilters.json"
   # urlfilters.config.file: "urlfilters.json"

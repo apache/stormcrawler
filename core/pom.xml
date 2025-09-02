@@ -46,12 +46,12 @@ under the License.
 		<commons.lang.version>2.6</commons.lang.version>
 		<wiremock.version>3.13.1</wiremock.version>
 		<rometools.version>2.1.0</rometools.version>
-		<selenium.version>4.35.0</selenium.version>
 		<cli.version>1.10.0</cli.version>
 		<okhttp.version>5.1.0</okhttp.version>
 		<caffeine.version>3.2.2</caffeine.version>
 		<xsoup.version>0.3.7</xsoup.version>
 		<awaitility.version>4.3.0</awaitility.version>
+		<guava.version>33.4.8-jre</guava.version>
 		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
 		<jacoco.classRatio>0.73</jacoco.classRatio>
 		<jacoco.instructionRatio>0.54</jacoco.instructionRatio>
@@ -221,18 +221,6 @@ under the License.
 		</dependency>
 
 		<dependency>
-			<groupId>org.seleniumhq.selenium</groupId>
-			<artifactId>selenium-remote-driver</artifactId>
-			<version>${selenium.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.seleniumhq.selenium</groupId>
-			<artifactId>selenium-support</artifactId>
-			<version>${selenium.version}</version>
-		</dependency>
-
-		<dependency>
 			<groupId>us.codecraft</groupId>
 			<artifactId>xsoup</artifactId>
 			<version>${xsoup.version}</version>
@@ -258,19 +246,12 @@ under the License.
 		</dependency>
 
 		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>selenium</artifactId>
-			<scope>test</scope>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>${guava.version}</version>
 		</dependency>
-
-		<dependency>
-			<groupId>org.seleniumhq.selenium</groupId>
-			<artifactId>selenium-chrome-driver</artifactId>
-			<version>${selenium.version}</version>
-			<scope>test</scope>
-		</dependency>
-
 	</dependencies>
+
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
