@@ -140,9 +140,7 @@ List of third-party dependencies grouped by their license type.
         * Gson (com.google.code.gson:gson:2.11.0 - https://github.com/google/gson)
         * Gson (com.google.code.gson:gson:2.12.1 - https://github.com/google/gson)
         * Guava: Google Core Libraries for Java (com.google.guava:guava:18.0 - http://code.google.com/p/guava-libraries/guava)
-        * Guava: Google Core Libraries for Java (com.google.guava:guava:33.2.1-android - https://github.com/google/guava)
         * Guava: Google Core Libraries for Java (com.google.guava:guava:33.4.8-jre - https://github.com/google/guava)
-        * Guava InternalFutureFailureAccess and InternalFutures (com.google.guava:failureaccess:1.0.2 - https://github.com/google/guava/failureaccess)
         * Guava InternalFutureFailureAccess and InternalFutures (com.google.guava:failureaccess:1.0.3 - https://github.com/google/guava/failureaccess)
         * Guava ListenableFuture only (com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava - https://github.com/google/guava/listenablefuture)
         * IntelliJ IDEA Annotations (com.intellij:annotations:12.0 - http://www.jetbrains.org)
@@ -213,8 +211,10 @@ List of third-party dependencies grouped by their license type.
         * opensearch-task-commons (org.opensearch:opensearch-task-commons:2.19.3 - https://github.com/opensearch-project/OpenSearch.git)
         * opensearch-telemetry (org.opensearch:opensearch-telemetry:2.19.3 - https://github.com/opensearch-project/OpenSearch.git)
         * opensearch-x-content (org.opensearch:opensearch-x-content:2.19.3 - https://github.com/opensearch-project/OpenSearch.git)
+        * OpenTelemetry Java (io.opentelemetry:opentelemetry-api:1.49.0 - https://github.com/open-telemetry/opentelemetry-java)
         * OpenTelemetry Java (io.opentelemetry:opentelemetry-api:1.53.0 - https://github.com/open-telemetry/opentelemetry-java)
         * OpenTelemetry Java (io.opentelemetry:opentelemetry-common:1.53.0 - https://github.com/open-telemetry/opentelemetry-java)
+        * OpenTelemetry Java (io.opentelemetry:opentelemetry-context:1.49.0 - https://github.com/open-telemetry/opentelemetry-java)
         * OpenTelemetry Java (io.opentelemetry:opentelemetry-context:1.53.0 - https://github.com/open-telemetry/opentelemetry-java)
         * OpenTelemetry Java (io.opentelemetry:opentelemetry-exporter-logging:1.53.0 - https://github.com/open-telemetry/opentelemetry-java)
         * OpenTelemetry Java (io.opentelemetry:opentelemetry-sdk:1.53.0 - https://github.com/open-telemetry/opentelemetry-java)
@@ -353,7 +353,6 @@ List of third-party dependencies grouped by their license type.
     MIT License
 
         * Animal Sniffer Annotations (org.codehaus.mojo:animal-sniffer-annotations:1.24 - https://www.mojohaus.org/animal-sniffer/animal-sniffer-annotations)
-        * Checker Qual (org.checkerframework:checker-qual:3.42.0 - https://checkerframework.org/)
         * dd-plist (com.googlecode.plist:dd-plist:1.28 - http://www.github.com/3breadt/dd-plist)
         * JCodings (org.jruby.jcodings:jcodings:1.0.58 - http://nexus.sonatype.org/oss-repository-hosting.html/jcodings)
         * Joni (org.jruby.joni:joni:2.2.1 - http://nexus.sonatype.org/oss-repository-hosting.html/joni)
