@@ -38,7 +38,6 @@ selenium.timeouts:
 #       - "--headless"       # Run Chrome in headless mode
 #       - "--disable-gpu"    # Disable GPU acceleration
 #       - "--mute-audio"     # Mute audio output
-Protocol implementation for Apache StormCrawler based on Selenium
 
 Add `selenium-conf.yaml ` to the configuration of your topology.
 
