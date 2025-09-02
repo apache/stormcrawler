@@ -39,6 +39,5 @@ selenium.timeouts:
 #       - "--disable-gpu"    # Disable GPU acceleration
 #       - "--mute-audio"     # Mute audio output
 
-Add `selenium-conf.yaml ` to the configuration of your topology.
 
 
