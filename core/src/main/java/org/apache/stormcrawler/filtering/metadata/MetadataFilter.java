@@ -31,9 +31,11 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Filter out URLs based on metadata in the source document.
- * The following json configurations are working perfectly.<br>
+/**
+ * Filter out URLs based on metadata in the source document. The following json configurations are
+ * working perfectly.<br>
  * Example 1:
+ *
  * <pre>
  *  {
  *    "class": "org.apache.stormcrawler.filtering.metadata.MetadataFilter",
@@ -43,7 +45,9 @@ import org.slf4j.LoggerFactory;
  *    }
  *  }
  * </pre>
+ *
  * Example 2:
+ *
  * <pre>
  *  {
  *    "class": "org.apache.stormcrawler.filtering.metadata.MetadataFilter",
@@ -51,12 +55,15 @@ import org.slf4j.LoggerFactory;
  *    "params": {
  *      "operation": "AND",
  *      "filters": {
- *        "key": "val"
+ *        "key": "val",
+ *        "key2": "val2"
  *      }
  *    }
  *  }
  * </pre>
+ *
  * Example 3:
+ *
  * <pre>
  *  {
  *    "class": "org.apache.stormcrawler.filtering.metadata.MetadataFilter",
@@ -88,11 +95,11 @@ public class MetadataFilter extends URLFilter {
 
     @Override
     public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode paramNode) {
-        configure(this.filters,  paramNode);
+        configure(this.filters, paramNode);
     }
 
     private void configure(@NotNull ComplexFilter filters, @NotNull JsonNode paramNode) {
-        if (!paramNode.has(OPERATION_KEY) &&  !paramNode.has(FILTERS_KEY)) {
+        if (!paramNode.has(OPERATION_KEY) && !paramNode.has(FILTERS_KEY)) {
             java.util.Iterator<Entry<String, JsonNode>> iter = paramNode.fields();
             while (iter.hasNext()) {
                 Entry<String, JsonNode> entry = iter.next();
@@ -110,13 +117,17 @@ public class MetadataFilter extends URLFilter {
             }
         }
         if (paramNode.has(FILTERS_KEY)) {
-            paramNode.get(FILTERS_KEY).fields().forEachRemaining(entry -> {
-                String key = entry.getKey();
-                if (!key.startsWith(COMPLEX_FILTERING_KEY_PREFIX)) {
-                    String value = entry.getValue().asText();
-                    filters.addFilter(key, value);
-                }
-            });
+            paramNode
+                    .get(FILTERS_KEY)
+                    .fields()
+                    .forEachRemaining(
+                            entry -> {
+                                String key = entry.getKey();
+                                if (!key.startsWith(COMPLEX_FILTERING_KEY_PREFIX)) {
+                                    String value = entry.getValue().asText();
+                                    filters.addFilter(key, value);
+                                }
+                            });
             Iterator<String> fieldNames = paramNode.get(FILTERS_KEY).fieldNames();
             while (fieldNames.hasNext()) {
                 String fieldName = fieldNames.next();
@@ -223,9 +234,7 @@ public class MetadataFilter extends URLFilter {
 
     @Override
     public String toString() {
-        return "MetadataFilter{" +
-                "filters=" + filters +
-                '}';
+        return "MetadataFilter{" + "filters=" + filters + '}';
     }
 
     public static class ComplexFilter {
@@ -262,10 +271,7 @@ public class MetadataFilter extends URLFilter {
 
         @Override
         public String toString() {
-            return "ComplexFilter{" +
-                    "filters=" + filters +
-                    ", operation=" + operation +
-                    '}';
+            return "ComplexFilter{" + "filters=" + filters + ", operation=" + operation + '}';
         }
     }
 

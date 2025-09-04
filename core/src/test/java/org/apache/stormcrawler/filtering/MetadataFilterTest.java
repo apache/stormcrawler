@@ -266,7 +266,7 @@ class MetadataFilterTest {
         Assertions.assertNull(filterResult);
     }
 
-    //configure() backward compatible
+    // configure() backward compatible
     @Test
     void testConfigureBackwardCompatible() {
         MetadataFilter filter = new MetadataFilter();
@@ -281,7 +281,7 @@ class MetadataFilterTest {
         Assertions.assertEquals(expectedFilter, filter);
     }
 
-    //new configure()
+    // new configure()
     @Test
     void testNewConfigure() {
         MetadataFilter filter = new MetadataFilter();
@@ -302,10 +302,6 @@ class MetadataFilterTest {
 
     @Test
     void testNewConfigureWithComplexFilter() {
-        /*
-        *
-        * */
-
         MetadataFilter filter = new MetadataFilter();
         ObjectNode filterParams = new ObjectNode(JsonNodeFactory.instance);
         filterParams.put("operation", "OR");
