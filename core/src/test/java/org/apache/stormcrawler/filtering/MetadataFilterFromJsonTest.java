@@ -16,13 +16,12 @@
  */
 package org.apache.stormcrawler.filtering;
 
-import org.apache.stormcrawler.Metadata;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Map;
+import org.apache.stormcrawler.Metadata;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 class MetadataFilterFromJsonTest {
 
