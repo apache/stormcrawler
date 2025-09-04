@@ -19,8 +19,10 @@ package org.apache.stormcrawler.filtering.metadata;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.function.Predicate;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilter;
@@ -29,21 +31,101 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Filter out URLs based on metadata in the source document */
+/** Filter out URLs based on metadata in the source document.
+ * The following json configurations are working perfectly.<br>
+ * Example 1:
+ * <pre>
+ *  {
+ *    "class": "org.apache.stormcrawler.filtering.metadata.MetadataFilter",
+ *    "name": "MetadataFilter",
+ *    "params": {
+ *      "key": "val"
+ *    }
+ *  }
+ * </pre>
+ * Example 2:
+ * <pre>
+ *  {
+ *    "class": "org.apache.stormcrawler.filtering.metadata.MetadataFilter",
+ *    "name": "MetadataFilter",
+ *    "params": {
+ *      "operation": "AND",
+ *      "filters": {
+ *        "key": "val"
+ *      }
+ *    }
+ *  }
+ * </pre>
+ * Example 3:
+ * <pre>
+ *  {
+ *    "class": "org.apache.stormcrawler.filtering.metadata.MetadataFilter",
+ *    "name": "MetadataFilter",
+ *    "params": {
+ *      "operation": "AND",
+ *      "filters": {
+ *        "key": "val",
+ *        "unique_key_for_complex_filtering_1": {
+ *          "operation": "OR",
+ *          "filters": {
+ *            "key2": "val2",
+ *            "key3": "val3"
+ *          }
+ *        }
+ *      }
+ *    }
+ *  }
+ * </pre>
+ */
 public class MetadataFilter extends URLFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(MetadataFilter.class);
+    public static final String COMPLEX_FILTERING_KEY_PREFIX = "unique_key_for_complex_filtering_";
+    public static final String OPERATION_KEY = "operation";
+    public static final String FILTERS_KEY = "filters";
 
     private final ComplexFilter filters = new ComplexFilter();
 
     @Override
     public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode paramNode) {
-        java.util.Iterator<Entry<String, JsonNode>> iter = paramNode.fields();
-        while (iter.hasNext()) {
-            Entry<String, JsonNode> entry = iter.next();
-            String key = entry.getKey();
-            String value = entry.getValue().asText();
-            filters.addFilter(key, value);
+        configure(this.filters,  paramNode);
+    }
+
+    private void configure(@NotNull ComplexFilter filters, @NotNull JsonNode paramNode) {
+        if (!paramNode.has(OPERATION_KEY) &&  !paramNode.has(FILTERS_KEY)) {
+            java.util.Iterator<Entry<String, JsonNode>> iter = paramNode.fields();
+            while (iter.hasNext()) {
+                Entry<String, JsonNode> entry = iter.next();
+                String key = entry.getKey();
+                String value = entry.getValue().asText();
+                filters.addFilter(key, value);
+            }
+        }
+
+        if (paramNode.has(OPERATION_KEY)) {
+            if (paramNode.get(OPERATION_KEY).asText().equalsIgnoreCase("AND")) {
+                filters.setOperation(FilterOperation.AND);
+            } else if (paramNode.get(OPERATION_KEY).asText().equalsIgnoreCase("OR")) {
+                filters.setOperation(FilterOperation.OR);
+            }
+        }
+        if (paramNode.has(FILTERS_KEY)) {
+            paramNode.get(FILTERS_KEY).fields().forEachRemaining(entry -> {
+                String key = entry.getKey();
+                if (!key.startsWith(COMPLEX_FILTERING_KEY_PREFIX)) {
+                    String value = entry.getValue().asText();
+                    filters.addFilter(key, value);
+                }
+            });
+            Iterator<String> fieldNames = paramNode.get(FILTERS_KEY).fieldNames();
+            while (fieldNames.hasNext()) {
+                String fieldName = fieldNames.next();
+                if (fieldName.startsWith(COMPLEX_FILTERING_KEY_PREFIX)) {
+                    ComplexFilter subFilters = new ComplexFilter();
+                    filters.addFilter(subFilters);
+                    configure(subFilters, paramNode.get(FILTERS_KEY).get(fieldName));
+                }
+            }
         }
     }
 
@@ -128,6 +210,24 @@ public class MetadataFilter extends URLFilter {
         };
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof MetadataFilter that)) return false;
+        return Objects.equals(filters, that.filters);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(filters);
+    }
+
+    @Override
+    public String toString() {
+        return "MetadataFilter{" +
+                "filters=" + filters +
+                '}';
+    }
+
     public static class ComplexFilter {
         private final Map<String, Object> filters = new HashMap<>();
         private FilterOperation operation = FilterOperation.OR;
@@ -141,12 +241,31 @@ public class MetadataFilter extends URLFilter {
         }
 
         public void addFilter(ComplexFilter filter) {
-            String key = "unique_key_for_complex_filtering_";
+            String key = COMPLEX_FILTERING_KEY_PREFIX;
             int counter = 1;
             while (filters.containsKey(key + counter)) {
                 counter++;
             }
             filters.put(key + counter, filter);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof ComplexFilter that)) return false;
+            return Objects.equals(filters, that.filters) && operation == that.operation;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(filters, operation);
+        }
+
+        @Override
+        public String toString() {
+            return "ComplexFilter{" +
+                    "filters=" + filters +
+                    ", operation=" + operation +
+                    '}';
         }
     }
 

@@ -265,4 +265,72 @@ class MetadataFilterTest {
         filterResult = filter.filter(url, metadata, url.toExternalForm());
         Assertions.assertNull(filterResult);
     }
+
+    //configure() backward compatible
+    @Test
+    void testConfigureBackwardCompatible() {
+        MetadataFilter filter = new MetadataFilter();
+        ObjectNode filterParams = new ObjectNode(JsonNodeFactory.instance);
+        filterParams.put("key", "val");
+        Map<String, Object> conf = new HashMap<>();
+        filter.configure(conf, filterParams);
+
+        MetadataFilter expectedFilter = new MetadataFilter();
+        expectedFilter.addFilter("key", "val");
+
+        Assertions.assertEquals(expectedFilter, filter);
+    }
+
+    //new configure()
+    @Test
+    void testNewConfigure() {
+        MetadataFilter filter = new MetadataFilter();
+        ObjectNode filterParams = new ObjectNode(JsonNodeFactory.instance);
+        filterParams.put("operation", "AND");
+        ObjectNode filters = new ObjectNode(JsonNodeFactory.instance);
+        filters.put("key", "val");
+        filterParams.set("filters", filters);
+        Map<String, Object> conf = new HashMap<>();
+        filter.configure(conf, filterParams);
+
+        MetadataFilter expectedFilter = new MetadataFilter();
+        expectedFilter.addFilter("key", "val");
+        expectedFilter.setOperation(MetadataFilter.FilterOperation.AND);
+
+        Assertions.assertEquals(expectedFilter, filter);
+    }
+
+    @Test
+    void testNewConfigureWithComplexFilter() {
+        /*
+        *
+        * */
+
+        MetadataFilter filter = new MetadataFilter();
+        ObjectNode filterParams = new ObjectNode(JsonNodeFactory.instance);
+        filterParams.put("operation", "OR");
+        ObjectNode filters = new ObjectNode(JsonNodeFactory.instance);
+        filters.put("key", "val");
+        ObjectNode filters2 = new ObjectNode(JsonNodeFactory.instance);
+        filters2.put("operation", "AND");
+        ObjectNode subfilters = new ObjectNode(JsonNodeFactory.instance);
+        subfilters.put("key2", "val2");
+        subfilters.put("key3", "val3");
+        filters2.set("filters", subfilters);
+        filters.set("unique_key_for_complex_filtering_1", filters2);
+        filterParams.set("filters", filters);
+        Map<String, Object> conf = new HashMap<>();
+        filter.configure(conf, filterParams);
+
+        // Filter if key=>val OR (key2=>val2 AND key3=>val3) match
+        MetadataFilter expectedFilter = new MetadataFilter();
+        expectedFilter.addFilter("key", "val");
+        MetadataFilter.ComplexFilter filter2 = new MetadataFilter.ComplexFilter();
+        filter2.addFilter("key2", "val2");
+        filter2.addFilter("key3", "val3");
+        filter2.setOperation(MetadataFilter.FilterOperation.AND);
+        expectedFilter.addFilter(filter2);
+
+        Assertions.assertEquals(expectedFilter, filter);
+    }
 }
