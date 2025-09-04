@@ -1,0 +1,15 @@
+{
+  "org.apache.stormcrawler.filtering.URLFilters": [
+    {
+      "class": "org.apache.stormcrawler.filtering.metadata.MetadataFilter",
+      "name": "MetadataFilter",
+      "params": {
+        "operation": "AND",
+        "filters": {
+          "key": "val",
+          "key2": "val2"
+        }
+      }
+    }
+  ]
+}
