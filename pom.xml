@@ -30,7 +30,7 @@ under the License.
 
 	<groupId>org.apache.stormcrawler</groupId>
 	<artifactId>stormcrawler</artifactId>
-	<version>3.4.1-SNAPSHOT</version>
+	<version>3.4.1</version>
 	<packaging>pom</packaging>
 
 	<name>stormcrawler</name>
@@ -50,7 +50,7 @@ under the License.
 		<developerConnection>
 			scm:git:git@github.com:apache/stormcrawler.git</developerConnection>
 		<url>https://github.com/apache/stormcrawler</url>
-		<tag>stormcrawler-3.4.0</tag>
+		<tag>stormcrawler-3.4.1</tag>
 	</scm>
 
 	<issueManagement>
@@ -60,7 +60,7 @@ under the License.
 
 	<properties>
 		<!-- timestamp for reproducible outputs, updated on release by the release plugin -->
-		<project.build.outputTimestamp>2025-06-24T05:39:32Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2025-09-05T18:41:34Z</project.build.outputTimestamp>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<additionalparam>-Xdoclint:none</additionalparam>
 		<!-- dependency versions -->
