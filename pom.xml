@@ -68,7 +68,7 @@ under the License.
 		<storm-client.version>2.8.2</storm-client.version>
 		<!-- Jackson's version should be in-line with the one in Storm -->
 		<jackson.version>2.18.1</jackson.version>
-		<tika.version>3.2.2</tika.version>
+		<tika.version>3.2.3</tika.version>
 		<mockito.version>5.19.0</mockito.version>
 		<slf4j-simple.version>2.0.17</slf4j-simple.version>
 		<jetbrains.annotations.version>26.0.2-1</jetbrains.annotations.version>
