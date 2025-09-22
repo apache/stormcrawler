@@ -227,6 +227,8 @@ public class IndexerBolt extends AbstractIndexerBolt
                 }
             }
 
+            customizeDocument(builder, metadata, tuple);
+
             builder.endObject();
 
             final IndexRequest indexRequest =
@@ -268,6 +270,27 @@ public class IndexerBolt extends AbstractIndexerBolt
                 waitAckLock.unlock();
             }
         }
+    }
+
+    /**
+     * Hook method for subclasses to customize the JSON document before it is indexed.
+     *
+     * <p>This method is called after the default fields (text, URL, filtered metadata) have been
+     * added to the {@link XContentBuilder}. Implementations can add, remove, or transform fields to
+     * suit application-specific needs.
+     *
+     * <p>This extension point is particularly useful when the index mapping has been customized to
+     * include additional top-level fields beyond those provided by the default implementation.
+     * Subclasses can ensure these fields are properly populated during indexing.
+     *
+     * @param builder the {@link XContentBuilder} used to construct the document
+     * @param metadata the {@link Metadata} associated with the document
+     * @param tuple the input {@link Tuple} containing the crawl data
+     * @throws IOException if adding fields to the builder fails
+     */
+    protected void customizeDocument(XContentBuilder builder, Metadata metadata, Tuple tuple)
+            throws IOException {
+        // Default implementation is empty. Subclasses may override.
     }
 
     /**
