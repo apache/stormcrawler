@@ -51,7 +51,7 @@ under the License.
 		<caffeine.version>3.2.2</caffeine.version>
 		<xsoup.version>0.3.7</xsoup.version>
 		<awaitility.version>4.3.0</awaitility.version>
-		<guava.version>33.4.8-jre</guava.version>
+		<guava.version>33.5.0-jre</guava.version>
 		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
 		<jacoco.classRatio>0.72</jacoco.classRatio>
 		<jacoco.instructionRatio>0.54</jacoco.instructionRatio>
