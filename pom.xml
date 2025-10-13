@@ -78,7 +78,7 @@ under the License.
 		<git-code-format-maven-plugin.version>5.4</git-code-format-maven-plugin.version>
 		<testcontainers.version>1.21.3</testcontainers.version>
 		<maven.mojo.license.plugin>2.7.0</maven.mojo.license.plugin>
-		<jacoco.maven.plugin>0.8.13</jacoco.maven.plugin>
+		<jacoco.maven.plugin>0.8.14</jacoco.maven.plugin>
 		<jacoco.haltOnFailure>false</jacoco.haltOnFailure>
 		<jacoco.classRatio>1.00</jacoco.classRatio>
 		<jacoco.instructionRatio>1.00</jacoco.instructionRatio>
