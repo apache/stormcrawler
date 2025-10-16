@@ -55,7 +55,7 @@ import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
 
-/** Extracts URLs from feeds */
+/** Extracts URLs from feeds. */
 public class FeedParserBolt extends StatusEmitterBolt {
 
     public static final String isFeedKey = "isFeed";
