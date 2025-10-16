@@ -84,7 +84,8 @@ public class FeedParserBolt extends StatusEmitterBolt {
                 // uses mime-type
                 // won't work when servers return text/xml
                 // TODO: use Tika instead?
-                String ct = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix);
+                String ct =
+                        metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix);
                 if (ct != null && ct.contains("rss+xml")) {
                     isfeed = true;
                 } else {
