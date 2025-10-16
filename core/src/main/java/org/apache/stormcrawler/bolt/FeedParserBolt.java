@@ -62,12 +62,12 @@ public class FeedParserBolt extends StatusEmitterBolt {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(FeedParserBolt.class);
 
-    private boolean sniffWhenNoMDKey = false;
+    private boolean sniffWhenNoMetadataKey = false;
 
     private ParseFilter parseFilters;
     private int filterHoursSincePub = -1;
 
-    private String protocolMDprefix;
+    private String protocolMetadataPrefix;
 
     @Override
     public void execute(Tuple tuple) {
@@ -80,11 +80,11 @@ public class FeedParserBolt extends StatusEmitterBolt {
         boolean isfeed = Boolean.parseBoolean(metadata.getFirstValue(isFeedKey));
         // doesn't have the metadata expected
         if (!isfeed) {
-            if (sniffWhenNoMDKey) {
+            if (sniffWhenNoMetadataKey) {
                 // uses mime-type
                 // won't work when servers return text/xml
                 // TODO use Tika instead?
-                String ct = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMDprefix);
+                String ct = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix);
                 if (ct != null && ct.contains("rss+xml")) {
                     isfeed = true;
                 } else {
@@ -174,20 +174,20 @@ public class FeedParserBolt extends StatusEmitterBolt {
             feed = input.build(new InputSource(is));
         }
 
-        URL sURL = new URL(url);
+        URL url1 = new URL(url);
 
         List<SyndEntry> entries = feed.getEntries();
         for (SyndEntry entry : entries) {
-            String targetURL = entry.getLink();
-            // targetURL can be null?!?
+            String targetUrl = entry.getLink();
+            // targetUrl can be null?!?
             // e.g. feed does not use links but guid
-            if (StringUtils.isBlank(targetURL)) {
-                targetURL = entry.getUri();
-                if (StringUtils.isBlank(targetURL)) {
+            if (StringUtils.isBlank(targetUrl)) {
+                targetUrl = entry.getUri();
+                if (StringUtils.isBlank(targetUrl)) {
                     continue;
                 }
             }
-            Outlink newLink = filterOutlink(sURL, targetURL, parentMetadata);
+            Outlink newLink = filterOutlink(url1, targetUrl, parentMetadata);
             if (newLink == null) continue;
 
             String title = entry.getTitle();
@@ -205,7 +205,7 @@ public class FeedParserBolt extends StatusEmitterBolt {
                     if (publishedDate.before(rightNow.getTime())) {
                         LOG.info(
                                 "{} has a published date {} which is more than {} hours old",
-                                targetURL,
+                                targetUrl,
                                 publishedDate,
                                 filterHoursSincePub);
                         continue;
@@ -229,10 +229,10 @@ public class FeedParserBolt extends StatusEmitterBolt {
     public void prepare(
             Map<String, Object> stormConf, TopologyContext context, OutputCollector collect) {
         super.prepare(stormConf, context, collect);
-        sniffWhenNoMDKey = ConfUtils.getBoolean(stormConf, "feed.sniffContent", false);
+        sniffWhenNoMetadataKey = ConfUtils.getBoolean(stormConf, "feed.sniffContent", false);
         filterHoursSincePub = ConfUtils.getInt(stormConf, "feed.filter.hours.since.published", -1);
         parseFilters = ParseFilters.fromConf(stormConf);
-        protocolMDprefix =
+        protocolMetadataPrefix =
                 ConfUtils.getString(stormConf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "");
     }
 
