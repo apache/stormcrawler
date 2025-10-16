@@ -189,7 +189,9 @@ public class FeedParserBolt extends StatusEmitterBolt {
                 }
             }
             Outlink newLink = filterOutlink(url1, targetUrl, parentMetadata);
-            if (newLink == null) continue;
+            if (newLink == null) {
+                continue;
+            }
 
             String title = entry.getTitle();
             if (StringUtils.isNotBlank(title)) {
