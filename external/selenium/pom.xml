@@ -37,7 +37,7 @@ under the License.
 	<description>Selenium-based Protocol for StormCrawler</description>
 
 	<properties>
-		<selenium.version>4.36.0</selenium.version>
+		<selenium.version>4.37.0</selenium.version>
 		<awaitility.version>4.3.0</awaitility.version>
 		<wiremock.version>3.13.1</wiremock.version>
 		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
