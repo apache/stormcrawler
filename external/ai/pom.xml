@@ -37,7 +37,7 @@ under the License.
 
     <properties>
         <langchain4j.version>1.7.1</langchain4j.version>
-        <langchain4j.openai.version>1.7.1</langchain4j.openai.version>
+        <langchain4j.openai.version>1.8.0</langchain4j.openai.version>
     </properties>
 
     <dependencies>
