@@ -39,7 +39,7 @@ under the License.
 		<!-- dependency versions -->
 		<crawler-commons.version>1.5</crawler-commons.version>
 		<jsoup.version>1.21.2</jsoup.version>
-		<icu4j.version>77.1</icu4j.version>
+		<icu4j.version>78.1</icu4j.version>
 		<xerces.version>2.12.2</xerces.version>
 		<httpclient.version>4.5.14</httpclient.version>
 		<snakeyaml.version>2.4</snakeyaml.version>
