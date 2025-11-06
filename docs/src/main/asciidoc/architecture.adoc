@@ -89,9 +89,9 @@ The **SimpleFetcherBolt** does not do any of this, hence its name. It just fetch
 === Indexer Bolts
 The purpose of crawlers is often to index web pages to make them searchable. The project contains resources for indexing with popular search solutions such as:
 
-* link:https://github.com/apache/stormcrawler/blob/master/external/solr/src/main/java/com/digitalpebble/stormcrawler/solr/bolt/IndexerBolt.java[Apache SOLR]
-* link:https://github.com/apache/stormcrawler/blob/master/external/opensearch/src/main/java/com/digitalpebble/stormcrawler/elasticsearch/bolt/IndexerBolt.java[Elasticsearch]
-* link:https://github.com/apache/stormcrawler/blob/master/external/aws/src/main/java/com/digitalpebble/stormcrawler/aws/bolt/CloudSearchIndexerBolt.java[AWS CloudSearch]
+* link:https://github.com/apache/stormcrawler/blob/main/external/solr/src/main/java/com/digitalpebble/stormcrawler/solr/bolt/IndexerBolt.java[Apache SOLR]
+* link:https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/com/digitalpebble/stormcrawler/elasticsearch/bolt/IndexerBolt.java[Elasticsearch]
+* link:https://github.com/apache/stormcrawler/blob/main/external/aws/src/main/java/com/digitalpebble/stormcrawler/aws/bolt/CloudSearchIndexerBolt.java[AWS CloudSearch]
 
 All of these extend the class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/indexing/AbstractIndexerBolt.java[AbstractIndexerBolt].
 
@@ -117,14 +117,14 @@ You can easily build your own custom indexer to integrate with other storage sys
 === Parser Bolts
 ==== JSoupParserBolt
 
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] can be used to parse HTML documents and extract the outlinks, text, and metadata it contains. If you want to parse non-HTML documents, use the link:https://github.com/apache/stormcrawler/tree/master/external/src/main/java/com/digitalpebble/storm/crawler/tika[Tika-based ParserBolt] from the external modules.
+The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] can be used to parse HTML documents and extract the outlinks, text, and metadata it contains. If you want to parse non-HTML documents, use the link:https://github.com/apache/stormcrawler/tree/main/external/src/main/java/com/digitalpebble/storm/crawler/tika[Tika-based ParserBolt] from the external modules.
 
 This parser calls the [[URLFilters]] and [[ParseFilters]] defined in the configuration. Please note that it calls [[MetadataTransfer]] prior to calling the [[ParseFilters]]. If you create new Outlinks in your [[ParseFilters]], you'll need to make sure that you use MetadataTransfer there to inherit the Metadata from the parent document.
 
 The **JSoupParserBolt** automatically identifies the charset of the documents. It uses the link:StatusStream[status stream] to report parsing errors but also for the outlinks it extracts from a page. These would typically be used by an extension of link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/AbstractStatusUpdaterBolt.java[AbstractStatusUpdaterBolt] and persisted in some form of storage.
 
 ==== SiteMapParserBolt
-StormCrawler can handle sitemap files thanks to the **SiteMapParserBolt**. This bolt should be placed before the standard **ParserBolt** in the topology, as illustrated in link:https://github.com/apache/stormcrawler/blob/master/archetype/src/main/resources/archetype-resources/src/main/java/CrawlTopology.java[CrawlTopology].
+StormCrawler can handle sitemap files thanks to the **SiteMapParserBolt**. This bolt should be placed before the standard **ParserBolt** in the topology, as illustrated in link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/java/CrawlTopology.java[CrawlTopology].
 
 The reason for this is that the **SiteMapParserBolt** acts as a filter: it passes on any incoming tuples to the default stream so that they get processed by the **ParserBolt**, unless the tuple contains `isSitemap=true` in its metadata, in which case the **SiteMapParserBolt** will parse it itself. Any outlinks found in the sitemap files are then emitted on the [[StatusStream]].
 
@@ -151,7 +151,7 @@ public boolean needsDOM();
 * The `needsDOM` method indicates whether the ParseFilter instance requires the DOM structure. If no ParseFilters need it, the parsing bolt will skip generating the DOM, slightly improving performance.
 * The `configure` method takes a JSON object loaded by the wrapper class ParseFilters. The Storm configuration map can also be used to configure the filters, as described in link:Configuration[Configuration].
 
-Here is the default link:https://github.com/apache/stormcrawler/blob/master/core/src/main/resources/parsefilters.json[JSON configuration file] for ParseFilters. The configuration allows multiple instances of the same filter class with different parameters and supports complex parameter objects. ParseFilters are executed in the order they appear in the JSON file.
+Here is the default link:https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/parsefilters.json[JSON configuration file] for ParseFilters. The configuration allows multiple instances of the same filter class with different parameters and supports complex parameter objects. ParseFilters are executed in the order they appear in the JSON file.
 
 ===== Provided ParseFilters
 
@@ -207,7 +207,7 @@ public void configure(Map stormConf, JsonNode jsonNode);
 
 The configuration is done via a JSON file which is loaded by the wrapper class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/URLFilters.java[URLFilters]. The URLFilter instances can be used directly, but it is easier to use the class URLFilters instead. Some filter implementations can also be configured with the link:https://github.com/apache/stormcrawler/wiki/Configuration[standard configuration mechanism].
 
-Here is an example of a link:https://github.com/apache/stormcrawler/blob/master/archetype/src/main/resources/archetype-resources/src/main/resources/urlfilters.json[JSON configuration file].
+Here is an example of a link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/urlfilters.json[JSON configuration file].
 
 The JSON configuration allows loading several instances of the same filtering class with different parameters and can handle complex configuration objects since it makes no assumptions about the content of the field `param`. The URLFilters are executed in the order in which they are defined in the JSON file.
 
@@ -353,7 +353,7 @@ https.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProt
 * link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/httpclient/HttpProtocol.java[HttpClient] does not yet support HTTP/2.
 * link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/selenium/SeleniumProtocol.java[Selenium]: whether HTTP/2 is used or not depends on the used driver.
 
-Since link:https://github.com/apache/stormcrawler/pull/829[#829], the HTTP protocol version used is configurable via `http.protocol.versions` (see also comments in link:https://github.com/apache/stormcrawler/blob/master/core/src/main/resources/crawler-default.yaml[crawler-default.yaml]).
+Since link:https://github.com/apache/stormcrawler/pull/829[#829], the HTTP protocol version used is configurable via `http.protocol.versions` (see also comments in link:https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml[crawler-default.yaml]).
 
 For example, to force that only HTTP/1.1 is used:
 

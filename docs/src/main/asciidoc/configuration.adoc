@@ -151,8 +151,8 @@ The latter is used by extensions of the link:https://github.com/apache/stormcraw
 
 The behavior of the default **MetadataTransfer** class is driven by configuration only. It has the following options:
 
-* `metadata.transfer`:: list of metadata key values to filter or transfer to the outlinks. See link:https://github.com/DigitalPebble/storm-crawler/blob/master/core/src/main/resources/crawler-default.yaml#L23[crawler-default.yaml]
-* `metadata.persist`:: list of metadata key values to persist in the status storage. See link:https://github.com/DigitalPebble/storm-crawler/blob/master/core/src/main/resources/crawler-default.yaml#L28[crawler-default.yaml]
+* `metadata.transfer`:: list of metadata key values to filter or transfer to the outlinks. See link:https://github.com/DigitalPebble/storm-crawler/blob/main/core/src/main/resources/crawler-default.yaml#L23[crawler-default.yaml]
+* `metadata.persist`:: list of metadata key values to persist in the status storage. See link:https://github.com/DigitalPebble/storm-crawler/blob/main/core/src/main/resources/crawler-default.yaml#L28[crawler-default.yaml]
 * `metadata.track.path`:: whether to track the URL path or not. Boolean value, true by default.
 * `metadata.track.depth`:: whether to track the depth from seed. Boolean value, true by default.
 
@@ -160,4 +160,165 @@ Note that the method `getMetaForOutlink` calls `filter` to determine which key v
 
 === Configuration Options
 
-TODO
+The following tables describe all available configuration options and their default values.
+If one of the keys is not present in your YAML file, the default value will be taken.
+
+Note: Some configuration options may not be applicable depending on the specific components and
+features you are using in your Apache StormCrawler topology. Some external modules might define additional options not listed here.
+
+==== Fetching and Partitioning
+
+[cols="1,1,3", options="header"]
+|===
+| key | default value | description
+
+| fetcher.max.crawl.delay | 30 | The maximum number in seconds that will be accepted by Crawl-delay
+directives in robots.txt files. If the crawl-delay exceeds this value the behavior depends on the value of fetcher.max.crawl.delay.force.
+| fetcher.max.crawl.delay.force | false | Configures the behavior of fetcher if the robots.txt crawl-delay exceeds fetcher.max.crawl.delay. If false: the tuple is emitted to the StatusStream
+as an ERROR. If true: the queue delay is set to fetcher.max.crawl.delay.
+| fetcher.max.queue.size | -1 | The maximum length of the queue used to store items to be fetched by the FetcherBolt. A setting of -1 sets the length to Integer.MAX_VALUE.
+| fetcher.max.throttle.sleep | -1 | The maximum amount of time to wait between fetches; if exceeded, the item is sent to the back of the queue. Used in SimpleFetcherBolt. -1 disables it.
+| fetcher.max.urls.in.queues | -1 | Limits the number of URLs that can be stored in a fetch queue. -1 disables the limit.
+| fetcher.maxThreads.host/domain/ip | fetcher.threads.per.queue | Overwrites fetcher.threads.per.queue. Useful for crawling some domains/hosts/IPs more intensively.
+| fetcher.metrics.time.bucket.secs | 10 | Metrics events emitted every value seconds to the system stream.
+| fetcher.queue.mode | byHost | Possible values: byHost, byDomain, byIP. Determines queue grouping.
+| fetcher.server.delay | 1 | Delay between crawls in the same queue if no Crawl-delay
+is defined.
+| fetcher.server.delay.force | false | Defines fetcher behavior when the robots.txt crawl-delay is smaller than fetcher.server.delay.
+| fetcher.server.min.delay | 0 | Delay between crawls for queues with >1 thread. Ignores robots.txt.
+| fetcher.threads.number | 10 | Total concurrent threads fetching pages. Adjust carefully based on system capacity.
+| fetcher.threads.per.queue | 1 | Default number of threads per queue. Can be overridden.
+| fetcher.timeout.queue | -1 | Maximum wait time (seconds) for items in the queue. -1 disables timeout.
+| fetcherbolt.queue.debug.filepath | "" | Path to a debug log (e.g. /tmp/fetcher-dump-{port}).
+| http.agent.description | - | Description for the User-Agent header.
+| http.agent.email | - | Email address in User-Agent header.
+| http.agent.name | - | Name in User-Agent header.
+| http.agent.url | - | URL in User-Agent header.
+| http.agent.version | - | Version in User-Agent header.
+| http.basicauth.password | - | Password for http.basicauth.user.
+| http.basicauth.user | - | Username for Basic Authentication.
+| http.content.limit | -1 | Maximum HTTP response body size (bytes). Default: no limit.
+| http.protocol.implementation | org.apache.stormcrawler.protocol.httpclient.HttpProtocol | HTTP Protocol
+implementation.
+| http.proxy.host | - | HTTP proxy host.
+| http.proxy.pass | - | Proxy password.
+| http.proxy.port | 8080 | Proxy port.
+| http.proxy.user | - | Proxy username.
+| http.robots.403.allow | true | Defines behavior when robots.txt returns HTTP 403.
+| http.robots.agents | '' | Additional user-agent strings for interpreting robots.txt.
+| http.robots.file.skip | false | Ignore robots.txt rules (1.17+).
+| http.skip.robots | false | Deprecated (replaced by http.robots.file.skip).
+| http.store.headers | false | Whether to store response headers.
+| http.store.responsetime | true | Not yet implemented — store response time in Metadata.
+| http.timeout | 10000 | Connection timeout (ms).
+| http.use.cookies | false | Use cookies in subsequent requests.
+| https.protocol.implementation | org.apache.stormcrawler.protocol.httpclient.HttpProtocol | HTTPS Protocol
+implementation.
+| partition.url.mode | byHost | Defines how URLs are partitioned: byHost, byDomain, or byIP.
+| protocols | http,https | Supported protocols.
+| redirections.allowed | true | Allow URL redirects.
+| sitemap.discovery | false | Enable automatic sitemap discovery.
+|===
+
+==== Protocol
+
+[cols="1,1,3", options="header"]
+|===
+| key | default value | description
+
+| cacheConfigParamName | maximumSize=10000,expireAfterWrite=6h | CacheBuilder configuration for robots cache.
+| errorcacheConfigParamName | maximumSize=10000,expireAfterWrite=1h | CacheBuilder configuration for error cache.
+| file.encoding | UTF-8 | Encoding for FileProtocol.
+| http.custom.headers | - | Custom HTTP headers.
+| http.accept | - | HTTP Accept
+header.
+| http.accept.language | - | HTTP Accept-Language
+header.
+| http.content.partial.as.trimmed | false | Accepts partially fetched content in OKHTTP.
+| http.trust.everything | true | If true, trust all SSL/TLS connections.
+| navigationfilters.config.file | - | JSON config for NavigationFilter. See blog post
+.
+| selenium.addresses | - | WebDriver server addresses.
+| selenium.capabilities | - | Desired WebDriver capabilities
+.
+| selenium.delegated.protocol | - | Delegated protocol for selective Selenium usage.
+| selenium.implicitlyWait | 0 | WebDriver element search timeout.
+| selenium.instances.num | 1 | Number of instances per WebDriver connection.
+| selenium.pageLoadTimeout | 0 | WebDriver page load timeout.
+| selenium.setScriptTimeout | 0 | WebDriver script execution timeout.
+| topology.message.timeout.secs | -1 | OKHTTP message timeout.
+|===
+
+==== Indexing
+
+The values below are used by sub-classes of `AbstractIndexerBolt`.
+
+[cols="1,1,3", options="header"]
+|===
+| key | default value | description
+
+| indexer.md.filter | - | YAML list of key=value filters for metadata-based indexing.
+| indexer.md.mapping | - | YAML mapping from metadata fields to persistence layer fields.
+| indexer.text.fieldname | - | Field name for indexed HTML body text.
+| indexer.url.fieldname | - | Field name for indexed URL.
+|===
+
+==== Status Persistence
+
+This refers to persisting the status of a URL (e.g. ERROR, DISCOVERED etc.) along with asomething like a `nextFetchDate`
+that is being calculated by a link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/DefaultScheduler.java[Scheduler].
+
+[cols="1,1,3", options="header"]
+|===
+| key | default value | description
+
+| fetchInterval.default | 1440 | Default revisit interval (minutes). Used by DefaultScheduler
+.
+| fetchInterval.error | 44640 | Revisit interval for error pages (minutes).
+| fetchInterval.fetch.error | 120 | Revisit interval for fetch errors (minutes).
+| status.updater.cache.spec | maximumSize=10000, expireAfterAccess=1h | Cache specification
+.
+| status.updater.use.cache | true | Whether to use cache to avoid re-persisting URLs.
+|===
+
+==== Parsing
+
+Configures parsing of fetched text and the handling of discovered URIs
+
+[cols="1,1,3", options="header"]
+|===
+| key | default value | description
+
+| collections.file | collections.json | Config for CollectionTagger
+.
+| collections.key | collections | Key under which tags are stored in metadata.
+| feed.filter.hours.since.published | -1 | Discard feeds older than value hours.
+| feed.sniffContent | false | Try to detect feeds automatically.
+| parsefilters.config.file | parsefilters.json | Path to JSON config defining ParseFilters. See example
+.
+| parser.emitOutlinks | true | Emit discovered links as DISCOVERED tuples.
+| parser.emitOutlinks.max.per.page | -1 | Limit number of emitted links per page.
+| textextractor.exclude.tags | "" | HTML tags ignored by TextExtractor.
+| textextractor.include.pattern | "" | Regex patterns to include for TextExtractor.
+| textextractor.no.text | false | Disable text extraction entirely.
+| track.anchors | true | Add anchor text to outlink metadata.
+| urlfilters.config.file | urlfilters.json | JSON file defining URL filters. See default
+.
+|===
+
+====  Metadata
+
+Options on how Storm Crawler should handle metadata tracking as well as
+minimising metadata clashes
+
+[cols="1,1,3", options="header"]
+|===
+| key | default value | description
+
+| metadata.persist | - | Metadata to persist but not transfer to outlinks.
+| metadata.track.depth | true | Track crawl depth of URLs.
+| metadata.track.path | true | Track URL path history in metadata.
+| metadata.transfer | - | Metadata to transfer to outlinks.
+| metadata.transfer.class | org.apache.stormcrawler.util.MetadataTransfer | Class handling metadata transfer.
+| protocol.md.prefix | - | Prefix for remote metadata keys to avoid collisions.
+|===
