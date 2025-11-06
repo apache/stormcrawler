@@ -12,7 +12,7 @@ You'll be asked to enter a groupId (e.g. com.mycompany.crawler), an artefactId (
 
 This will not only create a fully formed project containing a POM with the dependency above but also a set of resources, configuration files and sample topology classes. Enter the directory you just created (should be the same as the artefactId you specified earlier) and follow the instructions on the README file.
 
-You will of course need to have both Apache Storm (2.8.2) and Apache Solr (9.8.0) installed.
+You will of course need to have both Apache Storm (2.8.3) and Apache Solr (9.8.0) installed.
 
 Official references:
 * [Apache Storm: Setting Up a Development Environment](https://storm.apache.org/releases/current/Setting-up-development-environment.html)
