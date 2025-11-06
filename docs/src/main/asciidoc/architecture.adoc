@@ -300,7 +300,42 @@ The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org
 The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/sitemap/SitemapFilter.java[SitemapFilter] discards the outlinks of URLs which are not sitemaps when sitemaps have been found.
 
 
+=== Metadata Transfer
+
+The class https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/util/MetadataTransfer.java[MetadataTransfer] is an important part of the framework and is used in key parts of a pipeline.
+
+* Fetching
+* Parsing
+* Updating bolts
+
+An instance (or extension) of MetadataTransfer gets created and configured with the method `public static MetadataTransfer getInstance(Map++<++String, Object++>++ conf)` which takes as parameter with the standard Apache Storm configuration.
+
+A *MetadataTransfer* instance has mainly two methods, both returning Metadata objects :
+
+* `getMetaForOutlink(String targetURL, String sourceURL,           Metadata parentMD)`
+* `filter(Metadata metadata)`
+
+The former is used when creating https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/Outlink.java[Outlinks] i.e. in the parsing bolts but also for handling redirections in the FetcherBolt(s)
+The latter is used by extensions of the https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/AbstractStatusUpdaterBolt.java[AbstractStatusUpdaterBolt] class to determine which *Metadata* should be persisted.
+
+The behavior of the default MetadataTransfer class is driven by configuration only. It has the following options.
+
+* `metadata.transfer` list of metadata key values to filter or transfer to the outlinks. See https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml#L23[crawler-default.yaml]
+* `metadata.persist` list of metadata key values to persist in the status storage. See https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml#L28[crawler-default.yaml]
+* `metadata.track.path` whether to track the URL path or not. Boolean value, true by default.
+* `metadata.track.depth` whether to track the depth from seed. Boolean value, true by default.
+
+Note that the method `getMetaForOutlink` calls `filter` to determine what to key values to keep.
+
 === Protocols
+
+StormCrawler supports multiple *network protocols* for fetching content from various sources on the web.
+Each protocol implementation defines how the crawler connects to a resource, sends requests, and handles responses such as status codes, headers, and content streams.
+
+Protocols are a key part of the fetching process and are used by StormCrawler’s *bolts* to retrieve data from remote servers.
+While HTTP and HTTPS are the most commonly used, other protocols like `file:` are also supported for local or distributed filesystem access.
+
+Use these configurations to fine-tune fetching performance, authentication, connection handling, and protocol-level optimizations across your crawler topology.
 
 ==== Network Protocols
 
@@ -414,3 +449,4 @@ metadata.persist:
 metadata.transfer:
   - set-cookie
 ----
+
