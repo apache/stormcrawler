@@ -12,14 +12,14 @@
 // limitations under the License.
 //
 
-Apache StormCrawler 3.3.x - Documentation
+Apache StormCrawler 3.x - Documentation
 =========================================
 Apache Software Foundation
 :doctype: article
 :toc: left
 :toclevels: 3
 :toc-position: left
-:toc-title: Apache StormCrawler 3.3.x - Documentation
+:toc-title: Apache StormCrawler 3.x - Documentation
 :numbered:
 
 include::overview.adoc[]
