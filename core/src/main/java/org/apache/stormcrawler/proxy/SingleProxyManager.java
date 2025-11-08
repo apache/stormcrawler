@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.proxy;
 
 import java.util.Locale;
@@ -22,7 +23,7 @@ import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.util.ConfUtils;
 
-/** SingleProxyManager is a ProxyManager implementation for a single proxy endpoint */
+/** SingleProxyManager is a ProxyManager implementation for a single proxy endpoint. */
 public class SingleProxyManager implements ProxyManager {
     private SCProxy proxy;
 

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -83,7 +84,7 @@ public class URLFilters extends URLFilter implements JSONResource {
     }
 
     /**
-     * Loads the filters from a JSON configuration file
+     * Loads the filters from a JSON configuration file.
      *
      * @throws IOException
      */
@@ -110,19 +111,21 @@ public class URLFilters extends URLFilter implements JSONResource {
             @Nullable URL sourceUrl,
             @Nullable Metadata sourceMetadata,
             @NotNull String urlToFilter) {
-        String normalizedURL = urlToFilter;
+        String normalizedUrl = urlToFilter;
         try {
             for (URLFilter filter : filters) {
                 long start = System.currentTimeMillis();
-                normalizedURL = filter.filter(sourceUrl, sourceMetadata, normalizedURL);
+                normalizedUrl = filter.filter(sourceUrl, sourceMetadata, normalizedUrl);
                 long end = System.currentTimeMillis();
                 LOG.debug("URLFilter {} took {} msec", filter.getClass().getName(), end - start);
-                if (normalizedURL == null) break;
+                if (normalizedUrl == null) {
+                    break;
+                }
             }
         } catch (Exception e) {
             LOG.error("URL filtering threw exception", e);
         }
-        return normalizedURL;
+        return normalizedUrl;
     }
 
     @Override
@@ -138,15 +141,15 @@ public class URLFilters extends URLFilter implements JSONResource {
         filters = list.toArray(new URLFilter[0]);
     }
 
-    /** Utility to check the filtering of a URL * */
+    /** Utility to check the filtering of a URL. */
     public static void main(String[] args) throws ParseException {
 
         Config conf = new Config();
 
         // loads the default configuration file
-        Map<String, Object> defaultSCConfig =
+        Map<String, Object> defaultStormCrawlerConfig =
                 Utils.findAndReadConfigFile("crawler-default.yaml", false);
-        conf.putAll(ConfUtils.extractConfigElement(defaultSCConfig));
+        conf.putAll(ConfUtils.extractConfigElement(defaultStormCrawlerConfig));
 
         String configFile = "urlfilters.json";
 
@@ -167,22 +170,22 @@ public class URLFilters extends URLFilter implements JSONResource {
         }
 
         // read URL to check
-        String inputURL = cmd.getArgList().get(0);
+        String inputUrl = cmd.getArgList().get(0);
 
         // if a URL has been specified in 2nd position
-        String sourceURL = inputURL;
+        String sourceUrl = inputUrl;
         if (cmd.getArgList().size() > 1) {
-            sourceURL = cmd.getArgList().get(1);
+            sourceUrl = cmd.getArgList().get(1);
         }
 
         try {
             URLFilters filters = new URLFilters(conf, configFile);
-            String normalizedURL = inputURL;
+            String normalizedUrl = inputUrl;
             try {
                 for (URLFilter filter : filters.filters) {
                     long start = System.currentTimeMillis();
-                    normalizedURL =
-                            filter.filter(new URL(sourceURL), new Metadata(), normalizedURL);
+                    normalizedUrl =
+                            filter.filter(new URL(sourceUrl), new Metadata(), normalizedUrl);
                     long end = System.currentTimeMillis();
                     System.out.println(
                             "\t["
@@ -190,8 +193,10 @@ public class URLFilters extends URLFilter implements JSONResource {
                                     + "] "
                                     + (end - start)
                                     + "msec => "
-                                    + normalizedURL);
-                    if (normalizedURL == null) break;
+                                    + normalizedUrl);
+                    if (normalizedUrl == null) {
+                        break;
+                    }
                 }
             } catch (Exception e) {
                 LOG.error("URL filtering threw exception", e);

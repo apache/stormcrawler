@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.bolt;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
@@ -86,7 +87,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
     private ReducedMetric averagedMetrics;
 
-    /** Delay in minutes used for scheduling sub-sitemaps * */
+    /** Delay in minutes used for scheduling sub-sitemaps. */
     private int scheduleSitemapsWithDelay = -1;
 
     private List<Extension> extensionsToParse;
@@ -109,16 +110,16 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
         String isSitemap = metadata.getFirstValue(isSitemapKey);
 
-        boolean treatAsSM = Boolean.parseBoolean(isSitemap);
+        boolean treatAsSitemap = Boolean.parseBoolean(isSitemap);
 
         // doesn't have the key and want to rely on the clue
         if (isSitemap == null && looksLikeSitemap) {
             LOG.info("{} detected as sitemap based on content", url);
-            treatAsSM = true;
+            treatAsSitemap = true;
         }
 
         // decided that it is not a sitemap file
-        if (!treatAsSM) {
+        if (!treatAsSitemap) {
             LOG.debug("Not a sitemap {}", url);
             // just pass it on
             metadata.setValue(isSitemapKey, "false");
@@ -182,14 +183,14 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
             String url, byte[] content, String contentType, Metadata parentMetadata)
             throws UnknownFormatException, IOException {
 
-        URL sURL = new URL(url);
+        URL url1 = new URL(url);
         long start = System.currentTimeMillis();
         AbstractSiteMap siteMap;
         // let the parser guess what the mimetype is
         if (StringUtils.isBlank(contentType) || contentType.contains("octet-stream")) {
-            siteMap = parser.parseSiteMap(content, sURL);
+            siteMap = parser.parseSiteMap(content, url1);
         } else {
-            siteMap = parser.parseSiteMap(contentType, content, sURL);
+            siteMap = parser.parseSiteMap(contentType, content, url1);
         }
         long end = System.currentTimeMillis();
         averagedMetrics.update(end - start);
@@ -229,7 +230,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
                 Outlink ol =
                         filterOutlink(
-                                sURL,
+                                url1,
                                 target,
                                 parentMetadata,
                                 isSitemapKey,
@@ -252,16 +253,15 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
                 links.add(ol);
                 LOG.debug("{} : [sitemap] {}", url, target);
             }
-        }
-        // sitemap files
-        else {
+        } else {
+            // sitemap files
             SiteMap sm = (SiteMap) siteMap;
-            // TODO see what we can do with the LastModified info
-            Collection<SiteMapURL> sitemapURLs = sm.getSiteMapUrls();
-            for (SiteMapURL smurl : sitemapURLs) {
-                // TODO handle priority in metadata
+            // TODO: see what we can do with the LastModified info
+            Collection<SiteMapURL> sitemapUrls = sm.getSiteMapUrls();
+            for (SiteMapURL smurl : sitemapUrls) {
+                // TODO: handle priority in metadata
                 double priority = smurl.getPriority();
-                // TODO convert the frequency into a numerical value and handle
+                // TODO: convert the frequency into a numerical value and handle
                 // it in metadata
                 ChangeFrequency freq = smurl.getChangeFrequency();
 
@@ -288,7 +288,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
                 Outlink ol =
                         filterOutlink(
-                                sURL,
+                                url1,
                                 target,
                                 parentMetadata,
                                 isSitemapKey,

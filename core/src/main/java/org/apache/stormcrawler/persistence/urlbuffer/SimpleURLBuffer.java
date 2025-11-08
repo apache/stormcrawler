@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence.urlbuffer;
 
 import java.util.Iterator;
@@ -34,7 +35,7 @@ public class SimpleURLBuffer extends AbstractURLBuffer {
     static final Logger LOG = LoggerFactory.getLogger(SimpleURLBuffer.class);
 
     /**
-     * Retrieves the next available URL, guarantees that the URLs are always perfectly shuffled
+     * Retrieves the next available URL, guarantees that the URLs are always perfectly shuffled.
      *
      * @return null if no entries are available
      */
@@ -75,16 +76,15 @@ public class SimpleURLBuffer extends AbstractURLBuffer {
         if (!queue.isEmpty()) {
             LOG.debug("adding to the back of the queue {}", queueName);
             queues.put(queueName, queue);
-        }
-        // notify that the queue is empty
-        else {
+        } else {
+            // notify that the queue is empty
             if (listener != null) {
                 listener.emptyQueue(queueName);
             }
         }
 
         // remove it from the list of URLs in the queue
-        in_buffer.remove(item.url);
+        inBuffer.remove(item.url);
         return new Values(item.url, item.metadata);
     }
 }

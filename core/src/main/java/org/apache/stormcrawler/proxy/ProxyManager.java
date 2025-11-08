@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.proxy;
 
 import java.util.Optional;
@@ -22,7 +23,7 @@ import org.apache.stormcrawler.Metadata;
 
 /**
  * Proxy manager is an abstract class specification that details the required interface of a proxy
- * manager
+ * manager.
  */
 public interface ProxyManager {
     void configure(Config conf);

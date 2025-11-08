@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.file;
 
 import java.io.File;
@@ -124,7 +125,7 @@ public class FileResponse {
     }
 
     private byte[] generateSitemap(File dir) {
-        File[] files = dir.listFiles();
+        final File[] files = dir.listFiles();
         StringBuilder sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         sb.append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
         sb.append("<url><loc>file://").append(dir.getPath()).append("</loc>\n");

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -42,7 +43,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.slf4j.LoggerFactory;
 
-/** Wrapper for the JSoupFilters defined in a JSON configuration */
+/** Wrapper for the JSoupFilters defined in a JSON configuration. */
 public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, JSONResource {
 
     public static final JSoupFilters emptyParseFilter = new JSoupFilters();
@@ -79,7 +80,7 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
         return JSoupFilters.emptyParseFilter;
     }
 
-    /** loads the filters from a JSON configuration file */
+    /** loads the filters from a JSON configuration file. */
     public JSoupFilters(Map<String, Object> stormConf, String configFile) throws IOException {
         this.configFile = configFile;
         this.stormConf = stormConf;
@@ -130,9 +131,9 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
         Config conf = new Config();
 
         // loads the default configuration file
-        Map<String, Object> defaultSCConfig =
+        Map<String, Object> defaultStormCrawlerConfig =
                 Utils.findAndReadConfigFile("crawler-default.yaml", false);
-        conf.putAll(ConfUtils.extractConfigElement(defaultSCConfig));
+        conf.putAll(ConfUtils.extractConfigElement(defaultStormCrawlerConfig));
 
         Options options = new Options();
         options.addOption("c", true, "stormcrawler configuration file");

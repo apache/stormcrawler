@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import java.nio.ByteBuffer;
@@ -24,7 +25,7 @@ import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Metadata;
 
-/** Converts a byte array into URL + metadata */
+/** Converts a byte array into URL + metadata. */
 public class StringTabScheme implements Scheme {
 
     @Override
@@ -32,7 +33,9 @@ public class StringTabScheme implements Scheme {
         String input = new String(bytes.array(), StandardCharsets.UTF_8);
 
         String[] tokens = input.split("\t");
-        if (tokens.length < 1) return new Values();
+        if (tokens.length < 1) {
+            return new Values();
+        }
 
         String url = tokens[0];
         Metadata metadata = null;
@@ -47,11 +50,15 @@ public class StringTabScheme implements Scheme {
                 key = token.substring(0, firstequals);
                 value = token.substring(firstequals + 1);
             }
-            if (metadata == null) metadata = new Metadata();
+            if (metadata == null) {
+                metadata = new Metadata();
+            }
             metadata.addValue(key, value);
         }
 
-        if (metadata == null) metadata = new Metadata();
+        if (metadata == null) {
+            metadata = new Metadata();
+        }
 
         return new Values(url, metadata);
     }

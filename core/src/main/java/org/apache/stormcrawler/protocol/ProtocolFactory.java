@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol;
 
 import java.net.URL;
@@ -75,7 +76,9 @@ public class ProtocolFactory {
                 } else if (protocol.equalsIgnoreCase("https")) {
                     protocolimplementation =
                             "org.apache.stormcrawler.protocol.httpclient.HttpProtocol";
-                } else throw new RuntimeException(paramName + "should not have an empty value");
+                } else {
+                    throw new RuntimeException(paramName + "should not have an empty value");
+                }
             }
             // we have a value -> is it correct?
             Protocol[] protocolInstances = new Protocol[protocolInstanceNum];
@@ -93,11 +96,13 @@ public class ProtocolFactory {
     public synchronized void cleanup() {
         cache.forEach(
                 (k, v) -> {
-                    for (Protocol p : v) p.cleanup();
+                    for (Protocol p : v) {
+                        p.cleanup();
+                    }
                 });
     }
 
-    /** Returns an instance of the protocol to use for a given URL */
+    /** Returns an instance of the protocol to use for a given URL. */
     public synchronized Protocol getProtocol(URL url) {
         // get the protocol
         String protocol = url.getProtocol();

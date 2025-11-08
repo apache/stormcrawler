@@ -97,7 +97,7 @@ public class HybridSpout extends AggregationSpout implements EmptyQueueListener 
 
         if (queryDate == null) {
             queryDate = new Date();
-            lastTimeResetToNOW = Instant.now();
+            lastTimeResetToNow = Instant.now();
         }
 
         String formattedQueryDate = ISODateTimeFormat.dateTimeNoMillis().print(queryDate.getTime());

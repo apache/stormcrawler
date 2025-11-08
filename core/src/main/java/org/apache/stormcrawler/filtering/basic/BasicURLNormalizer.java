@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.basic;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -47,7 +48,7 @@ public class BasicURLNormalizer extends URLFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(BasicURLNormalizer.class);
 
-    /** Nutch 1098 - finds URL encoded parts of the URL */
+    /** Nutch 1098 - finds URL encoded parts of the URL. */
     private static final Pattern unescapeRulePattern = Pattern.compile("%([0-9A-Fa-f]{2})");
 
     /** https://github.com/apache/stormcrawler/issues/401 * */
@@ -56,7 +57,7 @@ public class BasicURLNormalizer extends URLFilter {
     // charset used for encoding URLs before escaping
     private static final Charset utf8 = StandardCharsets.UTF_8;
 
-    /** look-up table for characters which should not be escaped in URL paths */
+    /** look-up table for characters which should not be escaped in URL paths. */
     private static final boolean[] unescapedCharacters = new boolean[128];
 
     private static final Pattern thirtytwobithash = Pattern.compile("[a-fA-F\\d]{32}");
@@ -84,7 +85,7 @@ public class BasicURLNormalizer extends URLFilter {
 
     boolean removeAnchorPart = true;
     boolean unmangleQueryString = true;
-    boolean checkValidURI = true;
+    boolean checkValidUri = true;
     boolean removeHashes = false;
     private boolean hostIDNtoASCII = false;
     final Set<String> queryElementsToRemove = new TreeSet<>();
@@ -114,13 +115,15 @@ public class BasicURLNormalizer extends URLFilter {
             urlToFilter = processQueryElements(urlToFilter);
         }
 
-        if (urlToFilter == null) return null;
+        if (urlToFilter == null) {
+            return null;
+        }
 
         try {
-            URL theURL = new URL(urlToFilter);
-            String file = theURL.getFile();
-            String protocol = theURL.getProtocol();
-            String host = theURL.getHost();
+            URL theUrl = new URL(urlToFilter);
+            String file = theUrl.getFile();
+            String protocol = theUrl.getProtocol();
+            String host = theUrl.getHost();
             boolean hasChanged = !urlToFilter.startsWith(protocol); // lowercased protocol
 
             if (host != null) {
@@ -141,7 +144,7 @@ public class BasicURLNormalizer extends URLFilter {
                 }
             }
 
-            int port = theURL.getPort();
+            int port = theUrl.getPort();
             // properly encode characters in path/file using percent-encoding
             String file2 = unescapePath(file);
             file2 = escapePath(file2);
@@ -155,7 +158,7 @@ public class BasicURLNormalizer extends URLFilter {
             return null;
         }
 
-        if (checkValidURI) {
+        if (checkValidUri) {
             try {
                 URI uri = URI.create(urlToFilter);
                 urlToFilter = uri.normalize().toString();
@@ -196,7 +199,7 @@ public class BasicURLNormalizer extends URLFilter {
 
         node = paramNode.get("checkValidURI");
         if (node != null) {
-            checkValidURI = node.booleanValue();
+            checkValidUri = node.booleanValue();
         }
 
         node = paramNode.get("removeHashes");
@@ -323,8 +326,8 @@ public class BasicURLNormalizer extends URLFilter {
     /**
      * Remove % encoding from path segment in URL for characters which should be unescaped according
      * to <a href="https://tools.ietf.org/html/rfc3986#section-2.2">RFC3986</a> as well as
-     * non-standard implementations of percent encoding, see <https://en.
-     * wikipedia.org/wiki/Percent-encoding#Non-standard_implementations>.
+     * non-standard implementations of percent encoding, see
+     * https://en.wikipedia.org/wiki/Percent-encoding#Non-standard_implementations.
      */
     private String unescapePath(String path) {
         Matcher matcher = illegalEscapePattern.matcher(path);

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence.urlbuffer;
 
 import java.util.Map;
@@ -42,7 +43,7 @@ public interface URLBuffer {
     /** Implementation to use for URLBuffer. Must implement the interface URLBuffer. */
     String bufferClassParamName = "urlbuffer.class";
 
-    /** Returns a URLBuffer instance based on the configuration * */
+    /** Returns a URLBuffer instance based on the configuration. */
     static @NotNull URLBuffer createInstance(@NotNull Map<String, Object> stormConf) {
 
         String className = ConfUtils.getString(stormConf, bufferClassParamName);
@@ -61,7 +62,7 @@ public interface URLBuffer {
         return buffer;
     }
 
-    /** Replace with {@link URLBuffer#createInstance(Map)} */
+    /** Replace with {@link URLBuffer#createInstance(Map)}. */
     @Deprecated
     static URLBuffer getInstance(Map<String, Object> stormConf) {
         return URLBuffer.createInstance(stormConf);
@@ -74,7 +75,7 @@ public interface URLBuffer {
      *
      * @return false if the URL was already in the buffer, true if it wasn't and was added
      */
-    boolean add(String URL, Metadata m, String key);
+    boolean add(String url, Metadata m, String key);
 
     /**
      * Stores the URL and its Metadata using the hostname as key.
@@ -83,31 +84,31 @@ public interface URLBuffer {
      *
      * @return false if the URL was already in the buffer, true if it wasn't and was added
      */
-    default boolean add(String URL, Metadata m) {
-        return add(URL, m, null);
+    default boolean add(String url, Metadata m) {
+        return add(url, m, null);
     }
 
-    /** Total number of URLs in the buffer * */
+    /** Total number of URLs in the buffer. */
     int size();
 
-    /** Total number of queues in the buffer * */
+    /** Total number of queues in the buffer. */
     int numQueues();
 
     /**
-     * Retrieves the next available URL, guarantees that the URLs are always perfectly shuffled
+     * Retrieves the next available URL, guarantees that the URLs are always perfectly shuffled.
      *
      * <p>Implementations of this method should be synchronised
      */
     Values next();
 
-    /** Implementations of this method should be synchronised */
+    /** Implementations of this method should be synchronised. */
     boolean hasNext();
 
     void setEmptyQueueListener(EmptyQueueListener l);
 
     /**
      * Notify the buffer that a URL has been successfully processed used e.g to compute an ideal
-     * delay for a host queue
+     * delay for a host queue.
      */
     default void acked(String url) {
         // do nothing with the information about URLs being acked

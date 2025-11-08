@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import com.ibm.icu.text.CharsetDetector;
@@ -125,12 +126,12 @@ public class CharsetIdentification {
         return DEFAULT_CHARSET.name();
     }
 
-    /** Returns the charset declared by the server if any */
+    /** Returns the charset declared by the server if any. */
     private static String getCharsetFromHTTP(Metadata metadata) {
         return getCharsetFromContentType(metadata.getFirstValue(HttpHeaders.CONTENT_TYPE));
     }
 
-    /** Detects any BOMs and returns the corresponding charset */
+    /** Detects any BOMs and returns the corresponding charset. */
     private static String getCharsetFromBOM(final byte[] byteData) {
         try (BOMInputStream bomIn = new BOMInputStream(new ByteArrayInputStream(byteData))) {
             ByteOrderMark bom = bomIn.getBOM();
@@ -151,7 +152,9 @@ public class CharsetIdentification {
         CharsetDetector charsetDetector = new CharsetDetector();
         charsetDetector.enableInputFilter(true);
         // give it a hint
-        if (declaredCharset != null) charsetDetector.setDeclaredEncoding(declaredCharset);
+        if (declaredCharset != null) {
+            charsetDetector.setDeclaredEncoding(declaredCharset);
+        }
         // trim the content of the text for the detection
         byte[] subContent = content;
         if (maxLengthCharsetDetection != -1 && content.length > maxLengthCharsetDetection) {
@@ -171,7 +174,7 @@ public class CharsetIdentification {
      * Attempt to find a META tag in the HTML that hints at the character set used to write the
      * document.
      */
-    private static String getCharsetFromMeta(byte buffer[], int maxlength) {
+    private static String getCharsetFromMeta(byte[] buffer, int maxlength) {
         // convert to UTF-8 String -- which hopefully will not mess up the
         // characters we're interested in...
         int len = buffer.length;
@@ -208,11 +211,15 @@ public class CharsetIdentification {
             // charset="gb2312">
             Elements metaElements = doc.select("meta[http-equiv=content-type], meta[charset]");
             for (Element meta : metaElements) {
-                if (meta.hasAttr("http-equiv"))
+                if (meta.hasAttr("http-equiv")) {
                     foundCharset = getCharsetFromContentType(meta.attr("content"));
-                if (foundCharset == null && meta.hasAttr("charset"))
+                }
+                if (foundCharset == null && meta.hasAttr("charset")) {
                     foundCharset = meta.attr("charset");
-                if (foundCharset != null) return foundCharset;
+                }
+                if (foundCharset != null) {
+                    return foundCharset;
+                }
             }
         } catch (Exception e) {
             foundCharset = null;
@@ -229,7 +236,9 @@ public class CharsetIdentification {
      * @return "EUC-JP", or null if not found. Charset is trimmed and uppercased.
      */
     private static String getCharsetFromContentType(String contentType) {
-        if (contentType == null) return null;
+        if (contentType == null) {
+            return null;
+        }
         Matcher m = charsetPattern.matcher(contentType);
         if (m.find()) {
             String charset = m.group(1).trim();
@@ -240,12 +249,18 @@ public class CharsetIdentification {
     }
 
     private static String validateCharset(String cs) {
-        if (cs == null || cs.length() == 0) return null;
+        if (cs == null || cs.length() == 0) {
+            return null;
+        }
         cs = cs.trim().replaceAll("[\"']", "");
         try {
-            if (Charset.isSupported(cs)) return cs;
+            if (Charset.isSupported(cs)) {
+                return cs;
+            }
             cs = cs.toUpperCase(Locale.ENGLISH);
-            if (Charset.isSupported(cs)) return cs;
+            if (Charset.isSupported(cs)) {
+                return cs;
+            }
         } catch (IllegalCharsetNameException e) {
         }
         return null;

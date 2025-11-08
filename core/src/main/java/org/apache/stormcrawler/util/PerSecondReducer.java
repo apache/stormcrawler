@@ -14,11 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import org.apache.storm.metric.api.IReducer;
 
-/** Used to return an average value per second * */
+/** Used to return an average value per second. */
 public class PerSecondReducer implements IReducer<TimeReducerState> {
 
     @Override
@@ -47,7 +48,9 @@ public class PerSecondReducer implements IReducer<TimeReducerState> {
     public Object extractResult(TimeReducerState accumulator) {
         // time spent
         double msec = System.currentTimeMillis() - accumulator.started;
-        if (msec == 0) return 0;
+        if (msec == 0) {
+            return 0;
+        }
         double permsec = accumulator.sum / msec;
         return permsec * 1000d;
     }

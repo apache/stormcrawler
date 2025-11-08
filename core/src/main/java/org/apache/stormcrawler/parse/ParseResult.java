@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse;
 
 import java.util.ArrayList;
@@ -68,32 +69,32 @@ public class ParseResult implements Iterable<Map.Entry<String, ParseData>> {
      * @return An existent instance of Parse for the given URL or an empty one if none can be found,
      *     useful to avoid unnecessary checks in the parse plugins
      */
-    public ParseData get(String URL) {
-        ParseData parse = parseMap.get(URL);
+    public ParseData get(String url) {
+        ParseData parse = parseMap.get(url);
         if (parse == null) {
             parse = new ParseData();
-            parseMap.put(URL, parse);
+            parseMap.put(url, parse);
             return parse;
         }
         return parse;
     }
 
-    public String[] getValues(String URL, String key) {
-        ParseData parseInfo = parseMap.get(URL);
+    public String[] getValues(String url, String key) {
+        ParseData parseInfo = parseMap.get(url);
         if (parseInfo == null) {
             return null;
         }
         return parseInfo.getValues(key);
     }
 
-    /** Add the key value to the metadata object for a given URL * */
-    public void put(String URL, String key, String value) {
-        get(URL).getMetadata().addValue(key, value);
+    /** Add the key value to the metadata object for a given URL. */
+    public void put(String url, String key, String value) {
+        get(url).getMetadata().addValue(key, value);
     }
 
-    /** Set the metadata for a given URL * */
-    public void set(String URL, Metadata metadata) {
-        get(URL).setMetadata(metadata);
+    /** Set the metadata for a given URL. */
+    public void set(String url, Metadata metadata) {
+        get(url).setMetadata(metadata);
     }
 
     public Map<String, ParseData> getParseMap() {

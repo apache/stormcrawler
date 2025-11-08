@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import java.net.URL;
@@ -61,7 +62,9 @@ public class CookieConverter {
 
             for (int i = 1; i < tokens.length; i++) {
                 String ti = tokens[i].trim();
-                if (ti.equalsIgnoreCase("secure")) secure = true;
+                if (ti.equalsIgnoreCase("secure")) {
+                    secure = true;
+                }
                 if (ti.toLowerCase(Locale.ROOT).startsWith("path=")) {
                     path = ti.substring(5);
                 }
@@ -79,22 +82,29 @@ public class CookieConverter {
             if (domain != null) {
                 cookie.setDomain(domain);
 
-                if (!checkDomainMatchToUrl(domain, targetURL.getHost())) continue;
+                if (!checkDomainMatchToUrl(domain, targetURL.getHost())) {
+                    continue;
+                }
             }
 
             // check path
             if (path != null) {
                 cookie.setPath(path);
 
-                if (!path.equals("") && !path.equals("/") && !targetURL.getPath().startsWith(path))
+                if (!path.equals("")
+                        && !path.equals("/")
+                        && !targetURL.getPath().startsWith(path)) {
                     continue;
+                }
             }
 
             // check secure
             if (secure) {
                 cookie.setSecure(secure);
 
-                if (!targetURL.getProtocol().equalsIgnoreCase("https")) continue;
+                if (!targetURL.getProtocol().equalsIgnoreCase("https")) {
+                    continue;
+                }
             }
 
             // check expiration
@@ -104,7 +114,9 @@ public class CookieConverter {
                     cookie.setExpiryDate(expirationDate);
 
                     // check that it hasn't expired?
-                    if (cookie.isExpired(new Date())) continue;
+                    if (cookie.isExpired(new Date())) {
+                        continue;
+                    }
 
                     cookie.setExpiryDate(expirationDate);
                 } catch (ParseException e) {

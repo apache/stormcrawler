@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse;
 
 import org.apache.html.dom.HTMLDocumentImpl;
@@ -29,7 +30,7 @@ import org.w3c.dom.Text;
 /** Adapted from org.jsoup.helper.W3CDom but does not transfer namespaces. * */
 public final class DocumentFragmentBuilder {
 
-    /** Restrict instantiation */
+    /** Restrict instantiation. */
     private DocumentFragmentBuilder() {}
 
     public static DocumentFragment fromJsoup(org.jsoup.nodes.Document jsoupDocument) {
@@ -93,8 +94,9 @@ public final class DocumentFragmentBuilder {
             for (Attribute attribute : source.attributes()) {
                 // valid xml attribute names are: ^[a-zA-Z_:][-a-zA-Z0-9_:.]
                 String key = attribute.getKey().replaceAll("[^-a-zA-Z0-9_:.]", "");
-                if (key.matches("[a-zA-Z_:][-a-zA-Z0-9_:.]*"))
+                if (key.matches("[a-zA-Z_:][-a-zA-Z0-9_:.]*")) {
                     el.setAttribute(key, attribute.getValue());
+                }
             }
         }
     }

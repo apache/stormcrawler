@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -118,10 +119,10 @@ public class CollectionTagger extends ParseFilter implements JSONResource {
     }
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
-        String[] tags = collections.tag(URL);
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+        String[] tags = collections.tag(url);
         if (tags.length > 0) {
-            parse.get(URL).getMetadata().setValues(key, tags);
+            parse.get(url).getMetadata().setValues(key, tags);
         }
     }
 }

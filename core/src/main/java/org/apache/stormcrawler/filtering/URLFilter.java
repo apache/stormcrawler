@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering;
 
 import java.net.URL;
@@ -32,7 +33,7 @@ public abstract class URLFilter extends AbstractConfigurable {
 
     /**
      * Returns null if the URL is to be removed or a normalised representation which can correspond
-     * to the input URL
+     * to the input URL.
      *
      * @param sourceUrl the URL of the page where the URL was found. Can be null.
      * @param sourceMetadata the metadata collected for the page

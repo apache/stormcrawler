@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse;
 
 import org.apache.storm.task.IBolt;
@@ -29,19 +30,19 @@ import org.w3c.dom.DocumentFragment;
 public abstract class ParseFilter extends AbstractConfigurable {
 
     /**
-     * Called when parsing a specific page
+     * Called when parsing a specific page.
      *
-     * @param URL the URL of the page being parsed
+     * @param url the URL of the page being parsed
      * @param content the content being parsed
      * @param doc the DOM tree resulting of the parsing of the content or null if {@link
      *     #needsDOM()} returns <code>false</code>
      * @param parse the metadata to be updated with the resulting of the parsing
      */
     public abstract void filter(
-            String URL, byte[] content, DocumentFragment doc, ParseResult parse);
+            String url, byte[] content, DocumentFragment doc, ParseResult parse);
 
     /**
-     * Specifies whether this filter requires a DOM representation of the document
+     * Specifies whether this filter requires a DOM representation of the document.
      *
      * @return <code>true</code>if this needs a DOM representation of the document, <code>false
      *     </code> otherwise.

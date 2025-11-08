@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.proxy;
 
 import java.io.File;
@@ -31,7 +32,7 @@ import org.apache.stormcrawler.protocol.httpclient.HttpProtocol;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.LoggerFactory;
 
-/** MultiProxyManager is a ProxyManager implementation for a multiple proxy endpoints */
+/** MultiProxyManager is a ProxyManager implementation for a multiple proxy endpoints. */
 public class MultiProxyManager implements ProxyManager {
     public enum ProxyRotation {
         RANDOM,
@@ -46,7 +47,7 @@ public class MultiProxyManager implements ProxyManager {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(HttpProtocol.class);
 
-    /** Default constructor for setting up the proxy manager */
+    /** Default constructor for setting up the proxy manager. */
     private void init(ProxyRotation rotation) {
         // create rng with nano seed
         this.rng = new Random(System.nanoTime());
@@ -75,11 +76,12 @@ public class MultiProxyManager implements ProxyManager {
                 proxyRotationScheme = ProxyRotation.LEAST_USED;
                 break;
             default:
-                if (!proxyRot.equals("ROUND_ROBIN"))
+                if (!proxyRot.equals("ROUND_ROBIN")) {
                     LOG.error(
                             "invalid proxy rotation scheme passed `{}` defaulting to ROUND_ROBIN; options: {}",
                             proxyRot,
                             ProxyRotation.values());
+                }
                 proxyRotationScheme = ProxyRotation.ROUND_ROBIN;
                 break;
         }
@@ -124,7 +126,9 @@ public class MultiProxyManager implements ProxyManager {
             if (proxyConnectionString.startsWith("#")
                     || proxyConnectionString.startsWith("//")
                     || proxyConnectionString.isEmpty()
-                    || proxyConnectionString.trim().isEmpty()) continue;
+                    || proxyConnectionString.trim().isEmpty()) {
+                continue;
+            }
 
             // attempt to load proxy connection string and add proxy to proxies array
             fileProxies =
@@ -175,7 +179,9 @@ public class MultiProxyManager implements ProxyManager {
 
     private SCProxy getRoundRobin() {
         // ensure that last accessed does not exceed proxy list length
-        if (this.lastAccessedIndex.get() >= this.proxies.length) this.lastAccessedIndex.set(0);
+        if (this.lastAccessedIndex.get() >= this.proxies.length) {
+            this.lastAccessedIndex.set(0);
+        }
 
         // retrieve the current proxy, increment usage index, and return
         return this.proxies[this.lastAccessedIndex.getAndIncrement()];

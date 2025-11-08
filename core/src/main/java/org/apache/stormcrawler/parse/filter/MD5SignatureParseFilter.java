@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -47,18 +48,18 @@ import org.w3c.dom.DocumentFragment;
  */
 public class MD5SignatureParseFilter extends ParseFilter {
 
-    private String key_name = "signature";
+    private String keyName = "signature";
 
     private boolean useText = false;
 
     private String copyKeyName = null;
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
-        ParseData parseData = parse.get(URL);
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+        ParseData parseData = parse.get(url);
         Metadata metadata = parseData.getMetadata();
         if (copyKeyName != null) {
-            String signature = metadata.getFirstValue(key_name);
+            String signature = metadata.getFirstValue(keyName);
             if (signature != null) {
                 metadata.setValue(copyKeyName, signature);
             }
@@ -73,10 +74,10 @@ public class MD5SignatureParseFilter extends ParseFilter {
             data = content;
         }
         if (data == null) {
-            data = URL.getBytes(StandardCharsets.UTF_8);
+            data = url.getBytes(StandardCharsets.UTF_8);
         }
         String hex = DigestUtils.md5Hex(data);
-        metadata.setValue(key_name, hex);
+        metadata.setValue(keyName, hex);
     }
 
     @Override
@@ -87,7 +88,7 @@ public class MD5SignatureParseFilter extends ParseFilter {
         }
         node = filterParams.get("keyName");
         if (node != null && node.isTextual()) {
-            key_name = node.asText("signature");
+            keyName = node.asText("signature");
         }
         node = filterParams.get("keyNameCopy");
         if (node != null && node.isTextual() && StringUtils.isNotBlank(node.asText(""))) {

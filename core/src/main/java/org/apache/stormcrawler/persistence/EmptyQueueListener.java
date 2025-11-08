@@ -14,9 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence;
 
-/** Used by URLBuffer to inform the spouts when a queue has no more URLs in it */
+/** Used by URLBuffer to inform the spouts when a queue has no more URLs in it. */
 @FunctionalInterface
 public interface EmptyQueueListener {
     void emptyQueue(String queueName);

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -54,7 +55,9 @@ public class CommaSeparatedToMultivaluedMetadata extends ParseFilter {
         Metadata m = parse.get(url).getMetadata();
         for (String key : keys) {
             String val = m.getFirstValue(key);
-            if (val == null) continue;
+            if (val == null) {
+                continue;
+            }
             m.remove(key);
             String[] tokens = val.split(" *, *");
             for (String t : tokens) {

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.core.JsonPointer;
@@ -37,7 +38,7 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
 import org.w3c.dom.Node;
 
-/** Extracts data from JSON-LD representation (https://json-ld.org/) */
+/** Extracts data from JSON-LD representation (https://json-ld.org/). */
 public class LDJsonParseFilter extends ParseFilter {
 
     public static final Logger LOG = LoggerFactory.getLogger(LDJsonParseFilter.class);
@@ -50,7 +51,7 @@ public class LDJsonParseFilter extends ParseFilter {
     private List<LabelledJsonPointer> expressions = new LinkedList<>();
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
         if (doc == null) {
             return;
         }
@@ -60,7 +61,7 @@ public class LDJsonParseFilter extends ParseFilter {
                 return;
             }
 
-            ParseData parseData = parse.get(URL);
+            ParseData parseData = parse.get(url);
             Metadata metadata = parseData.getMetadata();
 
             // extract patterns and store as metadata

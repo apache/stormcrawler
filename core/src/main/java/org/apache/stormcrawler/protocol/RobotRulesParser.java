@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -52,14 +53,14 @@ public abstract class RobotRulesParser {
     protected static Cache<String, RobotRules> ERRORCACHE;
 
     /**
-     * Parameter name to configure the cache for robots @see http://docs.guava-libraries.googlecode
+     * Parameter name to configure the cache for robots. @see http://docs.guava-libraries.googlecode
      * .com/git/javadoc/com/google/common/cache/CacheBuilderSpec.html Default value is
      * "maximumSize=10000,expireAfterWrite=6h"
      */
     public static final String cacheConfigParamName = "robots.cache.spec";
 
     /**
-     * Parameter name to configure the cache for robots errors @see
+     * Parameter name to configure the cache for robots errors. @see
      * http://docs.guava-libraries.googlecode
      * .com/git/javadoc/com/google/common/cache/CacheBuilderSpec.html Default value is
      * "maximumSize=10000,expireAfterWrite=1h"
@@ -89,14 +90,14 @@ public abstract class RobotRulesParser {
 
     /**
      * Pattern to match a valid user-agent product tokens as defined in <a
-     * href="https://www.rfc-editor.org/rfc/rfc9309.html#section-2.2.1">RFC 9309, section 2.2.1</a>
+     * href="https://www.rfc-editor.org/rfc/rfc9309.html#section-2.2.1">RFC 9309, section 2.2.1</a>.
      */
     protected static final Pattern USER_AGENT_PRODUCT_TOKEN_MATCHER =
             Pattern.compile("[a-zA-Z_-]+");
 
     public RobotRulesParser() {}
 
-    /** Set the {@link Configuration} object */
+    /** Set the {@link Configuration} object. */
     public void setConf(Config conf) {
 
         // Grab the agent names we advertise to robots files.
@@ -168,7 +169,7 @@ public abstract class RobotRulesParser {
     /**
      * Check that the agent is valid as defined in <a
      * href="https://www.rfc-editor.org/rfc/rfc9309.html#section-2.2.1">RFC / 9309, section
-     * 2.2.1</a>
+     * 2.2.1</a>.
      *
      * @param agentName
      */
@@ -183,7 +184,7 @@ public abstract class RobotRulesParser {
     }
 
     /**
-     * Parses the robots content using the {@link SimpleRobotRulesParser} from crawler-commons
+     * Parses the robots content using the {@link SimpleRobotRulesParser} from crawler-commons.
      *
      * @param url A string representation of a URL
      * @param content Contents of the robots file in a byte array

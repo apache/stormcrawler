@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.host;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -79,9 +80,9 @@ public class HostURLFilter extends URLFilter {
             return urlToFilter;
         }
 
-        URL tURL;
+        URL url;
         try {
-            tURL = new URL(urlToFilter);
+            url = new URL(urlToFilter);
         } catch (MalformedURLException e1) {
             return null;
         }
@@ -105,7 +106,7 @@ public class HostURLFilter extends URLFilter {
         }
 
         // resolve the hosts
-        String toHost = tURL.getHost();
+        String toHost = url.getHost();
 
         if (ignoreOutsideHost) {
             if (toHost == null || !toHost.equalsIgnoreCase(fromHost)) {

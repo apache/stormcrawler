@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.jsoup;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -34,7 +35,7 @@ import org.slf4j.LoggerFactory;
 import us.codecraft.xsoup.XPathEvaluator;
 import us.codecraft.xsoup.Xsoup;
 
-/** Reads a XPATH patterns and stores the value found in web page as metadata */
+/** Reads a XPATH patterns and stores the value found in web page as metadata. */
 public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(XPathFilter.class);
@@ -94,9 +95,9 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
 
     @Override
     public void filter(
-            String URL, byte[] content, org.jsoup.nodes.Document doc, ParseResult parse) {
+            String url, byte[] content, org.jsoup.nodes.Document doc, ParseResult parse) {
 
-        ParseData parseData = parse.get(URL);
+        ParseData parseData = parse.get(url);
         Metadata metadata = parseData.getMetadata();
 
         // applies the XPATH expression in the order in which they are produced

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import crawlercommons.domains.PaidLevelDomain;
@@ -48,9 +49,9 @@ public class URLPartitioner {
 
         // IP in metadata?
         if (partitionMode.equalsIgnoreCase(Constants.PARTITION_MODE_IP)) {
-            String ip_provided = metadata.getFirstValue("ip");
-            if (StringUtils.isNotBlank(ip_provided)) {
-                partitionKey = ip_provided;
+            String ipProvided = metadata.getFirstValue("ip");
+            if (StringUtils.isNotBlank(ipProvided)) {
+                partitionKey = ipProvided;
             }
         }
 
@@ -66,10 +67,10 @@ public class URLPartitioner {
         }
 
         // partition by hostname
-        if (partitionMode.equalsIgnoreCase(Constants.PARTITION_MODE_HOST)) partitionKey = host;
-
-        // partition by domain : needs fixing
-        else if (partitionMode.equalsIgnoreCase(Constants.PARTITION_MODE_DOMAIN)) {
+        if (partitionMode.equalsIgnoreCase(Constants.PARTITION_MODE_HOST)) {
+            partitionKey = host;
+        } else if (partitionMode.equalsIgnoreCase(Constants.PARTITION_MODE_DOMAIN)) {
+            // partition by domain : needs fixing
             partitionKey = PaidLevelDomain.getPLD(host);
         }
 

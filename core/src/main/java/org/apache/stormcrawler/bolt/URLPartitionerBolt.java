@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.bolt;
 
 import crawlercommons.domains.PaidLevelDomain;
@@ -43,7 +44,7 @@ public class URLPartitionerBolt extends BaseRichBolt {
 
     private static final Logger LOG = LoggerFactory.getLogger(URLPartitionerBolt.class);
 
-    private OutputCollector _collector;
+    private OutputCollector collector;
 
     private MultiCountMetric eventCounter;
 
@@ -53,23 +54,27 @@ public class URLPartitionerBolt extends BaseRichBolt {
 
     @Override
     public void execute(Tuple tuple) {
-        String url = tuple.getStringByField("url");
+        final String url = tuple.getStringByField("url");
         Metadata metadata = null;
 
-        if (tuple.contains("metadata")) metadata = (Metadata) tuple.getValueByField("metadata");
+        if (tuple.contains("metadata")) {
+            metadata = (Metadata) tuple.getValueByField("metadata");
+        }
 
         // maybe there is a field metadata but it can be null
         // or there was no field at all
-        if (metadata == null) metadata = Metadata.empty;
+        if (metadata == null) {
+            metadata = Metadata.empty;
+        }
 
         String partitionKey = null;
         String host = "";
 
         // IP in metadata?
         if (mode.equalsIgnoreCase(Constants.PARTITION_MODE_IP)) {
-            String ip_provided = metadata.getFirstValue("ip");
-            if (StringUtils.isNotBlank(ip_provided)) {
-                partitionKey = ip_provided;
+            String ipProvided = metadata.getFirstValue("ip");
+            if (StringUtils.isNotBlank(ipProvided)) {
+                partitionKey = ipProvided;
                 eventCounter.scope("provided").incrBy(1);
             }
         }
@@ -83,16 +88,16 @@ public class URLPartitionerBolt extends BaseRichBolt {
                 eventCounter.scope("Invalid URL").incrBy(1);
                 LOG.warn("Invalid URL: {}", url);
                 // ack it so that it doesn't get replayed
-                _collector.ack(tuple);
+                collector.ack(tuple);
                 return;
             }
         }
 
         // partition by hostname
-        if (mode.equalsIgnoreCase(Constants.PARTITION_MODE_HOST)) partitionKey = host;
-
-        // partition by domain : needs fixing
-        else if (mode.equalsIgnoreCase(Constants.PARTITION_MODE_DOMAIN)) {
+        if (mode.equalsIgnoreCase(Constants.PARTITION_MODE_HOST)) {
+            partitionKey = host;
+        } else if (mode.equalsIgnoreCase(Constants.PARTITION_MODE_DOMAIN)) {
+            // partition by domain : needs fixing
             partitionKey = PaidLevelDomain.getPLD(host);
         }
 
@@ -116,7 +121,7 @@ public class URLPartitionerBolt extends BaseRichBolt {
                 } catch (final Exception e) {
                     eventCounter.scope("Unable to resolve IP").incrBy(1);
                     LOG.warn("Unable to resolve IP for: {}", host);
-                    _collector.ack(tuple);
+                    collector.ack(tuple);
                     return;
                 }
             }
@@ -124,8 +129,8 @@ public class URLPartitionerBolt extends BaseRichBolt {
 
         LOG.debug("Partition Key for: {} > {}", url, partitionKey);
 
-        _collector.emit(tuple, new Values(url, partitionKey, metadata));
-        _collector.ack(tuple);
+        collector.emit(tuple, new Values(url, partitionKey, metadata));
+        collector.ack(tuple);
     }
 
     @Override
@@ -153,7 +158,7 @@ public class URLPartitionerBolt extends BaseRichBolt {
 
         LOG.info("Using partition mode : {}", mode);
 
-        _collector = collector;
+        this.collector = collector;
         // Register a "MultiCountMetric" to count different events in this bolt
         // Storm will emit the counts every n seconds to a special bolt via a
         // system stream
@@ -161,13 +166,13 @@ public class URLPartitionerBolt extends BaseRichBolt {
         // topology
         this.eventCounter = context.registerMetric("URLPartitioner", new MultiCountMetric(), 10);
 
-        final int MAX_ENTRIES = 500;
+        final int maxEntries = 500;
         cache =
-                new LinkedHashMap<>(MAX_ENTRIES + 1, .75F, true) {
+                new LinkedHashMap<>(maxEntries + 1, .75F, true) {
                     // This method is called just after a new entry has been added
                     @Override
                     public boolean removeEldestEntry(Map.Entry eldest) {
-                        return size() > MAX_ENTRIES;
+                        return size() > maxEntries;
                     }
                 };
 

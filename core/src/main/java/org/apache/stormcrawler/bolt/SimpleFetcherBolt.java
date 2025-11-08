@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.bolt;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -83,20 +84,20 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
     private ProtocolFactory protocolFactory;
 
-    private int taskID = -1;
+    private int taskId = -1;
 
     boolean sitemapsAutoDiscovery = false;
 
-    // TODO configure the max time
+    // TODO: configure the max time
     private Cache<String, Long> throttler =
             Caffeine.newBuilder().expireAfterAccess(30, TimeUnit.SECONDS).build();
 
     private String queueMode;
 
-    /** default crawl delay in msec, can be overridden by robots directives * */
+    /** default crawl delay in msec, can be overridden by robots directives. */
     private long crawlDelay = 1000;
 
-    /** max value accepted from robots.txt * */
+    /** max value accepted from robots.txt. */
     private long maxCrawlDelay = 30000;
 
     /**
@@ -105,7 +106,7 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
      */
     private boolean maxCrawlDelayForce = true;
 
-    /** whether the default delay is used even if the robots.txt specifies a shorter crawl-delay */
+    /** whether the default delay is used even if the robots.txt specifies a shorter crawl-delay. */
     private boolean crawlDelayForce = false;
 
     private final AtomicInteger activeThreads = new AtomicInteger(0);
@@ -115,10 +116,10 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
      * it, the tuple is sent back to the Storm internal queue. Deactivate by default i.e. nothing is
      * sent back to the bolt via the throttle stream.
      */
-    private long maxThrottleSleepMSec = Long.MAX_VALUE;
+    private long maxThrottleSleepMilliSec = Long.MAX_VALUE;
 
     // by default remains as is-pre 1.17
-    private String protocolMDprefix = "";
+    private String protocolMetadataPrefix = "";
 
     private void checkConfiguration() {
 
@@ -146,11 +147,11 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
         checkConfiguration();
 
-        this.taskID = context.getThisTaskId();
+        this.taskId = context.getThisTaskId();
 
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
         long start = System.currentTimeMillis();
-        LOG.info("[Fetcher #{}] : starting at {}", taskID, sdf.format(start));
+        LOG.info("[Fetcher #{}] : starting at {}", taskId, sdf.format(start));
 
         // Register a "MultiCountMetric" to count different events in this bolt
         // Storm will emit the counts every n seconds to a special bolt via a
@@ -219,11 +220,11 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                 ConfUtils.getBoolean(conf, "fetcher.max.crawl.delay.force", false);
         this.crawlDelayForce = ConfUtils.getBoolean(conf, "fetcher.server.delay.force", false);
 
-        this.maxThrottleSleepMSec = ConfUtils.getLong(conf, "fetcher.max.throttle.sleep", -1);
+        this.maxThrottleSleepMilliSec = ConfUtils.getLong(conf, "fetcher.max.throttle.sleep", -1);
 
-        this.protocolMDprefix =
+        this.protocolMetadataPrefix =
                 ConfUtils.getString(
-                        conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, protocolMDprefix);
+                        conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, protocolMetadataPrefix);
     }
 
     @Override
@@ -243,7 +244,7 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
         String urlString = input.getStringByField("url");
         if (StringUtils.isBlank(urlString)) {
-            LOG.info("[Fetcher #{}] Missing value for field url in tuple {}", taskID, input);
+            LOG.info("[Fetcher #{}] Missing value for field url in tuple {}", taskId, input);
             // ignore silently
             collector.ack(input);
             return;
@@ -251,7 +252,9 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
         Metadata metadata = null;
 
-        if (input.contains("metadata")) metadata = (Metadata) input.getValueByField("metadata");
+        if (input.contains("metadata")) {
+            metadata = (Metadata) input.getValueByField("metadata");
+        }
         if (metadata == null) {
             metadata = new Metadata();
         }
@@ -312,12 +315,12 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
             }
 
             if (!fromCache && smautodisco) {
-                for (String sitemapURL : rules.getSitemaps()) {
-                    if (rules.isAllowed(sitemapURL)) {
+                for (String sitemapUrl : rules.getSitemaps()) {
+                    if (rules.isAllowed(sitemapUrl)) {
                         emitOutlink(
                                 input,
                                 url,
-                                sitemapURL,
+                                sitemapUrl,
                                 metadata,
                                 SiteMapParserBolt.isSitemapKey,
                                 "true");
@@ -358,14 +361,14 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                 long timeToWait = timeAllowed - now;
                 if (timeToWait > 0) {
                     // too long -> send it to the back of the internal queue
-                    if (maxThrottleSleepMSec != -1 && timeToWait > maxThrottleSleepMSec) {
+                    if (maxThrottleSleepMilliSec != -1 && timeToWait > maxThrottleSleepMilliSec) {
                         collector.emitDirect(
-                                this.taskID,
+                                this.taskId,
                                 THROTTLE_STREAM,
                                 input,
                                 new Values(urlString, metadata));
                         collector.ack(input);
-                        LOG.debug("[Fetcher #{}] sent back to the queue {}", taskID, urlString);
+                        LOG.debug("[Fetcher #{}] sent back to the queue {}", taskId, urlString);
                         eventCounter.scope("sentBackToQueue").incrBy(1);
                         return;
                     }
@@ -416,7 +419,7 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                 }
             }
 
-            LOG.debug("[Fetcher #{}] : Fetching {}", taskID, urlString);
+            LOG.debug("[Fetcher #{}] : Fetching {}", taskId, urlString);
 
             activeThreads.incrementAndGet();
 
@@ -447,24 +450,24 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
             LOG.info(
                     "[Fetcher #{}] Fetched {} with status {} in {} after waiting {}",
-                    taskID,
+                    taskId,
                     urlString,
                     response.getStatusCode(),
                     timeFetching,
                     timeWaiting);
 
-            Metadata mergedMD = new Metadata();
-            mergedMD.putAll(metadata);
+            Metadata mergedMetadata = new Metadata();
+            mergedMetadata.putAll(metadata);
 
             // add a prefix to avoid confusion, preserve protocol metadata
             // persisted or transferred from previous fetches
-            mergedMD.putAll(response.getMetadata(), protocolMDprefix);
+            mergedMetadata.putAll(response.getMetadata(), protocolMetadataPrefix);
 
-            mergedMD.setValue("fetch.statusCode", Integer.toString(response.getStatusCode()));
+            mergedMetadata.setValue("fetch.statusCode", Integer.toString(response.getStatusCode()));
 
-            mergedMD.setValue("fetch.loadingTime", Long.toString(timeFetching));
+            mergedMetadata.setValue("fetch.loadingTime", Long.toString(timeFetching));
 
-            mergedMD.setValue("fetch.byteLength", Integer.toString(byteLength));
+            mergedMetadata.setValue("fetch.byteLength", Integer.toString(byteLength));
 
             // determine the status based on the status code
             final Status status = Status.fromHTTPCode(response.getStatusCode());
@@ -472,7 +475,7 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
             eventCounter.scope("status_" + response.getStatusCode()).incrBy(1);
 
             // used when sending to status stream
-            final Values values4status = new Values(urlString, mergedMD, status);
+            final Values values4status = new Values(urlString, mergedMetadata, status);
 
             // if the status is OK emit on default stream
             if (status.equals(Status.FETCHED)) {
@@ -488,7 +491,7 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                     collector.emit(
                             Utils.DEFAULT_STREAM_ID,
                             input,
-                            new Values(urlString, response.getContent(), mergedMD));
+                            new Values(urlString, response.getContent(), mergedMetadata));
                 }
             } else if (status.equals(Status.REDIRECTION)) {
 
@@ -499,11 +502,11 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                 // used for debugging mainly - do not resolve the target
                 // URL
                 if (StringUtils.isNotBlank(redirection)) {
-                    mergedMD.setValue("_redirTo", redirection);
+                    mergedMetadata.setValue("_redirTo", redirection);
                 }
 
                 if (allowRedirs() && StringUtils.isNotBlank(redirection)) {
-                    emitOutlink(input, url, redirection, mergedMD);
+                    emitOutlink(input, url, redirection, mergedMetadata);
                 }
                 // Mark URL as redirected
                 collector.emit(
@@ -517,7 +520,9 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
         } catch (Exception exece) {
 
             String message = exece.getMessage();
-            if (message == null) message = "";
+            if (message == null) {
+                message = "";
+            }
 
             // common exceptions for which we log only a short message
             if (exece.getCause() instanceof java.util.concurrent.TimeoutException

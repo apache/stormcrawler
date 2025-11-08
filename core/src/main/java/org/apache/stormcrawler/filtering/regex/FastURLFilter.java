@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.regex;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -142,11 +143,14 @@ public class FastURLFilter extends URLFilter implements JSONResource {
                 type = Scope.Type.METADATA;
                 offset = "metadata:".length();
                 value = scopeval.substring(offset);
-            } else throw new RuntimeException("Invalid scope: " + scopeval);
+            } else {
+                throw new RuntimeException("Invalid scope: " + scopeval);
+            }
 
             final JsonNode patternsNode = current.get("patterns");
-            if (patternsNode == null)
+            if (patternsNode == null) {
                 throw new RuntimeException("Missing patterns for scope" + scopeval);
+            }
 
             final List<Rule> rlist = new LinkedList<>();
 
@@ -170,7 +174,9 @@ public class FastURLFilter extends URLFilter implements JSONResource {
             @Nullable Metadata sourceMetadata,
             @NotNull String urlToFilter) {
         try {
-            if (rules.filter(urlToFilter, sourceMetadata)) return null;
+            if (rules.filter(urlToFilter, sourceMetadata)) {
+                return null;
+            }
         } catch (MalformedURLException e) {
             return null;
         }
@@ -251,7 +257,9 @@ class Rules {
     }
 
     private boolean checkScope(Scope s, URL u) {
-        if (s == null) return false;
+        if (s == null) {
+            return false;
+        }
         for (Rule r : s.getRules()) {
             String haystack = u.getPath();
             // whether to include the query as well?
@@ -339,7 +347,9 @@ class Rule {
             }
         }
         // no match?
-        if (type == null) return;
+        if (type == null) {
+            return;
+        }
 
         String patternString = line.substring(offset).trim();
         pattern = Pattern.compile(patternString);

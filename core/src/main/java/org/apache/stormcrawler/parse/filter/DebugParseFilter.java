@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,13 +30,13 @@ import org.apache.xml.serialize.XMLSerializer;
 import org.jetbrains.annotations.NotNull;
 import org.w3c.dom.DocumentFragment;
 
-/** Dumps the DOM representation of a document into a file */
+/** Dumps the DOM representation of a document into a file. */
 public class DebugParseFilter extends ParseFilter {
 
     private OutputStream os;
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
 
         try {
             XMLSerializer serializer = new XMLSerializer(os, null);

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.jsoup;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -59,9 +60,9 @@ public class LinkParseFilter extends XPathFilter {
 
     @Override
     public void filter(
-            String URL, byte[] content, org.jsoup.nodes.Document doc, ParseResult parse) {
+            String url, byte[] content, org.jsoup.nodes.Document doc, ParseResult parse) {
 
-        ParseData parseData = parse.get(URL);
+        ParseData parseData = parse.get(url);
         Metadata metadata = parseData.getMetadata();
 
         Map<String, Outlink> dedup = new HashMap<>();
@@ -72,11 +73,11 @@ public class LinkParseFilter extends XPathFilter {
 
         java.net.URL sourceUrl;
         try {
-            sourceUrl = new URL(URL);
+            sourceUrl = new URL(url);
         } catch (MalformedURLException e1) {
             // we would have known by now as previous components check whether
             // the URL is valid
-            LOG.error("MalformedURLException on {}", URL);
+            LOG.error("MalformedURLException on {}", url);
             return;
         }
 
@@ -90,7 +91,7 @@ public class LinkParseFilter extends XPathFilter {
                     }
                     for (String target : values) {
                         // resolve URL
-                        target = URLUtil.resolveURL(sourceUrl, target).toExternalForm();
+                        target = URLUtil.resolveUrl(sourceUrl, target).toExternalForm();
 
                         // apply filtering
                         target = urlFilters.filter(sourceUrl, metadata, target);
@@ -107,10 +108,10 @@ public class LinkParseFilter extends XPathFilter {
                         Outlink ol = new Outlink(target);
 
                         // get the metadata for the outlink from the parent one
-                        Metadata metadataOL =
-                                metadataTransfer.getMetaForOutlink(target, URL, metadata);
+                        Metadata metadataOutlink =
+                                metadataTransfer.getMetaForOutlink(target, url, metadata);
 
-                        ol.setMetadata(metadataOL);
+                        ol.setMetadata(metadataOutlink);
                         dedup.put(ol.getTargetURL(), ol);
                     }
                 } catch (Exception e) {

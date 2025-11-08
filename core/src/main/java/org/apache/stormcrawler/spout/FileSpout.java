@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.spout;
 
 import java.io.BufferedReader;
@@ -54,12 +55,12 @@ public class FileSpout extends BaseRichSpout {
     public static final int BATCH_SIZE = 10000;
     public static final Logger LOG = LoggerFactory.getLogger(FileSpout.class);
 
-    protected SpoutOutputCollector _collector;
+    protected SpoutOutputCollector collector;
 
-    private final Queue<String> _inputFiles;
+    private final Queue<String> inputFiles;
     private BufferedReader currentBuffer;
 
-    protected Scheme _scheme = new StringTabScheme();
+    protected Scheme scheme = new StringTabScheme();
 
     protected LinkedList<byte[]> buffer = new LinkedList<>();
     protected boolean active;
@@ -92,12 +93,12 @@ public class FileSpout extends BaseRichSpout {
     public FileSpout(String dir, String filter, boolean withDiscoveredStatus) {
         this.withDiscoveredStatus = withDiscoveredStatus;
         Path pdir = Paths.get(dir);
-        _inputFiles = new LinkedList<>();
+        inputFiles = new LinkedList<>();
         LOG.info("Reading directory: {} (filter: {})", pdir, filter);
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(pdir, filter)) {
             for (Path entry : stream) {
                 String inputFile = entry.toAbsolutePath().toString();
-                _inputFiles.add(inputFile);
+                inputFiles.add(inputFile);
                 LOG.info("Input : {}", inputFile);
             }
         } catch (IOException ioe) {
@@ -116,8 +117,8 @@ public class FileSpout extends BaseRichSpout {
         if (files.length == 0) {
             throw new IllegalArgumentException("Must configure at least one inputFile");
         }
-        _inputFiles = new LinkedList<>();
-        Collections.addAll(_inputFiles, files);
+        inputFiles = new LinkedList<>();
+        Collections.addAll(inputFiles, files);
     }
 
     /**
@@ -127,13 +128,15 @@ public class FileSpout extends BaseRichSpout {
      * @since 1.13
      */
     public void setScheme(Scheme scheme) {
-        _scheme = scheme;
+        this.scheme = scheme;
     }
 
     protected void populateBuffer() throws IOException {
         if (currentBuffer == null) {
-            String file = _inputFiles.poll();
-            if (file == null) return;
+            String file = inputFiles.poll();
+            if (file == null) {
+                return;
+            }
             Path inputPath = Paths.get(file);
             currentBuffer =
                     new BufferedReader(
@@ -145,8 +148,12 @@ public class FileSpout extends BaseRichSpout {
         String line = null;
         int linesRead = 0;
         while (linesRead < BATCH_SIZE && (line = currentBuffer.readLine()) != null) {
-            if (StringUtils.isBlank(line)) continue;
-            if (line.startsWith("#")) continue;
+            if (StringUtils.isBlank(line)) {
+                continue;
+            }
+            if (line.startsWith("#")) {
+                continue;
+            }
             // check whether this entry should be skipped?
             // totalTasks could be at 0 if a subclass forgot to
             // call this classes open()
@@ -171,7 +178,7 @@ public class FileSpout extends BaseRichSpout {
     @Override
     public void open(
             Map<String, Object> conf, TopologyContext context, SpoutOutputCollector collector) {
-        _collector = collector;
+        this.collector = collector;
 
         // if more than one instance is used we expect their number to be the
         // same as the number of shards
@@ -181,7 +188,9 @@ public class FileSpout extends BaseRichSpout {
 
     @Override
     public void nextTuple() {
-        if (!active) return;
+        if (!active) {
+            return;
+        }
 
         if (buffer.isEmpty()) {
             try {
@@ -192,25 +201,27 @@ public class FileSpout extends BaseRichSpout {
         }
 
         // still empty?
-        if (buffer.isEmpty()) return;
+        if (buffer.isEmpty()) {
+            return;
+        }
 
         byte[] head = buffer.removeFirst();
-        List<Object> fields = this._scheme.deserialize(ByteBuffer.wrap(head));
+        List<Object> fields = this.scheme.deserialize(ByteBuffer.wrap(head));
 
         if (withDiscoveredStatus) {
             fields.add(Status.DISCOVERED);
-            this._collector.emit(Constants.StatusStreamName, fields, head);
+            this.collector.emit(Constants.StatusStreamName, fields, head);
         } else {
-            this._collector.emit(fields, head);
+            this.collector.emit(fields, head);
         }
     }
 
     @Override
     public void declareOutputFields(OutputFieldsDeclarer declarer) {
-        declarer.declare(_scheme.getOutputFields());
+        declarer.declare(scheme.getOutputFields());
         if (withDiscoveredStatus) {
             // add status field to output
-            List<String> s = _scheme.getOutputFields().toList();
+            List<String> s = scheme.getOutputFields().toList();
             s.add("status");
             declarer.declareStream(Constants.StatusStreamName, new Fields(s));
         }

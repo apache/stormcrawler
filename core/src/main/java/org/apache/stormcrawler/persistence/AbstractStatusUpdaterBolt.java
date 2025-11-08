@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -54,13 +55,13 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
      */
     public static String useCacheParamName = "status.updater.use.cache";
 
-    /** Number of successive FETCH_ERROR before status changes to ERROR * */
+    /** Number of successive FETCH_ERROR before status changes to ERROR. */
     public static String maxFetchErrorsParamName = "max.fetch.errors";
 
     /**
-     * Parameter name to configure the cache @see http://docs.guava-libraries.googlecode
+     * Parameter name to configure the cache. @see http://docs.guava-libraries.googlecode
      * .com/git/javadoc/com/google/common/cache/CacheBuilderSpec.html Default value is
-     * "maximumSize=10000,expireAfterAccess=1h"
+     * "maximumSize=10000,expireAfterAccess=1h".
      */
     public static String cacheConfigParamName = "status.updater.cache.spec";
 
@@ -78,7 +79,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
     public static final String AS_IS_NEXTFETCHDATE_METADATA =
             "status.store.as.is.with.nextfetchdate";
 
-    protected OutputCollector _collector;
+    protected OutputCollector collector;
 
     private Scheduler scheduler;
     private MetadataTransfer mdTransfer;
@@ -96,7 +97,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
     @Override
     public void prepare(
             Map<String, Object> stormConf, TopologyContext context, OutputCollector collector) {
-        _collector = collector;
+        this.collector = collector;
 
         scheduler = Scheduler.getInstance(stormConf);
 
@@ -152,7 +153,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
                 // no need to add it to the queue
                 LOG.debug("URL {} already in cache", url);
                 cacheHits++;
-                _collector.ack(tuple);
+                collector.ack(tuple);
                 return;
             } else {
                 LOG.debug("URL {} not in cache", url);
@@ -172,7 +173,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
                 return;
             } catch (Exception e) {
                 LOG.error("Exception caught when storing", e);
-                _collector.fail(tuple);
+                collector.fail(tuple);
                 return;
             }
         }
@@ -213,10 +214,9 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             metadata.remove(Constants.STATUS_ERROR_CAUSE);
             metadata.remove(Constants.STATUS_ERROR_MESSAGE);
             metadata.remove(Constants.STATUS_ERROR_SOURCE);
-        }
-        // gone? notify any deleters. Doesn't need to be anchored
-        else if (status == Status.ERROR) {
-            _collector.emit(Constants.DELETION_STREAM_NAME, new Values(url, metadata));
+        } else if (status == Status.ERROR) {
+            // gone? notify any deleters. Doesn't need to be anchored
+            collector.emit(Constants.DELETION_STREAM_NAME, new Values(url, metadata));
         }
 
         // determine the value of the next fetch based on the status
@@ -237,7 +237,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             store(url, status, metadata, nextFetch, tuple);
         } catch (Exception e) {
             LOG.error("Exception caught when storing", e);
-            _collector.fail(tuple);
+            collector.fail(tuple);
         }
     }
 
@@ -252,14 +252,14 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
         return org.apache.commons.codec.digest.DigestUtils.sha256Hex(url);
     }
 
-    /** Must be called by extending classes to store and collect in one go */
+    /** Must be called by extending classes to store and collect in one go. */
     protected final void ack(Tuple t, String url) {
         // keep the URL in the cache
         if (useCache) {
             cache.put(url, "");
         }
 
-        _collector.ack(t);
+        collector.ack(t);
     }
 
     protected abstract void store(

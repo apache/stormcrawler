@@ -311,7 +311,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         LOG.error("Purged from waitAck {} with {} values", key, value.size());
         for (Tuple t : value) {
             eventCounter.scope("purged").incrBy(1);
-            _collector.fail(t);
+            collector.fail(t);
         }
     }
 
@@ -409,7 +409,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
                     } else {
                         failureCount++;
                         eventCounter.scope("failed").incrBy(1);
-                        _collector.fail(tuple);
+                        collector.fail(tuple);
                     }
                 }
             } else {
@@ -460,7 +460,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
                 for (Tuple x : failedTuples) {
                     // fail it
                     eventCounter.scope("failed").incrBy(1);
-                    _collector.fail(x);
+                    collector.fail(x);
                 }
             } else {
                 LOG.warn("Could not find unacked tuple for {}", id);

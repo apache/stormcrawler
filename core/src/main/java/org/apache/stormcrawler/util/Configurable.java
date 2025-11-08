@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,7 +32,7 @@ public interface Configurable {
     public String getName();
 
     /**
-     * Called when this filter is being initialized
+     * Called when this filter is being initialized.
      *
      * @param stormConf The Storm configuration used for the configurable
      * @param filterParams the filter specific configuration. Never null
@@ -40,7 +41,7 @@ public interface Configurable {
             @NotNull Map<String, Object> stormConf, @NotNull JsonNode filterParams) {}
 
     /**
-     * Called when this filter is being initialized
+     * Called when this filter is being initialized.
      *
      * @param stormConf The Storm configuration used for the configurable
      * @param filterParams the filter specific configuration. Never null
@@ -50,6 +51,21 @@ public interface Configurable {
             @NotNull Map<String, Object> stormConf,
             @NotNull JsonNode filterParams,
             @NotNull String filterName) {}
+
+    /**
+     * @deprecated Replace with {@link Configurable#createConfiguredInstance(Class, Class, Map,
+     *     JsonNode)} or {@link Configurable#createConfiguredInstance(String, Class, Map, JsonNode)}
+     */
+    @Deprecated
+    @NotNull
+    static <T extends Configurable> List<@NotNull T> configure(
+            @NotNull Map<String, Object> stormConf,
+            @NotNull JsonNode filtersConf,
+            @NotNull Class<T> filterClass,
+            @NotNull String callingClass) {
+        return ConfigurableHelper.createConfiguredInstance(
+                callingClass, filterClass, stormConf, filtersConf);
+    }
 
     /**
      * Calls {@link Configurable#createConfiguredInstance(String, Class, Map, JsonNode)} with {@code
@@ -118,20 +134,5 @@ public interface Configurable {
             @NotNull JsonNode filtersConf) {
         return ConfigurableHelper.createConfiguredInstance(
                 configName, filterClass, stormConf, filtersConf);
-    }
-
-    /**
-     * @deprecated Replace with {@link Configurable#createConfiguredInstance(Class, Class, Map,
-     *     JsonNode)} or {@link Configurable#createConfiguredInstance(String, Class, Map, JsonNode)}
-     */
-    @Deprecated
-    @NotNull
-    static <T extends Configurable> List<@NotNull T> configure(
-            @NotNull Map<String, Object> stormConf,
-            @NotNull JsonNode filtersConf,
-            @NotNull Class<T> filterClass,
-            @NotNull String callingClass) {
-        return ConfigurableHelper.createConfiguredInstance(
-                callingClass, filterClass, stormConf, filtersConf);
     }
 }

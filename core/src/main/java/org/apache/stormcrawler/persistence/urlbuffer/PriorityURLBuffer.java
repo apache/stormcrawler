@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence.urlbuffer;
 
 import java.time.Instant;
@@ -44,7 +45,7 @@ public class PriorityURLBuffer extends SimpleURLBuffer {
 
     private Instant lastSorting;
 
-    private long minDelayReRankSec = 10l;
+    private long minDelayReRankSec = 10L;
 
     public PriorityURLBuffer() {
         lastSorting = Instant.now();
@@ -111,7 +112,9 @@ public class PriorityURLBuffer extends SimpleURLBuffer {
         @Override
         public int compareTo(QueueCount otherQueue) {
             int countDiff = otherQueue.count - count;
-            if (countDiff == 0) return name.compareTo(otherQueue.name);
+            if (countDiff == 0) {
+                return name.compareTo(otherQueue.name);
+            }
             return countDiff;
         }
     }

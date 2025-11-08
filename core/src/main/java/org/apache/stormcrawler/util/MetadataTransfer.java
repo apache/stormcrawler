@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import java.util.HashSet;
@@ -58,13 +59,13 @@ public class MetadataTransfer {
      */
     public static final String trackDepthParamName = "metadata.track.depth";
 
-    /** Metadata key name for tracking the source URLs */
+    /** Metadata key name for tracking the source URLs. */
     public static final String urlPathKeyName = "url.path";
 
-    /** Metadata key name for tracking the depth */
+    /** Metadata key name for tracking the depth. */
     public static final String depthKeyName = "depth";
 
-    /** Metadata key name for tracking a non-default max depth */
+    /** Metadata key name for tracking a non-default max depth. */
     public static final String maxDepthKeyName = "max.depth";
 
     protected final Set<String> mdToTransfer = new HashSet<>();
@@ -121,12 +122,12 @@ public class MetadataTransfer {
      * Determine which metadata should be transferred to an outlink. Adds additional metadata like
      * the URL path.
      */
-    public Metadata getMetaForOutlink(String targetURL, String sourceURL, Metadata parentMD) {
-        Metadata md = _filter(parentMD, mdToTransfer);
+    public Metadata getMetaForOutlink(String targetUrl, String sourceUrl, Metadata parentMetadata) {
+        Metadata md = _filter(parentMetadata, mdToTransfer);
 
         // keep the path?
         if (trackPath) {
-            md.addValue(urlPathKeyName, sourceURL);
+            md.addValue(urlPathKeyName, sourceUrl);
         }
 
         // track depth
@@ -146,16 +147,16 @@ public class MetadataTransfer {
 
     /**
      * Determine which metadata should be persisted for a given document including those which are
-     * not necessarily transferred to the outlinks
+     * not necessarily transferred to the outlinks.
      */
     public Metadata filter(Metadata metadata) {
-        Metadata filtered_md = _filter(metadata, mdToTransfer);
+        Metadata filteredMetadata = _filter(metadata, mdToTransfer);
 
         // add the features that are only persisted but
         // not transferred like __redirTo_
-        filtered_md.putAll(_filter(metadata, mdToPersistOnly));
+        filteredMetadata.putAll(_filter(metadata, mdToPersistOnly));
 
-        return filtered_md;
+        return filteredMetadata;
     }
 
     /**
@@ -163,19 +164,19 @@ public class MetadataTransfer {
      * with the prefix will be added.
      */
     private Metadata _filter(Metadata metadata, Set<String> filter) {
-        Metadata filtered_md = new Metadata();
+        Metadata filteredMetadata = new Metadata();
 
         for (String key : filter) {
             if (key.endsWith("*")) {
                 String prefix = key.substring(0, key.length() - 1);
                 for (String k : metadata.keySet(prefix)) {
-                    metadata.copy(filtered_md, k);
+                    metadata.copy(filteredMetadata, k);
                 }
             } else {
-                metadata.copy(filtered_md, key);
+                metadata.copy(filteredMetadata, key);
             }
         }
 
-        return filtered_md;
+        return filteredMetadata;
     }
 }

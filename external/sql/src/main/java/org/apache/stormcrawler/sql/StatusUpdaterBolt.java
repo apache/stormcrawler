@@ -245,7 +245,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
             waitingAck.forEach(
                     (k, v) -> {
                         for (Tuple t : v) {
-                            super._collector.fail(t);
+                            super.collector.fail(t);
                         }
                     });
         }

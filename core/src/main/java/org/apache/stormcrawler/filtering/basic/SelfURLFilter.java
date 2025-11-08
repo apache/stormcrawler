@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.basic;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,7 +25,7 @@ import org.apache.stormcrawler.filtering.URLFilter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Filters links to self * */
+/** Filters links to self. * */
 public class SelfURLFilter extends URLFilter {
 
     @Override
@@ -37,7 +38,9 @@ public class SelfURLFilter extends URLFilter {
             return urlToFilter;
         }
 
-        if (sourceUrl.toExternalForm().equalsIgnoreCase(urlToFilter)) return null;
+        if (sourceUrl.toExternalForm().equalsIgnoreCase(urlToFilter)) {
+            return null;
+        }
 
         return urlToFilter;
     }

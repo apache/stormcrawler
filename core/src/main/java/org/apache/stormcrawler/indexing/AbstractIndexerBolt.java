@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.indexing;
 
 import crawlercommons.domains.PaidLevelDomain;
@@ -42,13 +43,13 @@ import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Abstract class to simplify writing IndexerBolts * */
+/** Abstract class to simplify writing IndexerBolts. * */
 public abstract class AbstractIndexerBolt extends BaseRichBolt {
 
-    private final Logger LOG = LoggerFactory.getLogger(getClass());
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     /**
-     * Mapping between metadata keys and field names for indexing Can be a list of values separated
+     * Mapping between metadata keys and field names for indexing. Can be a list of values separated
      * by a = or a single string
      */
     public static final String metadata2fieldParamName = "indexer.md.mapping";
@@ -59,16 +60,16 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
      */
     public static final String metadataFilterParamName = "indexer.md.filter";
 
-    /** Field name to use for storing the text of a document * */
+    /** Field name to use for storing the text of a document. */
     public static final String textFieldParamName = "indexer.text.fieldname";
 
     /** Trim length of text to index. Defaults to -1 to keep it intact * */
     public static final String textLengthParamName = "indexer.text.maxlength";
 
-    /** Field name to use for storing the url of a document * */
+    /** Field name to use for storing the url of a document. */
     public static final String urlFieldParamName = "indexer.url.fieldname";
 
-    /** Field name to use for reading the canonical property of the metadata */
+    /** Field name to use for reading the canonical property of the metadata. */
     public static final String canonicalMetadataParamName = "indexer.canonical.name";
 
     /** Indicates that empty field values should not be emitted at all. */
@@ -82,7 +83,7 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
 
     private int maxLengthText = -1;
 
-    private String fieldNameForURL = null;
+    private String fieldNameForUrl = null;
 
     private String canonicalMetadataName = null;
 
@@ -143,7 +144,7 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
                 String value = mdF.substring(equals + 1);
                 filterKeyValue = new String[] {key.trim(), value.trim()};
             } else {
-                LOG.error("Can't split into key value : {}", mdF);
+                log.error("Can't split into key value : {}", mdF);
             }
         }
 
@@ -151,7 +152,7 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
 
         maxLengthText = ConfUtils.getInt(conf, textLengthParamName, -1);
 
-        fieldNameForURL = ConfUtils.getString(conf, urlFieldParamName);
+        fieldNameForUrl = ConfUtils.getString(conf, urlFieldParamName);
 
         canonicalMetadataName = ConfUtils.getString(conf, canonicalMetadataParamName);
 
@@ -159,7 +160,8 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
 
         for (String mapping : ConfUtils.loadListFromConf(metadata2fieldParamName, conf)) {
             int equals = mapping.indexOf('=');
-            String key, value;
+            String key;
+            String value;
             if (equals != -1) {
                 key = mapping.substring(0, equals).trim();
                 value = mapping.substring(equals + 1).trim();
@@ -175,7 +177,7 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
                 key = key.substring(0, match.start());
             }
             metadata2field.add(new Key(key, index, value));
-            LOG.info("Mapping key {} to field {}", key, value);
+            log.info("Mapping key {} to field {}", key, value);
         }
 
         ignoreEmptyFields =
@@ -190,16 +192,22 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
      */
     protected boolean filterDocument(Metadata meta) {
         String noindexVal = meta.getFirstValue(RobotsTags.ROBOTS_NO_INDEX);
-        if (Boolean.parseBoolean(noindexVal)) return false;
+        if (Boolean.parseBoolean(noindexVal)) {
+            return false;
+        }
 
-        if (filterKeyValue == null) return true;
+        if (filterKeyValue == null) {
+            return true;
+        }
         String[] values = meta.getValues(filterKeyValue[0]);
         // key not found
-        if (values == null) return false;
+        if (values == null) {
+            return false;
+        }
         return ArrayUtils.contains(values, filterKeyValue[1]);
     }
 
-    /** Returns a mapping field name / values for the metadata to index * */
+    /** Returns a mapping field name / values for the metadata to index. */
     protected Map<String, String[]> filterMetadata(Metadata meta) {
 
         Map<String, String[]> fieldVals = new HashMap<>();
@@ -235,9 +243,8 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
                 // store all values available
                 if (index == -1) {
                     fieldVals.put(label, values);
-                }
-                // or only the one we want
-                else {
+                } else {
+                    // or only the one we want
                     fieldVals.put(label, new String[] {values[index]});
                 }
             }
@@ -258,8 +265,8 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
     }
 
     /**
-     * Returns the value to be used as the URL for indexing purposes, if present the canonical value
-     * is used instead
+     * Returns the value to be used as the URL for indexing purposes. If present the canonical value
+     * is used instead.
      */
     protected String valueForURL(Tuple tuple) {
 
@@ -279,26 +286,26 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
         }
 
         try {
-            URL sURL = new URL(url);
-            URL canonical = URLUtil.resolveURL(sURL, canonicalValue);
+            URL url1 = new URL(url);
+            URL canonical = URLUtil.resolveUrl(url1, canonicalValue);
 
-            String sDomain = PaidLevelDomain.getPLD(sURL.getHost());
+            String domain = PaidLevelDomain.getPLD(url1.getHost());
             String canonicalDomain = PaidLevelDomain.getPLD(canonical.getHost());
 
             // check that the domain is the same
-            if (sDomain.equalsIgnoreCase(canonicalDomain)) {
+            if (domain.equalsIgnoreCase(canonicalDomain)) {
                 return canonical.toExternalForm();
             } else {
-                LOG.info("Canonical URL references a different domain, ignoring in {} ", url);
+                log.info("Canonical URL references a different domain, ignoring in {} ", url);
             }
         } catch (MalformedURLException e) {
-            LOG.error("Malformed canonical URL {} was found in {} ", canonicalValue, url);
+            log.error("Malformed canonical URL {} was found in {} ", canonicalValue, url);
         }
 
         return url;
     }
 
-    /** Returns the field name to use for the text or null if the text must not be indexed */
+    /** Returns the field name to use for the text or null if the text must not be indexed. */
     protected String fieldNameForText() {
         return fieldNameForText;
     }
@@ -308,16 +315,22 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
      * configuration.
      */
     protected String trimText(String text) {
-        if (text == null) return null;
+        if (text == null) {
+            return null;
+        }
         text = text.trim();
-        if (maxLengthText == -1) return text;
-        if (text.length() <= maxLengthText) return text;
+        if (maxLengthText == -1) {
+            return text;
+        }
+        if (text.length() <= maxLengthText) {
+            return text;
+        }
         return text.substring(0, maxLengthText);
     }
 
     /** Returns the field name to use for the URL or null if the URL must not be indexed */
     protected String fieldNameForURL() {
-        return fieldNameForURL;
+        return fieldNameForUrl;
     }
 
     protected boolean ignoreEmptyFields() {

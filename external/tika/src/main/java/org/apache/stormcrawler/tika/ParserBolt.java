@@ -389,7 +389,7 @@ public class ParserBolt extends BaseRichBolt {
 
             // build an absolute URL
             try {
-                URL tmpURL = URLUtil.resolveURL(url_, l.getUri());
+                URL tmpURL = URLUtil.resolveUrl(url_, l.getUri());
                 urlOL = tmpURL.toExternalForm();
             } catch (MalformedURLException e) {
                 LOG.debug("MalformedURLException on {}", l.getUri());

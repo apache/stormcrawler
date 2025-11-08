@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.indexing;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
@@ -32,13 +33,13 @@ import org.apache.stormcrawler.persistence.Status;
  * debugging and as an illustration of what AbstractIndexerBolt provides.
  */
 public class StdOutIndexer extends AbstractIndexerBolt {
-    OutputCollector _collector;
+    OutputCollector collector;
 
     @Override
     public void prepare(
             Map<String, Object> conf, TopologyContext context, OutputCollector collector) {
         super.prepare(conf, context, collector);
-        _collector = collector;
+        this.collector = collector;
     }
 
     @Override
@@ -56,8 +57,8 @@ public class StdOutIndexer extends AbstractIndexerBolt {
         if (!keep) {
             // treat it as successfully processed even if
             // we do not index it
-            _collector.emit(StatusStreamName, tuple, new Values(url, metadata, Status.FETCHED));
-            _collector.ack(tuple);
+            collector.emit(StatusStreamName, tuple, new Values(url, metadata, Status.FETCHED));
+            collector.ack(tuple);
             return;
         }
 
@@ -81,12 +82,14 @@ public class StdOutIndexer extends AbstractIndexerBolt {
             }
         }
 
-        _collector.emit(StatusStreamName, tuple, new Values(url, metadata, Status.FETCHED));
-        _collector.ack(tuple);
+        collector.emit(StatusStreamName, tuple, new Values(url, metadata, Status.FETCHED));
+        collector.ack(tuple);
     }
 
     private String trimValue(String value) {
-        if (value.length() > 100) return value.length() + " chars";
+        if (value.length() > 100) {
+            return value.length() + " chars";
+        }
         return value;
     }
 }

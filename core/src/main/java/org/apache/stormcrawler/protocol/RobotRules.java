@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol;
 
 import crawlercommons.robots.BaseRobotRules;
@@ -54,12 +55,12 @@ public class RobotRules extends crawlercommons.robots.BaseRobotRules {
         return base.isAllowNone();
     }
 
-    /** Returns the number of bytes fetched per request when not cached * */
+    /** Returns the number of bytes fetched per request when not cached. */
     public int[] getContentLengthFetched() {
         return bytesFetched;
     }
 
-    /** Returns the number of bytes fetched per request when not cached * */
+    /** Returns the number of bytes fetched per request when not cached. */
     public void setContentLengthFetched(int[] bytesFetched) {
         this.bytesFetched = bytesFetched;
     }

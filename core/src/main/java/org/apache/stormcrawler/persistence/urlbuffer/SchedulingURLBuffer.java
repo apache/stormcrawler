@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence.urlbuffer;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -42,9 +43,9 @@ public class SchedulingURLBuffer extends AbstractURLBuffer
 
     public static final String MAXTIMEPARAM = "priority.buffer.max.time.msec";
 
-    private int maxTimeMSec = 30000;
+    private int maxTimeMilliSec = 30000;
 
-    // TODO make it configurable
+    // TODO: make it configurable
     private int historySize = 5;
 
     // keeps track of the URL having been sent
@@ -56,10 +57,10 @@ public class SchedulingURLBuffer extends AbstractURLBuffer
 
     public void configure(Map<String, Object> stormConf) {
         super.configure(stormConf);
-        maxTimeMSec = ConfUtils.getInt(stormConf, MAXTIMEPARAM, maxTimeMSec);
+        maxTimeMilliSec = ConfUtils.getInt(stormConf, MAXTIMEPARAM, maxTimeMilliSec);
         unacked =
                 Caffeine.newBuilder()
-                        .expireAfterWrite(maxTimeMSec, TimeUnit.MILLISECONDS)
+                        .expireAfterWrite(maxTimeMilliSec, TimeUnit.MILLISECONDS)
                         .removalListener(this)
                         .build();
         timings = Caffeine.newBuilder().expireAfterAccess(10, TimeUnit.MINUTES).build();
@@ -67,7 +68,7 @@ public class SchedulingURLBuffer extends AbstractURLBuffer
     }
 
     /**
-     * Retrieves the next available URL, guarantees that the URLs are always perfectly shuffled
+     * Retrieves the next available URL, guarantees that the URLs are always perfectly shuffled.
      *
      * @return null if no entries are available
      */
@@ -106,9 +107,8 @@ public class SchedulingURLBuffer extends AbstractURLBuffer
             if (!queue.isEmpty()) {
                 LOG.debug("Adding to the back of the queue {}", queueName);
                 queues.put(queueName, queue);
-            }
-            // notify that the queue is empty
-            else {
+            } else {
+                // notify that the queue is empty
                 if (listener != null) {
                     listener.emptyQueue(queueName);
                 }
@@ -118,7 +118,7 @@ public class SchedulingURLBuffer extends AbstractURLBuffer
                 lastReleased.put(queueName, Instant.now());
                 unacked.put(item.url, new Object[] {Instant.now(), queueName});
                 // remove it from the list of URLs in the queue
-                in_buffer.remove(item.url);
+                inBuffer.remove(item.url);
                 return new Values(item.url, item.metadata);
             }
         } while (!queues.isEmpty());
@@ -130,13 +130,17 @@ public class SchedulingURLBuffer extends AbstractURLBuffer
         // given the past performance of the last N urls
 
         Queue<Long> times = timings.getIfPresent(queueName);
-        if (times == null) return true;
+        if (times == null) {
+            return true;
+        }
 
         // not enough history yet? just say yes
-        if (times.size() < historySize) return true;
+        if (times.size() < historySize) {
+            return true;
+        }
 
         // get the average duration over the recent history
-        long totalMsec = 0l;
+        long totalMsec = 0L;
         for (Long t : times) {
             totalMsec += t;
         }
@@ -183,6 +187,6 @@ public class SchedulingURLBuffer extends AbstractURLBuffer
     @Override
     public void onRemoval(
             @Nullable String key, Object @Nullable [] value, @NotNull RemovalCause cause) {
-        addTiming(maxTimeMSec, key);
+        addTiming(maxTimeMilliSec, key);
     }
 }

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.regex;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -40,7 +41,7 @@ public abstract class RegexURLFilterBase extends URLFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(RegexURLFilterBase.class);
 
-    /** A list of applicable rules */
+    /** A list of applicable rules. */
     private List<RegexRule> rules;
 
     @Override

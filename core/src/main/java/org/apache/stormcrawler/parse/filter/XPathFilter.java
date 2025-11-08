@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -153,9 +154,9 @@ public class XPathFilter extends ParseFilter {
     }
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
 
-        ParseData parseData = parse.get(URL);
+        ParseData parseData = parse.get(url);
         Metadata metadata = parseData.getMetadata();
 
         // applies the XPATH expression in the order in which they are produced

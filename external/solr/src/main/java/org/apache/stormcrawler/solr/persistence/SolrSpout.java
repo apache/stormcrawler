@@ -135,21 +135,21 @@ public class SolrSpout extends AbstractQueryingSpout {
         if (lastNextFetchDate == null) {
             lastNextFetchDate = Instant.now();
             lastStartOffset = 0;
-            lastTimeResetToNOW = Instant.now();
+            lastTimeResetToNow = Instant.now();
         }
         // reset the value for next fetch date if the previous one is too
         // old
         else if (resetFetchDateAfterNSecs != -1) {
             Instant changeNeededOn =
                     Instant.ofEpochMilli(
-                            lastTimeResetToNOW.toEpochMilli() + (resetFetchDateAfterNSecs * 1000));
+                            lastTimeResetToNow.toEpochMilli() + (resetFetchDateAfterNSecs * 1000));
             if (Instant.now().isAfter(changeNeededOn)) {
                 LOG.info(
                         "lastDate reset based on resetFetchDateAfterNSecs {}",
                         resetFetchDateAfterNSecs);
                 lastNextFetchDate = Instant.now();
                 lastStartOffset = 0;
-                lastTimeResetToNOW = Instant.now();
+                lastTimeResetToNow = Instant.now();
             }
         }
 

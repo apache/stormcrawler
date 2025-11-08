@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler;
 
 import java.io.FileNotFoundException;
@@ -34,11 +35,11 @@ public abstract class ConfigurableTopology {
 
     protected Config conf = new Config();
 
-    public static void start(ConfigurableTopology topology, String args[]) {
+    public static void start(ConfigurableTopology topology, String[] args) {
         // loads the default configuration file
-        Map<String, Object> defaultSCConfig =
+        Map<String, Object> defaultStormCrawlerConfig =
                 Utils.findAndReadConfigFile("crawler-default.yaml", false);
-        topology.conf.putAll(ConfUtils.extractConfigElement(defaultSCConfig));
+        topology.conf.putAll(ConfUtils.extractConfigElement(defaultStormCrawlerConfig));
 
         String[] remainingArgs = topology.parse(args);
         topology.run(remainingArgs);
@@ -48,17 +49,18 @@ public abstract class ConfigurableTopology {
         return conf;
     }
 
-    protected abstract int run(String args[]);
+    protected abstract int run(String[] args);
 
-    /** Submits the topology with the name taken from the configuration * */
+    /** Submits the topology with the name taken from the configuration. */
     protected int submit(Config conf, TopologyBuilder builder) {
         String name = ConfUtils.getString(conf, Config.TOPOLOGY_NAME);
-        if (StringUtils.isBlank(name))
+        if (StringUtils.isBlank(name)) {
             throw new RuntimeException("No value found for " + Config.TOPOLOGY_NAME);
+        }
         return submit(name, conf, builder);
     }
 
-    /** Submits the topology under a specific name * */
+    /** Submits the topology under a specific name. */
     protected int submit(String name, Config conf, TopologyBuilder builder) {
 
         // register for serialization with Kryo
@@ -74,7 +76,7 @@ public abstract class ConfigurableTopology {
         return 0;
     }
 
-    private String[] parse(String args[]) {
+    private String[] parse(String[] args) {
 
         List<String> newArgs = new ArrayList<>();
         Collections.addAll(newArgs, args);

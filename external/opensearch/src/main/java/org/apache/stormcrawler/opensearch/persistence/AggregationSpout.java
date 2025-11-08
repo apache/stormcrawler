@@ -100,7 +100,7 @@ public class AggregationSpout extends AbstractSpout implements ActionListener<Se
 
         if (queryDate == null) {
             queryDate = new Date();
-            lastTimeResetToNOW = Instant.now();
+            lastTimeResetToNow = Instant.now();
         }
 
         String formattedQueryDate = ISODateTimeFormat.dateTimeNoMillis().print(queryDate.getTime());
@@ -347,7 +347,7 @@ public class AggregationSpout extends AbstractSpout implements ActionListener<Se
         if (resetFetchDateAfterNSecs != -1) {
             Instant changeNeededOn =
                     Instant.ofEpochMilli(
-                            lastTimeResetToNOW.toEpochMilli() + (resetFetchDateAfterNSecs * 1000L));
+                            lastTimeResetToNow.toEpochMilli() + (resetFetchDateAfterNSecs * 1000L));
             if (Instant.now().isAfter(changeNeededOn)) {
                 LOG.info(
                         "{} queryDate set to null based on resetFetchDateAfterNSecs {}",

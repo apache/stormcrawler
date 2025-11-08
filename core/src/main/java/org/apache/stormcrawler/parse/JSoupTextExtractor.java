@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse;
 
 import java.util.HashSet;
@@ -76,7 +77,9 @@ public class JSoupTextExtractor implements TextExtractor {
 
     public String text(Object o) {
         // not interested in getting any text?
-        if (noText) return "";
+        if (noText) {
+            return "";
+        }
 
         if (o instanceof Element element) {
 
@@ -128,7 +131,9 @@ public class JSoupTextExtractor implements TextExtractor {
                             }
                             if (accum.length() > 0
                                     && (element.isBlock() || element.tag().getName().equals("br"))
-                                    && !lastCharIsWhitespace(accum)) accum.append(' ');
+                                    && !lastCharIsWhitespace(accum)) {
+                                accum.append(' ');
+                            }
                         }
                     }
 
@@ -142,7 +147,9 @@ public class JSoupTextExtractor implements TextExtractor {
                             }
                             if (element.isBlock()
                                     && (node.nextSibling() instanceof TextNode)
-                                    && !lastCharIsWhitespace(accum)) accum.append(' ');
+                                    && !lastCharIsWhitespace(accum)) {
+                                accum.append(' ');
+                            }
                         }
                     }
                 },
@@ -165,7 +172,9 @@ public class JSoupTextExtractor implements TextExtractor {
 
         while (node != null) {
             // interrupts if too much text has already been produced
-            if (maxSize > 0 && builder.length() >= maxSize) return;
+            if (maxSize > 0 && builder.length() >= maxSize) {
+                return;
+            }
 
             Node parent =
                     node.parentNode(); // remember parent to find nodes that get replaced in .head
@@ -200,7 +209,9 @@ public class JSoupTextExtractor implements TextExtractor {
                     depth--;
                 }
                 visitor.tail(node, depth);
-                if (node == root) break;
+                if (node == root) {
+                    break;
+                }
                 node = node.nextSibling();
             }
         }
@@ -208,20 +219,26 @@ public class JSoupTextExtractor implements TextExtractor {
 
     private static void appendNormalisedText(final StringBuilder accum, final TextNode textNode) {
         final String text = textNode.getWholeText();
-        if (textNode instanceof CDataNode || preserveWhitespace(textNode.parent()))
+        if (textNode instanceof CDataNode || preserveWhitespace(textNode.parent())) {
             accum.append(text);
-        else StringUtil.appendNormalisedWhitespace(accum, text, lastCharIsWhitespace(accum));
+        } else {
+            StringUtil.appendNormalisedWhitespace(accum, text, lastCharIsWhitespace(accum));
+        }
     }
 
     @Contract("null -> false")
     static boolean preserveWhitespace(Node node) {
-        if (node == null) return false;
+        if (node == null) {
+            return false;
+        }
         // looks only at this element and five levels up, to prevent recursion &
         // needless stack searches
         if (node instanceof Element el) {
             int i = 0;
             do {
-                if (el.tag().preserveWhitespace()) return true;
+                if (el.tag().preserveWhitespace()) {
+                    return true;
+                }
                 el = el.parent();
                 i++;
             } while (i < 6 && el != null);

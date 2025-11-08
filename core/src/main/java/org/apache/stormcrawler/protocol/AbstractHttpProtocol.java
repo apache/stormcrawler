@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol;
 
 import crawlercommons.robots.BaseRobotRules;
@@ -53,7 +54,7 @@ public abstract class AbstractHttpProtocol implements Protocol {
             DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ROOT)
                     .withZone(ZoneId.of(ZoneOffset.UTC.toString()));
 
-    /** Formatter to parse ISO-formatted dates persisted in status index */
+    /** Formatter to parse ISO-formatted dates persisted in status index. */
     private static final DateTimeFormatter ISO_INSTANT_FORMATTER =
             DateTimeFormatter.ISO_INSTANT.withZone(ZoneId.of(ZoneOffset.UTC.toString()));
 
@@ -61,7 +62,7 @@ public abstract class AbstractHttpProtocol implements Protocol {
 
     protected boolean skipRobots = false;
 
-    protected boolean storeHTTPHeaders = false;
+    protected boolean storeHttpHeaders = false;
 
     protected boolean useCookies = false;
 
@@ -71,34 +72,38 @@ public abstract class AbstractHttpProtocol implements Protocol {
 
     protected static final String SET_HEADER_BY_REQUEST = "set-header";
 
-    protected String protocolMDprefix = "";
+    protected String protocolMetadataPrefix = "";
 
     public ProxyManager proxyManager;
 
     protected final List<KeyValue> customHeaders = new LinkedList<>();
 
     protected static class KeyValue {
-        private final String k;
-        private final String v;
+        private final String key;
+        private final String value;
 
         public String getKey() {
-            return k;
+            return key;
         }
 
         public String getValue() {
-            return v;
+            return value;
         }
 
         public KeyValue(String k, String v) {
             super();
-            this.k = k;
-            this.v = v;
+            this.key = k;
+            this.value = v;
         }
 
         public static KeyValue build(String h) {
             int pos = h.indexOf("=");
-            if (pos == -1) return new KeyValue(h.trim(), "");
-            if (pos + 1 == h.length()) return new KeyValue(h.trim(), "");
+            if (pos == -1) {
+                return new KeyValue(h.trim(), "");
+            }
+            if (pos + 1 == h.length()) {
+                return new KeyValue(h.trim(), "");
+            }
             return new KeyValue(h.substring(0, pos).trim(), h.substring(pos + 1).trim());
         }
     }
@@ -107,7 +112,7 @@ public abstract class AbstractHttpProtocol implements Protocol {
     public void configure(Config conf) {
         this.skipRobots = ConfUtils.getBoolean(conf, "http.robots.file.skip", false);
 
-        this.storeHTTPHeaders = ConfUtils.getBoolean(conf, "http.store.headers", false);
+        this.storeHttpHeaders = ConfUtils.getBoolean(conf, "http.store.headers", false);
         this.useCookies = ConfUtils.getBoolean(conf, "http.use.cookies", false);
         this.protocolVersions = ConfUtils.loadListFromConf("http.protocol.versions", conf);
 
@@ -117,9 +122,9 @@ public abstract class AbstractHttpProtocol implements Protocol {
         }
 
         robots = new HttpRobotRulesParser(conf);
-        protocolMDprefix =
+        protocolMetadataPrefix =
                 ConfUtils.getString(
-                        conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, protocolMDprefix);
+                        conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, protocolMetadataPrefix);
 
         String proxyManagerImplementation =
                 ConfUtils.getString(
@@ -148,7 +153,9 @@ public abstract class AbstractHttpProtocol implements Protocol {
 
     @Override
     public BaseRobotRules getRobotRules(String url) {
-        if (this.skipRobots) return RobotRulesParser.EMPTY_RULES;
+        if (this.skipRobots) {
+            return RobotRulesParser.EMPTY_RULES;
+        }
         return robots.getRobotRulesSet(this, url);
     }
 
@@ -178,7 +185,7 @@ public abstract class AbstractHttpProtocol implements Protocol {
             String agentName,
             String agentVersion,
             String agentDesc,
-            String agentURL,
+            String agentUrl,
             String agentEmail) {
 
         StringBuilder buf = new StringBuilder();
@@ -191,20 +198,24 @@ public abstract class AbstractHttpProtocol implements Protocol {
         }
 
         boolean hasAgentDesc = StringUtils.isNotBlank(agentDesc);
-        boolean hasAgentURL = StringUtils.isNotBlank(agentURL);
+        boolean hasAgentUrl = StringUtils.isNotBlank(agentUrl);
         boolean hasAgentEmail = StringUtils.isNotBlank(agentEmail);
 
-        if (hasAgentDesc || hasAgentEmail || hasAgentURL) {
+        if (hasAgentDesc || hasAgentEmail || hasAgentUrl) {
             buf.append(" (");
 
             if (hasAgentDesc) {
                 buf.append(agentDesc);
-                if (hasAgentURL || hasAgentEmail) buf.append("; ");
+                if (hasAgentUrl || hasAgentEmail) {
+                    buf.append("; ");
+                }
             }
 
-            if (hasAgentURL) {
-                buf.append(agentURL);
-                if (hasAgentEmail) buf.append("; ");
+            if (hasAgentUrl) {
+                buf.append(agentUrl);
+                if (hasAgentEmail) {
+                    buf.append("; ");
+                }
             }
 
             if (hasAgentEmail) {
@@ -218,7 +229,7 @@ public abstract class AbstractHttpProtocol implements Protocol {
     }
 
     /**
-     * Format an ISO date string as HTTP date used in HTTP headers, e.g.,
+     * Format an ISO date string as HTTP date used in HTTP headers. E.g.,
      *
      * <pre>
      * 1994-11-06T08:49:37.000Z

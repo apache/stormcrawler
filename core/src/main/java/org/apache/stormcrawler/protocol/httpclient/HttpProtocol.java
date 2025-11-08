@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.httpclient;
 
 import java.io.IOException;
@@ -68,7 +69,7 @@ import org.apache.stormcrawler.util.CookieConverter;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.LoggerFactory;
 
-/** Uses Apache httpclient to handle http and https */
+/** Uses Apache httpclient to handle http and https. */
 public class HttpProtocol extends AbstractHttpProtocol
         implements ResponseHandler<ProtocolResponse> {
 
@@ -220,7 +221,7 @@ public class HttpProtocol extends AbstractHttpProtocol
                 request.addHeader(HttpHeaders.IF_MODIFIED_SINCE, formatHttpDate(lastModified));
             }
 
-            String ifNoneMatch = md.getFirstValue(HttpHeaders.ETAG, protocolMDprefix);
+            String ifNoneMatch = md.getFirstValue(HttpHeaders.ETAG, protocolMetadataPrefix);
             if (StringUtils.isNotBlank(ifNoneMatch)) {
                 request.addHeader(HttpHeaders.IF_NONE_MATCH, ifNoneMatch);
             }
@@ -260,7 +261,7 @@ public class HttpProtocol extends AbstractHttpProtocol
     }
 
     private void addCookiesToRequest(HttpRequestBase request, Metadata md) {
-        String[] cookieStrings = md.getValues(RESPONSE_COOKIES_HEADER, protocolMDprefix);
+        String[] cookieStrings = md.getValues(RESPONSE_COOKIES_HEADER, protocolMetadataPrefix);
         if (cookieStrings != null && cookieStrings.length > 0) {
             List<Cookie> cookies;
             try {
@@ -274,7 +275,7 @@ public class HttpProtocol extends AbstractHttpProtocol
     }
 
     protected void addHeadersToRequest(HttpRequestBase request, Metadata md) {
-        String[] headerStrings = md.getValues(SET_HEADER_BY_REQUEST, protocolMDprefix);
+        String[] headerStrings = md.getValues(SET_HEADER_BY_REQUEST, protocolMetadataPrefix);
         if ((headerStrings != null) && (headerStrings.length > 0)) {
             for (String hs : headerStrings) {
                 KeyValue h = KeyValue.build(hs);
@@ -294,7 +295,7 @@ public class HttpProtocol extends AbstractHttpProtocol
         int status = statusLine.getStatusCode();
 
         StringBuilder verbatim = new StringBuilder();
-        if (storeHTTPHeaders) {
+        if (storeHttpHeaders) {
             verbatim.append(statusLine).append("\r\n");
         }
 
@@ -302,7 +303,7 @@ public class HttpProtocol extends AbstractHttpProtocol
         HeaderIterator iter = response.headerIterator();
         while (iter.hasNext()) {
             Header header = iter.nextHeader();
-            if (storeHTTPHeaders) {
+            if (storeHttpHeaders) {
                 verbatim.append(header.toString()).append("\r\n");
             }
             metadata.addValue(header.getName().toLowerCase(Locale.ROOT), header.getValue());
@@ -320,7 +321,7 @@ public class HttpProtocol extends AbstractHttpProtocol
             }
         }
 
-        if (storeHTTPHeaders) {
+        if (storeHttpHeaders) {
             verbatim.append("\r\n");
             metadata.setValue(ProtocolResponse.RESPONSE_HEADERS_KEY, verbatim.toString());
         }
@@ -341,7 +342,9 @@ public class HttpProtocol extends AbstractHttpProtocol
     private static byte[] toByteArray(
             final HttpEntity entity, int maxContent, MutableBoolean trimmed) throws IOException {
 
-        if (entity == null) return new byte[] {};
+        if (entity == null) {
+            return new byte[] {};
+        }
 
         final InputStream instream = entity.getContent();
         if (instream == null) {

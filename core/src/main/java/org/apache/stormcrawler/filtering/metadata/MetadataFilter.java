@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.metadata;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -223,7 +224,9 @@ public class MetadataFilter extends URLFilter {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof MetadataFilter that)) return false;
+        if (!(o instanceof MetadataFilter that)) {
+            return false;
+        }
         return Objects.equals(filters, that.filters);
     }
 
@@ -260,7 +263,9 @@ public class MetadataFilter extends URLFilter {
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof ComplexFilter that)) return false;
+            if (!(o instanceof ComplexFilter that)) {
+                return false;
+            }
             return Objects.equals(filters, that.filters) && operation == that.operation;
         }
 

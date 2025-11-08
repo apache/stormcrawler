@@ -263,7 +263,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             LOG.info("Failed {} tuple(s) for ID {}", values.size(), url);
             for (Tuple t : values) {
                 eventCounter.scope("failed").incrBy(1);
-                _collector.fail(t);
+                collector.fail(t);
             }
         }
     }
@@ -440,7 +440,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
 
             for (Tuple t : values) {
                 eventCounter.scope("failed").incrBy(1);
-                _collector.fail(t);
+                collector.fail(t);
             }
         } else {
             // This should never happen, but log it anyway.

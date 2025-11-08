@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -77,7 +78,7 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
 
     protected int resetFetchDateAfterNSecs = 120;
 
-    protected Instant lastTimeResetToNOW;
+    protected Instant lastTimeResetToNow;
 
     private long timeLastQuerySent = 0;
     private long timeLastQueryReceived = 0;
@@ -88,9 +89,9 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
 
     protected URLBuffer buffer;
 
-    protected SpoutOutputCollector _collector;
+    protected SpoutOutputCollector collector;
 
-    /** Required for implementations doing asynchronous calls * */
+    /** Required for implementations doing asynchronous calls. */
     protected AtomicBoolean isInQuery = new AtomicBoolean(false);
 
     protected CollectionMetric queryTimes;
@@ -126,7 +127,7 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
         resetFetchDateAfterNSecs =
                 ConfUtils.getInt(stormConf, resetFetchDateParamName, resetFetchDateAfterNSecs);
 
-        _collector = collector;
+        this.collector = collector;
     }
 
     /**
@@ -176,7 +177,9 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
 
     @Override
     public void nextTuple() {
-        if (!active) return;
+        if (!active) {
+            return;
+        }
 
         // force the refresh of the buffer even if the buffer is not empty
         if (!isInQuery.get() && triggerQueries()) {
@@ -194,7 +197,7 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
             }
             List<Object> fields = buffer.next();
             String url = fields.get(0).toString();
-            this._collector.emit(fields, url);
+            this.collector.emit(fields, url);
             beingProcessed.put(url, null);
             eventCounter.scope("emitted").incrBy(1);
             return;
@@ -249,7 +252,7 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
         return timeLastQuerySent;
     }
 
-    /** sets the marker that we are in a query to false and timeLastQueryReceived to now */
+    /** sets the marker that we are in a query to false and timeLastQueryReceived to now. */
     protected void markQueryReceivedNow() {
         isInQuery.set(false);
         LOG.trace("{} isInquery set to false");

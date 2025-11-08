@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.bolt;
 
 import java.net.MalformedURLException;
@@ -71,10 +72,12 @@ public abstract class StatusEmitterBolt extends BaseRichBolt {
      * the target metadata post-filtering.
      */
     protected void emitOutlink(
-            Tuple t, URL sURL, String newUrl, Metadata sourceMetadata, String... customKeyVals) {
+            Tuple t, URL url, String newUrl, Metadata sourceMetadata, String... customKeyVals) {
 
-        Outlink ol = filterOutlink(sURL, newUrl, sourceMetadata, customKeyVals);
-        if (ol == null) return;
+        Outlink ol = filterOutlink(url, newUrl, sourceMetadata, customKeyVals);
+        if (ol == null) {
+            return;
+        }
 
         collector.emit(
                 org.apache.stormcrawler.Constants.StatusStreamName,
@@ -83,17 +86,17 @@ public abstract class StatusEmitterBolt extends BaseRichBolt {
     }
 
     protected Outlink filterOutlink(
-            URL sURL, String newUrl, Metadata sourceMetadata, String... customKeyVals) {
+            URL url, String newUrl, Metadata sourceMetadata, String... customKeyVals) {
         // build an absolute URL
         try {
-            URL tmpURL = URLUtil.resolveURL(sURL, newUrl);
-            newUrl = tmpURL.toExternalForm();
+            URL tmpUrl = URLUtil.resolveUrl(url, newUrl);
+            newUrl = tmpUrl.toExternalForm();
         } catch (MalformedURLException e) {
             return null;
         }
 
         // apply URL filters
-        newUrl = this.urlFilters.filter(sURL, sourceMetadata, newUrl);
+        newUrl = this.urlFilters.filter(url, sourceMetadata, newUrl);
 
         // filtered
         if (newUrl == null) {
@@ -101,7 +104,7 @@ public abstract class StatusEmitterBolt extends BaseRichBolt {
         }
 
         Metadata metadata =
-                metadataTransfer.getMetaForOutlink(newUrl, sURL.toExternalForm(), sourceMetadata);
+                metadataTransfer.getMetaForOutlink(newUrl, url.toExternalForm(), sourceMetadata);
 
         for (int i = 0; i < customKeyVals.length; i = i + 2) {
             metadata.addValue(customKeyVals[i], customKeyVals[i + 1]);

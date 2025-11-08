@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.bolt;
 
 import java.io.IOException;
@@ -50,7 +51,7 @@ public class URLFilterBolt extends BaseRichBolt {
 
     /**
      * Relies on the file defined in urlfilters.config.file and applied to all tuples regardless of
-     * status
+     * status.
      */
     public URLFilterBolt() {
         this(false, null);
@@ -66,7 +67,9 @@ public class URLFilterBolt extends BaseRichBolt {
         // the input can come from the standard stream or the status one
         // we'll emit to whichever it came from
         String stream = input.getSourceStreamId();
-        if (stream == null) stream = Utils.DEFAULT_STREAM_ID;
+        if (stream == null) {
+            stream = Utils.DEFAULT_STREAM_ID;
+        }
 
         // must have at least a URL and metadata, possibly a status
         String urlString = input.getStringByField("url");

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -64,7 +65,7 @@ public class HttpRobotRulesParser extends RobotRulesParser {
         allow5xx = ConfUtils.getBoolean(conf, "http.robots.5xx.allow", false);
     }
 
-    /** Compose unique key to store and access robot rules in cache for given URL */
+    /** Compose unique key to store and access robot rules in cache for given URL. */
     protected static String getCacheKey(URL url) {
         String protocol = url.getProtocol().toLowerCase(Locale.ROOT);
         String host = url.getHost().toLowerCase(Locale.ROOT);
@@ -81,7 +82,7 @@ public class HttpRobotRulesParser extends RobotRulesParser {
     }
 
     /**
-     * Returns the robots rules from the cache or empty rules if not found
+     * Returns the robots rules from the cache or empty rules if not found.
      *
      * @see org.apache.stormcrawler.filtering.robots.RobotsFilter
      */
@@ -124,12 +125,13 @@ public class HttpRobotRulesParser extends RobotRulesParser {
         boolean cacheRule = true;
         Set<String> redirectCacheKeys = new HashSet<>();
 
-        URL robotsUrl = null, redir = null;
+        URL robotsUrl = null;
+        URL redir = null;
 
         LOG.debug("Cache miss {} for {}", cacheKey, url);
         List<Integer> bytesFetched = new LinkedList<>();
         try {
-            robotsUrl = URLUtil.resolveURL(url, "/robots.txt");
+            robotsUrl = URLUtil.resolveUrl(url, "/robots.txt");
             ProtocolResponse response = http.getProtocolOutput(robotsUrl.toString(), fetchRobotsMd);
             int code = response.getStatusCode();
             bytesFetched.add(response.getContent() != null ? response.getContent().length : 0);
@@ -147,7 +149,7 @@ public class HttpRobotRulesParser extends RobotRulesParser {
                 String redirection = response.getMetadata().getFirstValue(HttpHeaders.LOCATION);
                 LOG.debug("Redirected from {} to {}", redir, redirection);
                 if (StringUtils.isNotBlank(redirection)) {
-                    redir = URLUtil.resolveURL(redir, redirection);
+                    redir = URLUtil.resolveUrl(redir, redirection);
                     if (redir.getPath().equals("/robots.txt") && redir.getQuery() == null) {
                         // only if the path (including the query part) of the redirect target is
                         // `/robots.txt` we can get/put the rules from/to the cache under the host

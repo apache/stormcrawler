@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import java.net.IDN;
@@ -23,7 +24,7 @@ import java.net.URL;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-/** Utility class for URL analysis */
+/** Utility class for URL analysis. */
 public class URLUtil {
 
     private URLUtil() {}
@@ -37,7 +38,7 @@ public class URLUtil {
      * @return resolved absolute url.
      * @throws MalformedURLException
      */
-    public static URL resolveURL(URL base, String target) throws MalformedURLException {
+    public static URL resolveUrl(URL base, String target) throws MalformedURLException {
         target = target.trim();
 
         if (target.startsWith("?")) {
@@ -48,7 +49,7 @@ public class URLUtil {
     }
 
     /**
-     * Refactor deprecated URL constructor to use the URI class for resolving relative URLs
+     * Refactor deprecated URL constructor to use the URI class for resolving relative URLs.
      *
      * @param base the base URL
      * @param target the target URL (may be relative)
@@ -97,17 +98,20 @@ public class URLUtil {
         }
 
         // get the base url and it params information
-        String baseURL = base.toString();
-        int startParams = baseURL.indexOf(';');
-        String params = baseURL.substring(startParams);
+        String baseUrl = base.toString();
+        int startParams = baseUrl.indexOf(';');
+        String params = baseUrl.substring(startParams);
 
         // if the target has a query string then put the params information
         // after
         // any path but before the query string, otherwise just append to the
         // path
-        int startQS = target.indexOf('?');
-        if (startQS >= 0) {
-            target = target.substring(0, startQS) + params + target.substring(startQS);
+        int startQueryString = target.indexOf('?');
+        if (startQueryString >= 0) {
+            target =
+                    target.substring(0, startQueryString)
+                            + params
+                            + target.substring(startQueryString);
         } else {
             target += params;
         }
@@ -117,17 +121,19 @@ public class URLUtil {
 
     private static Pattern IP_PATTERN = Pattern.compile("(\\d{1,3}\\.){3}(\\d{1,3})");
 
-    /** Partitions of the hostname of the url by "." */
+    /** Partitions of the hostname of the url by ".". */
     public static String[] getHostSegments(URL url) {
         String host = url.getHost();
         // return whole hostname, if it is an ipv4
-        // TODO : handle ipv6
-        if (IP_PATTERN.matcher(host).matches()) return new String[] {host};
+        // TODO: handle ipv6
+        if (IP_PATTERN.matcher(host).matches()) {
+            return new String[] {host};
+        }
         return host.split("\\.");
     }
 
     /**
-     * Partitions of the hostname of the url by "."
+     * Partitions of the hostname of the url by ".".
      *
      * @throws MalformedURLException
      */
