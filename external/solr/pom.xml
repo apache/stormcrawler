@@ -38,7 +38,7 @@ under the License.
 	<description>Solr resources for StormCrawler</description>
 
 	<properties>
-		<solr.version>9.9.0</solr.version>
+		<solr.version>9.10.0</solr.version>
 	</properties>
 
 	<dependencies>
