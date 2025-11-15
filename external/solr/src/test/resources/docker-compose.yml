@@ -30,7 +30,7 @@ services:
       retries: 5
 
   solr:
-    image: solr:9.8.1
+    image: solr:9.10.0
     hostname: solr
     ports:
       - "8983:8983"
