@@ -44,7 +44,7 @@ under the License.
 		<httpclient.version>4.5.14</httpclient.version>
 		<snakeyaml.version>2.4</snakeyaml.version>
 		<commons.lang.version>3.19.0</commons.lang.version>
-		<wiremock.version>3.13.1</wiremock.version>
+		<wiremock.version>3.13.2</wiremock.version>
 		<rometools.version>2.1.0</rometools.version>
 		<cli.version>1.10.0</cli.version>
 		<okhttp.version>5.3.0</okhttp.version>
