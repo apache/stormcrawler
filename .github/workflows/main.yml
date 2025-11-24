@@ -44,7 +44,7 @@ jobs:
         run: mvn -U -ntp --batch-mode --show-version --fail-at-end clean install -DfailIfNoTests=false -DskipTests
 
       - name: Create Pull Request after License Regeneration
-        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        uses: peter-evans/create-pull-request@84ae59a2cdc2258d6fa0732dd66352dddae2a412 # v7.0.9
         with:
           base: main
           token: ${{ secrets.GITHUB_TOKEN }}
