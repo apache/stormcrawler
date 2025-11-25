@@ -19,44 +19,38 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>org.apache.stormcrawler</groupId>
-        <artifactId>stormcrawler-external</artifactId>
-        <version>3.5.1-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
-    </parent>
+<project xmlns="http://maven.apache.org/POM/4.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 https://maven.apache.org/xsd/maven-4.1.0.xsd">
+	
+	<parent/>
 
+	<artifactId>stormcrawler-ai</artifactId>
+	<name>stormcrawler-ai</name>
 
-    <artifactId>stormcrawler-ai</artifactId>
-    <name>stormcrawler-ai</name>
+	<url>https://github.com/apache/stormcrawler/tree/master/external/ai</url>
+	<description>AI resources for StormCrawler</description>
 
-    <url>https://github.com/apache/stormcrawler/tree/master/external/ai</url>
-    <description>AI resources for StormCrawler</description>
+	<properties>
+		<langchain4j.version>1.8.0</langchain4j.version>
+		<langchain4j.openai.version>1.8.0</langchain4j.openai.version>
+	</properties>
 
-    <properties>
-        <langchain4j.version>1.8.0</langchain4j.version>
-        <langchain4j.openai.version>1.8.0</langchain4j.openai.version>
-    </properties>
-
-    <dependencies>
-        <dependency>
-            <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j</artifactId>
-            <version>${langchain4j.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.opennlp</groupId>
-                    <artifactId>opennlp-tools</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-open-ai</artifactId>
-            <version>${langchain4j.openai.version}</version>
-        </dependency>
-    </dependencies>
+	<dependencies>
+		<dependency>
+			<groupId>dev.langchain4j</groupId>
+			<artifactId>langchain4j</artifactId>
+			<version>${langchain4j.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.apache.opennlp</groupId>
+					<artifactId>opennlp-tools</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>dev.langchain4j</groupId>
+			<artifactId>langchain4j-open-ai</artifactId>
+			<version>${langchain4j.openai.version}</version>
+		</dependency>
+	</dependencies>
 
 </project>

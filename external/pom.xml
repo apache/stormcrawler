@@ -19,20 +19,30 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-
-	<parent>
-		<groupId>org.apache.stormcrawler</groupId>
-		<artifactId>stormcrawler</artifactId>
-		<version>3.5.1-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath>
-	</parent>
+<project xmlns="http://maven.apache.org/POM/4.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 https://maven.apache.org/xsd/maven-4.1.0.xsd">
+	
+	<parent/>
 
 	<artifactId>stormcrawler-external</artifactId>
 	<packaging>pom</packaging>
 
-    <dependencies>
+	<subprojects>
+		<subproject>ai</subproject>
+		<subproject>aws</subproject>
+		<subproject>langid</subproject>
+		<subproject>opensearch</subproject>
+		<subproject>opensearch/archetype</subproject>
+		<subproject>playwright</subproject>
+		<subproject>selenium</subproject>
+		<subproject>solr</subproject>
+		<subproject>solr/archetype</subproject>
+		<subproject>sql</subproject>
+		<subproject>tika</subproject>
+		<subproject>urlfrontier</subproject>
+		<subproject>warc</subproject>
+	</subprojects>
+
+	<dependencies>
 		<dependency>
 			<groupId>org.apache.storm</groupId>
 			<artifactId>storm-client</artifactId>
@@ -62,7 +72,5 @@ under the License.
 			<version>${mockito.version}</version>
 			<scope>test</scope>
 		</dependency>
-
-
 	</dependencies>
 </project>

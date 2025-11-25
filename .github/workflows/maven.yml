@@ -38,6 +38,16 @@ jobs:
         with:
           distribution: adopt
           java-version: 17
+      - name: Install Maven 4
+        run: |
+          MAVEN_VERSION=4.0.0-rc-5
+          BASE_URL="https://dlcdn.apache.org/maven/maven-4/${MAVEN_VERSION}/binaries"
+          curl -fsSL "${BASE_URL}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o maven.tar.gz
+          mkdir -p "$HOME/maven"
+          tar -xzf maven.tar.gz -C "$HOME/maven"
+          echo "M2_HOME=$HOME/maven/apache-maven-${MAVEN_VERSION}" >> "$GITHUB_ENV"
+          echo "$HOME/maven/apache-maven-${MAVEN_VERSION}/bin" >> "$GITHUB_PATH"
+          rm maven.tar.gz
       - name: Build with Maven
         run: mvn -B --no-transfer-progress -Prat -DskipTests verify -Dskip.format.code=false
 
@@ -63,5 +73,15 @@ jobs:
       with:
         distribution: adopt
         java-version: ${{ matrix.java }}
+    - name: Install Maven 4
+      run: |
+        MAVEN_VERSION=4.0.0-rc-5
+        BASE_URL="https://dlcdn.apache.org/maven/maven-4/${MAVEN_VERSION}/binaries"
+        curl -fsSL "${BASE_URL}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o maven.tar.gz
+        mkdir -p "$HOME/maven"
+        tar -xzf maven.tar.gz -C "$HOME/maven"
+        echo "M2_HOME=$HOME/maven/apache-maven-${MAVEN_VERSION}" >> "$GITHUB_ENV"
+        echo "$HOME/maven/apache-maven-${MAVEN_VERSION}/bin" >> "$GITHUB_PATH"
+        rm maven.tar.gz
     - name: Build with Maven
       run: mvn -B --no-transfer-progress package --file pom.xml -DCI_ENV=true verify

@@ -19,9 +19,8 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-
+<project xmlns="http://maven.apache.org/POM/4.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 https://maven.apache.org/xsd/maven-4.1.0.xsd">
+	
 	<parent>
 		<groupId>org.apache</groupId>
 		<artifactId>apache</artifactId>
@@ -73,8 +72,8 @@ under the License.
 		<slf4j-simple.version>2.0.17</slf4j-simple.version>
 		<jetbrains.annotations.version>26.0.2-1</jetbrains.annotations.version>
 		<commons.io.version>2.17.0</commons.io.version>
-        <commons.compress.version>1.28.0</commons.compress.version>
-        <commons.codec.version>1.20.0</commons.codec.version>
+		<commons.compress.version>1.28.0</commons.compress.version>
+		<commons.codec.version>1.20.0</commons.codec.version>
 		<git-code-format-maven-plugin.version>5.4</git-code-format-maven-plugin.version>
 		<testcontainers.version>1.21.3</testcontainers.version>
 		<maven.mojo.license.plugin>2.7.0</maven.mojo.license.plugin>
@@ -467,34 +466,34 @@ under the License.
 					  </execution>
 				  </executions>
 		   </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>${checkstyle-maven-plugin.version}</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>com.puppycrawl.tools</groupId>
-                        <artifactId>checkstyle</artifactId>
-                        <version>${checkstyle.version}</version>
-                    </dependency>
-                </dependencies>
-                <configuration>
-                    <configLocation>checkstyle.xml</configLocation>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+				<version>${checkstyle-maven-plugin.version}</version>
+				<dependencies>
+					<dependency>
+						<groupId>com.puppycrawl.tools</groupId>
+						<artifactId>checkstyle</artifactId>
+						<version>${checkstyle.version}</version>
+					</dependency>
+				</dependencies>
+				<configuration>
+					<configLocation>checkstyle.xml</configLocation>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 
 	<profiles>
 		<!-- Run Apache Rat license checks in a separate profile, because during local builds it doesn't skip files
-          that are not checked into Git -->
+		  that are not checked into Git -->
 		<profile>
 			<id>rat</id>
 			<build>
@@ -515,33 +514,33 @@ under the License.
 							<outputDirectory>${project.basedir}/rat</outputDirectory>
 							<excludes>
 								<exclude>**/*.ndjson</exclude>
-                                <exclude>**/*.mapping</exclude>
-                                <exclude>**/*.flux</exclude>
-                                <exclude>**/*.txt</exclude>
-                                <exclude>**/*.rss</exclude>
-                                <exclude>**/*.tar.gz</exclude>
-                                <exclude>**/README.md</exclude>
-                                <exclude>**/target/**</exclude>
-                                <exclude>**/warc.inputs</exclude>
-                                <exclude>**/llm-default-prompt.txt</exclude>
-                                <exclude>LICENSE</exclude>
-                                <exclude>NOTICE</exclude>
-                                <exclude>CONTRIBUTING.md</exclude>
-                                <exclude>RELEASING.md</exclude>
+								<exclude>**/*.mapping</exclude>
+								<exclude>**/*.flux</exclude>
+								<exclude>**/*.txt</exclude>
+								<exclude>**/*.rss</exclude>
+								<exclude>**/*.tar.gz</exclude>
+								<exclude>**/README.md</exclude>
+								<exclude>**/target/**</exclude>
+								<exclude>**/warc.inputs</exclude>
+								<exclude>**/llm-default-prompt.txt</exclude>
+								<exclude>LICENSE</exclude>
+								<exclude>NOTICE</exclude>
+								<exclude>CONTRIBUTING.md</exclude>
+								<exclude>RELEASING.md</exclude>
 								<exclude>external/opensearch/dashboards/**</exclude>
 								<exclude>external/solr/archetype/src/main/resources/archetype-resources/configsets/**</exclude>
-                                <exclude>THIRD-PARTY.properties</exclude>
-                                <exclude>THIRD-PARTY.txt</exclude>
+								<exclude>THIRD-PARTY.properties</exclude>
+								<exclude>THIRD-PARTY.txt</exclude>
 								<exclude>.github/ISSUE_TEMPLATE/*.yml</exclude>
-                                <exclude>.github/*.md</exclude>
-                                <exclude>.mvn/*.config</exclude>
-                                <exclude>.gitattributes</exclude>
-                                <exclude>**/dependency-reduced-pom.xml</exclude>
-                                <exclude>.editorconfig</exclude>
-                                <exclude>**/.settings/**/*</exclude> <!-- Eclipse -->
-                                <exclude>**/.classpath</exclude> <!-- Eclipse -->
-                                <exclude>**/.project</exclude> <!-- Eclipse -->
-                                <exclude>**/.idea</exclude> <!-- IntelliJ -->
+								<exclude>.github/*.md</exclude>
+								<exclude>.mvn/*.config</exclude>
+								<exclude>.gitattributes</exclude>
+								<exclude>**/dependency-reduced-pom.xml</exclude>
+								<exclude>.editorconfig</exclude>
+								<exclude>**/.settings/**/*</exclude> <!-- Eclipse -->
+								<exclude>**/.classpath</exclude> <!-- Eclipse -->
+								<exclude>**/.project</exclude> <!-- Eclipse -->
+								<exclude>**/.idea</exclude> <!-- IntelliJ -->
 							</excludes>
 						</configuration>
 					</plugin>
@@ -660,38 +659,18 @@ under the License.
 				<scope>import</scope>
 			</dependency>
 
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-compress</artifactId>
-                <version>${commons.compress.version}</version>
-            </dependency>
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-compress</artifactId>
+				<version>${commons.compress.version}</version>
+			</dependency>
 
-            <dependency>
-                <groupId>commons-codec</groupId>
-                <artifactId>commons-codec</artifactId>
-                <version>${commons.codec.version}</version>
-            </dependency>
-
+			<dependency>
+				<groupId>commons-codec</groupId>
+				<artifactId>commons-codec</artifactId>
+				<version>${commons.codec.version}</version>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
-
-	<modules>
-		<module>core</module>
-		<module>external</module>
-		<module>external/ai</module>
-		<module>external/aws</module>
-		<module>external/langid</module>
-		<module>external/opensearch</module>
-		<module>external/playwright</module>
-		<module>external/selenium</module>
-		<module>external/solr</module>
-		<module>external/sql</module>
-		<module>external/tika</module>
-		<module>external/urlfrontier</module>
-		<module>external/warc</module>
-		<module>archetype</module>
-		<module>external/opensearch/archetype</module>
-		<module>external/solr/archetype</module>
-    </modules>
 
 </project>
