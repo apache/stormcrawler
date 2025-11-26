@@ -54,17 +54,16 @@ public abstract class RobotRulesParser {
     protected static Cache<String, RobotRules> ERRORCACHE;
 
     /**
-     * Parameter name to configure the cache for robots. @see http://docs.guava-libraries.googlecode
-     * .com/git/javadoc/com/google/common/cache/CacheBuilderSpec.html Default value is
-     * "maximumSize=10000,expireAfterWrite=6h"
+     * Parameter name to configure the cache for robots, see <a href=
+     * "https://guava.dev/releases/snapshot-jre/api/docs/com/google/common/cache/CacheBuilderSpec.html">Guava's
+     * CacheBuilderSpec</a>. Default value is "maximumSize=10000,expireAfterWrite=6h"
      */
     public static final String cacheConfigParamName = "robots.cache.spec";
 
     /**
-     * Parameter name to configure the cache for robots errors. @see
-     * http://docs.guava-libraries.googlecode
-     * .com/git/javadoc/com/google/common/cache/CacheBuilderSpec.html Default value is
-     * "maximumSize=10000,expireAfterWrite=1h"
+     * Parameter name to configure the cache for robots errors, see <a href=
+     * "https://guava.dev/releases/snapshot-jre/api/docs/com/google/common/cache/CacheBuilderSpec.html">Guava's
+     * CacheBuilderSpec</a>. Default value is "maximumSize=10000,expireAfterWrite=1h"
      */
     public static final String errorcacheConfigParamName = "robots.error.cache.spec";
 

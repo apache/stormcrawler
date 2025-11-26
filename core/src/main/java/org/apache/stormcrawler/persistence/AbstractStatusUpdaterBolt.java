@@ -58,9 +58,9 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
     public static String maxFetchErrorsParamName = "max.fetch.errors";
 
     /**
-     * Parameter name to configure the cache. @see http://docs.guava-libraries.googlecode
-     * .com/git/javadoc/com/google/common/cache/CacheBuilderSpec.html Default value is
-     * "maximumSize=10000,expireAfterAccess=1h".
+     * Parameter name to configure the cache, see <a href=
+     * "https://guava.dev/releases/snapshot-jre/api/docs/com/google/common/cache/CacheBuilderSpec.html">Guava's
+     * CacheBuilderSpec</a> Default value is "maximumSize=10000,expireAfterAccess=1h".
      */
     public static String cacheConfigParamName = "status.updater.cache.spec";
 
