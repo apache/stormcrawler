@@ -36,7 +36,7 @@ under the License.
     <description>AI resources for StormCrawler</description>
 
     <properties>
-        <langchain4j.version>1.8.0</langchain4j.version>
+        <langchain4j.version>1.9.1</langchain4j.version>
         <langchain4j.openai.version>1.8.0</langchain4j.openai.version>
     </properties>
 
