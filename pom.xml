@@ -79,7 +79,7 @@ under the License.
 		<testcontainers.version>1.21.3</testcontainers.version>
 		<maven.mojo.license.plugin>2.7.0</maven.mojo.license.plugin>
 		<checkstyle-maven-plugin.version>3.6.0</checkstyle-maven-plugin.version>
-		<checkstyle.version>12.1.2</checkstyle.version>
+		<checkstyle.version>12.2.0</checkstyle.version>
 		<jacoco.maven.plugin>0.8.14</jacoco.maven.plugin>
 		<jacoco.haltOnFailure>false</jacoco.haltOnFailure>
 		<jacoco.classRatio>1.00</jacoco.classRatio>
