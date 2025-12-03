@@ -37,7 +37,6 @@ under the License.
 
     <properties>
         <langchain4j.version>1.9.1</langchain4j.version>
-        <langchain4j.openai.version>1.8.0</langchain4j.openai.version>
     </properties>
 
     <dependencies>
@@ -55,7 +54,7 @@ under the License.
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-open-ai</artifactId>
-            <version>${langchain4j.openai.version}</version>
+            <version>${langchain4j.version}</version>
         </dependency>
     </dependencies>
 
