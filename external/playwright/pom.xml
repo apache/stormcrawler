@@ -37,7 +37,7 @@ under the License.
 	<description>Playwright-based protocol for StormCrawler</description>
 
 	<properties>
-		<playwright.version>1.56.0</playwright.version>
+		<playwright.version>1.57.0</playwright.version>
 		<awaitility.version>4.3.0</awaitility.version>
 		<wiremock.version>3.13.2</wiremock.version>
 		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
