@@ -48,15 +48,34 @@ under the License.
                                 <source-highlighter>coderay</source-highlighter>
                                 <toc />
                                 <linkcss>false</linkcss>
-                                <icons>font</icons>
+                                <icons>inline</icons>
                             </attributes>
                         </configuration>
                     </execution>
                 </executions>
                 <configuration>
                     <sourceDirectory>src/main/asciidoc</sourceDirectory>
-                    <headerFooter>true</headerFooter>
                 </configuration>
+            </plugin>
+
+            <!-- Maven Assembly plugin to create tar.gz -->
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>make-docs-archive</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/docs.xml</descriptor>
+                            </descriptors>
+                            <finalName>${project.artifactId}-${project.version}</finalName>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
