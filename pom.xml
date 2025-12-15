@@ -519,6 +519,7 @@ under the License.
                                 <exclude>**/*.flux</exclude>
                                 <exclude>**/*.txt</exclude>
                                 <exclude>**/*.rss</exclude>
+                                <exclude>**/*.pdf</exclude>
                                 <exclude>**/*.tar.gz</exclude>
                                 <exclude>**/README.md</exclude>
                                 <exclude>**/target/**</exclude>

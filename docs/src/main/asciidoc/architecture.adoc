@@ -1,452 +1,102 @@
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
+////
+Licensed under the Apache License, Version 2.0 (the "License");
+You may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+https://www.apache.org/licenses/LICENSE-2.0
+////
+
+== Understanding StormCrawler's Architecture
+:imagesdir: images
+
 
 == Understanding StormCrawler's Architecture
 :imagesdir: images
 
 === Architecture Overview
-TODO: Architecture similar to JMIR Paper with abstraction towards url frontier and storage
-Explain concept of URL Fitlers and PArse Filters
 
-=== Status Stream
+Apache StormCrawler is built as a distributed, stream-oriented web crawling system
+on top of Apache Storm. Its architecture emphasizes clear separation between
+*crawl control* and *content processing*, with the URL frontier acting as the
+central coordination point.
 
-The Apache StormCrawler components rely on two Apache Storm streams: the _default_ one and another one called _status_.
+.Architecture overview of StormCrawler
+image::stormcrawler.drawio.jpg[StormCrawler Architecture, width=100%]
 
-The aim of the _status_ stream is to pass information about URLs to a persistence layer. Typically, a bespoke bolt will take the tuples coming from the _status_ stream and update the information about URLs in some sort of storage (e.g., ElasticSearch, HBase, etc...), which is then used by a Spout to send new URLs down the topology.
+Figure 1 illustrates StormCrawler’s stream-processing crawl pipeline, built on Apache Storm.
+The architecture is intentionally modular and centers around two core abstractions:
 
-This is critical for building recursive crawls (i.e., you discover new URLs and not just process known ones). The _default_ stream is used for the URL being processed and is generally used at the end of the pipeline by an indexing bolt (which could also be ElasticSearch, HBase, etc...), regardless of whether the crawler is recursive or not.
+- The URL frontier: decides *what* to crawl and *when*
+- The parsing and indexing pipeline: decides *what* to *extract*, *keep*, and *store*
 
-Tuples are emitted on the _status_ stream by the parsing bolts for handling outlinks but also to notify that there has been a problem with a URL (e.g., unparsable content). It is also used by the fetching bolts to handle redirections, exceptions, and unsuccessful fetch status (e.g., HTTP code 400).
+Black arrows show the *main data flow*, gray arrows represent URLs *taken from the frontier*, and purple arrows indicate *URL status updates* fed back to the frontier.
 
-A bolt which sends tuples on the _status_ stream declares its output in the following way:
+==== Crawl Flow and Core Components
 
-[source,java]
-----
-declarer.declareStream(
-    org.apache.storm.crawler.Constants.StatusStreamName,
-    new Fields("url", "metadata", "status"));
-----
+The crawl begins with the *Frontier*, which is responsible for scheduling,
+prioritization, politeness, and retry logic. URLs are emitted by a
+`FrontierSpout` and partitioned by the `URLPartitioner`, typically using the
+host as a key to enforce politeness constraints.
 
-As you can see for instance in link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/SimpleFetcherBolt.java#L149[SimpleFetcherBolt].
+The `Fetcher` retrieves web resources and emits both the fetched content and
+associated metadata such as HTTP status codes, headers, and MIME types. Based
+on the content type, documents are routed to specialized parsers, including
+`SiteMapParser`, `JSoupParser` for HTML content, and `TikaParser` for binary
+formats via Apache Tika.
 
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/Status.java[Status] enum has the following values:
-
-* DISCOVERED:: outlinks found by the parsers or "seed" URLs emitted into the topology by one of the link:https://stormcrawler.net/docs/api/com/digitalpebble/stormcrawler/spout/package-summary.html[spouts] or "injected" into the storage. The URLs can be already known in the storage.
-* REDIRECTION:: set by the fetcher bolts.
-* FETCH_ERROR:: set by the fetcher bolts.
-* ERROR:: used by either the fetcher, parser, or indexer bolts.
-* FETCHED:: set by the StatusStreamBolt bolt (see below).
-
-The difference between FETCH_ERROR and ERROR is that the former is possibly transient whereas the latter is terminal. The bolt which is in charge of updating the status (see below) can then decide when and whether to schedule a new fetch for a URL based on the status value.
-
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/indexing/DummyIndexer.java[DummyIndexer] is useful for notifying the storage layer that a URL has been successfully processed, i.e., fetched, parsed, and anything else we want to do with the main content. It must be placed just before the StatusUpdaterBolt and sends a tuple for the URL on the status stream with a Status value of `fetched`.
-
-The class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/AbstractStatusUpdaterBolt.java[AbstractStatusUpdaterBolt] can be extended to handle status updates for a specific backend. It has an internal cache of URLs with a `discovered` status so that they don't get added to the backend if they already exist, which is a simple but efficient optimisation. It also uses link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/DefaultScheduler.java[DefaultScheduler] to compute a next fetch date and calls MetadataTransfer to filter the metadata that will be stored in the backend.
-
-In most cases, the extending classes will just need to implement the method `store(String URL, Status status, Metadata metadata, Date nextFetch)` and handle their own initialisation in `prepare()`. You can find an example of a class which extends it in the link:https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/persistence/StatusUpdaterBolt.java[StatusUpdaterBolt] for Elasticsearch.
-
-
-=== Bolts
-
-==== Fetcher Bolts
-
-There are actually two different bolts for fetching the content of URLs:
-
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/SimpleFetcherBolt.java[SimpleFetcherBolt]
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/FetcherBolt.java[FetcherBolt]
-
-Both declare the same output:
-
-[source,java]
-----
-declarer.declare(new Fields("url", "content", "metadata"));
-declarer.declareStream(
-        org.apache.storm.crawler.Constants.StatusStreamName,
-        new Fields("url", "metadata", "status"));
-----
-
-with the [[StatusStream]] being used for handling redirections, restrictions by robots directives, or fetch errors, whereas the default stream gets the binary content returned by the server as well as the metadata to the following components (typically a parsing bolt).
-
-Both use the same [[Protocols]] implementations and [[URLFilters]] to control the redirections.
-
-The **FetcherBolt** has an internal set of queues where the incoming URLs are placed based on their hostname/domain/IP (see config `fetcher.queue.mode`) and a number of **FetchingThreads** (config `fetcher.threads.number` – 10 by default) which pull the URLs to fetch from the **FetchQueues**. When doing so, they make sure that a minimal amount of time (set with `fetcher.server.delay` – default 1 sec) has passed since the previous URL was fetched from the same queue. This mechanism ensures that we can control the rate at which requests are sent to the servers. A **FetchQueue** can also be used by more than one **FetchingThread** at a time (in which case `fetcher.server.min.delay` is used), based on the value of `fetcher.threads.per.queue`.
-
-Incoming tuples spend very little time in the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/FetcherBolt.java#L768[execute] method of the **FetcherBolt** as they are put in the FetchQueues, which is why you'll find that the value of **Execute latency** in the Storm UI is pretty low. They get acked later on, after they've been fetched. The metric to watch for in the Storm UI is **Process latency**.
-
-The **SimpleFetcherBolt** does not do any of this, hence its name. It just fetches incoming tuples in its `execute` method and does not do multi-threading. It does enforce politeness by checking when a URL can be fetched and will wait until it is the case. It is up to the user to declare multiple instances of the bolt in the Topology class and to manage how the URLs get distributed across the instances of **SimpleFetcherBolt**, often with the help of the link:https:/
-
-=== Indexer Bolts
-The purpose of crawlers is often to index web pages to make them searchable. The project contains resources for indexing with popular search solutions such as:
-
-* link:https://github.com/apache/stormcrawler/blob/main/external/solr/src/main/java/com/digitalpebble/stormcrawler/solr/bolt/IndexerBolt.java[Apache SOLR]
-* link:https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/com/digitalpebble/stormcrawler/elasticsearch/bolt/IndexerBolt.java[Elasticsearch]
-* link:https://github.com/apache/stormcrawler/blob/main/external/aws/src/main/java/com/digitalpebble/stormcrawler/aws/bolt/CloudSearchIndexerBolt.java[AWS CloudSearch]
-
-All of these extend the class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/indexing/AbstractIndexerBolt.java[AbstractIndexerBolt].
-
-The core module also contains a link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/indexing/StdOutIndexer.java[simple indexer] which dumps the documents into the standard output – useful for debugging – as well as a link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/indexing/DummyIndexer.java[DummyIndexer].
-
-The basic functionalities of filtering a document to index, mapping the metadata (which determines which metadata to keep for indexing and under what field name), or using the canonical tag (if any) are handled by the abstract class. This allows implementations to focus on communication with the indexing APIs.
-
-Indexing is often the penultimate component in a pipeline and takes the output of a Parsing bolt on the standard stream. The output of the indexing bolts is on the _status_ stream:
-
-[source,java]
-----
-public void declareOutputFields(OutputFieldsDeclarer declarer) {
-    declarer.declareStream(
-            org.apache.stormcrawler.Constants.StatusStreamName,
-            new Fields("url", "metadata", "status"));
-}
-----
-
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/indexing/DummyIndexer.java[DummyIndexer] is used for cases where no actual indexing is required. It simply generates a tuple on the _status_ stream so that any StatusUpdater bolt knows that the URL was processed successfully and can update its status and scheduling in the corresponding backend.
-
-You can easily build your own custom indexer to integrate with other storage systems, such as a vector database for semantic search, a graph database for network analysis, or any other specialized data store. By extending AbstractIndexerBolt, you only need to implement the logic to communicate with your target system, while StormCrawler handles the rest of the pipeline and status updates.
-
-=== Parser Bolts
-==== JSoupParserBolt
-
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] can be used to parse HTML documents and extract the outlinks, text, and metadata it contains. If you want to parse non-HTML documents, use the link:https://github.com/apache/stormcrawler/tree/main/external/src/main/java/com/digitalpebble/storm/crawler/tika[Tika-based ParserBolt] from the external modules.
-
-This parser calls the [[URLFilters]] and [[ParseFilters]] defined in the configuration. Please note that it calls [[MetadataTransfer]] prior to calling the [[ParseFilters]]. If you create new Outlinks in your [[ParseFilters]], you'll need to make sure that you use MetadataTransfer there to inherit the Metadata from the parent document.
-
-The **JSoupParserBolt** automatically identifies the charset of the documents. It uses the link:StatusStream[status stream] to report parsing errors but also for the outlinks it extracts from a page. These would typically be used by an extension of link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/AbstractStatusUpdaterBolt.java[AbstractStatusUpdaterBolt] and persisted in some form of storage.
-
-==== SiteMapParserBolt
-StormCrawler can handle sitemap files thanks to the **SiteMapParserBolt**. This bolt should be placed before the standard **ParserBolt** in the topology, as illustrated in link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/java/CrawlTopology.java[CrawlTopology].
-
-The reason for this is that the **SiteMapParserBolt** acts as a filter: it passes on any incoming tuples to the default stream so that they get processed by the **ParserBolt**, unless the tuple contains `isSitemap=true` in its metadata, in which case the **SiteMapParserBolt** will parse it itself. Any outlinks found in the sitemap files are then emitted on the [[StatusStream]].
-
-The **SiteMapParserBolt** applies any configured [[ParseFilters]] to the documents it parses and, just like its equivalent for HTML pages, it uses [[MetadataTransfer]] to populate the Metadata objects for the Outlinks it finds.
-
-=== Filters
-
-==== Parse Filters
-
-ParseFilters are called from parsing bolts such as link:https://github.com/apache/stormcrawler/wiki/JSoupParserBolt[JSoupParserBolt] and link:https://github.com/apache/stormcrawler/wiki/SiteMapParserBolt[SiteMapParserBolt] to extract data from web pages. The extracted data is stored in the Metadata object. ParseFilters can also modify the Outlinks and, in that sense, act as URLFilters.
-
-ParseFilters need to implement the interface link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/ParseFilter.java[ParseFilter], which defines three methods:
-
-[source,java]
-----
-public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse);
-
-public void configure(Map stormConf, JsonNode filterParams);
-
-public boolean needsDOM();
-----
-
-* The `filter` method is where the extraction occurs. ParseResult objects contain the outlinks extracted from the document as well as a Map of String to ParseData, where the String is the URL of a subdocument or the main document itself. ParseData objects contain Metadata, binary content, and text for the subdocuments, which is useful for indexing subdocuments independently of the main document.
-* The `needsDOM` method indicates whether the ParseFilter instance requires the DOM structure. If no ParseFilters need it, the parsing bolt will skip generating the DOM, slightly improving performance.
-* The `configure` method takes a JSON object loaded by the wrapper class ParseFilters. The Storm configuration map can also be used to configure the filters, as described in link:Configuration[Configuration].
-
-Here is the default link:https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/parsefilters.json[JSON configuration file] for ParseFilters. The configuration allows multiple instances of the same filter class with different parameters and supports complex parameter objects. ParseFilters are executed in the order they appear in the JSON file.
-
-===== Provided ParseFilters
-
-* **CollectionTagger** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/CollectionTagger.java[CollectionTagger] assigns one or more tags to the metadata of a document based on URL patterns defined in a JSON resource file. The resource file supports both include and exclude regular expressions:
-
-[source,json]
-----
-{
-  "collections": [
-    {
-      "name": "stormcrawler",
-      "includePatterns": ["http://stormcrawler.net/.+"]
-    },
-    {
-      "name": "crawler",
-      "includePatterns": [".+crawler.+", ".+nutch.+"],
-      "excludePatterns": [".+baby.+", ".+spider.+"]
-    }
-  ]
-}
-----
-
-* **CommaSeparatedToMultivaluedMetadata** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/CommaSeparatedToMultivaluedMetadata.java[CommaSeparatedToMultivaluedMetadata] rewrites single metadata values containing comma-separated entries into multiple values for the same key, useful for keyword tags.
-* **DebugParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/DebugParseFilter.java[DebugParseFilter] dumps an XML representation of the DOM structure to a temporary file.
-* **DomainParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/DomainParseFilter.java[DomainParseFilter] stores the domain or host name in the metadata for later indexing.
-* **LDJsonParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/LDJsonParseFilter.java[LDJsonParseFilter] extracts data from JSON-LD representations.
-* **LinkParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/LinkParseFilter.java[LinkParseFilter] extracts outlinks from documents using XPath expressions defined in the configuration.
-* **MD5SignatureParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/MD5SignatureParseFilter.java[MD5SignatureParseFilter] generates an MD5 signature of a document based on the binary content, text, or URL (as a last resort). It can be combined with content filtering to exclude boilerplate text.
-* **MimeTypeNormalization** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/MimeTypeNormalization.java[MimeTypeNormalization] converts server-reported or inferred mime-type values into human-readable values such as _pdf_, _html_, or _image_ and stores them in the metadata, useful for indexing and filtering search results.
-* **XPathFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/XPathFilter.java[XPathFilter] allows extraction of data using XPath expressions and storing them in the Metadata object.
-
-You can also implement custom ParseFilters to extend the capabilities of the parsing pipeline. For example, you might create a filter to enrich a document's metadata with additional information, such as language detection, sentiment analysis, named entity recognition, or custom tags extracted from the content. Custom filters can also modify or remove outlinks, normalize text, or integrate external data sources, allowing you to tailor the crawler to your specific processing or indexing requirements.
-By implementing the ParseFilter interface and configuring the filter in the JSON file, your custom logic will be seamlessly executed within the parsing bolt.
+Parsed content is then sent to the `Indexer` and persisted by the `Storage`
+layer. Throughout the pipeline, fetch and parse outcomes are reported to the
+`StatusUpdater`, which feeds URL status information back to the frontier,
+closing the crawl feedback loop.
 
 ==== URL Filters
 
-The URL filters can be used to both remove or modify incoming URLs (unlike Nutch where these functionalities are separated between URLFilters and URLNormalizers). This is generally used within a parsing bolt to normalize and filter outgoing URLs, but is also called within the FetcherBolt to handle redirections.
-
-URLFilters need to implement the interface link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/URLFilter.java[URLFilter] which defines a single method:
-
-[source, java]
-----
-public String filter(URL sourceUrl, Metadata sourceMetadata,
-            String urlToFilter);
-----
-
-and inherits a default one from link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/util/Configurable.java[Configurable]:
-
-[source, java]
-----
-public void configure(Map stormConf, JsonNode jsonNode);
-----
-
-The configuration is done via a JSON file which is loaded by the wrapper class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/URLFilters.java[URLFilters]. The URLFilter instances can be used directly, but it is easier to use the class URLFilters instead. Some filter implementations can also be configured with the link:https://github.com/apache/stormcrawler/wiki/Configuration[standard configuration mechanism].
-
-Here is an example of a link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/urlfilters.json[JSON configuration file].
-
-The JSON configuration allows loading several instances of the same filtering class with different parameters and can handle complex configuration objects since it makes no assumptions about the content of the field `param`. The URLFilters are executed in the order in which they are defined in the JSON file.
-
-===== Built-in URL Filters
-
-====== Basic
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/basic/BasicURLFilter.java[BasicURLFilter] filters based on the length of the URL and the repetition of path elements.
-
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/basic/BasicURLNormalizer.java[BasicURLNormalizer] removes the anchor part of URLs based on the value of the parameter `removeAnchorPart`. It also removes query elements based on the configuration and whether their value corresponds to a 32-bit hash.
-
-====== FastURLFilter
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/regex/FastURLFilter.java[FastURLFilter] is based on regex patterns and organized by scope (host | domain | metadata | global). For a given URL, the scopes are tried in the order given above and the URL is kept or removed based on the first matching rule. The default policy is to accept a URL if no match is found.
-
-The resource file is in JSON and looks like this:
-
-[source,json]
-----
-[{
-    "scope": "GLOBAL",
-    "patterns": [
-        "DenyPathQuery \\.jpg"
-    ]
-  },
-  {
-    "scope": "domain:stormcrawler.net",
-    "patterns": [
-        "AllowPath /digitalpebble/",
-        "DenyPath .+"
-    ]
-  },
-  {
-    "scope": "metadata:key=value",
-    "patterns": [
-       "DenyPath .+"
-    ]
-}]
-----
-
-_DenyPathQuery_ indicates that the pattern should be applied on the path URL path and the query element, whereas _DenyPath_ means the path alone.
-
-====== Host
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/host/HostURLFilter.java[HostURLFilter] filters URLs based on whether they belong to the same host or domain name as the source URL. This is configured with the parameters `ignoreOutsideDomain` and `ignoreOutsideHost`. The latter takes precedence over the former.
-
-====== MaxDepth
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/depth/MaxDepthFilter.java[MaxDepthFilter] is configured with the parameter `maxDepth` and requires `metadata.track.depth` to be set to true in the Configuration. This removes outlinks found too far from the seed URL and controls the expansion of the crawl.
-
-If the filter is configured with a value of 0, all outlinks will be removed, regardless of whether the depth is being tracked.
-
-The max depth can also be set on a per-seed basis using the key/value `max.depth`, which is automatically transferred to the outlinks if `metadata.track.depth` is set to true.
-
-====== Metadata
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/metadata/MetadataFilter.java[MetadataFilter] filters URLs based on metadata in the source document.
-
-====== RegexURLFilter
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/regex/RegexURLFilter.java[RegexURLFilter] uses a configuration file or a JSON ArrayNode containing regular expressions to determine whether a URL should be kept or not. The most specific rule must be placed first as a URL is kept or removed based on the first matching rule.
-
-[source,json]
-----
-{
-    "urlFilters": [
-        "-^(file|ftp|mailto):",
-        "+."
-    ]
-}
-----
-
-====== RegexURLNormalizer
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/regex/RegexURLNormalizer.java[RegexURLNormalizer] uses a configuration file or a JSON ArrayNode containing regular expressions and replacements to normalize URLs.
-
-[source,json]
-----
-{
-    "urlNormalizers": [
-        {
-            "pattern": "#.*?(\\?|&amp;|$)",
-            "substitution": "$1"
-        },
-        {
-            "pattern": "\\?&amp;",
-            "substitution": "\\?"
-        }
-    ]
-}
-----
-
-====== RobotsFilter
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/robots/RobotsFilter.java[RobotsFilter] discards URLs based on the robots.txt directives. This is meant for small, limited crawls where the number of hosts is finite. Using this on a larger or open crawl would impact performance as the filter tries to retrieve the robots.txt files for any host found.
-
-====== SitemapFilter
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/sitemap/SitemapFilter.java[SitemapFilter] discards the outlinks of URLs which are not sitemaps when sitemaps have been found.
-
-
-=== Metadata Transfer
-
-The class https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/util/MetadataTransfer.java[MetadataTransfer] is an important part of the framework and is used in key parts of a pipeline.
-
-* Fetching
-* Parsing
-* Updating bolts
-
-An instance (or extension) of MetadataTransfer gets created and configured with the method `public static MetadataTransfer getInstance(Map++<++String, Object++>++ conf)` which takes as parameter with the standard Apache Storm configuration.
-
-A *MetadataTransfer* instance has mainly two methods, both returning Metadata objects :
-
-* `getMetaForOutlink(String targetURL, String sourceURL,           Metadata parentMD)`
-* `filter(Metadata metadata)`
-
-The former is used when creating https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/Outlink.java[Outlinks] i.e. in the parsing bolts but also for handling redirections in the FetcherBolt(s)
-The latter is used by extensions of the https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/AbstractStatusUpdaterBolt.java[AbstractStatusUpdaterBolt] class to determine which *Metadata* should be persisted.
-
-The behavior of the default MetadataTransfer class is driven by configuration only. It has the following options.
-
-* `metadata.transfer` list of metadata key values to filter or transfer to the outlinks. See https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml#L23[crawler-default.yaml]
-* `metadata.persist` list of metadata key values to persist in the status storage. See https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml#L28[crawler-default.yaml]
-* `metadata.track.path` whether to track the URL path or not. Boolean value, true by default.
-* `metadata.track.depth` whether to track the depth from seed. Boolean value, true by default.
-
-Note that the method `getMetaForOutlink` calls `filter` to determine what to key values to keep.
-
-=== Protocols
-
-StormCrawler supports multiple *network protocols* for fetching content from various sources on the web.
-Each protocol implementation defines how the crawler connects to a resource, sends requests, and handles responses such as status codes, headers, and content streams.
-
-Protocols are a key part of the fetching process and are used by StormCrawler’s *bolts* to retrieve data from remote servers.
-While HTTP and HTTPS are the most commonly used, other protocols like `file:` are also supported for local or distributed filesystem access.
-
-Use these configurations to fine-tune fetching performance, authentication, connection handling, and protocol-level optimizations across your crawler topology.
-
-==== Network Protocols
-
-The following network protocols are implemented in StormCrawler:
-
-===== File
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/file/FileProtocol.java[FileProtocol]
-
-===== HTTP/S
-
-See [[HTTPProtocol]] for the effect of metadata content on protocol behaviour.
-
-To change the implementation, add the following lines to your _crawler-conf.yaml_:
-
-[source,yaml]
-----
-http.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
-https.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
-----
-
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/httpclient/HttpProtocol.java[HttpClient]
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/selenium/SeleniumProtocol.java[Selenium]
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/okhttp/HttpProtocol.java[OKHttp]
-
-==== Feature grid
-
-[cols="2,1,1,1", options="header"]
-|===
-| Features | HTTPClient | OKHttp | Selenium
-
-| Basic authentication | link:https://github.com/apache/stormcrawler/pull/589[Y] | link:https://github.com/apache/stormcrawler/issues/792[Y] | N
-| Proxy (w. credentials?) | Y / Y | Y / link:https://github.com/apache/stormcrawler/issues/751[Y] | ?
-| Interruptible / trimmable link:https://github.com/apache/stormcrawler/issues/463[#463] | N / Y | Y / Y | Y / N
-| Cookies | Y | link:https://github.com/apache/stormcrawler/issues/632[Y] | N
-| Response headers | Y | Y | N
-| Trust all certificates | N | link:https://github.com/apache/stormcrawler/issues/615[Y] | N
-| HEAD method | link:https://github.com/apache/stormcrawler/issues/485[Y] | link:https://github.com/apache/stormcrawler/pull/923[Y] | N
-| POST method | N | link:https://github.com/apache/stormcrawler/issues/641[Y] | N
-| Verbatim response header | link:https://github.com/apache/stormcrawler/issues/317[Y] | link:https://github.com/apache/stormcrawler/issues/506[Y] | N
-| Verbatim request header | N | link:https://github.com/apache/stormcrawler/issues/506[Y] | N
-| IP address capture | N | link:https://github.com/apache/stormcrawler/pull/691[Y] | N
-| Navigation and javascript | N | N | Y
-| HTTP/2 | N | Y | (Y)
-| Configurable connection pool | N | link:https://github.com/apache/stormcrawler/issues/918[Y] | N
-|===
-
-==== HTTP/2
-
-* The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/okhttp/HttpProtocol.java[OKHttp] protocol supports link:https://en.wikipedia.org/wiki/HTTP/2[HTTP/2] if the JDK includes link:https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation[ALPN] (Java 9 and upwards or Java 8 builds starting early/mid 2020).
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/httpclient/HttpProtocol.java[HttpClient] does not yet support HTTP/2.
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/selenium/SeleniumProtocol.java[Selenium]: whether HTTP/2 is used or not depends on the used driver.
-
-Since link:https://github.com/apache/stormcrawler/pull/829[#829], the HTTP protocol version used is configurable via `http.protocol.versions` (see also comments in link:https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml[crawler-default.yaml]).
-
-For example, to force that only HTTP/1.1 is used:
-
-[source,yaml]
-----
-http.protocol.versions:
-- "http/1.1"
-----
-
-==== Metadata-dependent Behavior For HTTP Protocols
-
-The `metadata` argument to link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/Protocol.java#L53[HTTPProtocol.getProtocolOutput()] can affect the behavior of the protocol. The following metadata keys are detected by `HTTPProtocol` implementations and utilized in performing the request:
-
-* `last-modified`: If this key is present in `metadata`, the protocol will use the metadata value as the date for the `If-Modified-Since` header field of the HTTP request. If the key is not present, the `If-Modified-Since` field won't be added to the request header.
-
-* `protocol.etag`: If this key is present in `metadata`, the protocol will use the metadata value as the ETag for the `If-None-Match` header field of the HTTP request. If the key is not present, the `If-None-Match` field won't be added to the request header.
-
-* `http.accept`: If this key is present in `metadata`, the protocol will use the value to override the value for the `Accept` header field of the HTTP request. If the key is not present, the `http.accept` global configuration value is used instead. (Available in v1.11+)
-
-* `http.accept.language`: If this key is present in `metadata`, the protocol will use the value to override the value for the `Accept-Language` header field of the HTTP request. If the key is not present, the `http.accept.language` global configuration value is used instead. (Available in v1.11+)
-
-* `protocol.set-cookie`: If this key is present in `metadata` and `http.use.cookies` is true, the protocol will send cookies stored from the response this page was linked to, given the cookie is applicable to the domain of the link.
-
-* `http.method.head`: If this key is present in `metadata`, the protocol sends a HEAD request. (Available in v1.12+ only for httpclient, see link:https://github.com/apache/stormcrawler/issues/485[#485])
-
-* `http.post.json`: If this key is present in `metadata`, the protocol sends a POST request. (Available in v1.12+ only for okhttp, see link:https://github.com/apache/stormcrawler/issues/641[#641])
-
-* `protocol.set-headers`: If this key is present in metadata, the protocol adds the specified headers to the request. See link:https://github.com/apache/stormcrawler/pull/993[#993]
-
-Example:
-
-[source,json]
-----
-"protocol%2Eset-header": [
-  "header1=value1",
-  "header2=value2"
-]
-----
-
-Notes:
-
-* Metadata values starting with `protocol.` may start with a different prefix instead. See `protocol.md.prefix` and link:https://github.com/apache/stormcrawler/issues/776[#776].
-* Metadata used for requests needs to be persisted. For example:
-
-[source,yaml]
-----
-metadata.persist:
-  - last-modified
-  - protocol.etag
-  - protocol.set-cookie
-  - ...
-----
-
-* Cookies need to be transferred to outlinks by setting:
-
-[source,yaml]
-----
-metadata.transfer:
-  - set-cookie
-----
-
+URL Filters determine whether a URL should be accepted, rejected, or modified
+before it is scheduled for fetching. They operate on seed URLs, discovered
+links, and redirect targets, ensuring that only crawl-worthy URLs enter the
+frontier.
+
+In Figure 1, URL Filters are conceptually positioned between link discovery
+and the frontier. Their primary role is to control crawl scope and prevent
+frontier explosion.
+
+Typical URL Filters include:
+
+* *URL Length*: rejects excessively long URLs that often indicate session IDs
+or crawler traps.
+* *Path Repetition*: detects repeating path segments that can lead to infinite
+crawl loops.
+* *URL Normalization*: canonicalizes URLs by removing fragments, sorting query
+parameters, or enforcing consistent schemes.
+* *MIME Type*: avoids scheduling URLs unlikely to yield useful content.
+
+By applying these filters early, StormCrawler prevents unnecessary fetches and
+maintains an efficient, focused crawl.
+
+==== Parse Filters
+
+Parse Filters operate after content has been successfully fetched and parsed.
+They allow fine-grained control over how extracted data and outgoing links are
+processed.
+
+Parse Filters are applied within the parsing bolts, following parsing by
+`SiteMapParser`, `JSoupParser`, or `TikaParser`. They can modify extracted text,
+metadata, and links before the content is indexed or new URLs are emitted.
+
+Common Parse Filters include:
+
+* *URL Filters (post-parse)*: further refine outgoing links extracted from
+content.
+* *XPath*: extract structured fields from HTML documents.
+* *Text Extraction*: control which parts of a document contribute to the
+indexed text.
+* *Enrichment*: add custom metadata such as language detection, entity tags,
+or domain-specific signals.
+
+Parse Filters enable domain-specific logic without coupling it directly to the
+crawler’s core components.
+
+==== Interaction Between URL Filters and Parse Filters
+
+URL Filters focus on deciding *what should be crawled*, while Parse
+Filters focus on deciding *what should be kept and how it should be
+interpreted*.
