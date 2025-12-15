@@ -37,7 +37,7 @@ under the License.
 	<description>AWS resources for StormCrawler</description>
 
 	<properties>
-		<aws.version>1.12.794</aws.version>
+		<aws.version>1.12.795</aws.version>
 	</properties>
 
 	<dependencies>
