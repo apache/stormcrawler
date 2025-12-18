@@ -63,9 +63,9 @@ declarer.declareStream(
         new Fields("url", "metadata", "status"));
 ----
 
-with the [[StatusStream]] being used for handling redirections, restrictions by robots directives, or fetch errors, whereas the default stream gets the binary content returned by the server as well as the metadata to the following components (typically a parsing bolt).
+with the `StatusStream` being used for handling redirections, restrictions by robots directives, or fetch errors, whereas the default stream gets the binary content returned by the server as well as the metadata to the following components (typically a parsing bolt).
 
-Both use the same [[Protocols]] implementations and [[URLFilters]] to control the redirections.
+Both use the same xref:protocols[Protocols] implementations and xref:urlfilters[URLFilters] to control the redirections.
 
 The **FetcherBolt** has an internal set of queues where the incoming URLs are placed based on their hostname/domain/IP (see config `fetcher.queue.mode`) and a number of **FetchingThreads** (config `fetcher.threads.number` – 10 by default) which pull the URLs to fetch from the **FetchQueues**. When doing so, they make sure that a minimal amount of time (set with `fetcher.server.delay` – default 1 sec) has passed since the previous URL was fetched from the same queue. This mechanism ensures that we can control the rate at which requests are sent to the servers. A **FetchQueue** can also be used by more than one **FetchingThread** at a time (in which case `fetcher.server.min.delay` is used), based on the value of `fetcher.threads.per.queue`.
 
@@ -106,7 +106,7 @@ You can easily build your own custom indexer to integrate with other storage sys
 
 The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] can be used to parse HTML documents and extract the outlinks, text, and metadata it contains. If you want to parse non-HTML documents, use the link:https://github.com/apache/stormcrawler/tree/main/external/src/main/java/com/digitalpebble/storm/crawler/tika[Tika-based ParserBolt] from the external modules.
 
-This parser calls the [[URLFilters]] and [[ParseFilters]] defined in the configuration. Please note that it calls [[MetadataTransfer]] prior to calling the [[ParseFilters]]. If you create new Outlinks in your [[ParseFilters]], you'll need to make sure that you use MetadataTransfer there to inherit the Metadata from the parent document.
+This parser calls the xref:urlfilters[URLFilters] and xref:parsefilters[ParseFilters] defined in the configuration. Please note that it calls xref:metadatatransfer[MetadataTransfer] prior to calling the xref:parsefilters[ParseFilters]. If you create new Outlinks in your [[ParseFilters]], you'll need to make sure that you use MetadataTransfer there to inherit the Metadata from the parent document.
 
 The **JSoupParserBolt** automatically identifies the charset of the documents. It uses the link:StatusStream[status stream] to report parsing errors but also for the outlinks it extracts from a page. These would typically be used by an extension of link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/AbstractStatusUpdaterBolt.java[AbstractStatusUpdaterBolt] and persisted in some form of storage.
 
@@ -115,10 +115,11 @@ StormCrawler can handle sitemap files thanks to the **SiteMapParserBolt**. This 
 
 The reason for this is that the **SiteMapParserBolt** acts as a filter: it passes on any incoming tuples to the default stream so that they get processed by the **ParserBolt**, unless the tuple contains `isSitemap=true` in its metadata, in which case the **SiteMapParserBolt** will parse it itself. Any outlinks found in the sitemap files are then emitted on the [[StatusStream]].
 
-The **SiteMapParserBolt** applies any configured [[ParseFilters]] to the documents it parses and, just like its equivalent for HTML pages, it uses [[MetadataTransfer]] to populate the Metadata objects for the Outlinks it finds.
+The **SiteMapParserBolt** applies any configured xref:parsefilters[ParseFilters] to the documents it parses and, just like its equivalent for HTML pages, it uses xref:metadatatransfer[MetadataTransfer] to populate the Metadata objects for the Outlinks it finds.
 
 === Filters
 
+[[parsefilters]]
 ==== Parse Filters
 
 ParseFilters are called from parsing bolts such as link:https://github.com/apache/stormcrawler/wiki/JSoupParserBolt[JSoupParserBolt] and link:https://github.com/apache/stormcrawler/wiki/SiteMapParserBolt[SiteMapParserBolt] to extract data from web pages. The extracted data is stored in the Metadata object. ParseFilters can also modify the Outlinks and, in that sense, act as URLFilters.
@@ -150,7 +151,7 @@ Here is the default link:https://github.com/apache/stormcrawler/blob/main/core/s
   "collections": [
     {
       "name": "stormcrawler",
-      "includePatterns": ["http://stormcrawler.net/.+"]
+      "includePatterns": ["https://stormcrawler.net/.+"]
     },
     {
       "name": "crawler",
@@ -173,6 +174,7 @@ Here is the default link:https://github.com/apache/stormcrawler/blob/main/core/s
 You can also implement custom ParseFilters to extend the capabilities of the parsing pipeline. For example, you might create a filter to enrich a document's metadata with additional information, such as language detection, sentiment analysis, named entity recognition, or custom tags extracted from the content. Custom filters can also modify or remove outlinks, normalize text, or integrate external data sources, allowing you to tailor the crawler to your specific processing or indexing requirements.
 By implementing the ParseFilter interface and configuring the filter in the JSON file, your custom logic will be seamlessly executed within the parsing bolt.
 
+[[urlfilters]]
 ==== URL Filters
 
 The URL filters can be used to both remove or modify incoming URLs (unlike Nutch where these functionalities are separated between URLFilters and URLNormalizers). This is generally used within a parsing bolt to normalize and filter outgoing URLs, but is also called within the FetcherBolt to handle redirections.
@@ -286,7 +288,7 @@ The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org
 ====== SitemapFilter
 The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/sitemap/SitemapFilter.java[SitemapFilter] discards the outlinks of URLs which are not sitemaps when sitemaps have been found.
 
-
+[[metadatatransfer]]
 === Metadata Transfer
 
 The class https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/util/MetadataTransfer.java[MetadataTransfer] is an important part of the framework and is used in key parts of a pipeline.
@@ -314,6 +316,7 @@ The behavior of the default MetadataTransfer class is driven by configuration on
 
 Note that the method `getMetaForOutlink` calls `filter` to determine what to key values to keep.
 
+[[protocols]]
 === Protocols
 
 StormCrawler supports multiple *network protocols* for fetching content from various sources on the web.

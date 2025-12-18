@@ -6,7 +6,7 @@ https://www.apache.org/licenses/LICENSE-2.0
 ////
 == Overview
 
-Apache StormCrawler is an open source collection of resources for building low-latency, scalable web crawlers on link:http://storm.apache.org/[Apache Storm]. It is provided under the link:http://www.apache.org/licenses/LICENSE-2.0[Apache License] and is written mostly in Java.
+Apache StormCrawler is an open source collection of resources for building low-latency, scalable web crawlers on link:https://storm.apache.org/[Apache Storm]. It is provided under the link:https://www.apache.org/licenses/LICENSE-2.0[Apache License] and is written mostly in Java.
 
 The aims of StormCrawler are to help build web crawlers that are:
 
@@ -49,4 +49,5 @@ Here is a short list of provided features:
 * Stream-based, real-time architecture using link:https://storm.apache.org/[Apache Storm] — suitable for both recursive and one-shot crawling tasks
 * Can run in both local and distributed environments
 * Apache Maven archetypes for quickly bootstrapping new crawler projects
-* Actively developed and used in production by link:powered-by.adoc[multiple organizations]
+* Actively developed and used in production by xref:poweredby[multiple organizations]
+

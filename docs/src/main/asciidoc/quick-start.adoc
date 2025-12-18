@@ -134,7 +134,7 @@ Check the logs and see, if every service is up and running:
 docker compose logs -f
 ----
 
-Next, access the Storm UI via `http://localhost:8080` and check, that a Storm Nimbus as well as a Storm Supervisor is available.
+Next, access the Storm UI via `https://localhost:8080` and check, that a Storm Nimbus as well as a Storm Supervisor is available.
 
 ==== Compile
 

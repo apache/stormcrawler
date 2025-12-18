@@ -4,25 +4,26 @@ You may not use this file except in compliance with the License.
 You may obtain a copy of the License at:
 https://www.apache.org/licenses/LICENSE-2.0
 ////
+[[poweredby]]
 == Companies & Projects Using StormCrawler
 
 Apache StormCrawler has been adopted by a wide variety of organizations across industries, from startups to large enterprises and research institutions.
 The following is a non-exhaustive list of companies, projects, and institutions that have used Apache StormCrawler in production or research.
 If your organization is also making use of Apache StormCrawler, we’d love to hear from you!
 
-* link:http://www.careerbuilder.com/[CareerBuilder]
-* link:http://www.stolencamerafinder.com/[StolenCameraFinder]
-* link:http://www.weborama.com/[Weborama]
-* link:http://www.ontopic.io/[Ontopic]
-* link:http://www.shopstyle.com/[ShopStyle]
-* link:http://www.wombatsoftware.de/[Wombat Software]
-* link:http://commoncrawl.org/2016/10/news-dataset-available/[CommonCrawl]
+* link:https://www.careerbuilder.com/[CareerBuilder]
+* link:https://www.stolencamerafinder.com/[StolenCameraFinder]
+* link:https://www.weborama.com/[Weborama]
+* link:https://www.ontopic.io/[Ontopic]
+* link:https://www.shopstyle.com/[ShopStyle]
+* link:https://www.wombatsoftware.de/[Wombat Software]
+* link:https://commoncrawl.org/2016/10/news-dataset-available/[CommonCrawl]
 * link:https://webfinery.com/[WebFinery]
-* link:http://www.reportlinker.com/[ReportLinker]
-* link:http://www.tokenmill.lt/[TokenMill]
-* link:http://www.polecat.com/[Polecat]
-* link:http://www.wizenoze.com/en/[WizeNoze]
-* link:http://iproduct.io/[IProduct.io]
+* link:https://www.reportlinker.com/[ReportLinker]
+* link:https://www.tokenmill.lt/[TokenMill]
+* link:https://www.polecat.com/[Polecat]
+* link:https://www.wizenoze.com/en/[WizeNoze]
+* link:https://iproduct.io/[IProduct.io]
 * link:https://www.cgi.com/[CGI]
 * link:https://github.com/miras-tech/MirasText[MirasText]
 * link:https://www.g2webservices.com/[G2 Web Services]
@@ -34,6 +35,6 @@ If your organization is also making use of Apache StormCrawler, we’d love to h
 * link:https://openwebsearch.eu/owler/[OpenWebSearch]
 * link:https://shc-info.zml.hs-heilbronn.de/[Heilbronn University]
 * link:https://www.contexity.com[Contexity]
-* link:https://https://www.kodis.iao.fraunhofer.de/de/projekte/SPIDERWISE.html[Fraunhofer IAO - KODIS]
+* link:https://www.kodis.iao.fraunhofer.de/de/projekte/SPIDERWISE.html[Fraunhofer IAO - KODIS]
 
 Drop us a line at mailto:dev@stormcrawler.apache.org[dev@stormcrawler.apache.org] if you want to be added to this page.
