@@ -143,8 +143,8 @@ The latter is used by extensions of the link:https://github.com/apache/stormcraw
 
 The behavior of the default **MetadataTransfer** class is driven by configuration only. It has the following options:
 
-* `metadata.transfer`:: list of metadata key values to filter or transfer to the outlinks. See link:https://github.com/DigitalPebble/storm-crawler/blob/main/core/src/main/resources/crawler-default.yaml#L23[crawler-default.yaml]
-* `metadata.persist`:: list of metadata key values to persist in the status storage. See link:https://github.com/DigitalPebble/storm-crawler/blob/main/core/src/main/resources/crawler-default.yaml#L28[crawler-default.yaml]
+* `metadata.transfer`:: list of metadata key values to filter or transfer to the outlinks. Please see the corresponding comments in link:https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml[crawler-default.yaml]
+* `metadata.persist`:: list of metadata key values to persist in the status storage. Please see the corresponding comments in link:https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml[crawler-default.yaml]
 * `metadata.track.path`:: whether to track the URL path or not. Boolean value, true by default.
 * `metadata.track.depth`:: whether to track the depth from seed. Boolean value, true by default.
 
