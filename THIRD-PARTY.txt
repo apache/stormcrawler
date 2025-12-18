@@ -257,6 +257,8 @@ List of third-party dependencies grouped by their license type.
         * urlfrontier-API (com.github.crawler-commons:urlfrontier-API:2.5 - https://github.com/crawler-commons/url-frontier/urlfrontier-API)
         * Xerces2-j (xerces:xercesImpl:2.12.2 - https://xerces.apache.org/xerces2-j/)
         * XmlBeans (org.apache.xmlbeans:xmlbeans:5.3.0 - https://xmlbeans.apache.org/)
+        * zstd-kmp (com.squareup.zstd:zstd-kmp-jvm:0.4.0 - https://github.com/square/okio-zstd/)
+        * zstd-kmp-okio (com.squareup.zstd:zstd-kmp-okio-jvm:0.4.0 - https://github.com/square/okio-zstd/)
 
     Apache License, Version 2.0, Eclipse Public License - Version 2.0
 
