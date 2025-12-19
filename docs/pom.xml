@@ -48,7 +48,7 @@ under the License.
                                 <source-highlighter>coderay</source-highlighter>
                                 <toc />
                                 <linkcss>false</linkcss>
-                                <icons>inline</icons>
+                                <icons>font</icons>
                             </attributes>
                         </configuration>
                     </execution>
