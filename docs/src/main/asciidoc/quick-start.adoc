@@ -39,8 +39,10 @@ You can quickly generate a new StormCrawler project using the Maven archetype:
 ----
 mvn archetype:generate -DarchetypeGroupId=org.apache.stormcrawler \
                        -DarchetypeArtifactId=stormcrawler-archetype \
-                       -DarchetypeVersion=3.3.0
+                       -DarchetypeVersion=<CURRENT_VERSION>
 ----
+
+Be sure to replace `<CURRENT_VERSION>` with the latest released version of StormCrawler, which you can find on link:https://search.maven.org/artifact/org.apache.stormcrawler/stormcrawler-archetype[search.maven.org].
 
 During the process, you’ll be prompted to provide the following:
 
