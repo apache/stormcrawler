@@ -76,7 +76,7 @@ under the License.
         <commons.compress.version>1.28.0</commons.compress.version>
         <commons.codec.version>1.20.0</commons.codec.version>
 		<git-code-format-maven-plugin.version>5.4</git-code-format-maven-plugin.version>
-		<testcontainers.version>1.21.3</testcontainers.version>
+		<testcontainers.version>1.21.4</testcontainers.version>
 		<maven.mojo.license.plugin>2.7.0</maven.mojo.license.plugin>
 		<checkstyle-maven-plugin.version>3.6.0</checkstyle-maven-plugin.version>
 		<checkstyle.version>12.3.0</checkstyle.version>
