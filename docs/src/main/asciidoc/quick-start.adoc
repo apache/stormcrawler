@@ -68,7 +68,7 @@ By exploring that part of the documentation, you can gain a better understanding
 
 ==== Docker Compose Setup
 
-Below is a simple `docker-compose.yaml` configuration to spin up URLFrontier, Zookeeper, Storm Nimbus, Storm Supervisor, and the Storm UI:
+Below is a simple `docker-compose.yml` configuration to spin up URLFrontier, Zookeeper, Storm Nimbus, Storm Supervisor, and the Storm UI:
 
 [source,yaml]
 ----

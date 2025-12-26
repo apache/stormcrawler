@@ -3,14 +3,20 @@ Have a look at the code and resources and modify them to your heart's content.
 
 # Prerequisites
 
-You need to install Apache Storm. The instructions on [setting up a Storm cluster](https://storm.apache.org/releases/2.6.2/Setting-up-a-Storm-cluster.html) should help. 
+## Native
 
+You need to install Apache Storm. The instructions on [setting up a Storm cluster](https://storm.apache.org/releases/2.8.3/Setting-up-a-Storm-cluster.html) should help.
 You also need to have an instance of URLFrontier running. See [the URLFrontier README](https://github.com/crawler-commons/url-frontier/tree/master/service); the easiest way is to use Docker, like so:
 
 ```
 docker pull crawlercommons/url-frontier
 docker run --rm --name frontier -p 7071:7071  crawlercommons/url-frontier
 ```
+
+## Docker Compose
+
+We provide a simple `docker-compose.yaml` file to launch URLFrontier, Zookeeper, Storm Nimbus, Storm Supervisor, and the Storm UI.
+You may need to update `crawler-conf.yaml` to reference the URLFrontier host configuration (Docker container name).
 
 # Compilation
 
