@@ -10,9 +10,9 @@ https://www.apache.org/licenses/LICENSE-2.0
 
 The Apache StormCrawler components rely on two Apache Storm streams: the _default_ one and another one called _status_.
 
-The aim of the _status_ stream is to pass information about URLs to a persistence layer. Typically, a bespoke bolt will take the tuples coming from the _status_ stream and update the information about URLs in some sort of storage (e.g., ElasticSearch, HBase, etc...), which is then used by a Spout to send new URLs down the topology.
+The aim of the _status_ stream is to pass information about URLs to a persistence layer. Typically, a bespoke bolt will take the tuples coming from the _status_ stream and update the information about URLs in some sort of storage (e.g., OpenSearch, HBase, etc...), which is then used by a Spout to send new URLs down the topology.
 
-This is critical for building recursive crawls (i.e., you discover new URLs and not just process known ones). The _default_ stream is used for the URL being processed and is generally used at the end of the pipeline by an indexing bolt (which could also be ElasticSearch, HBase, etc...), regardless of whether the crawler is recursive or not.
+This is critical for building recursive crawls (i.e., you discover new URLs and not just process known ones). The _default_ stream is used for the URL being processed and is generally used at the end of the pipeline by an indexing bolt (which could also be OpenSearch, HBase, etc...), regardless of whether the crawler is recursive or not.
 
 Tuples are emitted on the _status_ stream by the parsing bolts for handling outlinks but also to notify that there has been a problem with a URL (e.g., unparsable content). It is also used by the fetching bolts to handle redirections, exceptions, and unsuccessful fetch status (e.g., HTTP code 400).
 
@@ -29,7 +29,7 @@ As you can see for instance in link:https://github.com/apache/stormcrawler/blob/
 
 The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/Status.java[Status] enum has the following values:
 
-* DISCOVERED:: outlinks found by the parsers or "seed" URLs emitted into the topology by one of the link:https://stormcrawler.net/docs/api/com/digitalpebble/stormcrawler/spout/package-summary.html[spouts] or "injected" into the storage. The URLs can be already known in the storage.
+* DISCOVERED:: outlinks found by the parsers or "seed" URLs emitted into the topology by one of the spouts or "injected" into the storage. The URLs can be already known in the storage.
 * REDIRECTION:: set by the fetcher bolts.
 * FETCH_ERROR:: set by the fetcher bolts.
 * ERROR:: used by either the fetcher, parser, or indexer bolts.
@@ -41,7 +41,7 @@ The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org
 
 The class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/AbstractStatusUpdaterBolt.java[AbstractStatusUpdaterBolt] can be extended to handle status updates for a specific backend. It has an internal cache of URLs with a `discovered` status so that they don't get added to the backend if they already exist, which is a simple but efficient optimisation. It also uses link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/DefaultScheduler.java[DefaultScheduler] to compute a next fetch date and calls MetadataTransfer to filter the metadata that will be stored in the backend.
 
-In most cases, the extending classes will just need to implement the method `store(String URL, Status status, Metadata metadata, Date nextFetch)` and handle their own initialisation in `prepare()`. You can find an example of a class which extends it in the link:https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/persistence/StatusUpdaterBolt.java[StatusUpdaterBolt] for Elasticsearch.
+In most cases, the extending classes will just need to implement the method `store(String URL, Status status, Metadata metadata, Date nextFetch)` and handle their own initialisation in `prepare()`. You can find an example of a class which extends it in the link:https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/persistence/StatusUpdaterBolt.java[StatusUpdaterBolt] for OpenSearch.
 
 
 === Bolts
@@ -71,14 +71,14 @@ The **FetcherBolt** has an internal set of queues where the incoming URLs are pl
 
 Incoming tuples spend very little time in the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/FetcherBolt.java#L768[execute] method of the **FetcherBolt** as they are put in the FetchQueues, which is why you'll find that the value of **Execute latency** in the Storm UI is pretty low. They get acked later on, after they've been fetched. The metric to watch for in the Storm UI is **Process latency**.
 
-The **SimpleFetcherBolt** does not do any of this, hence its name. It just fetches incoming tuples in its `execute` method and does not do multi-threading. It does enforce politeness by checking when a URL can be fetched and will wait until it is the case. It is up to the user to declare multiple instances of the bolt in the Topology class and to manage how the URLs get distributed across the instances of **SimpleFetcherBolt**, often with the help of the link:https:/
+The **SimpleFetcherBolt** does not do any of this, hence its name. It just fetches incoming tuples in its `execute` method and does not do multi-threading. It does enforce politeness by checking when a URL can be fetched and will wait until it is the case. It is up to the user to declare multiple instances of the bolt in the Topology class and to manage how the URLs get distributed across the instances of **SimpleFetcherBolt**, often with the help of the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/util/URLPartitioner.java[URLPartitioner].
 
 === Indexer Bolts
 The purpose of crawlers is often to index web pages to make them searchable. The project contains resources for indexing with popular search solutions such as:
 
-* link:https://github.com/apache/stormcrawler/blob/main/external/solr/src/main/java/com/digitalpebble/stormcrawler/solr/bolt/IndexerBolt.java[Apache SOLR]
-* link:https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/com/digitalpebble/stormcrawler/elasticsearch/bolt/IndexerBolt.java[Elasticsearch]
-* link:https://github.com/apache/stormcrawler/blob/main/external/aws/src/main/java/com/digitalpebble/stormcrawler/aws/bolt/CloudSearchIndexerBolt.java[AWS CloudSearch]
+* link:https://github.com/apache/stormcrawler/blob/main/external/solr/src/main/java/org/apache/stormcrawler/solr/bolt/IndexerBolt.java[Apache SOLR]
+* link:https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/bolt/IndexerBolt.java[OpenSearch]
+* link:https://github.com/apache/stormcrawler/blob/main/external/aws/src/main/java/org/apache/stormcrawler/aws/bolt/CloudSearchIndexerBolt.java[AWS CloudSearch]
 
 All of these extend the class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/indexing/AbstractIndexerBolt.java[AbstractIndexerBolt].
 
@@ -104,7 +104,7 @@ You can easily build your own custom indexer to integrate with other storage sys
 === Parser Bolts
 ==== JSoupParserBolt
 
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] can be used to parse HTML documents and extract the outlinks, text, and metadata it contains. If you want to parse non-HTML documents, use the link:https://github.com/apache/stormcrawler/tree/main/external/src/main/java/com/digitalpebble/storm/crawler/tika[Tika-based ParserBolt] from the external modules.
+The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] can be used to parse HTML documents and extract the outlinks, text, and metadata it contains. If you want to parse non-HTML documents, use the link:https://github.com/apache/stormcrawler/tree/main/external/tika/src/main/java/org/apache/stormcrawler/tika[Tika-based ParserBolt] from the external modules.
 
 This parser calls the xref:urlfilters[URLFilters] and xref:parsefilters[ParseFilters] defined in the configuration. Please note that it calls xref:metadatatransfer[MetadataTransfer] prior to calling the xref:parsefilters[ParseFilters]. If you create new Outlinks in your [[ParseFilters]], you'll need to make sure that you use MetadataTransfer there to inherit the Metadata from the parent document.
 

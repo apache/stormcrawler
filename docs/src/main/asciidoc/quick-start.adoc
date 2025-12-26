@@ -63,7 +63,7 @@ The archetype will generate a fully-structured project including:
 
 After generation, navigate into the newly created directory (named after the `artifactId` you specified).
 
-TIP: You can learn more about the architecture and how each component works together if you look into link:architecture.adoc[the architecture documentation].
+TIP: You can learn more about the architecture and how each component works together if you look into xref:architecture[the architecture documentation].
 By exploring that part of the documentation, you can gain a better understanding of how StormCrawler performs crawling and how bolts, spouts, as well as parse and URL filters, collaborate in the process.
 
 ==== Docker Compose Setup
