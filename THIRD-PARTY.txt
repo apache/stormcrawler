@@ -167,12 +167,13 @@ List of third-party dependencies grouped by their license type.
         * JSpecify annotations (org.jspecify:jspecify:1.0.0 - http://jspecify.org/)
         * JVM Integration for Metrics (io.dropwizard.metrics:metrics-jvm:4.2.37 - https://metrics.dropwizard.io/metrics-jvm)
         * jwarc (org.netpreserve:jwarc:0.32.0 - https://github.com/iipc/jwarc)
+        * jwarc (org.netpreserve:jwarc:0.33.0 - https://github.com/iipc/jwarc)
         * Kotlin Stdlib (org.jetbrains.kotlin:kotlin-stdlib:2.2.21 - https://kotlinlang.org/)
-        * LangChain4j :: Core (dev.langchain4j:langchain4j-core:1.9.1 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-core)
-        * LangChain4j :: HTTP Client :: JDK HttpClient (dev.langchain4j:langchain4j-http-client-jdk:1.9.1 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-http-client-jdk)
-        * LangChain4j :: HTTP Client (dev.langchain4j:langchain4j-http-client:1.9.1 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-http-client)
-        * LangChain4j :: Integration :: OpenAI (dev.langchain4j:langchain4j-open-ai:1.9.1 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-open-ai)
-        * LangChain4j (dev.langchain4j:langchain4j:1.9.1 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j)
+        * LangChain4j :: Core (dev.langchain4j:langchain4j-core:1.10.0 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-core)
+        * LangChain4j :: HTTP Client :: JDK HttpClient (dev.langchain4j:langchain4j-http-client-jdk:1.10.0 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-http-client-jdk)
+        * LangChain4j :: HTTP Client (dev.langchain4j:langchain4j-http-client:1.10.0 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-http-client)
+        * LangChain4j :: Integration :: OpenAI (dev.langchain4j:langchain4j-open-ai:1.10.0 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-open-ai)
+        * LangChain4j (dev.langchain4j:langchain4j:1.10.0 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j)
         * lang-mustache (org.opensearch.plugin:lang-mustache-client:2.19.4 - https://github.com/opensearch-project/OpenSearch.git)
         * language-detector (com.optimaize.languagedetector:language-detector:0.6 - https://github.com/optimaize/language-detector)
         * mapper-extras (org.opensearch.plugin:mapper-extras-client:2.19.4 - https://github.com/opensearch-project/OpenSearch.git)
@@ -294,6 +295,7 @@ List of third-party dependencies grouped by their license type.
     BSD 2-Clause License
 
         * zstd-jni (com.github.luben:zstd-jni:1.5.5-5 - https://github.com/luben/zstd-jni)
+        * zstd-jni (com.github.luben:zstd-jni:1.5.7-4 - https://github.com/luben/zstd-jni)
 
     BSD 3-Clause License
 
