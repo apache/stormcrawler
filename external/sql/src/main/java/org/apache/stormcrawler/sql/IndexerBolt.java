@@ -80,7 +80,6 @@ public class IndexerBolt extends AbstractIndexerBolt {
         String normalisedurl = valueForURL(tuple);
 
         Metadata metadata = (Metadata) tuple.getValueByField("metadata");
-        tuple.getStringByField("text");
 
         boolean keep = filterDocument(metadata);
         if (!keep) {
@@ -98,7 +97,7 @@ public class IndexerBolt extends AbstractIndexerBolt {
             Map<String, String[]> keyVals = filterMetadata(metadata);
             List<String> keys = new ArrayList<>(keyVals.keySet());
 
-            String query = getQuery(keys);
+            String query = buildQuery(keys);
 
             if (connection == null) {
                 try {
@@ -168,7 +167,7 @@ public class IndexerBolt extends AbstractIndexerBolt {
         preparedStmt.setString(position, value);
     }
 
-    private String getQuery(final List<String> keys) {
+    private String buildQuery(final List<String> keys) {
         final String columns = String.join(", ", keys);
         final String placeholders = keys.stream().map(k -> "?").collect(Collectors.joining(", "));
 
