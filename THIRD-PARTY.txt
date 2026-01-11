@@ -303,6 +303,7 @@ List of third-party dependencies grouped by their license type.
         * asm (org.ow2.asm:asm:9.8 - http://asm.ow2.io/)
         * Protocol Buffer Java API (com.google.protobuf:protobuf-java:2.5.0 - http://code.google.com/p/protobuf)
         * Protocol Buffers [Core] (com.google.protobuf:protobuf-java:3.25.8 - https://developers.google.com/protocol-buffers/protobuf-java/)
+        * Protocol Buffers [Core] (com.google.protobuf:protobuf-java:4.29.0 - https://developers.google.com/protocol-buffers/protobuf-java/)
         * Protocol Buffers [Util] (com.google.protobuf:protobuf-java-util:3.25.8 - https://developers.google.com/protocol-buffers/protobuf-java-util/)
 
     BSD License
@@ -377,6 +378,10 @@ List of third-party dependencies grouped by their license type.
     The Apache Software License, version 2.0
 
         * picocli (info.picocli:picocli:4.7.6 - https://picocli.info)
+
+    The GNU General Public License, v2 with Universal FOSS Exception, v1.0
+
+        * MySQL Connector/J (com.mysql:mysql-connector-j:9.3.0 - http://dev.mysql.com/doc/connector-j/en/)
 
     Unicode-3.0
 
