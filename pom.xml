@@ -674,12 +674,6 @@ under the License.
                 <version>${commons.codec.version}</version>
             </dependency>
 
-            <dependency>
-                <groupId>com.mysql</groupId>
-                <artifactId>mysql-connector-j</artifactId>
-                <version>${mysql-connector-j}</version>
-            </dependency>
-
 		</dependencies>
 	</dependencyManagement>
 

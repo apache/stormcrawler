@@ -7,11 +7,11 @@ The [tableCreation.script](https://github.com/apache/stormcrawler/blob/main/exte
 Check that you have specified a configuration file such as [sql-conf.yaml](https://github.com/apache/stormcrawler/blob/master/external/sql/sql-conf.yaml) and have a Java driver in the dependencies of your POM
 
 ```
-		<dependency>
-			<groupId>mysql</groupId>
-			<artifactId>mysql-connector-java</artifactId>
-			<version>5.1.31</version>
-		</dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>VERSION</version>   
+        </dependency>
 ```
 
 You can either inject the seeds directly as done in the tutorial or reuse the injection topology from the elasticsearch module and specify the statusupdaterbolt from the mysql module instead. Another approach could be to simply to add a MemorySpout to the topology alongside the SQLSpout.
