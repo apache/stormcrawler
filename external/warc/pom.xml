@@ -38,7 +38,7 @@ under the License.
 
 	<properties>
 		<commons-codec.version>1.10</commons-codec.version>
-		<jwarc.version>0.33.0</jwarc.version>
+		<jwarc.version>0.34.0</jwarc.version>
 		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
 		<jacoco.classRatio>0.75</jacoco.classRatio>
 		<jacoco.instructionRatio>0.65</jacoco.instructionRatio>
