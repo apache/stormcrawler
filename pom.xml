@@ -125,7 +125,7 @@ under the License.
 					<version>3.12.0</version>
 					<configuration>
 						<doclint>none</doclint>
-						<source>17</source>
+						<release>17</release>
 						<sourcepath>src/main/java</sourcepath>
 					</configuration>
 					<executions>
