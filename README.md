@@ -30,7 +30,7 @@ Have a look at [crawler.flux](https://github.com/apache/stormcrawler/blob/master
 
 ## Getting help
 
-The [WIKI](https://github.com/apache/stormcrawler/wiki) is a good place to start your investigations but if you are stuck please use the tag [stormcrawler](http://stackoverflow.com/questions/tagged/stormcrawler) on StackOverflow or ask a question in the [discussions](https://github.com/apache/stormcrawler/discussions) section.
+The [documentation](https://stormcrawler.apache.org/docs/) is a good place to start your investigations but if you are stuck please use the tag [stormcrawler](http://stackoverflow.com/questions/tagged/stormcrawler) on StackOverflow or ask a question in the [discussions](https://github.com/apache/stormcrawler/discussions) section.
 
 The project website has a page listing companies providing [commercial support](https://stormcrawler.apache.org/support/) for Apache StormCrawler.
 
