@@ -88,7 +88,7 @@ under the License.
         <jacoco.branchRatio>1.00</jacoco.branchRatio>
         <jacoco.lineRatio>1.00</jacoco.lineRatio>
         <jacoco.complexityRatio>1.00</jacoco.complexityRatio>
-        <mysql-connector-j>9.5.0</mysql-connector-j>
+        <mysql-connector-j>9.6.0</mysql-connector-j>
 
         <skip.format.code>true</skip.format.code>
 
