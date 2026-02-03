@@ -21,7 +21,7 @@ List of third-party dependencies grouped by their license type.
         * aggs-matrix-stats (org.opensearch.plugin:aggs-matrix-stats-client:2.19.4 - https://github.com/opensearch-project/OpenSearch.git)
         * Apache Avro (org.apache.avro:avro:1.12.1 - https://avro.apache.org)
         * Apache Commons CLI (commons-cli:commons-cli:1.11.0 - https://commons.apache.org/proper/commons-cli/)
-        * Apache Commons Codec (commons-codec:commons-codec:1.20.0 - https://commons.apache.org/proper/commons-codec/)
+        * Apache Commons Codec (commons-codec:commons-codec:1.21.0 - https://commons.apache.org/proper/commons-codec/)
         * Apache Commons Collections (org.apache.commons:commons-collections4:4.5.0 - https://commons.apache.org/proper/commons-collections/)
         * Apache Commons Compress (org.apache.commons:commons-compress:1.28.0 - https://commons.apache.org/proper/commons-compress/)
         * Apache Commons Crypto (org.apache.commons:commons-crypto:1.1.0 - https://commons.apache.org/proper/commons-crypto/)
@@ -234,9 +234,9 @@ List of third-party dependencies grouped by their license type.
         * parso (com.epam:parso:2.0.14 - https://github.com/epam/parso)
         * PDFBox JBIG2 ImageIO plugin (org.apache.pdfbox:jbig2-imageio:3.0.4 - https://www.apache.org/jbig2-imageio/)
         * perfmark:perfmark-api (io.perfmark:perfmark-api:0.27.0 - https://github.com/perfmark/perfmark)
-        * Playwright - Driver (com.microsoft.playwright:driver:1.57.0 - https://github.com/microsoft/playwright-java/driver)
-        * Playwright - Drivers For All Platforms (com.microsoft.playwright:driver-bundle:1.57.0 - https://github.com/microsoft/playwright-java/driver-bundle)
-        * Playwright - Main Library (com.microsoft.playwright:playwright:1.57.0 - https://github.com/microsoft/playwright-java/playwright)
+        * Playwright - Driver (com.microsoft.playwright:driver:1.58.0 - https://github.com/microsoft/playwright-java/driver)
+        * Playwright - Drivers For All Platforms (com.microsoft.playwright:driver-bundle:1.58.0 - https://github.com/microsoft/playwright-java/driver-bundle)
+        * Playwright - Main Library (com.microsoft.playwright:playwright:1.58.0 - https://github.com/microsoft/playwright-java/playwright)
         * proto-google-common-protos (com.google.api.grpc:proto-google-common-protos:2.59.2 - https://github.com/googleapis/sdk-platform-java)
         * rank-eval (org.opensearch.plugin:rank-eval-client:2.19.4 - https://github.com/opensearch-project/OpenSearch.git)
         * rest (org.opensearch.client:opensearch-rest-client:2.19.4 - https://github.com/opensearch-project/OpenSearch.git)
@@ -380,7 +380,7 @@ List of third-party dependencies grouped by their license type.
 
     The GNU General Public License, v2 with Universal FOSS Exception, v1.0
 
-        * MySQL Connector/J (com.mysql:mysql-connector-j:9.5.0 - http://dev.mysql.com/doc/connector-j/en/)
+        * MySQL Connector/J (com.mysql:mysql-connector-j:9.6.0 - http://dev.mysql.com/doc/connector-j/en/)
 
     Unicode-3.0
 
