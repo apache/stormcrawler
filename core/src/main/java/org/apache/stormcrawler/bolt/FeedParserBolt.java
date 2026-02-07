@@ -54,6 +54,8 @@ import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
+import java.net.URI;
+
 
 /** Extracts URLs from feeds. */
 public class FeedParserBolt extends StatusEmitterBolt {
@@ -175,7 +177,9 @@ public class FeedParserBolt extends StatusEmitterBolt {
             feed = input.build(new InputSource(is));
         }
 
-        URL url1 = new URL(url);
+        URI uri = URI.create(url);
+        URL url1 = uri.toURL();
+
 
         List<SyndEntry> entries = feed.getEntries();
         for (SyndEntry entry : entries) {
