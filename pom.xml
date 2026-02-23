@@ -71,7 +71,7 @@ under the License.
         <tika.version>3.2.3</tika.version>
         <mockito.version>5.21.0</mockito.version>
         <slf4j-simple.version>2.0.17</slf4j-simple.version>
-        <jetbrains.annotations.version>26.0.2-1</jetbrains.annotations.version>
+        <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
         <commons.io.version>2.17.0</commons.io.version>
         <commons.compress.version>1.28.0</commons.compress.version>
         <commons.codec.version>1.21.0</commons.codec.version>
