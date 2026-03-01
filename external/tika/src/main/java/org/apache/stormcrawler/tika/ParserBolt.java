@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.tika;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
@@ -70,7 +71,7 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
 import org.xml.sax.ContentHandler;
 
-/** Uses Tika to parse the output of a fetch and extract text + metadata */
+/** Uses Tika to parse the output of a fetch and extract text + metadata. */
 public class ParserBolt extends BaseRichBolt {
 
     private Tika tika;

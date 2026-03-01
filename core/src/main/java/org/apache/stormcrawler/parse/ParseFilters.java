@@ -62,6 +62,17 @@ public class ParseFilters extends ParseFilter implements JSONResource {
         filters = new ParseFilter[0];
     }
 
+    /** loads the filters from a JSON configuration file. */
+    public ParseFilters(Map<String, Object> stormConf, String configFile) throws IOException {
+        this.configFile = configFile;
+        this.stormConf = stormConf;
+        try {
+            loadJSONResources();
+        } catch (Exception e) {
+            throw new IOException("Unable to build JSON object from file", e);
+        }
+    }
+
     private String configFile;
 
     private Map<String, Object> stormConf;
@@ -84,17 +95,6 @@ public class ParseFilters extends ParseFilter implements JSONResource {
         }
 
         return ParseFilters.emptyParseFilter;
-    }
-
-    /** loads the filters from a JSON configuration file. */
-    public ParseFilters(Map<String, Object> stormConf, String configFile) throws IOException {
-        this.configFile = configFile;
-        this.stormConf = stormConf;
-        try {
-            loadJSONResources();
-        } catch (Exception e) {
-            throw new IOException("Unable to build JSON object from file", e);
-        }
     }
 
     @Override

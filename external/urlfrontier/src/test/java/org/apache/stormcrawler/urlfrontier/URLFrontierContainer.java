@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.urlfrontier;
 
 import java.util.ArrayList;
@@ -101,7 +102,9 @@ public class URLFrontierContainer extends GenericContainer<URLFrontierContainer>
 
     @Nullable
     public ConnectionInfo.Prometheus getPrometheusConnection() {
-        if (prometheusPort == -1) return null;
+        if (prometheusPort == -1) {
+            return null;
+        }
         return new ConnectionInfo.Prometheus(getHost(), getMappedPort(prometheusPort));
     }
 

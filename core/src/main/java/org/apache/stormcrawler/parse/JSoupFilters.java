@@ -52,6 +52,17 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
 
     private JSoupFilter[] filters;
 
+    /** loads the filters from a JSON configuration file. */
+    public JSoupFilters(Map<String, Object> stormConf, String configFile) throws IOException {
+        this.configFile = configFile;
+        this.stormConf = stormConf;
+        try {
+            loadJSONResources();
+        } catch (Exception e) {
+            throw new IOException("Unable to build JSON object from file", e);
+        }
+    }
+
     private JSoupFilters() {
         filters = new JSoupFilter[0];
     }
@@ -78,17 +89,6 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
         }
 
         return JSoupFilters.emptyParseFilter;
-    }
-
-    /** loads the filters from a JSON configuration file. */
-    public JSoupFilters(Map<String, Object> stormConf, String configFile) throws IOException {
-        this.configFile = configFile;
-        this.stormConf = stormConf;
-        try {
-            loadJSONResources();
-        } catch (Exception e) {
-            throw new IOException("Unable to build JSON object from file", e);
-        }
     }
 
     @Override
@@ -125,7 +125,7 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
         }
     }
 
-    /** * Used for quick testing + debugging */
+    /** * Used for quick testing + debugging. */
     public static void main(String[] args) throws IOException, ParseException {
 
         Config conf = new Config();

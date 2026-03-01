@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.warc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -160,8 +161,12 @@ class WARCHdfsBoltTest {
     private static WarcRecord readWARCrecord(WarcRecord record) {
         try {
             // need to read the HTTP header, so that it gets parsed
-            if (record instanceof WarcResponse) ((WarcResponse) record).http();
-            if (record instanceof WarcRequest) ((WarcRequest) record).http();
+            if (record instanceof WarcResponse) {
+                ((WarcResponse) record).http();
+            }
+            if (record instanceof WarcRequest) {
+                ((WarcRequest) record).http();
+            }
         } catch (IOException e) {
         }
         return record;

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.warc;
 
 import static org.apache.stormcrawler.protocol.ProtocolResponse.REQUEST_HEADERS_KEY;
@@ -112,7 +113,10 @@ public class WARCRequestRecordFormat extends WARCRecordFormat {
     }
 
     private static String fixHttpHeaders(String headers) {
-        int start = 0, lineEnd = 0, last = 0, trailingCrLf = 0;
+        int start = 0;
+        int lineEnd = 0;
+        int last = 0;
+        int trailingCrLf = 0;
         final StringBuilder replacement = new StringBuilder();
         while (start < headers.length()) {
             boolean valid = true;

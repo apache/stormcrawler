@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.solr.persistence;
 
 import java.time.Instant;
@@ -136,10 +137,9 @@ public class SolrSpout extends AbstractQueryingSpout {
             lastNextFetchDate = Instant.now();
             lastStartOffset = 0;
             lastTimeResetToNow = Instant.now();
-        }
-        // reset the value for next fetch date if the previous one is too
-        // old
-        else if (resetFetchDateAfterNSecs != -1) {
+        } else if (resetFetchDateAfterNSecs != -1) {
+            // reset the value for next fetch date if the previous one is too
+            // old
             Instant changeNeededOn =
                     Instant.ofEpochMilli(
                             lastTimeResetToNow.toEpochMilli() + (resetFetchDateAfterNSecs * 1000));

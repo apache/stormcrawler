@@ -14,11 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.aws.s3;
 
 import org.apache.stormcrawler.Metadata;
 
-/** Caches byte[] content into S3 */
+/** Caches byte[] content into S3. */
 public class S3ContentCacher extends S3Cacher {
 
     @Override

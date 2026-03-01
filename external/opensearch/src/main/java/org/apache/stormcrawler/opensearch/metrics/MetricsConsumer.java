@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch.metrics;
 
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
@@ -95,7 +96,9 @@ public class MetricsConsumer implements IMetricsConsumer {
 
     @Override
     public void cleanup() {
-        if (connection != null) connection.close();
+        if (connection != null) {
+            connection.close();
+        }
     }
 
     @Override
@@ -130,7 +133,9 @@ public class MetricsConsumer implements IMetricsConsumer {
      * @return elastic index name
      */
     private String getIndexName(Date timestamp) {
-        if (dateFormat == null) return indexName;
+        if (dateFormat == null) {
+            return indexName;
+        }
 
         StringBuilder sb = new StringBuilder(indexName);
         sb.append("-").append(dateFormat.format(timestamp));

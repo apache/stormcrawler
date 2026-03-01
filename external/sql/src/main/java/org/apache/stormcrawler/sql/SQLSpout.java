@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.sql;
 
 import java.nio.ByteBuffer;
@@ -45,30 +46,30 @@ public class SQLSpout extends AbstractQueryingSpout {
     private static final Scheme SCHEME = new StringTabScheme();
 
     private static final String BASE_SQL =
-            """
-    SELECT *
-    FROM (
-        SELECT
-            rank() OVER (PARTITION BY host ORDER BY nextfetchdate DESC, url) AS ranking,
-            url,
-            metadata,
-            nextfetchdate
-        FROM %s
-        WHERE nextfetchdate <= ? %s
-    ) AS urls_ranks
-    WHERE urls_ranks.ranking <= ?
-    ORDER BY ranking %s
-    """;
+        """
+            SELECT *
+            FROM (
+                SELECT
+                    rank() OVER (PARTITION BY host ORDER BY nextfetchdate DESC, url) AS ranking,
+                    url,
+                    metadata,
+                    nextfetchdate
+                FROM %s
+                WHERE nextfetchdate <= ? %s
+            ) AS urls_ranks
+            WHERE urls_ranks.ranking <= ?
+            ORDER BY ranking %s
+            """;
 
     private static final String BUCKET_CLAUSE =
-            """
-    AND bucket = ?
-    """;
+        """
+            AND bucket = ?
+            """;
 
     private static final String LIMIT_CLAUSE =
-            """
-    LIMIT ?
-    """;
+        """
+            LIMIT ?
+            """;
 
     private static final String URL_COLUMN = "url";
     private static final String METADATA_COLUMN = "metadata";

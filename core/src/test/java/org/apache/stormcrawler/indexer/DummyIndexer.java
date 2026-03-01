@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.indexer;
 
 import java.util.HashMap;
@@ -26,14 +27,14 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.indexing.AbstractIndexerBolt;
 
 public class DummyIndexer extends AbstractIndexerBolt {
-    OutputCollector _collector;
+    OutputCollector collector;
     Map<String, String> fields;
 
     @Override
     public void prepare(
             Map<String, Object> conf, TopologyContext context, OutputCollector collector) {
         super.prepare(conf, context, collector);
-        _collector = collector;
+        this.collector = collector;
         fields = new HashMap<>();
     }
 
@@ -45,7 +46,7 @@ public class DummyIndexer extends AbstractIndexerBolt {
         // tested by the TestOutputCollector
         boolean keep = filterDocument(metadata);
         if (!keep) {
-            _collector.ack(tuple);
+            collector.ack(tuple);
             return;
         }
 
@@ -72,11 +73,13 @@ public class DummyIndexer extends AbstractIndexerBolt {
             }
         }
 
-        _collector.ack(tuple);
+        collector.ack(tuple);
     }
 
     private String trimValue(String value) {
-        if (value.length() > 100) return value.length() + " chars";
+        if (value.length() > 100) {
+            return value.length() + " chars";
+        }
         return value;
     }
 

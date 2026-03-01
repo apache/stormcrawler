@@ -284,7 +284,7 @@ class Scope {
         GLOBAL,
         HOSTNAME,
         METADATA
-    };
+    }
 
     protected Rule[] rules;
 
@@ -329,7 +329,7 @@ class Rule {
         DENYPATHQUERY,
         ALLOWPATH,
         ALLOWPATHQUERY
-    };
+    }
 
     private Type type;
     private Pattern pattern;

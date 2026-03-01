@@ -59,6 +59,21 @@ public class URLFilters extends URLFilter implements JSONResource {
         filters = new URLFilters[0];
     }
 
+    /**
+     * Loads the filters from a JSON configuration file.
+     *
+     * @throws IOException
+     */
+    public URLFilters(Map<String, Object> stormConf, String configFile) throws IOException {
+        this.configFile = configFile;
+        this.stormConf = stormConf;
+        try {
+            loadJSONResources();
+        } catch (Exception e) {
+            throw new IOException("Unable to build JSON object from file", e);
+        }
+    }
+
     private String configFile = "urlfilters.json";
 
     private Map<String, Object> stormConf;
@@ -81,21 +96,6 @@ public class URLFilters extends URLFilter implements JSONResource {
         }
 
         return URLFilters.emptyURLFilters;
-    }
-
-    /**
-     * Loads the filters from a JSON configuration file.
-     *
-     * @throws IOException
-     */
-    public URLFilters(Map<String, Object> stormConf, String configFile) throws IOException {
-        this.configFile = configFile;
-        this.stormConf = stormConf;
-        try {
-            loadJSONResources();
-        } catch (Exception e) {
-            throw new IOException("Unable to build JSON object from file", e);
-        }
     }
 
     @Override

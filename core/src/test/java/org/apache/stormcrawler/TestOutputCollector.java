@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler;
 
 import java.util.ArrayList;
@@ -48,8 +49,19 @@ public class TestOutputCollector implements IOutputCollector, ISpoutOutputCollec
     }
 
     @Override
+    public List<Integer> emit(String streamId, List<Object> tuple, Object messageId) {
+        addEmittedTuple(streamId, tuple);
+        return null;
+    }
+
+    @Override
     public void emitDirect(
             int taskId, String streamId, Collection<Tuple> anchors, List<Object> tuple) {}
+
+    @Override
+    public void emitDirect(int taskId, String streamId, List<Object> tuple, Object messageId) {
+        addEmittedTuple(streamId, tuple);
+    }
 
     @Override
     public void ack(Tuple input) {
@@ -75,17 +87,6 @@ public class TestOutputCollector implements IOutputCollector, ISpoutOutputCollec
 
     public List<Tuple> getFailedTuples() {
         return failed;
-    }
-
-    @Override
-    public List<Integer> emit(String streamId, List<Object> tuple, Object messageId) {
-        addEmittedTuple(streamId, tuple);
-        return null;
-    }
-
-    @Override
-    public void emitDirect(int taskId, String streamId, List<Object> tuple, Object messageId) {
-        addEmittedTuple(streamId, tuple);
     }
 
     private void addEmittedTuple(String streamId, List<Object> tuple) {

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch.persistence;
 
 import java.io.IOException;
@@ -201,9 +202,8 @@ public abstract class AbstractSpout extends AbstractQueryingSpout {
                 // single value
                 if (mdValObj instanceof String) {
                     metadata.addValue(key, (String) mdValObj);
-                }
-                // multi valued
-                else {
+                } else {
+                    // multi valued
                     metadata.addValues(key, (List<String>) mdValObj);
                 }
             }
@@ -225,11 +225,12 @@ public abstract class AbstractSpout extends AbstractQueryingSpout {
 
     @Override
     public void close() {
-        if (client != null)
+        if (client != null) {
             try {
                 client.close();
             } catch (IOException e) {
                 LOG.error("Exception caught when closing client", e);
             }
+        }
     }
 }

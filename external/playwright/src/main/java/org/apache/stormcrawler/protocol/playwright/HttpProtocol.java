@@ -280,7 +280,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     /** Returns a proxy object if required * */
     private Proxy getProxy(String proxyserver, String proxyuser, String proxypwd) {
-        if (proxyserver == null) return null;
+        if (proxyserver == null) {
+            return null;
+        }
 
         Proxy proxy = new Proxy(proxyserver);
         if (proxyuser != null) {

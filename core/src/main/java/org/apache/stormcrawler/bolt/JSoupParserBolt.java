@@ -221,9 +221,8 @@ public class JSoupParserBolt extends StatusEmitterBolt {
             if (mimeType.toLowerCase(Locale.ROOT).contains("html")) {
                 contentTypeIsOk = true;
             }
-        }
-        // go ahead even if no mimetype is available
-        else {
+        } else {
+            // go ahead even if no mimetype is available
             contentTypeIsOk = true;
         }
 

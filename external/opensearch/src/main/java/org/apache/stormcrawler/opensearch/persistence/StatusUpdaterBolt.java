@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch.persistence;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -307,7 +308,9 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
     @Override
     public void onRemoval(
             @Nullable String key, @Nullable List<Tuple> value, @NotNull RemovalCause cause) {
-        if (!cause.wasEvicted()) return;
+        if (!cause.wasEvicted()) {
+            return;
+        }
         LOG.error("Purged from waitAck {} with {} values", key, value.size());
         for (Tuple t : value) {
             eventCounter.scope("purged").incrBy(1);
@@ -385,8 +388,11 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
                     if (tmp == null) {
                         tmp = buwff;
                     }
-                    if (buwff.failed) ctFailed++;
-                    else tmp = buwff;
+                    if (buwff.failed) {
+                        ctFailed++;
+                    } else {
+                        tmp = buwff;
+                    }
                 }
                 if (ctFailed != bulkItemsWithFailedFlag.size()) {
                     LOG.warn(

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.urlfrontier;
 
 import static org.mockito.Mockito.mock;
@@ -71,7 +72,9 @@ class StatusUpdaterBoltTest {
     void before() {
         String image = "crawlercommons/url-frontier";
         String version = System.getProperty("urlfrontier-version");
-        if (version != null) image += ":" + version;
+        if (version != null) {
+            image += ":" + version;
+        }
         urlFrontierContainer = new URLFrontierContainer(image);
         urlFrontierContainer.start();
         bolt = new StatusUpdaterBolt();

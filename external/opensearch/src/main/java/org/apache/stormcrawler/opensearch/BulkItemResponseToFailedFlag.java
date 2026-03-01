@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch;
 
 import java.io.IOException;
@@ -39,13 +40,21 @@ public final class BulkItemResponseToFailedFlag {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof BulkItemResponseToFailedFlag)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof BulkItemResponseToFailedFlag)) {
+            return false;
+        }
 
         BulkItemResponseToFailedFlag that = (BulkItemResponseToFailedFlag) o;
 
-        if (failed != that.failed) return false;
-        if (!response.equals(that.response)) return false;
+        if (failed != that.failed) {
+            return false;
+        }
+        if (!response.equals(that.response)) {
+            return false;
+        }
         return id.equals(that.id);
     }
 

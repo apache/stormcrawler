@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch.persistence;
 
 import static org.opensearch.index.query.QueryBuilders.boolQuery;
@@ -144,8 +145,8 @@ public class HybridSpout extends AggregationSpout implements EmptyQueueListener 
         client.searchAsync(request, RequestOptions.DEFAULT, hrl);
     }
 
+    /** Overrides the handling of responses for aggregations. */
     @Override
-    /** Overrides the handling of responses for aggregations */
     public void onResponse(SearchResponse response) {
         // delete all entries from the searchAfterCache when
         // we get the results from the aggregation spouts
@@ -153,13 +154,15 @@ public class HybridSpout extends AggregationSpout implements EmptyQueueListener 
         super.onResponse(response);
     }
 
+    /** The aggregation kindly told us where to start from. */
     @Override
-    /** The aggregation kindly told us where to start from * */
     protected void sortValuesForKey(String key, Object[] sortValues) {
-        if (sortValues != null && sortValues.length > 0) this.searchAfterCache.put(key, sortValues);
+        if (sortValues != null && sortValues.length > 0) {
+            this.searchAfterCache.put(key, sortValues);
+        }
     }
 
-    /** Handling of results for a specific queue * */
+    /** Handling of results for a specific queue. */
     class HostResultListener implements ActionListener<SearchResponse> {
 
         @Override
@@ -185,8 +188,9 @@ public class HybridSpout extends AggregationSpout implements EmptyQueueListener 
                 }
                 Object key_as_object = sourceAsMap.get(pfield);
                 if (key_as_object instanceof List) {
-                    if (((List<String>) (key_as_object)).size() == 1)
+                    if (((List<String>) (key_as_object)).size() == 1) {
                         key = ((List<String>) key_as_object).get(0);
+                    }
                 } else {
                     key = key_as_object.toString();
                 }

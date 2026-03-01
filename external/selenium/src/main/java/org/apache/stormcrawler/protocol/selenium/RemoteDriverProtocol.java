@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.selenium;
 
 import java.net.URL;
@@ -36,7 +37,9 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 public class RemoteDriverProtocol extends SeleniumProtocol {
 
     private void substituteUserAgent(Map<String, Object> keyvals, final String userAgentString) {
-        if (keyvals == null) return;
+        if (keyvals == null) {
+            return;
+        }
 
         for (Entry<String, Object> entry : keyvals.entrySet()) {
             Object val = entry.getValue();

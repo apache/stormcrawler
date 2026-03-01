@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch.bolt;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
@@ -155,7 +156,9 @@ public class IndexerBolt extends AbstractIndexerBolt
 
     public void onRemoval(
             @Nullable String key, @Nullable List<Tuple> value, @NotNull RemovalCause cause) {
-        if (!cause.wasEvicted()) return;
+        if (!cause.wasEvicted()) {
+            return;
+        }
         if (value != null) {
             LOG.error("Purged from waitAck {} with {} values", key, value.size());
             for (Tuple t : value) {
@@ -169,7 +172,9 @@ public class IndexerBolt extends AbstractIndexerBolt
 
     @Override
     public void cleanup() {
-        if (connection != null) connection.close();
+        if (connection != null) {
+            connection.close();
+        }
     }
 
     @Override
@@ -349,8 +354,11 @@ public class IndexerBolt extends AbstractIndexerBolt
                     if (tmp == null) {
                         tmp = buwff;
                     }
-                    if (buwff.failed) ctFailed++;
-                    else tmp = buwff;
+                    if (buwff.failed) {
+                        ctFailed++;
+                    } else {
+                        tmp = buwff;
+                    }
                 }
                 if (ctFailed != bulkItemsWithFailedFlag.size()) {
                     LOG.warn(
@@ -402,9 +410,8 @@ public class IndexerBolt extends AbstractIndexerBolt
                                         t,
                                         new Values(url, metadata, Status.ERROR));
                                 _collector.ack(t);
-                            }
-                            // otherwise just fail it
-                            else {
+                            } else {
+                                // otherwise just fail it
                                 _collector.fail(t);
                             }
                         }

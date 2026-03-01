@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.urlfrontier;
 
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_ADDRESS_KEY;
@@ -380,7 +381,9 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             String[] vals = metadata.getValues(k);
             if (vals != null) {
                 Builder builder = StringList.newBuilder();
-                for (String v : vals) builder.addValues(v);
+                for (String v : vals) {
+                    builder.addValues(v);
+                }
                 mdCopy.put(k, builder.build());
             }
         }

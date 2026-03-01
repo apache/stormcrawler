@@ -88,7 +88,9 @@ public class Metadata {
     }
 
     /**
-     * @return the first value for the key or null if it does not exist *
+     * Returns the first non-empty value found for the keys or null if none found.
+     *
+     * @return the first value for the key or null if it does not exist
      */
     public String getFirstValue(String key) {
         String[] values = getValues(key);
@@ -102,6 +104,8 @@ public class Metadata {
     }
 
     /**
+     * Returns the first non-empty value found for the keys or null if none found.
+     *
      * @return the first value for the key or null if it does not exist, given a prefix
      */
     public String getFirstValue(String key, String prefix) {
@@ -109,6 +113,21 @@ public class Metadata {
             return getFirstValue(key);
         }
         return getFirstValue(prefix + key);
+    }
+
+    /** Returns the first non-empty value found for the keys or null if none found.
+     *
+     * @return the first value for the key or null if it does not exist, given a prefix
+     */
+    public static String getFirstValue(Metadata md, String... keys) {
+        for (String key : keys) {
+            String val = md.getFirstValue(key);
+            if (StringUtils.isBlank(val)) {
+                continue;
+            }
+            return val;
+        }
+        return null;
     }
 
     public String[] getValues(String key, String prefix) {
@@ -245,18 +264,6 @@ public class Metadata {
                 .collect(Collectors.toSet());
     }
 
-    /** Returns the first non empty value found for the keys or null if none found. */
-    public static String getFirstValue(Metadata md, String... keys) {
-        for (String key : keys) {
-            String val = md.getFirstValue(key);
-            if (StringUtils.isBlank(val)) {
-                continue;
-            }
-            return val;
-        }
-        return null;
-    }
-
     /**
      * Copies the values arrays for a given key to another metadata object.
      *
@@ -288,7 +295,7 @@ public class Metadata {
     }
 
     /**
-     * Release the lock on a metadata
+     * Release the lock on a metadata.
      *
      * @since 1.16
      */

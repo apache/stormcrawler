@@ -628,7 +628,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
     }
 
-    public static void main(String args[]) throws Exception {
+    public static void main(String[] args) throws Exception {
         org.apache.stormcrawler.protocol.Protocol.main(new HttpProtocol(), args);
     }
 }

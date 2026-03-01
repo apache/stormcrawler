@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.solr;
 
 import java.io.IOException;
@@ -102,7 +103,9 @@ public class SolrConnection {
 
     private void flushAllUpdates(boolean force) {
         synchronized (lock) {
-            if (!force && System.currentTimeMillis() - lastUpdate < noUpdateThreshold) return;
+            if (!force && System.currentTimeMillis() - lastUpdate < noUpdateThreshold) {
+                return;
+            }
 
             CloudHttp2SolrClient cloudHttp2SolrClient = (CloudHttp2SolrClient) client;
             DocCollection col = cloudHttp2SolrClient.getClusterState().getCollection(collection);
@@ -110,7 +113,9 @@ public class SolrConnection {
             // Flush all slices
             for (var entry : updateQueues.entrySet()) {
                 List<Update> waitingUpdates = entry.getValue();
-                if (waitingUpdates.isEmpty()) continue;
+                if (waitingUpdates.isEmpty()) {
+                    continue;
+                }
 
                 Slice slice = col.getSlice(entry.getKey());
                 Replica leader = slice.getLeader();

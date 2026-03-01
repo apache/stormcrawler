@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.warc;
 
 import static org.apache.stormcrawler.protocol.ProtocolResponse.REQUEST_TIME_KEY;
@@ -141,7 +142,9 @@ public class WARCRecordFormat implements RecordFormat {
         // http://bibnum.bnf.fr/warc/WARC_ISO_28500_version1_latestdraft.pdf
         for (Entry<String, String> entry : fields.entrySet()) {
             String key = entry.getKey();
-            if (key.startsWith("WARC-")) continue;
+            if (key.startsWith("WARC-")) {
+                continue;
+            }
             fieldsBuffer.append(key).append(": ").append(entry.getValue()).append(CRLF);
         }
 
@@ -170,7 +173,10 @@ public class WARCRecordFormat implements RecordFormat {
      * @return safe HTTP response header
      */
     public static String fixHttpHeaders(String headers, int contentLength) {
-        int start = 0, lineEnd = 0, last = 0, trailingCrLf = 0;
+        int start = 0;
+        int lineEnd = 0;
+        int last = 0;
+        int trailingCrLf = 0;
         final StringBuilder replacement = new StringBuilder();
         while (start < headers.length()) {
             lineEnd = headers.indexOf(CRLF, start);
@@ -393,9 +399,8 @@ public class WARCRecordFormat implements RecordFormat {
         // provide a ContentType if type response
         if (WARCTypeValue.equals(WARC_TYPE_RESPONSE)) {
             buffer.append("Content-Type: application/http; msgtype=response").append(CRLF);
-        }
-        // for resources just use the content type provided by the server if any
-        else {
+        } else {
+            // for resources just use the content type provided by the server if any
             String ct = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, this.protocolMDprefix);
             if (StringUtils.isBlank(ct)) {
                 ct = "application/octet-stream";

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.sql;
 
 import static org.apache.stormcrawler.sql.SQLUtil.closeResource;
@@ -108,22 +109,18 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
                              """;
 
         final String updateQuery =
-                String.format(
-                        Locale.ROOT,
-                        """
-                                 REPLACE INTO %s %s
-                         """,
-                        tableName,
-                        baseColumns);
+            String.format(
+                Locale.ROOT,
+                "REPLACE INTO %s %s",
+                tableName,
+                baseColumns);
 
         final String insertQuery =
-                String.format(
-                        Locale.ROOT,
-                        """
-                            INSERT IGNORE INTO %s %s
-        """,
-                        tableName,
-                        baseColumns);
+            String.format(
+                Locale.ROOT,
+                "INSERT IGNORE INTO %s %s",
+                tableName,
+                baseColumns);
 
         try {
             updatePreparedStmt = connection.prepareStatement(updateQuery);

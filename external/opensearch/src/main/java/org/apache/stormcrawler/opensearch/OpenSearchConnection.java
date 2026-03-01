@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch;
 
 import static org.opensearch.client.RestClientBuilder.DEFAULT_CONNECT_TIMEOUT_MILLIS;
@@ -75,10 +76,6 @@ public final class OpenSearchConnection {
 
     public RestHighLevelClient getClient() {
         return client;
-    }
-
-    public void addToProcessor(final DocWriteRequest<?> request) {
-        processor.add(request);
     }
 
     public static RestHighLevelClient getClient(Map<String, Object> stormConf, String boltType) {
@@ -194,9 +191,8 @@ public final class OpenSearchConnection {
                 requestConfigBuilder ->
                         requestConfigBuilder
                                 .setConnectTimeout(connectTimeout)
-                                .setSocketTimeout(socketTimeout) // Timeout when waiting
-                // for data
-                );
+                                .setSocketTimeout(socketTimeout) // Timeout when waiting for data
+        );
 
         // TODO check if this has gone somewhere else
         // int maxRetryTimeout = ConfUtils.getInt(stormConf, Constants.PARAMPREFIX +
@@ -232,6 +228,10 @@ public final class OpenSearchConnection {
         builder.setCompressionEnabled(compression);
 
         return new RestHighLevelClient(builder);
+    }
+
+    public void addToProcessor(final DocWriteRequest<?> request) {
+        processor.add(request);
     }
 
     /**

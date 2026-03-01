@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch.persistence;
 
 import static org.opensearch.index.query.QueryBuilders.boolQuery;
@@ -276,7 +277,9 @@ public class AggregationSpout extends AbstractSpout implements ActionListener<Se
                 sortValuesForKey(key, lastHit.getSortValues());
             }
 
-            if (hitsForThisBucket > 0) numBuckets++;
+            if (hitsForThisBucket > 0) {
+                numBuckets++;
+            }
 
             numhits += hitsForThisBucket;
 

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -80,7 +81,9 @@ public abstract class AbstractProtocolTest {
                 jakarta.servlet.http.HttpServletRequest httpServletRequest,
                 jakarta.servlet.http.HttpServletResponse response)
                 throws IOException {
-            if (response.isCommitted() || baseRequest.isHandled()) return;
+            if (response.isCommitted() || baseRequest.isHandled()) {
+                return;
+            }
             baseRequest.setHandled(true);
             final String content = "Success!";
             response.setStatus(HttpServletResponse.SC_OK);

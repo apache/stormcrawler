@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.warc;
 
 import java.io.IOException;
@@ -126,7 +127,9 @@ public class WARCSpout extends FileSpout {
         byte[] head = buffer.removeFirst();
         List<Object> fields = scheme.deserialize(ByteBuffer.wrap(head));
         warcFileInProgress = (String) fields.get(0);
-        if (warcFileInProgress == null) return;
+        if (warcFileInProgress == null) {
+            return;
+        }
 
         LOG.info("Reading WARC file {}", warcFileInProgress);
         ReadableByteChannel warcChannel = null;
@@ -215,9 +218,15 @@ public class WARCSpout extends FileSpout {
     }
 
     private boolean isHttpResponse(Optional<WarcRecord> record) {
-        if (!record.isPresent()) return false;
-        if (!(record.get() instanceof WarcResponse)) return false;
-        if (record.get().contentType().equals(MediaType.HTTP_RESPONSE)) return true;
+        if (!record.isPresent()) {
+            return false;
+        }
+        if (!(record.get() instanceof WarcResponse)) {
+            return false;
+        }
+        if (record.get().contentType().equals(MediaType.HTTP_RESPONSE)) {
+            return true;
+        }
         return false;
     }
 
@@ -287,10 +296,13 @@ public class WARCSpout extends FileSpout {
         }
         // dynamically growing list of buffers for large content of unknown size
         ArrayList<ByteBuffer> bufs = new ArrayList<>();
-        int r, read = 0;
+        int r;
+        int read = 0;
         while (read < maxContentSize) {
             try {
-                if ((r = body.read(buf)) < 0) break; // eof
+                if ((r = body.read(buf)) < 0) {
+                    break; // eof
+                }
             } catch (ParsingException e) {
                 LOG.error("Failed to read chunked content of {}: {}", record.target(), e);
                 /*
@@ -417,7 +429,9 @@ public class WARCSpout extends FileSpout {
 
     @Override
     public void nextTuple() {
-        if (!active) return;
+        if (!active) {
+            return;
+        }
 
         if (buffer.isEmpty()) {
             try {
@@ -432,7 +446,9 @@ public class WARCSpout extends FileSpout {
             return;
         }
 
-        if (!record.isPresent()) nextRecord();
+        if (!record.isPresent()) {
+            nextRecord();
+        }
 
         while (record.isPresent() && !isHttpResponse(record)) {
             String warcType = record.get().type();
@@ -462,7 +478,9 @@ public class WARCSpout extends FileSpout {
             nextRecord();
         }
 
-        if (!record.isPresent()) return;
+        if (!record.isPresent()) {
+            return;
+        }
 
         eventCounter.scope("warc_http_response_record").incr();
         WarcResponse w = (WarcResponse) record.get();

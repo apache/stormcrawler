@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.sql;
 
 import static org.apache.stormcrawler.TestUtil.getMockedTopologyContextWithBucket;
@@ -173,10 +174,10 @@ class SQLSpoutTest extends AbstractSQLTest {
 
     private void insertTestURL(String url, int bucket, String host, Instant time) throws Exception {
         String sql =
-                """
-    INSERT INTO urls (url, status, nextfetchdate, metadata, bucket, host)
-    VALUES (?, ?, ?, ?, ?, ?)
-    """;
+            """
+                INSERT INTO urls (url, status, nextfetchdate, metadata, bucket, host)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """;
 
         try (PreparedStatement ps = testConnection.prepareStatement(sql)) {
             ps.setString(1, url);

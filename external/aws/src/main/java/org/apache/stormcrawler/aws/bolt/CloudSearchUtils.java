@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.aws.bolt;
 
 import java.nio.charset.StandardCharsets;
@@ -28,7 +29,7 @@ public class CloudSearchUtils {
     private static MessageDigest digester;
 
     private static final Pattern INVALID_XML_CHARS =
-            Pattern.compile("[^\\u0009\\u000A\\u000D\\u0020-\\uD7FF\\uE000-\\uFFFD]");
+            Pattern.compile("[^\\t\\n\\r -\\uD7FF\\uE000-\\uFFFD]");
 
     static {
         try {
@@ -76,9 +77,12 @@ public class CloudSearchUtils {
     public static String cleanFieldName(String name) {
         String lowercase = name.toLowerCase(Locale.ROOT);
         lowercase = lowercase.replaceAll("[^a-z_0-9]", "_");
-        if (lowercase.length() < 3 || lowercase.length() > 64)
+        if (lowercase.length() < 3 || lowercase.length() > 64) {
             throw new RuntimeException("Field name must be between 3 and 64 chars : " + lowercase);
-        if (lowercase.equals("score")) throw new RuntimeException("Field name must be score");
+        }
+        if (lowercase.equals("score")) {
+            throw new RuntimeException("Field name must be score");
+        }
         return lowercase;
     }
 }

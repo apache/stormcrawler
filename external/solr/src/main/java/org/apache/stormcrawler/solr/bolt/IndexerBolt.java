@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.solr.bolt;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
@@ -65,12 +66,13 @@ public class IndexerBolt extends AbstractIndexerBolt {
 
     @Override
     public void cleanup() {
-        if (connection != null)
+        if (connection != null) {
             try {
                 connection.close();
             } catch (Exception e) {
                 LOG.error("Can't close connection to Solr: {}", e);
             }
+        }
     }
 
     @Override

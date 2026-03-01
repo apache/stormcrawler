@@ -134,6 +134,9 @@ public class XPathFilter extends ParseFilter {
                                 // the value out of the serialized which isn't used in
                                 // this case
                                 continue;
+                            default:
+                                throw new IllegalStateException("Unexpected value: "
+                                    + node.getNodeType());
                         }
                         String serializedValue = out.toString();
                         if (serializedValue.length() > 0) {

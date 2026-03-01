@@ -12,6 +12,7 @@
  * express or implied. See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.warc;
 
 import java.nio.ByteBuffer;
@@ -61,23 +62,33 @@ public class MetadataRecordFormat extends WARCRecordFormat {
         String url = tuple.getStringByField("url");
         Metadata metadata = (Metadata) tuple.getValueByField("metadata");
 
-        if (metadata == null) return new byte[0];
-        if (url == null) return new byte[0];
+        if (metadata == null) {
+            return new byte[0];
+        }
+        if (url == null) {
+            return new byte[0];
+        }
 
         final StringBuilder payload = new StringBuilder();
 
         // get the metadata key / values to save in the WARCs
         for (String key : metadataKeys) {
             final String[] values = metadata.getValues(key);
-            if (values == null || values.length == 0) continue;
+            if (values == null || values.length == 0) {
+                continue;
+            }
             for (String value : values) {
-                if (StringUtils.isBlank(value)) continue;
+                if (StringUtils.isBlank(value)) {
+                    continue;
+                }
                 payload.append(key).append(": ").append(value).append(CRLF);
             }
         }
 
         // no payload? don't bother
-        if (payload.length() == 0) return new byte[0];
+        if (payload.length() == 0) {
+            return new byte[0];
+        }
 
         final byte[] metadata_representation = payload.toString().getBytes(StandardCharsets.UTF_8);
 

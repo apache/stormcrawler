@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.aws.bolt;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
@@ -256,9 +257,8 @@ public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
                             LOG.info("Unparsable date {}", value);
                             continue;
                         }
-                    }
-                    // normalise strings
-                    else {
+                    } else {
+                        // normalise strings
                         value = CloudSearchUtils.stripNonCharCodepoints(value);
                     }
 
@@ -317,13 +317,14 @@ public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
 
         // can add it to the buffer without overflowing?
         if (currentDocLength + 2 + currentBufferLength < MAX_SIZE_BATCH_BYTES) {
-            if (numDocsInBatch != 0) buffer.append(',');
+            if (numDocsInBatch != 0) {
+                buffer.append(',');
+            }
             buffer.append(currentDoc);
             this.unacked.add(tuple);
             numDocsInBatch++;
-        }
-        // flush the previous batch and create a new one with this doc
-        else {
+        } else {
+            // flush the previous batch and create a new one with this doc
             sendBatch();
             buffer.append(currentDoc);
             this.unacked.add(tuple);
