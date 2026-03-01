@@ -191,8 +191,8 @@ public final class OpenSearchConnection {
                 requestConfigBuilder ->
                         requestConfigBuilder
                                 .setConnectTimeout(connectTimeout)
-                                .setSocketTimeout(socketTimeout) // Timeout when waiting for data
-        );
+                                // Timeout when waiting for data
+                                .setSocketTimeout(socketTimeout));
 
         // TODO check if this has gone somewhere else
         // int maxRetryTimeout = ConfUtils.getInt(stormConf, Constants.PARAMPREFIX +

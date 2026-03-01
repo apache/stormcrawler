@@ -174,8 +174,10 @@ public class HttpRobotRulesParser extends RobotRulesParser {
                         }
                     } else {
                         LOG.debug(
-                            "Robots for {} redirected to {} "
-                                + "(not cached for target host because not at root)", url, redir);
+                                "Robots for {} redirected to {} "
+                                        + "(not cached for target host because not at root)",
+                                url,
+                                redir);
                     }
 
                     response = http.getProtocolOutput(redir.toString(), Metadata.empty);

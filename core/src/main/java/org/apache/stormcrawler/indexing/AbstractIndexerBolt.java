@@ -105,8 +105,8 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
                 // or an index
                 if (index != -1 || alias != null) {
                     throw new RuntimeException(
-                        "Can't have a mapping for indexer.md.mapping with a glob and index or "
-                            + "alias");
+                            "Can't have a mapping for indexer.md.mapping with a glob and index or "
+                                    + "alias");
                 }
             } else {
                 this.key = key;

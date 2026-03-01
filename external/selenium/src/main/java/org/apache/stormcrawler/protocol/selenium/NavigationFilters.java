@@ -57,7 +57,7 @@ public class NavigationFilters extends NavigationFilter {
      * @throws IOException
      */
     public NavigationFilters(@NotNull Map<String, Object> stormConf, @NotNull String configFile)
-        throws IOException {
+            throws IOException {
         // load the JSON configFile
         // build a JSON object out of it
         JsonNode confNode;

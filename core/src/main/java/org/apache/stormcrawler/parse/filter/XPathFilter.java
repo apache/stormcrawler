@@ -135,8 +135,8 @@ public class XPathFilter extends ParseFilter {
                                 // this case
                                 continue;
                             default:
-                                throw new IllegalStateException("Unexpected value: "
-                                    + node.getNodeType());
+                                throw new IllegalStateException(
+                                        "Unexpected value: " + node.getNodeType());
                         }
                         String serializedValue = out.toString();
                         if (serializedValue.length() > 0) {

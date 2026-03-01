@@ -46,7 +46,7 @@ public class SQLSpout extends AbstractQueryingSpout {
     private static final Scheme SCHEME = new StringTabScheme();
 
     private static final String BASE_SQL =
-        """
+            """
             SELECT *
             FROM (
                 SELECT
@@ -62,12 +62,12 @@ public class SQLSpout extends AbstractQueryingSpout {
             """;
 
     private static final String BUCKET_CLAUSE =
-        """
+            """
             AND bucket = ?
             """;
 
     private static final String LIMIT_CLAUSE =
-        """
+            """
             LIMIT ?
             """;
 

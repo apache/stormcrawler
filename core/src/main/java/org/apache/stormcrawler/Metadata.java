@@ -115,7 +115,8 @@ public class Metadata {
         return getFirstValue(prefix + key);
     }
 
-    /** Returns the first non-empty value found for the keys or null if none found.
+    /**
+     * Returns the first non-empty value found for the keys or null if none found.
      *
      * @return the first value for the key or null if it does not exist, given a prefix
      */

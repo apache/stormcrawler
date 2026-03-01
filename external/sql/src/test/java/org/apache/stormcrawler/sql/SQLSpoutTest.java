@@ -174,7 +174,7 @@ class SQLSpoutTest extends AbstractSQLTest {
 
     private void insertTestURL(String url, int bucket, String host, Instant time) throws Exception {
         String sql =
-            """
+                """
                 INSERT INTO urls (url, status, nextfetchdate, metadata, bucket, host)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """;
