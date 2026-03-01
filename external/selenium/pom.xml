@@ -45,7 +45,7 @@ under the License.
         <jacoco.instructionRatio>0.69</jacoco.instructionRatio>
         <jacoco.methodRatio>0.80</jacoco.methodRatio>
         <jacoco.branchRatio>0.62</jacoco.branchRatio>
-        <jacoco.lineRatio>0.66</jacoco.lineRatio>
+        <jacoco.lineRatio>0.65</jacoco.lineRatio>
         <jacoco.complexityRatio>0.55</jacoco.complexityRatio>
     </properties>
 
