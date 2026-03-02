@@ -42,7 +42,7 @@ under the License.
         <icu4j.version>78.2</icu4j.version>
         <xerces.version>2.12.2</xerces.version>
         <httpclient.version>4.5.14</httpclient.version>
-        <snakeyaml.version>2.4</snakeyaml.version>
+        <snakeyaml.version>2.6</snakeyaml.version>
         <commons.lang.version>3.20.0</commons.lang.version>
         <wiremock.version>3.13.2</wiremock.version>
         <rometools.version>2.1.0</rometools.version>
