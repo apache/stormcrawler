@@ -141,7 +141,7 @@ class StatusBoltTest extends AbstractOpenSearchTest {
         String id = org.apache.commons.codec.digest.DigestUtils.sha256Hex(url);
         GetResponse result = client.get(new GetRequest("status", id), RequestOptions.DEFAULT);
         Map<String, Object> sourceAsMap = result.getSourceAsMap();
-        final String pfield = "metadata.someKey";
+        final String pfield = "metadata.somekey";
         sourceAsMap = (Map<String, Object>) sourceAsMap.get("metadata");
         final var pfieldNew = pfield.substring(9);
         Object key = sourceAsMap.get(pfieldNew);
