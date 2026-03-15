@@ -242,8 +242,9 @@ public class Metadata {
 
     /** Returns the keySet for all keys starting with a given prefix. */
     public Set<String> keySet(String prefix) {
+        String normalizedPrefix = normalizeKey(prefix);
         return md.keySet().stream()
-                .filter(key -> key.startsWith(prefix))
+                .filter(key -> key.startsWith(normalizedPrefix))
                 .collect(Collectors.toSet());
     }
 
