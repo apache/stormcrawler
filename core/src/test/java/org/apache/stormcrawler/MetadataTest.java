@@ -22,6 +22,33 @@ import org.junit.jupiter.api.Test;
 class MetadataTest {
 
     @Test
+    void testCaseInsensitiveKeys() {
+        Metadata metadata = new Metadata();
+        metadata.addValue("location", "http://example.com");
+
+        // reads with different casing should all return the same value
+        Assertions.assertEquals("http://example.com", metadata.getFirstValue("location"));
+        Assertions.assertEquals("http://example.com", metadata.getFirstValue("Location"));
+        Assertions.assertEquals("http://example.com", metadata.getFirstValue("LOCATION"));
+
+        // containsKey should be case-insensitive
+        Assertions.assertTrue(metadata.containsKey("location"));
+        Assertions.assertTrue(metadata.containsKey("Location"));
+        Assertions.assertTrue(metadata.containsKey("LOCATION"));
+
+        // writing with different casing should update the same entry
+        metadata.addValue("Content-Type", "text/html");
+        metadata.addValue("content-type", "application/json");
+        Assertions.assertEquals(2, metadata.getValues("CONTENT-TYPE").length);
+        Assertions.assertEquals(2, metadata.size());
+
+        // remove should be case-insensitive
+        metadata.remove("LOCATION");
+        Assertions.assertNull(metadata.getFirstValue("location"));
+        Assertions.assertEquals(1, metadata.size());
+    }
+
+    @Test
     void testCopyWithPrefix() {
         Metadata metadata = new Metadata();
         metadata.addValue("fetch.statusCode", "500");

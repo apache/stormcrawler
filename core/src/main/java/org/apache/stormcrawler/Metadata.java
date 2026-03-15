@@ -122,7 +122,7 @@ public class Metadata {
         if (key == null || key.isEmpty()) {
             return null;
         }
-        String[] values = md.getOrDefault(key, md.get(key.toLowerCase(Locale.ROOT)));
+        String[] values = md.get(normalizeKey(key));
         if (values == null) {
             return null;
         }
@@ -133,7 +133,7 @@ public class Metadata {
     }
 
     public boolean containsKey(String key) {
-        return md.containsKey(key) || md.containsKey(key.toLowerCase(Locale.ROOT));
+        return md.containsKey(normalizeKey(key));
     }
 
     public boolean containsKeyWithValue(String key, String value) {
@@ -153,7 +153,7 @@ public class Metadata {
     public void setValue(String key, String value) {
         checkLockException();
 
-        md.put(key, new String[] {value});
+        md.put(normalizeKey(key), new String[] {value});
     }
 
     public void setValues(String key, String[] values) {
@@ -162,7 +162,7 @@ public class Metadata {
         if (values == null || values.length == 0) {
             return;
         }
-        md.put(key, values);
+        md.put(normalizeKey(key), values);
     }
 
     public void addValue(String key, String value) {
@@ -172,9 +172,10 @@ public class Metadata {
             return;
         }
 
-        String[] existingvals = md.get(key);
+        String normalizedKey = normalizeKey(key);
+        String[] existingvals = md.get(normalizedKey);
         if (existingvals == null || existingvals.length == 0) {
-            setValue(key, value);
+            md.put(normalizedKey, new String[] {value});
             return;
         }
 
@@ -182,7 +183,7 @@ public class Metadata {
         String[] newvals = new String[currentLength + 1];
         newvals[currentLength] = value;
         System.arraycopy(existingvals, 0, newvals, 0, currentLength);
-        md.put(key, newvals);
+        md.put(normalizedKey, newvals);
     }
 
     public void addValues(String key, String[] values) {
@@ -191,12 +192,13 @@ public class Metadata {
         if (values == null || values.length == 0) {
             return;
         }
-        if (!md.containsKey(key)) {
-            md.put(key, values);
+        String normalizedKey = normalizeKey(key);
+        if (!md.containsKey(normalizedKey)) {
+            md.put(normalizedKey, values);
             return;
         }
         for (String value : values) {
-            addValue(key, value);
+            addValue(normalizedKey, value);
         }
     }
 
@@ -209,7 +211,7 @@ public class Metadata {
      */
     public String[] remove(String key) {
         checkLockException();
-        return md.remove(key);
+        return md.remove(normalizeKey(key));
     }
 
     public String toString() {
@@ -295,6 +297,10 @@ public class Metadata {
     public Metadata unlock() {
         locked = false;
         return this;
+    }
+
+    private static String normalizeKey(String key) {
+        return key.toLowerCase(Locale.ROOT);
     }
 
     /**
