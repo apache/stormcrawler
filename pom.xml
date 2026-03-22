@@ -67,7 +67,8 @@ under the License.
         <junit.version>6.0.3</junit.version>
         <storm-client.version>2.8.4</storm-client.version>
         <!-- Jackson's version should be in-line with the one in Storm -->
-        <jackson.version>2.18.1</jackson.version>
+        <jackson-annotations.version>2.20</jackson-annotations.version>
+        <jackson.version>2.20.1</jackson.version>
         <tika.version>3.2.3</tika.version>
         <mockito.version>5.23.0</mockito.version>
         <slf4j-simple.version>2.0.17</slf4j-simple.version>
@@ -663,7 +664,7 @@ under the License.
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-annotations</artifactId>
-                <version>${jackson.version}</version>
+                <version>${jackson-annotations.version}</version>
             </dependency>
 
             <dependency>
