@@ -369,6 +369,16 @@ While HTTP and HTTPS are the most commonly used, other protocols like `file:` ar
 
 Use these configurations to fine-tune fetching performance, authentication, connection handling, and protocol-level optimizations across your crawler topology.
 
+==== Following Redirects
+
+When handling HTTP redirects, StormCrawler offers three modes:
+
+1. **Default behavior** (`redirections.allowed: true`, `http.allow.redirects: false`): The redirect target URL is emitted to the status stream. URL filter and normalization rules are applied to the target URL, the crawler verifies that the target URL is allowed per `robots.txt`, and it is ensured that the redirect target is not fetched multiple times (URLs are deduplicated in the status index).
+
+2. **Redirects disabled** (`redirections.allowed: false`): Redirect target URLs are not sent to the status stream. Redirects are effectively ignored.
+
+3. **Immediate follow** (`http.allow.redirects: true`): Redirects are followed immediately in the HTTP client and the target URLs are not emitted to the status stream. This is the default behavior for browser-based protocols (Selenium and Playwright), but it is also supported by the OkHttp protocol. Note that with immediate follows, redirect targets bypass URL filtering, deduplication, and `robots.txt` checks.
+
 ==== Network Protocols
 
 The following network protocols are implemented in StormCrawler:

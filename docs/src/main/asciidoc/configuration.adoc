@@ -179,7 +179,7 @@ is defined.
 | fetcher.server.min.delay | 0 | Delay between crawls for queues with >1 thread. Ignores robots.txt.
 | fetcher.threads.number | 10 | Total concurrent threads fetching pages. Adjust carefully based on system capacity.
 | fetcher.threads.per.queue | 1 | Default number of threads per queue. Can be overridden.
-| fetcher.threads.start.delay | 10 | Delay (seconds) before starting fetcher threads.
+| fetcher.threads.start.delay | 10 | Delay (milliseconds) between starting next fetcher thread. Avoids overloading DNS or network resources during fetcher startup when all threads simultaneously start requesting pages.
 | fetcher.timeout.queue | -1 | Maximum wait time (seconds) for items in the queue. -1 disables timeout.
 | fetcherbolt.queue.debug.filepath | "" | Path to a debug log (e.g. /tmp/fetcher-dump-{port}).
 | http.agent.description | - | Description for the User-Agent header.
@@ -196,7 +196,7 @@ implementation.
 | http.proxy.pass | - | Proxy password.
 | http.proxy.port | 8080 | Proxy port.
 | http.proxy.user | - | Proxy username.
-| http.retry.on.connection.failure | true | Retry fetching on connection failure.
+| http.retry.on.connection.failure | true | (OkHttp only) Retry fetching on connection failure. See link:https://square.github.io/okhttp/5.x/okhttp/okhttp3/-ok-http-client/-builder/retry-on-connection-failure.html[OkHttp docs].
 | http.robots.403.allow | true | Allow crawling when robots.txt returns HTTP 403.
 | http.robots.5xx.allow | false | Allow crawling when robots.txt returns a server error (5xx).
 | http.robots.agents | '' | Additional user-agent strings for interpreting robots.txt.
@@ -213,7 +213,8 @@ implementation.
 implementation.
 | partition.url.mode | byHost | Defines how URLs are partitioned: byHost, byDomain, or byIP.
 | protocols | http,https,file | Supported protocols.
-| http.allow.redirects | false | Allow URL redirects.
+| redirections.allowed | true | If true, emit redirect target URLs as "outlinks" to the status stream. If false, do not follow redirects. See also `http.allow.redirects`.
+| http.allow.redirects | false | (OkHttp only) Follow HTTP redirects immediately in the HTTP protocol client. Note: if followed immediately, redirect target URLs are not emitted to the status stream, are not filtered, not deduplicated, and not checked against robots.txt.
 | sitemap.discovery | false | Enable automatic sitemap discovery.
 | urlbuffer.class | org.apache.stormcrawler.persistence.urlbuffer.SimpleURLBuffer | URL buffer implementation used by spouts.
 |===
