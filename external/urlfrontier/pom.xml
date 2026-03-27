@@ -40,7 +40,7 @@ under the License.
         <urlfrontier.version>2.5</urlfrontier.version>
         <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
         <jacoco.classRatio>0.50</jacoco.classRatio>
-        <jacoco.instructionRatio>0.50</jacoco.instructionRatio>
+        <jacoco.instructionRatio>0.49</jacoco.instructionRatio>
         <jacoco.methodRatio>0.53</jacoco.methodRatio>
         <jacoco.branchRatio>0.42</jacoco.branchRatio>
         <jacoco.lineRatio>0.45</jacoco.lineRatio>

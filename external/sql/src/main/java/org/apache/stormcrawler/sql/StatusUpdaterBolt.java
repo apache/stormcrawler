@@ -32,11 +32,12 @@ import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.persistence.AbstractStatusUpdaterBolt;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
@@ -53,7 +54,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
 
     private static final Timestamp NEVER = Timestamp.valueOf("3000-01-01 00:00:00");
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     private Connection connection;
 
@@ -87,7 +88,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
         partitioner = new URLPartitioner();
         partitioner.configure(stormConf);
 
-        this.eventCounter = context.registerMetric("counter", new MultiCountMetric(), 10);
+        this.eventCounter = CrawlerMetrics.registerCounter(context, stormConf, "counter", 10);
 
         final String tableName =
                 ConfUtils.getString(stormConf, Constants.SQL_STATUS_TABLE_PARAM_NAME, "urls");

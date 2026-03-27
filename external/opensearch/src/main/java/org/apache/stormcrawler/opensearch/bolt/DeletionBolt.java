@@ -36,6 +36,7 @@ import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.opensearch.BulkItemResponseToFailedFlag;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.util.ConfUtils;
@@ -103,7 +104,7 @@ public class DeletionBolt extends BaseRichBolt
                         .removalListener(this)
                         .build();
 
-        context.registerMetric("waitAck", () -> waitAck.estimatedSize(), 10);
+        CrawlerMetrics.registerGauge(context, conf, "waitAck", waitAck::estimatedSize, 10);
     }
 
     public void onRemoval(

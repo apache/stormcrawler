@@ -35,12 +35,13 @@ import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.storm.metric.api.MultiCountMetric;
-import org.apache.storm.metric.api.MultiReducedMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
+import org.apache.stormcrawler.metrics.ScopedReducedMetric;
 import org.apache.stormcrawler.opensearch.BulkItemResponseToFailedFlag;
 import org.apache.stormcrawler.opensearch.Constants;
 import org.apache.stormcrawler.opensearch.IndexCreation;
@@ -48,7 +49,6 @@ import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.persistence.AbstractStatusUpdaterBolt;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.apache.stormcrawler.util.PerSecondReducer;
 import org.apache.stormcrawler.util.URLPartitioner;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -100,9 +100,9 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
     // Be fair due to cache timeout
     private final ReentrantLock waitAckLock = new ReentrantLock(true);
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
-    private MultiReducedMetric receivedPerSecMetrics;
+    private ScopedReducedMetric receivedPerSecMetrics;
 
     public StatusUpdaterBolt() {
         super();
@@ -174,18 +174,17 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         int metrics_time_bucket_secs = 30;
 
         // create gauge for waitAck
-        context.registerMetric("waitAck", () -> waitAck.estimatedSize(), metrics_time_bucket_secs);
+        CrawlerMetrics.registerGauge(
+                context, stormConf, "waitAck", waitAck::estimatedSize, metrics_time_bucket_secs);
 
         // benchmarking - average number of items received back by Elastic per second
         this.receivedPerSecMetrics =
-                context.registerMetric(
-                        "average_persec",
-                        new MultiReducedMetric(new PerSecondReducer()),
-                        metrics_time_bucket_secs);
+                CrawlerMetrics.registerPerSecMetric(
+                        context, stormConf, "average_persec", metrics_time_bucket_secs);
 
         this.eventCounter =
-                context.registerMetric(
-                        "counters", new MultiCountMetric(), metrics_time_bucket_secs);
+                CrawlerMetrics.registerCounter(
+                        context, stormConf, "counters", metrics_time_bucket_secs);
 
         try {
             connection = OpenSearchConnection.getConnection(stormConf, OSBoltType, this);

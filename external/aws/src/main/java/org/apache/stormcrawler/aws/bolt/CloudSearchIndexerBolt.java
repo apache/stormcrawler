@@ -52,7 +52,6 @@ import java.util.Map.Entry;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.Config;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
@@ -60,6 +59,8 @@ import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.TupleUtils;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.indexing.AbstractIndexerBolt;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.Logger;
@@ -91,7 +92,7 @@ public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
 
     private OutputCollector _collector;
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     private Map<String, String> csfields = new HashMap<>();
 
@@ -105,8 +106,7 @@ public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
         super.prepare(conf, context, collector);
         _collector = collector;
 
-        this.eventCounter =
-                context.registerMetric("CloudSearchIndexer", new MultiCountMetric(), 10);
+        this.eventCounter = CrawlerMetrics.registerCounter(context, conf, "CloudSearchIndexer", 10);
 
         maxTimeBuffered = ConfUtils.getInt(conf, CloudSearchConstants.MAX_TIME_BUFFERED, 10);
 

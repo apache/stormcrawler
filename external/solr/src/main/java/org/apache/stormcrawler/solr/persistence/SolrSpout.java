@@ -202,7 +202,7 @@ public class SolrSpout extends AbstractQueryingSpout {
 
         markQueryReceivedNow();
 
-        queryTimes.addMeasurement(timeTaken);
+        queryTimes.accept(timeTaken);
 
         SolrDocumentList docs = new SolrDocumentList();
 

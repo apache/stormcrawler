@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -35,6 +34,8 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.Logger;
@@ -47,7 +48,7 @@ public class URLPartitionerBolt extends BaseRichBolt {
 
     private OutputCollector collector;
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     private Map<String, String> cache;
 
@@ -165,7 +166,8 @@ public class URLPartitionerBolt extends BaseRichBolt {
         // system stream
         // The data can be accessed by registering a "MetricConsumer" in the
         // topology
-        this.eventCounter = context.registerMetric("URLPartitioner", new MultiCountMetric(), 10);
+        this.eventCounter =
+                CrawlerMetrics.registerCounter(context, stormConf, "URLPartitioner", 10);
 
         final int maxEntries = 500;
         cache =

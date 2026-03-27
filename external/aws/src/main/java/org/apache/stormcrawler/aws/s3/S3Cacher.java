@@ -25,12 +25,12 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Map;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,8 +61,8 @@ public abstract class S3Cacher extends AbstractS3CacheBolt {
             throw new RuntimeException(message);
         }
         this.eventCounter =
-                context.registerMetric(
-                        getMetricPrefix() + "s3cache_counter", new MultiCountMetric(), 10);
+                CrawlerMetrics.registerCounter(
+                        context, conf, getMetricPrefix() + "s3cache_counter", 10);
     }
 
     @Override

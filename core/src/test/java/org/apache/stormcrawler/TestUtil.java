@@ -39,15 +39,7 @@ public class TestUtil {
 
     public static TopologyContext getMockedTopologyContext() {
         TopologyContext context = mock(TopologyContext.class);
-        when(context.registerMetric(anyString(), any(IMetric.class), anyInt()))
-                .thenAnswer(
-                        new Answer<IMetric>() {
-
-                            @Override
-                            public IMetric answer(InvocationOnMock invocation) throws Throwable {
-                                return invocation.getArgument(1, IMetric.class);
-                            }
-                        });
+        mockMetricRegistration(context);
         return context;
     }
 
@@ -63,15 +55,7 @@ public class TestUtil {
             int taskIndex, int totalTasks, String componentId) {
         TopologyContext context = mock(TopologyContext.class);
 
-        // Mock metric registration
-        when(context.registerMetric(anyString(), any(IMetric.class), anyInt()))
-                .thenAnswer(
-                        new Answer<IMetric>() {
-                            @Override
-                            public IMetric answer(InvocationOnMock invocation) throws Throwable {
-                                return invocation.getArgument(1, IMetric.class);
-                            }
-                        });
+        mockMetricRegistration(context);
 
         // Mock task information for bucket assignment
         when(context.getThisTaskIndex()).thenReturn(taskIndex);
@@ -85,6 +69,33 @@ public class TestUtil {
         when(context.getComponentTasks(componentId)).thenReturn(taskIds);
 
         return context;
+    }
+
+    /** Sets up mock responses for both V1 and V2 metric registration on a TopologyContext. */
+    private static void mockMetricRegistration(TopologyContext context) {
+        // V1 metric registration
+        when(context.registerMetric(anyString(), any(IMetric.class), anyInt()))
+                .thenAnswer(
+                        new Answer<IMetric>() {
+                            @Override
+                            public IMetric answer(InvocationOnMock invocation) throws Throwable {
+                                return invocation.getArgument(1, IMetric.class);
+                            }
+                        });
+
+        // V2 metric registration
+        when(context.registerCounter(anyString()))
+                .thenAnswer(invocation -> new com.codahale.metrics.Counter());
+        when(context.registerHistogram(anyString()))
+                .thenAnswer(
+                        invocation ->
+                                new com.codahale.metrics.Histogram(
+                                        new com.codahale.metrics.ExponentiallyDecayingReservoir()));
+        when(context.registerMeter(anyString()))
+                .thenAnswer(invocation -> new com.codahale.metrics.Meter());
+        when(context.registerGauge(anyString(), any(com.codahale.metrics.Gauge.class)))
+                .thenAnswer(
+                        invocation -> invocation.getArgument(1, com.codahale.metrics.Gauge.class));
     }
 
     public static Tuple getMockedTestTuple(String url, String content, Metadata metadata) {

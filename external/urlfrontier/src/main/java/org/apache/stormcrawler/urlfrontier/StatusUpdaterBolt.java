@@ -56,11 +56,12 @@ import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.persistence.AbstractStatusUpdaterBolt;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
@@ -93,7 +94,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
     // Faster ways of locking until n messages are processed
     private Semaphore inFlightSemaphore;
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     /** Globally set crawlID * */
     private String globalCrawlID;
@@ -119,7 +120,8 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         throttleTimeMS = ConfUtils.getLong(stormConf, URLFRONTIER_THROTTLING_TIME_MS_KEY, 10);
 
         eventCounter =
-                context.registerMetric(this.getClass().getSimpleName(), new MultiCountMetric(), 30);
+                CrawlerMetrics.registerCounter(
+                        context, stormConf, this.getClass().getSimpleName(), 30);
 
         maxMessagesInFlight =
                 ConfUtils.getInt(

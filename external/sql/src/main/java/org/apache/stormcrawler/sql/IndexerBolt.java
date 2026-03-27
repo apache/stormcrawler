@@ -28,13 +28,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.indexing.AbstractIndexerBolt;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.Logger;
@@ -49,7 +50,7 @@ public class IndexerBolt extends AbstractIndexerBolt {
 
     private OutputCollector collector;
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     private Connection connection;
 
@@ -65,7 +66,7 @@ public class IndexerBolt extends AbstractIndexerBolt {
         super.prepare(conf, context, collector);
         this.collector = collector;
 
-        this.eventCounter = context.registerMetric("SQLIndexer", new MultiCountMetric(), 10);
+        this.eventCounter = CrawlerMetrics.registerCounter(context, conf, "SQLIndexer", 10);
 
         this.tableName = ConfUtils.getString(conf, SQL_INDEX_TABLE_PARAM_NAME);
 

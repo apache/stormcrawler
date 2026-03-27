@@ -31,6 +31,7 @@ import org.apache.storm.topology.base.BaseRichSpout;
 import org.apache.storm.tuple.Fields;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.StringTabScheme;
 import org.slf4j.Logger;
@@ -99,7 +100,7 @@ public class MemorySpout extends BaseRichSpout {
                     scheme.deserialize(ByteBuffer.wrap(u.getBytes(StandardCharsets.UTF_8)));
             add((String) tuple.get(0), (Metadata) tuple.get(1), now);
         }
-        context.registerMetric("queue_size", () -> queue.size(), 10);
+        CrawlerMetrics.registerGauge(context, conf, "queue_size", queue::size, 10);
     }
 
     @Override
