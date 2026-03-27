@@ -5,7 +5,7 @@ Have a look at the code and resources and modify them to your heart's content.
 
 ## Native
 
-You need to install Apache Storm. The instructions on [setting up a Storm cluster](https://storm.apache.org/releases/2.8.4/Setting-up-a-Storm-cluster.html) should help.
+You need to install Apache Storm. The instructions on [setting up a Storm cluster](https://storm.apache.org/releases/2.8.5/Setting-up-a-Storm-cluster.html) should help.
 You also need to have an instance of URLFrontier running. See [the URLFrontier README](https://github.com/crawler-commons/url-frontier/tree/master/service); the easiest way is to use Docker, like so:
 
 ```
