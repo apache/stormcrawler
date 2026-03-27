@@ -41,6 +41,17 @@ mvn archetype:generate -DarchetypeGroupId=org.apache.stormcrawler \
                        -DarchetypeArtifactId=stormcrawler-archetype \
                        -DarchetypeVersion=<CURRENT_VERSION>
 ----
+.PowerShell
+[%collapsible]
+====
+[source,powershell]
+----
+mvn archetype:generate `
+  "-DarchetypeGroupId=org.apache.stormcrawler" `
+  "-DarchetypeArtifactId=stormcrawler-archetype" `
+  "-DarchetypeVersion=<CURRENT_VERSION>"
+----
+====
 
 Be sure to replace `<CURRENT_VERSION>` with the latest released version of StormCrawler, which you can find on link:https://search.maven.org/artifact/org.apache.stormcrawler/stormcrawler-archetype[search.maven.org].
 
@@ -165,6 +176,15 @@ After you have saved it, we need to inject the seeds into URLFrontier. This can 
 java -cp target/${artifactId}-${version}.jar crawlercommons.urlfrontier.client.Client PutURLs -f seeds.txt
 ----
 
+.PowerShell
+[%collapsible]
+====
+[source,powershell]
+----
+java -cp target/$artifactId-$version.jar crawlercommons.urlfrontier.client.Client PutURLs -f seeds.txt
+----
+====
+
 where _seeds.txt_ is the previously created file containing URLs to inject, with one URL per line.
 
 ==== Run Your First Crawl
@@ -181,6 +201,21 @@ docker run --network ${NETWORK} -it \
 storm:latest \
 storm jar ${artifactId}-${version}.jar org.apache.storm.flux.Flux --remote crawler.flux
 ----
+
+.PowerShell
+[%collapsible]
+====
+[source,powershell]
+----
+docker run --network $NETWORK -it `
+  --rm `
+  -v "${PWD}/crawler-conf.yaml:/apache-storm/crawler-conf.yaml" `
+  -v "${PWD}/crawler.flux:/apache-storm/crawler.flux" `
+  -v "${PWD}/$artifactId-$version.jar:/apache-storm/$artifactId-$version.jar" `
+  storm:latest `
+  storm jar $artifactId-$version.jar org.apache.storm.flux.Flux --remote crawler.flux
+----
+====
 
 where `${NETWORK}` is the name of the Docker network of the previously started Docker Compose. You can find this name by running
 
