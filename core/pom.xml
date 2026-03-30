@@ -49,7 +49,7 @@ under the License.
         <cli.version>1.11.0</cli.version>
         <okhttp.version>5.3.2</okhttp.version>
         <caffeine.version>3.2.3</caffeine.version>
-        <xsoup.version>0.3.7</xsoup.version>
+
         <guava.version>33.5.0-jre</guava.version>
         <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
         <jacoco.classRatio>0.72</jacoco.classRatio>
@@ -218,18 +218,6 @@ under the License.
             <version>${commons.lang.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>us.codecraft</groupId>
-            <artifactId>xsoup</artifactId>
-            <version>${xsoup.version}</version>
-            <exclusions>
-                <!-- We declare a newer version of jsoup -->
-                <exclusion>
-                    <groupId>org.jsoup</groupId>
-                    <artifactId>jsoup</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
 
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
