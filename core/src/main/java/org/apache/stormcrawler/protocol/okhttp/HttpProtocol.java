@@ -306,6 +306,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 SCProxy prox = proxOptional.get();
                 // conditionally configure proxy authentication
                 if (StringUtils.isNotBlank(prox.getAddress())) {
+                    // create a new builder from the existing client to avoid
+                    // polluting shared state across concurrent requests
+                    OkHttpClient.Builder localBuilder = client.newBuilder();
+
                     // format SCProxy into native Java proxy
                     Proxy proxy =
                             new Proxy(
@@ -314,12 +318,12 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                             prox.getAddress(), Integer.parseInt(prox.getPort())));
 
                     // set proxy in builder
-                    builder.proxy(proxy);
+                    localBuilder.proxy(proxy);
 
                     // conditionally add proxy authentication
                     if (StringUtils.isNotBlank(prox.getUsername())) {
                         // add proxy authentication header to builder
-                        builder.proxyAuthenticator(
+                        localBuilder.proxyAuthenticator(
                                 (Route route, Response response) -> {
                                     String credential =
                                             Credentials.basic(
@@ -330,17 +334,17 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                             .build();
                                 });
                     }
+
+                    // save start time for debugging speed impact of client build
+                    long buildStart = System.currentTimeMillis();
+
+                    // create new local client from local builder using proxy
+                    localClient = localBuilder.build();
+
+                    LOG.debug(
+                            "time to build okhttp client with proxy: {}ms",
+                            System.currentTimeMillis() - buildStart);
                 }
-
-                // save start time for debugging speed impact of client build
-                long buildStart = System.currentTimeMillis();
-
-                // create new local client from builder using proxy
-                localClient = builder.build();
-
-                LOG.debug(
-                        "time to build okhttp client with proxy: {}ms",
-                        System.currentTimeMillis() - buildStart);
 
                 LOG.debug("fetching with proxy {} - {} ", url, prox.toString());
             }

@@ -163,44 +163,59 @@ public class HttpProtocol extends AbstractHttpProtocol
         // set default request config to global config
         RequestConfig reqConfig = requestConfig;
 
+        // default to the shared builder for non-proxy requests
+        HttpClientBuilder clientBuilder = builder;
+
         // conditionally add a dynamic proxy
         if (proxyManager != null) {
             // retrieve proxy from proxy manager
             Optional<SCProxy> proxOptional = proxyManager.getProxy(md);
             if (proxOptional.isPresent()) {
                 SCProxy prox = proxOptional.get();
+
+                // create local copies of builders to avoid polluting shared
+                // state across concurrent requests
+                HttpClientBuilder localBuilder =
+                        HttpClients.custom()
+                                .setConnectionManager(CONNECTION_MANAGER)
+                                .setConnectionManagerShared(true)
+                                .disableRedirectHandling()
+                                .disableAutomaticRetries();
+                RequestConfig.Builder localRequestConfigBuilder = RequestConfig.copy(requestConfig);
+
                 // conditionally configure proxy authentication
                 if (StringUtils.isNotBlank(prox.getUsername())) {
                     List<String> authSchemes = new ArrayList<>();
 
                     // Can make configurable and add more in future
                     authSchemes.add(AuthSchemes.BASIC);
-                    requestConfigBuilder.setProxyPreferredAuthSchemes(authSchemes);
+                    localRequestConfigBuilder.setProxyPreferredAuthSchemes(authSchemes);
 
                     BasicCredentialsProvider basicAuthCreds = new BasicCredentialsProvider();
                     basicAuthCreds.setCredentials(
                             new AuthScope(prox.getAddress(), Integer.parseInt(prox.getPort())),
                             new UsernamePasswordCredentials(
                                     prox.getUsername(), prox.getPassword()));
-                    builder.setDefaultCredentialsProvider(basicAuthCreds);
+                    localBuilder.setDefaultCredentialsProvider(basicAuthCreds);
                 }
 
                 HttpHost proxy = new HttpHost(prox.getAddress(), Integer.parseInt(prox.getPort()));
                 DefaultProxyRoutePlanner routePlanner = new DefaultProxyRoutePlanner(proxy);
-                builder.setRoutePlanner(routePlanner);
+                localBuilder.setRoutePlanner(routePlanner);
 
                 // save start time for debugging speed impact of request config
                 // build
                 long buildStart = System.currentTimeMillis();
 
                 // set request config to new configuration with dynamic proxy
-                reqConfig = requestConfigBuilder.build();
+                reqConfig = localRequestConfigBuilder.build();
 
                 LOG.debug(
                         "time to build http request config with proxy: {}ms",
                         System.currentTimeMillis() - buildStart);
 
                 LOG.debug("fetching with " + prox.toString());
+                clientBuilder = localBuilder;
             }
         }
 
@@ -255,7 +270,7 @@ public class HttpProtocol extends AbstractHttpProtocol
 
         // no need to release the connection explicitly as this is handled
         // automatically. The client itself must be closed though.
-        try (CloseableHttpClient httpclient = builder.build()) {
+        try (CloseableHttpClient httpclient = clientBuilder.build()) {
             return httpclient.execute(request, responseHandler);
         }
     }
