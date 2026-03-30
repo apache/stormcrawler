@@ -17,6 +17,7 @@
 
 package org.apache.stormcrawler.solr;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Collections;
@@ -63,7 +64,7 @@ class CloudConnectionTest extends SolrCloudContainerTest {
 
     @Test
     @Timeout(value = 120, unit = TimeUnit.SECONDS)
-    void consistencyTest() throws InterruptedException {
+    void consistencyTest() {
         SolrInputDocument doc = new SolrInputDocument();
         doc.addField("url", "test");
         doc.addField("content", "test");
@@ -75,9 +76,7 @@ class CloudConnectionTest extends SolrCloudContainerTest {
         stopNode(leader);
 
         // Wait for recovery
-        while (getLiveLeader() == null) {
-            Thread.sleep(100);
-        }
+        await().atMost(30, TimeUnit.SECONDS).until(() -> getLiveLeader() != null);
 
         assertEquals(1, getNumFound());
     }

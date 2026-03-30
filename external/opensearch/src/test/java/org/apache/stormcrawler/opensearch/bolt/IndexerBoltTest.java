@@ -17,6 +17,7 @@
 
 package org.apache.stormcrawler.opensearch.bolt;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -102,13 +103,13 @@ class IndexerBoltTest extends AbstractOpenSearchTest {
         return executorService
                 .submit(
                         () -> {
-                            // check that something has been emitted out
-                            var outputSize = output.getEmitted(Constants.StatusStreamName).size();
-                            while (outputSize == oldSize) {
-                                Thread.sleep(100);
-                                outputSize = output.getEmitted(Constants.StatusStreamName).size();
-                            }
-                            return outputSize;
+                            await().atMost(timeoutInMs, TimeUnit.MILLISECONDS)
+                                    .until(
+                                            () ->
+                                                    output.getEmitted(Constants.StatusStreamName)
+                                                                    .size()
+                                                            > oldSize);
+                            return output.getEmitted(Constants.StatusStreamName).size();
                         })
                 .get(timeoutInMs, TimeUnit.MILLISECONDS);
     }

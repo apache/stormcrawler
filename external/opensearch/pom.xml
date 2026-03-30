@@ -77,6 +77,12 @@ under the License.
             <version>${opensearch.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!--
         https://mvnrepository.com/artifact/org.opensearch.client/opensearch-rest-client-sniffer -->
         <dependency>

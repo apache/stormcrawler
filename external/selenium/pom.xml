@@ -38,7 +38,6 @@ under the License.
 
     <properties>
         <selenium.version>4.41.0</selenium.version>
-        <awaitility.version>4.3.0</awaitility.version>
         <wiremock.version>3.13.2</wiremock.version>
         <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
         <jacoco.classRatio>1.00</jacoco.classRatio>
@@ -80,7 +79,6 @@ under the License.
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
-            <version>${awaitility.version}</version>
             <scope>test</scope>
         </dependency>
 

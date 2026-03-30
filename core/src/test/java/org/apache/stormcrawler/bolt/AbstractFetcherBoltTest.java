@@ -21,6 +21,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Tuple;
@@ -85,12 +87,11 @@ abstract class AbstractFetcherBoltTest {
                 .thenReturn("http://localhost:" + wmRuntimeInfo.getHttpPort() + "/");
         when(tuple.getValueByField("metadata")).thenReturn(null);
         bolt.execute(tuple);
-        while (output.getAckedTuples().size() == 0 && output.getFailedTuples().size() == 0) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-            }
-        }
+        await().atMost(30, TimeUnit.SECONDS)
+                .until(
+                        () ->
+                                output.getAckedTuples().size() > 0
+                                        || output.getFailedTuples().size() > 0);
         boolean acked = output.getAckedTuples().contains(tuple);
         boolean failed = output.getFailedTuples().contains(tuple);
         // should be acked or failed

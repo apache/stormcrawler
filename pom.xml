@@ -78,6 +78,7 @@ under the License.
         <commons.codec.version>1.21.0</commons.codec.version>
         <git-code-format-maven-plugin.version>5.4</git-code-format-maven-plugin.version>
         <testcontainers.version>1.21.4</testcontainers.version>
+        <awaitility.version>4.3.0</awaitility.version>
         <maven.mojo.license.plugin>2.7.1</maven.mojo.license.plugin>
         <checkstyle-maven-plugin.version>3.6.0</checkstyle-maven-plugin.version>
         <checkstyle.version>12.3.1</checkstyle.version>
@@ -679,6 +680,13 @@ under the License.
                 <artifactId>annotations</artifactId>
                 <version>${jetbrains.annotations.version}</version>
                 <scope>compile</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.awaitility</groupId>
+                <artifactId>awaitility</artifactId>
+                <version>${awaitility.version}</version>
+                <scope>test</scope>
             </dependency>
 
             <dependency>

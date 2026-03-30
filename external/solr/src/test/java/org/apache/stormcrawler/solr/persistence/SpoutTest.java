@@ -17,6 +17,7 @@
 
 package org.apache.stormcrawler.solr.persistence;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
@@ -139,12 +140,9 @@ class SpoutTest extends SolrContainerTest {
 
         return executorService.submit(
                 () -> {
-                    var outputSize = boltOutput.getAckedTuples().size();
-                    while (outputSize == 0) {
-                        Thread.sleep(100);
-                        outputSize = boltOutput.getAckedTuples().size();
-                    }
-                    return outputSize;
+                    await().atMost(30, TimeUnit.SECONDS)
+                            .until(() -> boltOutput.getAckedTuples().size() > 0);
+                    return boltOutput.getAckedTuples().size();
                 });
     }
 

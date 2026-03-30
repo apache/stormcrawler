@@ -17,6 +17,7 @@
 
 package org.apache.stormcrawler.protocol.playwright;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.charset.StandardCharsets;
@@ -96,7 +97,7 @@ class ProtocolTest extends AbstractProtocolTest {
     /** Calls 2 URLs on the same protocol instance - should block * */
     @Test
     @Timeout(value = 2, unit = TimeUnit.MINUTES)
-    void testBlocking() throws InterruptedException {
+    void testBlocking() {
         HttpProtocol p = getProtocol();
         run(p, p, true);
     }
@@ -104,12 +105,11 @@ class ProtocolTest extends AbstractProtocolTest {
     /** Calls 2 URLs on 2 different instances - should run in parallel * */
     @Test
     @Timeout(value = 2, unit = TimeUnit.MINUTES)
-    void testParallel() throws InterruptedException {
+    void testParallel() {
         run(getProtocol(), getProtocol(), false);
     }
 
-    private void run(HttpProtocol protocol, HttpProtocol protocol2, boolean expected)
-            throws InterruptedException {
+    private void run(HttpProtocol protocol, HttpProtocol protocol2, boolean expected) {
         MutableBoolean noException = new MutableBoolean(true);
         MutableObject endTimeFirst = new MutableObject();
         MutableObject startTimeSecond = new MutableObject();
@@ -142,10 +142,12 @@ class ProtocolTest extends AbstractProtocolTest {
                             }
                         })
                 .start();
-        while (noException.booleanValue()
-                && (endTimeFirst.getObject() == null || startTimeSecond.getObject() == null)) {
-            Thread.sleep(10);
-        }
+        await().atMost(2, TimeUnit.MINUTES)
+                .until(
+                        () ->
+                                !noException.booleanValue()
+                                        || (endTimeFirst.getObject() != null
+                                                && startTimeSecond.getObject() != null));
         Assertions.assertEquals(true, noException.booleanValue());
         Instant etf = (Instant) endTimeFirst.getObject();
         Instant sts = (Instant) startTimeSecond.getObject();

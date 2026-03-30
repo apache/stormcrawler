@@ -50,7 +50,6 @@ under the License.
         <okhttp.version>5.3.2</okhttp.version>
         <caffeine.version>3.2.3</caffeine.version>
         <xsoup.version>0.3.7</xsoup.version>
-        <awaitility.version>4.3.0</awaitility.version>
         <guava.version>33.5.0-jre</guava.version>
         <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
         <jacoco.classRatio>0.72</jacoco.classRatio>
@@ -145,7 +144,6 @@ under the License.
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
-            <version>${awaitility.version}</version>
             <scope>test</scope>
         </dependency>
 

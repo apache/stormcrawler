@@ -17,6 +17,7 @@
 
 package org.apache.stormcrawler.solr.bolt;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -83,12 +84,9 @@ class IndexerBoltTest extends SolrContainerTest {
 
         return executorService.submit(
                 () -> {
-                    var outputSize = output.getAckedTuples().size();
-                    while (outputSize == 0) {
-                        Thread.sleep(100);
-                        outputSize = output.getAckedTuples().size();
-                    }
-                    return outputSize;
+                    await().atMost(30, TimeUnit.SECONDS)
+                            .until(() -> output.getAckedTuples().size() > 0);
+                    return output.getAckedTuples().size();
                 });
     }
 
