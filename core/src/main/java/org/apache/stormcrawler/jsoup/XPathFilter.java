@@ -93,7 +93,9 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
      * example, {@code //SPAN[@class="concept"]} becomes {@code //span[@class="concept"]}.
      */
     static String lowercaseElementNames(String xpath) {
-        return ELEMENT_NAME.matcher(xpath).replaceAll(m -> m.group().toLowerCase(java.util.Locale.ROOT));
+        return ELEMENT_NAME
+                .matcher(xpath)
+                .replaceAll(m -> m.group().toLowerCase(java.util.Locale.ROOT));
     }
 
     static class LabelledExpression {
