@@ -269,7 +269,7 @@ config:
 
   # Guava cache use by AbstractStatusUpdaterBolt for DISCOVERED URLs
   status.updater.use.cache: true
-  status.updater.cache.spec: "maximumSize=10000,expireAfterAccess=1h"
+  status.updater.cache.spec: "expireAfterAccess=1h,softValues"
 
   # Can also take "MINUTE" or "HOUR"
   status.updater.unit.round.date: "SECOND"
