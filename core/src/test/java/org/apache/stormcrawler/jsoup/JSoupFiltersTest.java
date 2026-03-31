@@ -155,5 +155,4 @@ class JSoupFiltersTest extends ParsingTester {
         Assertions.assertNotNull(fallback, "Fallback expression should have matched");
         Assertions.assertTrue(fallback.contains("Main Title"));
     }
-
 }
