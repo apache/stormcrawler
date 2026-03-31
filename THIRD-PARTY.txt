@@ -374,7 +374,6 @@ List of third-party dependencies grouped by their license type.
         * SLF4J API Module (org.slf4j:slf4j-api:1.7.36 - http://www.slf4j.org)
         * SLF4J API Module (org.slf4j:slf4j-api:1.7.6 - http://www.slf4j.org)
         * SLF4J API Module (org.slf4j:slf4j-api:2.0.17 - http://www.slf4j.org)
-        * xsoup (us.codecraft:xsoup:0.3.7 - https://github.com/code4craft/xsoup/)
 
     Similar to Apache License but with the acknowledgment clause removed
 
