@@ -18,6 +18,7 @@
 package org.apache.stormcrawler.jsoup;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.storm.task.OutputCollector;
@@ -93,4 +94,66 @@ class JSoupFiltersTest extends ParsingTester {
         parse("https://stormcrawler.apache.org", "stormcrawler.apache.org.html");
         Assertions.assertEquals(31, output.getEmitted("status").size());
     }
+
+    private Metadata parseXPathTestPage() throws IOException {
+        prepareParserBolt("test.xpath.jsoupfilters.json", new HashMap<>());
+        parse("https://example.com", "xpath-test.html");
+        Assertions.assertEquals(1, output.getEmitted().size());
+        List<Object> parsedTuple = output.getEmitted().get(0);
+        Metadata metadata = (Metadata) parsedTuple.get(2);
+        Assertions.assertNotNull(metadata);
+        return metadata;
+    }
+
+    @Test
+    void testAttributeExtraction() throws IOException {
+        Metadata metadata = parseXPathTestPage();
+        Assertions.assertEquals("storm, crawler, xpath", metadata.getFirstValue("attr_content"));
+        Assertions.assertEquals("Test Author", metadata.getFirstValue("attr_author"));
+    }
+
+    @Test
+    void testTidyTextFunction() throws IOException {
+        Metadata metadata = parseXPathTestPage();
+        String tidyText = metadata.getFirstValue("tidy_text");
+        Assertions.assertNotNull(tidyText);
+        Assertions.assertEquals("Hello world, this is a test.", tidyText.strip());
+    }
+
+    @Test
+    void testAllTextFunction() throws IOException {
+        Metadata metadata = parseXPathTestPage();
+        String allText = metadata.getFirstValue("all_text");
+        Assertions.assertNotNull(allText);
+        Assertions.assertEquals("Hello world, this is a test.", allText.strip());
+    }
+
+    @Test
+    void testHtmlFunction() throws IOException {
+        Metadata metadata = parseXPathTestPage();
+        String html = metadata.getFirstValue("html_content");
+        Assertions.assertNotNull(html);
+        Assertions.assertTrue(html.contains("<strong>world</strong>"));
+        Assertions.assertTrue(html.contains("Hello"));
+    }
+
+    @Test
+    void testUppercaseElementNames() throws IOException {
+        Metadata metadata = parseXPathTestPage();
+        String[] concepts = metadata.getValues("concept_upper");
+        Assertions.assertNotNull(concepts);
+        Assertions.assertEquals(2, concepts.length);
+        Assertions.assertTrue(concepts[0].contains("First concept"));
+        Assertions.assertTrue(concepts[1].contains("Second concept"));
+        Assertions.assertTrue(metadata.getFirstValue("h1_text").contains("Main Title"));
+    }
+
+    @Test
+    void testFallbackExpressions() throws IOException {
+        Metadata metadata = parseXPathTestPage();
+        String fallback = metadata.getFirstValue("fallback");
+        Assertions.assertNotNull(fallback, "Fallback expression should have matched");
+        Assertions.assertTrue(fallback.contains("Main Title"));
+    }
+
 }
