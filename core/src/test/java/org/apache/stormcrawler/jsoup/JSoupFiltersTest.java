@@ -155,4 +155,21 @@ class JSoupFiltersTest extends ParsingTester {
         Assertions.assertNotNull(fallback, "Fallback expression should have matched");
         Assertions.assertTrue(fallback.contains("Main Title"));
     }
+
+    @Test
+    void testLowercaseElementNames() {
+        Assertions.assertEquals(
+                "//span[@class=\"concept\"]",
+                XPathFilter.lowercaseElementNames("//SPAN[@class=\"concept\"]"));
+        Assertions.assertEquals(
+                "//meta[@name=\"keywords\"]/@content",
+                XPathFilter.lowercaseElementNames("//META[@name=\"keywords\"]/@content"));
+        Assertions.assertEquals(
+                "//*[@class=\"x\"]",
+                XPathFilter.lowercaseElementNames("//*[@class=\"x\"]"));
+        Assertions.assertEquals(
+                "//div/span/a[@href]",
+                XPathFilter.lowercaseElementNames("//DIV/SPAN/A[@href]"));
+        Assertions.assertEquals("//title", XPathFilter.lowercaseElementNames("//title"));
+    }
 }

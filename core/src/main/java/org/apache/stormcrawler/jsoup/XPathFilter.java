@@ -92,7 +92,7 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
      * Lowercases element names in an XPath expression to match JSoup's normalized tag names. For
      * example, {@code //SPAN[@class="concept"]} becomes {@code //span[@class="concept"]}.
      */
-    static String lowercaseElementNames(String xpath) {
+    public static String lowercaseElementNames(String xpath) {
         return ELEMENT_NAME
                 .matcher(xpath)
                 .replaceAll(m -> m.group().toLowerCase(java.util.Locale.ROOT));
