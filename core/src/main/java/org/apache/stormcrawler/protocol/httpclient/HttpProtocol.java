@@ -401,7 +401,11 @@ public class HttpProtocol extends AbstractHttpProtocol
 
     @Override
     public void cleanup() {
-        CONNECTION_MANAGER.close();
+        try {
+            client.close();
+        } catch (IOException e) {
+            LOG.error("Error closing HTTP client", e);
+        }
     }
 
     public static void main(String[] args) throws Exception {
