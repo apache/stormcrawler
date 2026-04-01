@@ -37,8 +37,10 @@ import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.Constants;
+import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
+import org.apache.stormcrawler.persistence.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -102,6 +104,51 @@ abstract class AbstractFetcherBoltTest {
         Assertions.assertEquals(1, statusTuples.size());
         // and none on the default stream as there is nothing to parse and/or
         // index
+        Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+    }
+
+    @Test
+    void testThreadTimeout(WireMockRuntimeInfo wmRuntimeInfo) {
+        // server delays response for 10 seconds — longer than the bolt timeout
+        stubFor(
+                get(urlMatching(".+"))
+                        .willReturn(aResponse().withStatus(200).withFixedDelay(10_000)));
+
+        TestOutputCollector output = new TestOutputCollector();
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        // bolt-level timeout: 2 seconds
+        config.put("fetcher.thread.timeout", 2L);
+        // raise the socket timeout so the bolt timeout fires first
+        config.put("http.timeout", 30_000);
+        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.getSourceComponent()).thenReturn("source");
+        when(tuple.getStringByField("url"))
+                .thenReturn("http://localhost:" + wmRuntimeInfo.getHttpPort() + "/slow");
+        when(tuple.getValueByField("metadata")).thenReturn(null);
+        bolt.execute(tuple);
+
+        // the bolt should ack within ~2s + margin, not wait the full 10s
+        await().atMost(8, TimeUnit.SECONDS)
+                .until(() -> output.getAckedTuples().size() > 0);
+
+        Assertions.assertTrue(output.getAckedTuples().contains(tuple));
+
+        // should have emitted a FETCH_ERROR on the status stream
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(1, statusTuples.size());
+        Status status = (Status) statusTuples.get(0).get(2);
+        Assertions.assertEquals(Status.FETCH_ERROR, status);
+
+        // verify the metadata records the timeout reason
+        Metadata metadata = (Metadata) statusTuples.get(0).get(1);
+        String exception = metadata.getFirstValue("fetch.exception");
+        Assertions.assertNotNull(exception);
+        Assertions.assertEquals("Socket timeout fetching", exception);
+
+        // nothing on the default stream — no content was fetched
         Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
     }
 }

@@ -28,7 +28,13 @@ import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
@@ -121,6 +127,11 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
     // by default remains as is-pre 1.17
     private String protocolMetadataPrefix = "";
+
+    /** Hard timeout in seconds for a single protocol fetch. -1 means disabled. */
+    private long fetchTimeout = -1;
+
+    private ExecutorService fetchExecutor;
 
     private void checkConfiguration() {
 
@@ -226,6 +237,18 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
         this.protocolMetadataPrefix =
                 ConfUtils.getString(
                         conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, protocolMetadataPrefix);
+
+        this.fetchTimeout =
+                ConfUtils.getLong(conf, FetcherBolt.FETCH_TIMEOUT_PARAM_KEY, fetchTimeout);
+        if (fetchTimeout > 0) {
+            fetchExecutor =
+                    Executors.newSingleThreadExecutor(
+                            r -> {
+                                Thread t = new Thread(r, "SimpleFetcherTimeout #" + taskId);
+                                t.setDaemon(true);
+                                return t;
+                            });
+        }
     }
 
     @Override
@@ -238,6 +261,9 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
     @Override
     public void cleanup() {
         protocolFactory.cleanup();
+        if (fetchExecutor != null) {
+            fetchExecutor.shutdownNow();
+        }
     }
 
     @Override
@@ -425,7 +451,35 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
             activeThreads.incrementAndGet();
 
             long start = System.currentTimeMillis();
-            ProtocolResponse response = protocol.getProtocolOutput(urlString, metadata);
+            final String fetchUrl = urlString;
+            final Metadata fetchMetadata = metadata;
+            ProtocolResponse response;
+            if (fetchExecutor != null) {
+                Future<ProtocolResponse> future =
+                        fetchExecutor.submit(
+                                () -> protocol.getProtocolOutput(fetchUrl, fetchMetadata));
+                try {
+                    response = future.get(fetchTimeout, TimeUnit.SECONDS);
+                } catch (TimeoutException e) {
+                    future.cancel(true);
+                    throw new Exception(
+                            "Fetch timed out after "
+                                    + fetchTimeout
+                                    + "s fetching "
+                                    + urlString,
+                            e);
+                } catch (CancellationException e) {
+                    throw new Exception("Fetch cancelled for " + urlString);
+                } catch (ExecutionException e) {
+                    Throwable cause = e.getCause();
+                    if (cause instanceof Exception) {
+                        throw (Exception) cause;
+                    }
+                    throw new Exception(cause);
+                }
+            } else {
+                response = protocol.getProtocolOutput(urlString, metadata);
+            }
             long timeFetching = System.currentTimeMillis() - start;
 
             final int byteLength = response.getContent().length;

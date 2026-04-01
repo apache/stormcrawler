@@ -29,6 +29,9 @@ config:
   fetcher.max.urls.in.queues: -1
   fetcher.max.queue.size: -1
   fetcher.timeout.queue: -1
+  # hard timeout in seconds for a single protocol fetch at the bolt level;
+  # -1 disables (relies on protocol-level socket timeouts only)
+  fetcher.thread.timeout: -1
   # max. crawl-delay accepted in robots.txt (in seconds)
   fetcher.max.crawl.delay: 30
   # behavior of fetcher when the crawl-delay in the robots.txt
