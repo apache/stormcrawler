@@ -25,13 +25,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
@@ -98,7 +98,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
     private final List<KeyValue> customRequestHeaders = new LinkedList<>();
 
     // track the time spent for each URL in DNS resolution
-    private final Map<String, Long> DNStimes = new HashMap<>();
+    private final Map<String, Long> DNStimes = new ConcurrentHashMap<>();
 
     private OkHttpClient.Builder builder;
 
@@ -186,7 +186,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     break;
             }
         }
-        if (protocols.size() > 0) {
+        if (!protocols.isEmpty()) {
             LOG.info("Using protocol versions: {}", protocols);
             builder.protocols(protocols);
         }
@@ -512,7 +512,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
             // okhttp may fetch more content than requested, quickly "increment"
             // bytes
-            bytesRequested = (int) source.getBuffer().size();
+            bytesRequested = source.getBuffer().size();
         }
         int bytesToCopy = (int) source.getBuffer().size(); // bytesBuffered
         if (maxContent != -1 && bytesToCopy > maxContent) {
