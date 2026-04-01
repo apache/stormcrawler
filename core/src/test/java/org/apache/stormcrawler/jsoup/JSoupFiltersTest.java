@@ -165,11 +165,9 @@ class JSoupFiltersTest extends ParsingTester {
                 "//meta[@name=\"keywords\"]/@content",
                 XPathFilter.lowercaseElementNames("//META[@name=\"keywords\"]/@content"));
         Assertions.assertEquals(
-                "//*[@class=\"x\"]",
-                XPathFilter.lowercaseElementNames("//*[@class=\"x\"]"));
+                "//*[@class=\"x\"]", XPathFilter.lowercaseElementNames("//*[@class=\"x\"]"));
         Assertions.assertEquals(
-                "//div/span/a[@href]",
-                XPathFilter.lowercaseElementNames("//DIV/SPAN/A[@href]"));
+                "//div/span/a[@href]", XPathFilter.lowercaseElementNames("//DIV/SPAN/A[@href]"));
         Assertions.assertEquals("//title", XPathFilter.lowercaseElementNames("//title"));
     }
 }
