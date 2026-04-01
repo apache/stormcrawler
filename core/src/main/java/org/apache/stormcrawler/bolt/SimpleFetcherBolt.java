@@ -463,11 +463,7 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                 } catch (TimeoutException e) {
                     future.cancel(true);
                     throw new Exception(
-                            "Fetch timed out after "
-                                    + fetchTimeout
-                                    + "s fetching "
-                                    + urlString,
-                            e);
+                            "Fetch timed out after " + fetchTimeout + "s fetching " + urlString, e);
                 } catch (CancellationException e) {
                     throw new Exception("Fetch cancelled for " + urlString);
                 } catch (ExecutionException e) {

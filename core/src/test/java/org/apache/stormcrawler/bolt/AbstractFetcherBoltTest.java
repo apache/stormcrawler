@@ -131,8 +131,7 @@ abstract class AbstractFetcherBoltTest {
         bolt.execute(tuple);
 
         // the bolt should ack within ~2s + margin, not wait the full 10s
-        await().atMost(8, TimeUnit.SECONDS)
-                .until(() -> output.getAckedTuples().size() > 0);
+        await().atMost(8, TimeUnit.SECONDS).until(() -> output.getAckedTuples().size() > 0);
 
         Assertions.assertTrue(output.getAckedTuples().contains(tuple));
 

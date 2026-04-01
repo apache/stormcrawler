@@ -90,8 +90,8 @@ public class FetcherBolt extends StatusEmitterBolt {
     /**
      * Hard timeout in seconds for a single call to {@link Protocol#getProtocolOutput}. If a fetch
      * exceeds this duration the thread is interrupted, the URL is marked as FETCH_ERROR, and the
-     * thread moves on to the next item. A value of {@code -1} (the default) disables the
-     * bolt-level timeout, relying solely on the protocol-level socket timeouts.
+     * thread moves on to the next item. A value of {@code -1} (the default) disables the bolt-level
+     * timeout, relying solely on the protocol-level socket timeouts.
      */
     public static final String FETCH_TIMEOUT_PARAM_KEY = "fetcher.thread.timeout";
 
