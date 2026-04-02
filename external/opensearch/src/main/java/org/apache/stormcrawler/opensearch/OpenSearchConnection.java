@@ -286,27 +286,45 @@ public final class OpenSearchConnection {
                 new HttpAsyncResponseConsumerFactory.HeapBufferedResponseConsumerFactory(
                         bufferSize * 1024 * 1024));
 
-        final BulkProcessor bulkProcessor =
-                BulkProcessor.builder(
-                                (request, bulkListener) ->
-                                        client.bulkAsync(
-                                                request,
-                                                requestOptionsBuilder.build(),
-                                                bulkListener),
-                                listener)
-                        .setFlushInterval(flushInterval)
-                        .setBulkActions(bulkActions)
-                        .setConcurrentRequests(concurrentRequests)
-                        .build();
-
-        boolean sniff =
-                ConfUtils.getBoolean(stormConf, Constants.PARAMPREFIX, dottedType, "sniff", true);
+        BulkProcessor bulkProcessor = null;
         Sniffer sniffer = null;
-        if (sniff) {
-            sniffer = Sniffer.builder(client.getLowLevelClient()).build();
-        }
+        try {
+            bulkProcessor =
+                    BulkProcessor.builder(
+                                    (request, bulkListener) ->
+                                            client.bulkAsync(
+                                                    request,
+                                                    requestOptionsBuilder.build(),
+                                                    bulkListener),
+                                    listener)
+                            .setFlushInterval(flushInterval)
+                            .setBulkActions(bulkActions)
+                            .setConcurrentRequests(concurrentRequests)
+                            .build();
 
-        return new OpenSearchConnection(client, bulkProcessor, sniffer);
+            boolean sniff =
+                    ConfUtils.getBoolean(
+                            stormConf, Constants.PARAMPREFIX, dottedType, "sniff", true);
+            if (sniff) {
+                sniffer = Sniffer.builder(client.getLowLevelClient()).build();
+            }
+
+            return new OpenSearchConnection(client, bulkProcessor, sniffer);
+        } catch (Exception e) {
+            if (bulkProcessor != null) {
+                try {
+                    bulkProcessor.close();
+                } catch (Exception suppressed) {
+                    e.addSuppressed(suppressed);
+                }
+            }
+            try {
+                client.close();
+            } catch (IOException suppressed) {
+                e.addSuppressed(suppressed);
+            }
+            throw e;
+        }
     }
 
     private boolean isClosed = false;
