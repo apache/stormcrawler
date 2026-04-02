@@ -225,11 +225,14 @@ public abstract class AbstractSpout extends AbstractQueryingSpout {
 
     @Override
     public void close() {
-        if (client != null) {
-            try {
-                client.close();
-            } catch (IOException e) {
-                LOG.error("Exception caught when closing client", e);
+        synchronized (AbstractSpout.class) {
+            if (client != null) {
+                try {
+                    client.close();
+                } catch (IOException e) {
+                    LOG.error("Exception caught when closing client", e);
+                }
+                client = null;
             }
         }
     }
