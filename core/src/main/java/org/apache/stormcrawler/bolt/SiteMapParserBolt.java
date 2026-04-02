@@ -379,6 +379,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
     @Override
     public void cleanup() {
+        super.cleanup();
         if (parseFilters != null) {
             parseFilters.cleanup();
         }

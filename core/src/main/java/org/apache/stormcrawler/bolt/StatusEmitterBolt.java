@@ -118,4 +118,11 @@ public abstract class StatusEmitterBolt extends BaseRichBolt {
     protected boolean allowRedirs() {
         return allowRedirs;
     }
+
+    @Override
+    public void cleanup() {
+        if (urlFilters != null) {
+            urlFilters.cleanup();
+        }
+    }
 }

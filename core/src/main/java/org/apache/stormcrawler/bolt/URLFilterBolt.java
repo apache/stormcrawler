@@ -122,4 +122,11 @@ public class URLFilterBolt extends BaseRichBolt {
             urlFilters = URLFilters.fromConf(stormConf);
         }
     }
+
+    @Override
+    public void cleanup() {
+        if (urlFilters != null) {
+            urlFilters.cleanup();
+        }
+    }
 }

@@ -1000,6 +1000,7 @@ public class FetcherBolt extends StatusEmitterBolt {
 
     @Override
     public void cleanup() {
+        super.cleanup();
         protocolFactory.cleanup();
     }
 

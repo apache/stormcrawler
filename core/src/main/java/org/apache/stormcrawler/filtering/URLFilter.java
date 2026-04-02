@@ -18,6 +18,7 @@
 package org.apache.stormcrawler.filtering;
 
 import java.net.URL;
+import org.apache.storm.task.IBolt;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.util.AbstractConfigurable;
 import org.jetbrains.annotations.NotNull;
@@ -46,4 +47,12 @@ public abstract class URLFilter extends AbstractConfigurable {
             @Nullable URL sourceUrl,
             @Nullable Metadata sourceMetadata,
             @NotNull String urlToFilter);
+
+    /**
+     * Might be used to clean any resources associated with this {@link URLFilter}. See {@link
+     * IBolt#cleanup()} for more details.
+     */
+    public void cleanup() {
+        // nothing to do here
+    }
 }

@@ -570,6 +570,7 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
     @Override
     public void cleanup() {
+        super.cleanup();
         if (parseFilters != null) {
             parseFilters.cleanup();
         }

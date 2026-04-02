@@ -142,6 +142,13 @@ public class URLFilters extends URLFilter implements JSONResource {
         filters = list.toArray(new URLFilter[0]);
     }
 
+    @Override
+    public void cleanup() {
+        for (URLFilter filter : filters) {
+            filter.cleanup();
+        }
+    }
+
     /** Utility to check the filtering of a URL. */
     public static void main(String[] args) throws ParseException {
 

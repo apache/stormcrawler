@@ -260,6 +260,7 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
     @Override
     public void cleanup() {
+        super.cleanup();
         protocolFactory.cleanup();
         if (fetchExecutor != null) {
             fetchExecutor.shutdownNow();

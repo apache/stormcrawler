@@ -19,6 +19,7 @@ package org.apache.stormcrawler.opensearch.filtering;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.net.URL;
 import java.util.Map;
 import java.util.Timer;
@@ -71,6 +72,8 @@ public class JSONURLFilterWrapper extends URLFilter {
     private static final Logger LOG = LoggerFactory.getLogger(JSONURLFilterWrapper.class);
 
     private URLFilter delegatedURLFilter;
+    private Timer refreshTimer;
+    private RestHighLevelClient osClient;
 
     public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode filterParams) {
 
@@ -127,11 +130,9 @@ public class JSONURLFilterWrapper extends URLFilter {
 
         final JSONResource resource = (JSONResource) delegatedURLFilter;
 
-        new Timer()
-                .schedule(
+        refreshTimer = new Timer();
+        refreshTimer.schedule(
                         new TimerTask() {
-                            private RestHighLevelClient osClient;
-
                             public void run() {
                                 if (osClient == null) {
                                     try {
@@ -171,5 +172,19 @@ public class JSONURLFilterWrapper extends URLFilter {
             @Nullable Metadata sourceMetadata,
             @NotNull String urlToFilter) {
         return delegatedURLFilter.filter(sourceUrl, sourceMetadata, urlToFilter);
+    }
+
+    @Override
+    public void cleanup() {
+        if (refreshTimer != null) {
+            refreshTimer.cancel();
+        }
+        if (osClient != null) {
+            try {
+                osClient.close();
+            } catch (IOException e) {
+                LOG.error("Exception when closing OpenSearch client", e);
+            }
+        }
     }
 }
