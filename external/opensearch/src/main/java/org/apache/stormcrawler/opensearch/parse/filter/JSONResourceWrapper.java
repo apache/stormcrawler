@@ -19,6 +19,7 @@ package org.apache.stormcrawler.opensearch.parse.filter;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -70,6 +71,8 @@ public class JSONResourceWrapper extends ParseFilter {
     private static final Logger LOG = LoggerFactory.getLogger(JSONResourceWrapper.class);
 
     private ParseFilter delegatedParseFilter;
+    private Timer refreshTimer;
+    private RestHighLevelClient osClient;
 
     public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode filterParams) {
 
@@ -126,15 +129,13 @@ public class JSONResourceWrapper extends ParseFilter {
 
         final JSONResource resource = (JSONResource) delegatedParseFilter;
 
-        new Timer()
-                .schedule(
+        refreshTimer = new Timer();
+        refreshTimer.schedule(
                         new TimerTask() {
-                            private RestHighLevelClient esClient;
-
                             public void run() {
-                                if (esClient == null) {
+                                if (osClient == null) {
                                     try {
-                                        esClient =
+                                        osClient =
                                                 OpenSearchConnection.getClient(stormConf, "config");
                                     } catch (Exception e) {
                                         LOG.error(
@@ -142,11 +143,11 @@ public class JSONResourceWrapper extends ParseFilter {
                                                 e);
                                     }
                                 }
-                                if (esClient != null) {
+                                if (osClient != null) {
                                     LOG.info("Reloading json resources from OpenSearch");
                                     try {
                                         GetResponse response =
-                                                esClient.get(
+                                                osClient.get(
                                                         new GetRequest(
                                                                 "config",
                                                                 resource.getResourceFile()),
@@ -167,5 +168,19 @@ public class JSONResourceWrapper extends ParseFilter {
     @Override
     public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
         delegatedParseFilter.filter(URL, content, doc, parse);
+    }
+
+    @Override
+    public void cleanup() {
+        if (refreshTimer != null) {
+            refreshTimer.cancel();
+        }
+        if (osClient != null) {
+            try {
+                osClient.close();
+            } catch (IOException e) {
+                LOG.error("Exception when closing OpenSearch client", e);
+            }
+        }
     }
 }
