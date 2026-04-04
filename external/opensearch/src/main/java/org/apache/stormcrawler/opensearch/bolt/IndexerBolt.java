@@ -244,9 +244,7 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
 
                     if (!selected.failed) {
                         _collector.emit(
-                                StatusStreamName,
-                                t,
-                                new Values(url, metadata, Status.FETCHED));
+                                StatusStreamName, t, new Values(url, metadata, Status.FETCHED));
                         _collector.ack(t);
                     } else {
                         var failure = selected.getFailure();
@@ -254,14 +252,10 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
                         // there is something wrong with the content we should
                         // treat it as an ERROR
                         if (failure.getStatus().equals(RestStatus.BAD_REQUEST)) {
-                            metadata.setValue(
-                                    Constants.STATUS_ERROR_SOURCE, "OpenSearch indexing");
-                            metadata.setValue(
-                                    Constants.STATUS_ERROR_MESSAGE, "invalid content");
+                            metadata.setValue(Constants.STATUS_ERROR_SOURCE, "OpenSearch indexing");
+                            metadata.setValue(Constants.STATUS_ERROR_MESSAGE, "invalid content");
                             _collector.emit(
-                                    StatusStreamName,
-                                    t,
-                                    new Values(url, metadata, Status.ERROR));
+                                    StatusStreamName, t, new Values(url, metadata, Status.ERROR));
                             _collector.ack(t);
                         } else {
                             _collector.fail(t);

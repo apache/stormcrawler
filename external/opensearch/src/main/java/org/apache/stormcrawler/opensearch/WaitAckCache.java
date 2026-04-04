@@ -68,8 +68,7 @@ public class WaitAckCache {
         this(Caffeine.from(cacheSpec), log, onEviction);
     }
 
-    private WaitAckCache(
-            Caffeine<Object, Object> builder, Logger log, Consumer<Tuple> onEviction) {
+    private WaitAckCache(Caffeine<Object, Object> builder, Logger log, Consumer<Tuple> onEviction) {
         this.log = log;
         this.cache =
                 builder.<String, List<Tuple>>removalListener(
@@ -159,16 +158,12 @@ public class WaitAckCache {
                                     if (f != null) {
                                         if (f.getStatus().equals(RestStatus.CONFLICT)) {
                                             if (conflictCounter != null) {
-                                                conflictCounter
-                                                        .scope("doc_conflicts")
-                                                        .incrBy(1);
+                                                conflictCounter.scope("doc_conflicts").incrBy(1);
                                             }
                                             log.debug("Doc conflict ID {}", bir.getId());
                                         } else {
                                             log.error(
-                                                    "Bulk item failure ID {}: {}",
-                                                    bir.getId(),
-                                                    f);
+                                                    "Bulk item failure ID {}: {}", bir.getId(), f);
                                             failed = true;
                                         }
                                     }
@@ -176,8 +171,7 @@ public class WaitAckCache {
                                 })
                         .collect(
                                 // https://github.com/apache/stormcrawler/issues/832
-                                Collectors.groupingBy(
-                                        b -> b.id, Collectors.toUnmodifiableList()));
+                                Collectors.groupingBy(b -> b.id, Collectors.toUnmodifiableList()));
 
         Map<String, List<Tuple>> presentTuples;
         long estimatedSize;
@@ -238,10 +232,7 @@ public class WaitAckCache {
 
     /** Processes a failed bulk request by failing all associated tuples. */
     public void processFailedBulk(
-            BulkRequest request,
-            long executionId,
-            Throwable failure,
-            Consumer<Tuple> failAction) {
+            BulkRequest request, long executionId, Throwable failure, Consumer<Tuple> failAction) {
 
         log.error("Exception with bulk {} - failing the whole lot ", executionId, failure);
 

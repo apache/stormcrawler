@@ -51,8 +51,7 @@ import org.slf4j.LoggerFactory;
  * Simple bolt which stores the status of URLs into OpenSearch. Takes the tuples coming from the
  * 'status' stream. To be used in combination with a Spout to read from the index.
  */
-public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
-        implements BulkProcessor.Listener {
+public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt implements BulkProcessor.Listener {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatusUpdaterBolt.class);
 

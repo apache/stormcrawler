@@ -28,8 +28,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.tuple.Tuple;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.opensearch.action.DocWriteRequest;
-import org.opensearch.action.DocWriteResponse;
 import org.opensearch.action.bulk.BulkItemResponse;
 import org.opensearch.action.bulk.BulkRequest;
 import org.opensearch.action.bulk.BulkResponse;
@@ -37,8 +38,6 @@ import org.opensearch.action.delete.DeleteRequest;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.core.index.shard.ShardId;
 import org.opensearch.core.rest.RestStatus;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
 class WaitAckCacheTest {
@@ -53,9 +52,7 @@ class WaitAckCacheTest {
         evicted = new CopyOnWriteArrayList<>();
         acked = new ArrayList<>();
         failed = new ArrayList<>();
-        cache =
-                new WaitAckCache(
-                        LoggerFactory.getLogger(WaitAckCacheTest.class), evicted::add);
+        cache = new WaitAckCache(LoggerFactory.getLogger(WaitAckCacheTest.class), evicted::add);
     }
 
     private Tuple mockTuple(String url) {
@@ -70,15 +67,13 @@ class WaitAckCacheTest {
     }
 
     private static BulkItemResponse successItem(int itemId, String docId) {
-        IndexResponse indexResponse =
-                new IndexResponse(shardId(), docId, 1, 1, 1, true);
+        IndexResponse indexResponse = new IndexResponse(shardId(), docId, 1, 1, 1, true);
         return new BulkItemResponse(itemId, DocWriteRequest.OpType.INDEX, indexResponse);
     }
 
     private static BulkItemResponse failedItem(int itemId, String docId, RestStatus status) {
         BulkItemResponse.Failure failure =
-                new BulkItemResponse.Failure(
-                        "index", docId, new Exception("test failure"), status);
+                new BulkItemResponse.Failure("index", docId, new Exception("test failure"), status);
         return new BulkItemResponse(itemId, DocWriteRequest.OpType.INDEX, failure);
     }
 
@@ -189,11 +184,7 @@ class WaitAckCacheTest {
 
         BulkResponse response = bulkResponse(successItem(0, "doc1"));
 
-        cache.processBulkResponse(
-                response,
-                1L,
-                null,
-                (id, tuple, selected) -> acked.add(tuple));
+        cache.processBulkResponse(response, 1L, null, (id, tuple, selected) -> acked.add(tuple));
 
         assertEquals(2, acked.size());
         assertTrue(acked.contains(t1));
@@ -238,11 +229,7 @@ class WaitAckCacheTest {
         request.add(new DeleteRequest("index", "doc1"));
         request.add(new DeleteRequest("index", "doc2"));
 
-        cache.processFailedBulk(
-                request,
-                1L,
-                new Exception("connection lost"),
-                failed::add);
+        cache.processFailedBulk(request, 1L, new Exception("connection lost"), failed::add);
 
         assertEquals(2, failed.size());
         assertTrue(failed.contains(t1));
@@ -259,11 +246,7 @@ class WaitAckCacheTest {
         BulkRequest request = new BulkRequest();
         request.add(new DeleteRequest("index", "doc_unknown"));
 
-        cache.processFailedBulk(
-                request,
-                1L,
-                new Exception("test"),
-                failed::add);
+        cache.processFailedBulk(request, 1L, new Exception("test"), failed::add);
 
         assertEquals(0, failed.size());
         // doc1 should still be in cache since it wasn't in the failed request
