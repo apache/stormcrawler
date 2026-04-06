@@ -18,22 +18,11 @@
 package org.apache.stormcrawler.opensearch.parse.filter;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
-import org.apache.stormcrawler.JSONResource;
-import org.apache.stormcrawler.opensearch.OpenSearchConnection;
+import org.apache.stormcrawler.opensearch.DelegateRefresher;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.jetbrains.annotations.NotNull;
-import org.opensearch.action.get.GetRequest;
-import org.opensearch.action.get.GetResponse;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.RestHighLevelClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
 
 /**
@@ -46,7 +35,7 @@ import org.w3c.dom.DocumentFragment;
  *
  * <pre>
  *  {
- *     "class": "org.apache.stormcrawler.elasticsearch.parse.filter.JSONResourceWrapper",
+ *     "class": "org.apache.stormcrawler.opensearch.parse.filter.JSONResourceWrapper",
  *     "name": "OpenSearchCollectionTagger",
  *     "params": {
  *         "refresh": "60",
@@ -68,114 +57,24 @@ import org.w3c.dom.DocumentFragment;
  */
 public class JSONResourceWrapper extends ParseFilter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JSONResourceWrapper.class);
-
-    private ParseFilter delegatedParseFilter;
-    private Timer refreshTimer;
-    private RestHighLevelClient osClient;
+    private DelegateRefresher<ParseFilter> refresher;
 
     public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode filterParams) {
-
-        String parsefilterclass = null;
-
-        JsonNode delegateNode = filterParams.get("delegate");
-        if (delegateNode == null) {
-            throw new RuntimeException("delegateNode undefined!");
-        }
-
-        JsonNode node = delegateNode.get("class");
-        if (node != null && node.isTextual()) {
-            parsefilterclass = node.asText();
-        }
-
-        if (parsefilterclass == null) {
-            throw new RuntimeException("parsefilter.class undefined!");
-        }
-
-        // load an instance of the delegated parsefilter
-        try {
-            Class<?> filterClass = Class.forName(parsefilterclass);
-
-            boolean subClassOK = ParseFilter.class.isAssignableFrom(filterClass);
-            if (!subClassOK) {
-                throw new RuntimeException(
-                        "Filter " + parsefilterclass + " does not extend ParseFilter");
-            }
-
-            delegatedParseFilter = (ParseFilter) filterClass.getDeclaredConstructor().newInstance();
-
-            // check that it implements JSONResource
-            if (!JSONResource.class.isInstance(delegatedParseFilter)) {
-                throw new RuntimeException(
-                        "Filter " + parsefilterclass + " does not implement JSONResource");
-            }
-
-        } catch (Exception e) {
-            LOG.error("Can't setup {}: {}", parsefilterclass, e);
-            throw new RuntimeException("Can't setup " + parsefilterclass, e);
-        }
-
-        // configure it
-        node = delegateNode.get("params");
-
-        delegatedParseFilter.configure(stormConf, node);
-
-        int refreshRate = 600;
-
-        node = filterParams.get("refresh");
-        if (node != null && node.isInt()) {
-            refreshRate = node.asInt(refreshRate);
-        }
-
-        final JSONResource resource = (JSONResource) delegatedParseFilter;
-
-        refreshTimer = new Timer();
-        refreshTimer.schedule(
-                new TimerTask() {
-                    public void run() {
-                        if (osClient == null) {
-                            try {
-                                osClient = OpenSearchConnection.getClient(stormConf, "config");
-                            } catch (Exception e) {
-                                LOG.error("Exception while creating OpenSearch connection", e);
-                            }
-                        }
-                        if (osClient != null) {
-                            LOG.info("Reloading json resources from OpenSearch");
-                            try {
-                                GetResponse response =
-                                        osClient.get(
-                                                new GetRequest(
-                                                        "config", resource.getResourceFile()),
-                                                RequestOptions.DEFAULT);
-                                resource.loadJSONResources(
-                                        new ByteArrayInputStream(response.getSourceAsBytes()));
-                            } catch (Exception e) {
-                                LOG.error("Can't load config from OpenSearch", e);
-                            }
-                        }
-                    }
-                },
-                0,
-                refreshRate * 1000);
+        refresher =
+                new DelegateRefresher<>(
+                        ParseFilter.class,
+                        stormConf,
+                        filterParams,
+                        (delegate, conf, params) -> delegate.configure(conf, params));
     }
 
     @Override
     public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
-        delegatedParseFilter.filter(URL, content, doc, parse);
+        refresher.getDelegate().filter(URL, content, doc, parse);
     }
 
     @Override
     public void cleanup() {
-        if (refreshTimer != null) {
-            refreshTimer.cancel();
-        }
-        if (osClient != null) {
-            try {
-                osClient.close();
-            } catch (IOException e) {
-                LOG.error("Exception when closing OpenSearch client", e);
-            }
-        }
+        refresher.cleanup();
     }
 }
