@@ -132,10 +132,7 @@ class DelegateRefresherTest {
 
         DelegateRefresher<URLFilter> refresher =
                 new DelegateRefresher<>(
-                        URLFilter.class,
-                        conf,
-                        params,
-                        (d, c, p) -> d.configure(c, p));
+                        URLFilter.class, conf, params, (d, c, p) -> d.configure(c, p));
 
         try {
             assertNotNull(refresher.getDelegate());
@@ -153,10 +150,7 @@ class DelegateRefresherTest {
 
         DelegateRefresher<ParseFilter> refresher =
                 new DelegateRefresher<>(
-                        ParseFilter.class,
-                        conf,
-                        params,
-                        (d, c, p) -> d.configure(c, p));
+                        ParseFilter.class, conf, params, (d, c, p) -> d.configure(c, p));
 
         try {
             assertNotNull(refresher.getDelegate());
@@ -174,10 +168,7 @@ class DelegateRefresherTest {
 
         DelegateRefresher<URLFilter> refresher =
                 new DelegateRefresher<>(
-                        URLFilter.class,
-                        conf,
-                        params,
-                        (d, c, p) -> d.configure(c, p));
+                        URLFilter.class, conf, params, (d, c, p) -> d.configure(c, p));
 
         try {
             String result = refresher.getDelegate().filter(null, null, "http://example.com");
@@ -197,10 +188,7 @@ class DelegateRefresherTest {
                 RuntimeException.class,
                 () ->
                         new DelegateRefresher<>(
-                                URLFilter.class,
-                                conf,
-                                params,
-                                (d, c, p) -> d.configure(c, p)));
+                                URLFilter.class, conf, params, (d, c, p) -> d.configure(c, p)));
     }
 
     @Test
@@ -215,10 +203,7 @@ class DelegateRefresherTest {
                 RuntimeException.class,
                 () ->
                         new DelegateRefresher<>(
-                                URLFilter.class,
-                                conf,
-                                params,
-                                (d, c, p) -> d.configure(c, p)));
+                                URLFilter.class, conf, params, (d, c, p) -> d.configure(c, p)));
     }
 
     @Test
@@ -262,10 +247,7 @@ class DelegateRefresherTest {
 
         DelegateRefresher<URLFilter> refresher =
                 new DelegateRefresher<>(
-                        URLFilter.class,
-                        conf,
-                        params,
-                        (d, c, p) -> d.configure(c, p));
+                        URLFilter.class, conf, params, (d, c, p) -> d.configure(c, p));
 
         // calling cleanup twice should not throw
         refresher.cleanup();
