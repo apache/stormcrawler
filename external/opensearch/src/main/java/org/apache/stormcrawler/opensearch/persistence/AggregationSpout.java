@@ -176,7 +176,7 @@ public class AggregationSpout extends AbstractSpout implements ActionListener<Se
         // dump query to log
         LOG.debug("{} OpenSearch query {}", logIdprefix, request);
 
-        LOG.trace("{} isInquery set to true");
+        LOG.trace("{} isInQuery set to true", logIdprefix);
         isInQuery.set(true);
         client.searchAsync(request, RequestOptions.DEFAULT, this);
     }
@@ -284,7 +284,7 @@ public class AggregationSpout extends AbstractSpout implements ActionListener<Se
             numhits += hitsForThisBucket;
 
             LOG.debug(
-                    "{} key [{}], hits[{}], doc_count [{}]",
+                    "{} key [{}], hits[{}], doc_count [{}], already_processed [{}]",
                     logIdprefix,
                     key,
                     hitsForThisBucket,
@@ -303,8 +303,8 @@ public class AggregationSpout extends AbstractSpout implements ActionListener<Se
 
         queryTimes.addMeasurement(timeTaken);
         eventCounter.scope("already_being_processed").incrBy(alreadyprocessed);
-        eventCounter.scope("ES_queries").incrBy(1);
-        eventCounter.scope("ES_docs").incrBy(numhits);
+        eventCounter.scope("OpenSearch_queries").incrBy(1);
+        eventCounter.scope("OpenSearch_docs").incrBy(numhits);
 
         // optimise the nextFetchDate by getting the most recent value
         // returned in the query and add to it, unless the previous value is

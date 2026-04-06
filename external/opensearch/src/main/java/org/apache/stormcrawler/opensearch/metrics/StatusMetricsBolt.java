@@ -102,7 +102,7 @@ public class StatusMetricsBolt extends BaseRichBolt {
         try {
             connection = OpenSearchConnection.getConnection(stormConf, OSBoltType);
         } catch (Exception e1) {
-            LOG.error("Can't connect to ElasticSearch", e1);
+            LOG.error("Can't connect to OpenSearch", e1);
             throw new RuntimeException(e1);
         }
 
