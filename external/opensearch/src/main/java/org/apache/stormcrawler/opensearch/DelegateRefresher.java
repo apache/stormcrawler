@@ -107,7 +107,7 @@ public class DelegateRefresher<T> {
         // set up periodic refresh from OpenSearch
         int refreshRate = 600;
         node = filterParams.get("refresh");
-        if (node != null && node.isInt()) {
+        if (node != null && (node.isInt() || node.isTextual())) {
             refreshRate = node.asInt(refreshRate);
         }
 
@@ -140,7 +140,7 @@ public class DelegateRefresher<T> {
                         }
                     }
                 },
-                0,
+                refreshRate * 1000L,
                 refreshRate * 1000L);
     }
 
@@ -160,6 +160,7 @@ public class DelegateRefresher<T> {
             } catch (IOException e) {
                 LOG.error("Exception when closing OpenSearch client", e);
             }
+            osClient = null;
         }
     }
 
