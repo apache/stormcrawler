@@ -17,7 +17,6 @@
 
 package org.apache.stormcrawler.opensearch;
 
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -25,10 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.github.benmanes.caffeine.cache.Ticker;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.tuple.Tuple;
 import org.junit.jupiter.api.BeforeEach;
@@ -258,29 +259,25 @@ class WaitAckCacheTest {
 
     @Test
     void eviction_failsTuplesOnExpiry() {
+        AtomicLong fakeTime = new AtomicLong(0);
+        Ticker fakeTicker = fakeTime::get;
         cache =
                 new WaitAckCache(
                         "expireAfterWrite=1s",
                         LoggerFactory.getLogger(WaitAckCacheTest.class),
-                        evicted::add);
+                        evicted::add,
+                        fakeTicker);
         Tuple t = mockTuple("http://example.com");
         cache.addTuple("doc1", t);
 
-        // Force cache maintenance after expiry by doing a contains() check
-        // which accesses the cache and triggers Caffeine's cleanup
-        await().atMost(5, TimeUnit.SECONDS)
-                .pollInterval(200, TimeUnit.MILLISECONDS)
-                .untilAsserted(
-                        () -> {
-                            // contains() accesses the cache which triggers cleanup
-                            cache.contains("doc1");
-                            // also try adding and invalidating a dummy entry to force maintenance
-                            Tuple dummy = mockTuple("http://dummy");
-                            cache.addTuple("_probe_", dummy);
-                            cache.invalidate("_probe_");
-                            assertFalse(evicted.isEmpty(), "Eviction callback should have fired");
-                        });
+        // Advance past the 1s expiry
+        fakeTime.set(TimeUnit.SECONDS.toNanos(2));
 
+        // Access triggers expiration; cleanUp forces listener execution
+        cache.contains("doc1");
+        cache.cleanUp();
+
+        assertFalse(evicted.isEmpty(), "Eviction callback should have fired");
         assertTrue(evicted.contains(t));
     }
 
@@ -312,5 +309,21 @@ class WaitAckCacheTest {
         assertSame(t1, acked.get(0));
         assertEquals(1, failed.size());
         assertSame(t2, failed.get(0));
+    }
+
+    @Test
+    void shutdown_failsAllRemainingTuples() {
+        Tuple t1 = mockTuple("http://example.com/1");
+        Tuple t2 = mockTuple("http://example.com/2");
+        cache.addTuple("doc1", t1);
+        cache.addTuple("doc2", t2);
+
+        cache.shutdown();
+
+        assertEquals(2, evicted.size());
+        assertTrue(evicted.contains(t1));
+        assertTrue(evicted.contains(t2));
+        assertFalse(cache.contains("doc1"));
+        assertFalse(cache.contains("doc2"));
     }
 }

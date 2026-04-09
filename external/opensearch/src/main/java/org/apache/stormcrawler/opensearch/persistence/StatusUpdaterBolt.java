@@ -190,6 +190,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt implements Bulk
 
     @Override
     public void cleanup() {
+        waitAck.shutdown();
         if (connection == null) {
             return;
         }

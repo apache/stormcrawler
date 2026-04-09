@@ -20,6 +20,7 @@ package org.apache.stormcrawler.opensearch;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
+import com.github.benmanes.caffeine.cache.Ticker;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -57,6 +58,7 @@ public class WaitAckCache {
     private final java.util.concurrent.locks.ReentrantLock lock =
             new java.util.concurrent.locks.ReentrantLock(true);
     private final Logger log;
+    private final Consumer<Tuple> onEviction;
 
     /** Creates a cache with a fixed 60-second expiry. */
     public WaitAckCache(Logger log, Consumer<Tuple> onEviction) {
@@ -68,8 +70,14 @@ public class WaitAckCache {
         this(Caffeine.from(cacheSpec), log, onEviction);
     }
 
+    /** Creates a cache with a custom ticker for deterministic time control in tests. */
+    WaitAckCache(String cacheSpec, Logger log, Consumer<Tuple> onEviction, Ticker ticker) {
+        this(Caffeine.from(cacheSpec).ticker(ticker).executor(Runnable::run), log, onEviction);
+    }
+
     private WaitAckCache(Caffeine<Object, Object> builder, Logger log, Consumer<Tuple> onEviction) {
         this.log = log;
+        this.onEviction = onEviction;
         this.cache =
                 builder.<String, List<Tuple>>removalListener(
                                 (String key, List<Tuple> value, RemovalCause cause) -> {
@@ -120,6 +128,31 @@ public class WaitAckCache {
         lock.lock();
         try {
             return cache.getIfPresent(docID) != null;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** Forces pending cache maintenance, triggering eviction listeners for expired entries. */
+    public void cleanUp() {
+        cache.cleanUp();
+    }
+
+    /** Fails all remaining tuples in the cache and invalidates all entries. */
+    public void shutdown() {
+        lock.lock();
+        try {
+            Map<String, List<Tuple>> remaining = cache.asMap();
+            for (var entry : remaining.entrySet()) {
+                log.warn(
+                        "Shutdown: failing {} tuple(s) for ID {}",
+                        entry.getValue().size(),
+                        entry.getKey());
+                for (Tuple t : entry.getValue()) {
+                    onEviction.accept(t);
+                }
+            }
+            cache.invalidateAll();
         } finally {
             lock.unlock();
         }
@@ -267,7 +300,8 @@ public class WaitAckCache {
 
     /**
      * Selects the best response when there are multiple bulk items for the same document ID.
-     * Prefers non-failed responses; warns when there is a mix of success and failure.
+     * Prefers non-failed responses; warns when there is a mix of success and failure. If all items
+     * are failed, returns the first one (no warning logged since there is no ambiguity).
      */
     private BulkItemResponseToFailedFlag selectBest(
             List<BulkItemResponseToFailedFlag> items, String id) {

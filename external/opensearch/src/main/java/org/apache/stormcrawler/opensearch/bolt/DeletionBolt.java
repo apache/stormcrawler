@@ -83,6 +83,7 @@ public class DeletionBolt extends BaseRichBolt implements Listener {
 
     @Override
     public void cleanup() {
+        waitAck.shutdown();
         if (connection != null) {
             connection.close();
         }

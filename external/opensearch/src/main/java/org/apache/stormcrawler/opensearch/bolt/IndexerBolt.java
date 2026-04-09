@@ -130,6 +130,7 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
 
     @Override
     public void cleanup() {
+        waitAck.shutdown();
         if (connection != null) {
             connection.close();
         }
