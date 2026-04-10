@@ -172,7 +172,6 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt implements Bulk
                 CrawlerMetrics.registerCounter(
                         context, stormConf, "counters", metrics_time_bucket_secs);
 
-
         try {
             connection = OpenSearchConnection.getConnection(stormConf, OSBoltType, this);
         } catch (Exception e1) {

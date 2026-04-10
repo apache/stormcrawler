@@ -137,7 +137,8 @@ public class DeletionBolt extends BaseRichBolt implements Listener {
         waitAck.processBulkResponse(
                 response,
                 executionId,
-                null, // no conflict counter — deletion conflicts are expected and only logged at debug
+                null, // no conflict counter — deletion conflicts are expected and only logged at
+                      // debug
                 (id, t, selected) -> {
                     if (!selected.failed) {
                         _collector.ack(t);
