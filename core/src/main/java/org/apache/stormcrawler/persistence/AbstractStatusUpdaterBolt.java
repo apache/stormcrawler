@@ -23,11 +23,9 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.time.DateUtils;
-import org.apache.storm.metric.api.IMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -37,6 +35,7 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.MetadataTransfer;
 import org.slf4j.Logger;
@@ -109,21 +108,28 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             String spec = ConfUtils.getString(stormConf, cacheConfigParamName);
             cache = Caffeine.from(spec).build();
 
-            context.registerMetric(
-                    "cache",
-                    new IMetric() {
-                        @Override
-                        public Object getValueAndReset() {
-                            Map<String, Long> statsMap = new HashMap<>();
-                            statsMap.put("hits", cacheHits);
-                            statsMap.put("misses", cacheMisses);
-                            statsMap.put("size", cache.estimatedSize());
-                            cacheHits = 0;
-                            cacheMisses = 0;
-                            return statsMap;
-                        }
+            CrawlerMetrics.registerGauge(
+                    context,
+                    stormConf,
+                    "cache.hits",
+                    () -> {
+                        long v = cacheHits;
+                        cacheHits = 0;
+                        return v;
                     },
                     30);
+            CrawlerMetrics.registerGauge(
+                    context,
+                    stormConf,
+                    "cache.misses",
+                    () -> {
+                        long v = cacheMisses;
+                        cacheMisses = 0;
+                        return v;
+                    },
+                    30);
+            CrawlerMetrics.registerGauge(
+                    context, stormConf, "cache.size", cache::estimatedSize, 30);
         }
 
         maxFetchErrors = ConfUtils.getInt(stormConf, maxFetchErrorsParamName, 3);

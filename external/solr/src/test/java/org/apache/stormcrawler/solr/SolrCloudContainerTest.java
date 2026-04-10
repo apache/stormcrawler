@@ -66,24 +66,24 @@ public abstract class SolrCloudContainerTest {
                                         "/opt/solr/bin/solr",
                                         "zk",
                                         "upconfig",
-                                        "-n",
+                                        "--conf-name",
                                         collectionName,
-                                        "-d",
+                                        "--conf-dir",
                                         "/opt/solr/server/solr/configsets/" + collectionName,
-                                        "-z",
+                                        "--zk-host",
                                         "zookeeper:2181");
 
                                 // Create the collection
                                 container.execInContainer(
                                         "/opt/solr/bin/solr",
                                         "create",
-                                        "-c",
+                                        "--name",
                                         collectionName,
-                                        "-n",
+                                        "--conf-name",
                                         collectionName,
-                                        "-sh",
+                                        "--shards",
                                         String.valueOf(shards),
-                                        "-rf",
+                                        "--replication-factor",
                                         String.valueOf(replicas));
                             } catch (Exception e) {
                                 LOG.error("Error while creating collection {}", collectionName, e);

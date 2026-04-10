@@ -30,8 +30,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import org.apache.storm.metric.api.MultiCountMetric;
-import org.apache.storm.task.TopologyContext;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.storm.tuple.Tuple;
 import org.jetbrains.annotations.Nullable;
 import org.opensearch.action.DocWriteRequest;
@@ -97,11 +96,6 @@ public class WaitAckCache {
                                     }
                                 })
                         .build();
-    }
-
-    /** Registers a gauge metric that reports the estimated cache size. */
-    public void registerMetric(TopologyContext context, String name, int timeBucketSecs) {
-        context.registerMetric(name, () -> cache.estimatedSize(), timeBucketSecs);
     }
 
     public long estimatedSize() {
@@ -179,7 +173,7 @@ public class WaitAckCache {
     public void processBulkResponse(
             BulkResponse response,
             long executionId,
-            @Nullable MultiCountMetric conflictCounter,
+            @Nullable ScopedCounter conflictCounter,
             TupleAction action) {
 
         var idsToBulkItems =

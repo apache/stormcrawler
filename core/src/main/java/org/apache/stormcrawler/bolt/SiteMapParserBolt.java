@@ -42,10 +42,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
-import org.apache.storm.metric.api.MeanReducer;
-import org.apache.storm.metric.api.ReducedMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -54,6 +53,7 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.parse.Outlink;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseFilters;
@@ -86,7 +86,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
     private int maxOffsetGuess = 300;
 
-    private ReducedMetric averagedMetrics;
+    private Consumer<Number> averagedMetrics;
 
     /** Delay in minutes used for scheduling sub-sitemaps. */
     private int scheduleSitemapsWithDelay = -1;
@@ -194,7 +194,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
             siteMap = parser.parseSiteMap(contentType, content, url1);
         }
         long end = System.currentTimeMillis();
-        averagedMetrics.update(end - start);
+        averagedMetrics.accept(end - start);
 
         List<Outlink> links = new ArrayList<>();
 
@@ -341,10 +341,8 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
         parseFilters = ParseFilters.fromConf(stormConf);
         maxOffsetGuess = ConfUtils.getInt(stormConf, "sitemap.offset.guess", 300);
         averagedMetrics =
-                context.registerMetric(
-                        "sitemap_average_processing_time",
-                        new ReducedMetric(new MeanReducer()),
-                        30);
+                CrawlerMetrics.registerSingleMeanMetric(
+                        context, stormConf, "sitemap_average_processing_time", 30);
         scheduleSitemapsWithDelay =
                 ConfUtils.getInt(stormConf, "sitemap.schedule.delay", scheduleSitemapsWithDelay);
         List<String> extensionsStrings =

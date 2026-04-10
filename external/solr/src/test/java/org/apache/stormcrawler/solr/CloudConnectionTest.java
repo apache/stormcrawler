@@ -25,9 +25,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import org.apache.solr.client.solrj.SolrQuery;
-import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
+import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
+import org.apache.solr.client.solrj.request.SolrQuery;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.DocCollection;
@@ -42,22 +42,25 @@ class CloudConnectionTest extends SolrCloudContainerTest {
     private static final Logger LOG = LoggerFactory.getLogger(CloudConnectionTest.class);
 
     private static SolrConnection connection;
-    private static CloudHttp2SolrClient client;
+    private static CloudSolrClient client;
 
     @BeforeAll
     static void setup() {
         createCollection("docs", 1, 2);
 
+        String zkHost = environment.getServiceHost("zookeeper", 2181);
+        Integer zkPort = environment.getServicePort("zookeeper", 2181);
+        String zkConnect = zkHost + ":" + zkPort;
+
         Map<String, Object> conf = new HashMap<>();
-        conf.put("solr.indexer.zkhost", "localhost:2181");
+        conf.put("solr.indexer.zkhost", zkConnect);
         conf.put("solr.indexer.collection", "docs");
         conf.put("solr.indexer.batchUpdateSize", 1);
         conf.put("solr.indexer.flushAfterNoUpdatesMillis", 5_000);
 
         connection = SolrConnection.getConnection(conf, "indexer");
         client =
-                new CloudHttp2SolrClient.Builder(
-                                Collections.singletonList("localhost:2181"), Optional.empty())
+                new CloudSolrClient.Builder(Collections.singletonList(zkConnect), Optional.empty())
                         .withDefaultCollection("docs")
                         .build();
     }
@@ -105,10 +108,9 @@ class CloudConnectionTest extends SolrCloudContainerTest {
                                 container.execInContainer(
                                         "/opt/solr/bin/solr",
                                         "start",
-                                        "-c",
                                         "-p",
                                         Integer.toString(port),
-                                        "-s",
+                                        "--solr-home",
                                         "/var/solr/" + port,
                                         "-z",
                                         "zookeeper:2181");

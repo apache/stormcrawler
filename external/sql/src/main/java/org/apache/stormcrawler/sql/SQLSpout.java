@@ -221,7 +221,7 @@ public class SQLSpout extends AbstractQueryingSpout {
 
     private long recordQueryTiming(long timeStartQuery) {
         long timeTaken = System.currentTimeMillis() - timeStartQuery;
-        queryTimes.addMeasurement(timeTaken);
+        queryTimes.accept(timeTaken);
         return timeTaken;
     }
 

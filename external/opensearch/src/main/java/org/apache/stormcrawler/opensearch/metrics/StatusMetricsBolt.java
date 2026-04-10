@@ -26,6 +26,7 @@ import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.utils.TupleUtils;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.opensearch.Constants;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.util.ConfUtils;
@@ -102,16 +103,12 @@ public class StatusMetricsBolt extends BaseRichBolt {
         try {
             connection = OpenSearchConnection.getConnection(stormConf, OSBoltType);
         } catch (Exception e1) {
-            LOG.error("Can't connect to ElasticSearch", e1);
+            LOG.error("Can't connect to OpenSearch", e1);
             throw new RuntimeException(e1);
         }
 
-        context.registerMetric(
-                "status.count",
-                () -> {
-                    return latestStatusCounts;
-                },
-                freqStats);
+        CrawlerMetrics.registerGauge(
+                context, stormConf, "status.count", () -> latestStatusCounts, freqStats);
 
         listeners = new StatusActionListener[6];
 

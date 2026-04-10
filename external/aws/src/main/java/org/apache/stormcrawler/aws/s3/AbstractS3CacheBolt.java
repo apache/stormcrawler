@@ -25,12 +25,12 @@ import com.amazonaws.regions.RegionUtils;
 import com.amazonaws.services.s3.AmazonS3Client;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Fields;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.util.ConfUtils;
 
 public abstract class AbstractS3CacheBolt extends BaseRichBolt {
@@ -45,7 +45,7 @@ public abstract class AbstractS3CacheBolt extends BaseRichBolt {
     public static final String INCACHE = S3_PREFIX + "inCache";
 
     protected OutputCollector _collector;
-    protected MultiCountMetric eventCounter;
+    protected ScopedCounter eventCounter;
 
     protected AmazonS3Client client;
 

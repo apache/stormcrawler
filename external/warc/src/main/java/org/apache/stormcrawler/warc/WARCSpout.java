@@ -31,7 +31,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -39,6 +38,8 @@ import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.spout.FileSpout;
@@ -78,7 +79,7 @@ public class WARCSpout extends FileSpout {
     private WarcRequest precedingWarcRequest;
     private Optional<WarcRecord> record;
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     protected transient Configuration hdfsConfig;
 
@@ -385,8 +386,8 @@ public class WARCSpout extends FileSpout {
 
         int metricsTimeBucketSecs = ConfUtils.getInt(conf, "fetcher.metrics.time.bucket.secs", 10);
         eventCounter =
-                context.registerMetric(
-                        "warc_spout_counter", new MultiCountMetric(), metricsTimeBucketSecs);
+                CrawlerMetrics.registerCounter(
+                        context, conf, "warc_spout_counter", metricsTimeBucketSecs);
 
         hdfsConfig = new Configuration();
 

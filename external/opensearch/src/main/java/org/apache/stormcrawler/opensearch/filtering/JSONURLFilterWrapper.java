@@ -18,24 +18,13 @@
 package org.apache.stormcrawler.opensearch.filtering;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.net.URL;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
-import org.apache.stormcrawler.JSONResource;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilter;
-import org.apache.stormcrawler.opensearch.OpenSearchConnection;
+import org.apache.stormcrawler.opensearch.DelegateRefresher;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.opensearch.action.get.GetRequest;
-import org.opensearch.action.get.GetResponse;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.RestHighLevelClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Wraps a URLFilter whose resources are in a JSON file that can be stored in OpenSearch. The
@@ -47,8 +36,8 @@ import org.slf4j.LoggerFactory;
  *
  * <pre>
  *  {
- *     "class": "org.apache.stormcrawler.elasticsearch.filtering.JSONURLFilterWrapper",
- *     "name": "ESFastURLFilter",
+ *     "class": "org.apache.stormcrawler.opensearch.filtering.JSONURLFilterWrapper",
+ *     "name": "OSFastURLFilter",
  *     "params": {
  *         "refresh": "60",
  *         "delegate": {
@@ -69,96 +58,15 @@ import org.slf4j.LoggerFactory;
  */
 public class JSONURLFilterWrapper extends URLFilter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JSONURLFilterWrapper.class);
-
-    private URLFilter delegatedURLFilter;
-    private Timer refreshTimer;
-    private RestHighLevelClient osClient;
+    private DelegateRefresher<URLFilter> refresher;
 
     public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode filterParams) {
-
-        String urlfilterclass = null;
-
-        JsonNode delegateNode = filterParams.get("delegate");
-        if (delegateNode == null) {
-            throw new RuntimeException("delegateNode undefined!");
-        }
-
-        JsonNode node = delegateNode.get("class");
-        if (node != null && node.isTextual()) {
-            urlfilterclass = node.asText();
-        }
-
-        if (urlfilterclass == null) {
-            throw new RuntimeException("urlfilter.class undefined!");
-        }
-
-        // load an instance of the delegated parsefilter
-        try {
-            Class<?> filterClass = Class.forName(urlfilterclass);
-
-            boolean subClassOK = URLFilter.class.isAssignableFrom(filterClass);
-            if (!subClassOK) {
-                throw new RuntimeException(
-                        "Filter " + urlfilterclass + " does not extend URLFilter");
-            }
-
-            delegatedURLFilter = (URLFilter) filterClass.getDeclaredConstructor().newInstance();
-
-            // check that it implements JSONResource
-            if (!JSONResource.class.isInstance(delegatedURLFilter)) {
-                throw new RuntimeException(
-                        "Filter " + urlfilterclass + " does not implement JSONResource");
-            }
-
-        } catch (Exception e) {
-            LOG.error("Can't setup {}: {}", urlfilterclass, e);
-            throw new RuntimeException("Can't setup " + urlfilterclass, e);
-        }
-
-        // configure it
-        node = delegateNode.get("params");
-
-        delegatedURLFilter.configure(stormConf, node);
-
-        int refreshRate = 600;
-
-        node = filterParams.get("refresh");
-        if (node != null && node.isInt()) {
-            refreshRate = node.asInt(refreshRate);
-        }
-
-        final JSONResource resource = (JSONResource) delegatedURLFilter;
-
-        refreshTimer = new Timer();
-        refreshTimer.schedule(
-                new TimerTask() {
-                    public void run() {
-                        if (osClient == null) {
-                            try {
-                                osClient = OpenSearchConnection.getClient(stormConf, "config");
-                            } catch (Exception e) {
-                                LOG.error("Exception while creating OpenSearch connection", e);
-                            }
-                        }
-                        if (osClient != null) {
-                            LOG.info("Reloading json resources from OpenSearch");
-                            try {
-                                GetResponse response =
-                                        osClient.get(
-                                                new GetRequest(
-                                                        "config", resource.getResourceFile()),
-                                                RequestOptions.DEFAULT);
-                                resource.loadJSONResources(
-                                        new ByteArrayInputStream(response.getSourceAsBytes()));
-                            } catch (Exception e) {
-                                LOG.error("Can't load config from OpenSearch", e);
-                            }
-                        }
-                    }
-                },
-                0,
-                refreshRate * 1000);
+        refresher =
+                new DelegateRefresher<>(
+                        URLFilter.class,
+                        stormConf,
+                        filterParams,
+                        (delegate, conf, params) -> delegate.configure(conf, params));
     }
 
     @Override
@@ -166,20 +74,11 @@ public class JSONURLFilterWrapper extends URLFilter {
             @Nullable URL sourceUrl,
             @Nullable Metadata sourceMetadata,
             @NotNull String urlToFilter) {
-        return delegatedURLFilter.filter(sourceUrl, sourceMetadata, urlToFilter);
+        return refresher.getDelegate().filter(sourceUrl, sourceMetadata, urlToFilter);
     }
 
     @Override
     public void cleanup() {
-        if (refreshTimer != null) {
-            refreshTimer.cancel();
-        }
-        if (osClient != null) {
-            try {
-                osClient.close();
-            } catch (IOException e) {
-                LOG.error("Exception when closing OpenSearch client", e);
-            }
-        }
+        refresher.cleanup();
     }
 }

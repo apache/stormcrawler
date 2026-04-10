@@ -48,9 +48,6 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.storm.Config;
-import org.apache.storm.metric.api.MeanReducer;
-import org.apache.storm.metric.api.MultiCountMetric;
-import org.apache.storm.metric.api.MultiReducedMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -61,13 +58,15 @@ import org.apache.storm.utils.TupleUtils;
 import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
+import org.apache.stormcrawler.metrics.ScopedReducedMetric;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.Protocol;
 import org.apache.stormcrawler.protocol.ProtocolFactory;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.RobotRules;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.apache.stormcrawler.util.PerSecondReducer;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 
@@ -112,8 +111,8 @@ public class FetcherBolt extends StatusEmitterBolt {
 
     private FetchItemQueues fetchQueues;
 
-    private MultiCountMetric eventCounter;
-    private MultiReducedMetric averagedMetrics;
+    private ScopedCounter eventCounter;
+    private ScopedReducedMetric averagedMetrics;
 
     private ProtocolFactory protocolFactory;
 
@@ -121,7 +120,7 @@ public class FetcherBolt extends StatusEmitterBolt {
 
     boolean sitemapsAutoDiscovery = false;
 
-    private MultiReducedMetric perSecMetrics;
+    private ScopedReducedMetric perSecMetrics;
 
     private File debugfiletrigger;
 
@@ -909,42 +908,34 @@ public class FetcherBolt extends StatusEmitterBolt {
         // The data can be accessed by registering a "MetricConsumer" in the
         // topology
         this.eventCounter =
-                context.registerMetric(
-                        "fetcher_counter", new MultiCountMetric(), metricsTimeBucketSecs);
+                CrawlerMetrics.registerCounter(
+                        context, stormConf, "fetcher_counter", metricsTimeBucketSecs);
 
         // create gauges
-        context.registerMetric(
-                "activethreads",
-                () -> {
-                    return activeThreads.get();
-                },
-                metricsTimeBucketSecs);
+        CrawlerMetrics.registerGauge(
+                context, stormConf, "activethreads", activeThreads::get, metricsTimeBucketSecs);
 
-        context.registerMetric(
+        CrawlerMetrics.registerGauge(
+                context,
+                stormConf,
                 "in_queues",
-                () -> {
-                    return fetchQueues.inQueues.get();
-                },
+                () -> fetchQueues.inQueues.get(),
                 metricsTimeBucketSecs);
 
-        context.registerMetric(
+        CrawlerMetrics.registerGauge(
+                context,
+                stormConf,
                 "num_queues",
-                () -> {
-                    return fetchQueues.queues.size();
-                },
+                () -> fetchQueues.queues.size(),
                 metricsTimeBucketSecs);
 
         this.averagedMetrics =
-                context.registerMetric(
-                        "fetcher_average_perdoc",
-                        new MultiReducedMetric(new MeanReducer()),
-                        metricsTimeBucketSecs);
+                CrawlerMetrics.registerMeanMetric(
+                        context, stormConf, "fetcher_average_perdoc", metricsTimeBucketSecs);
 
         this.perSecMetrics =
-                context.registerMetric(
-                        "fetcher_average_persec",
-                        new MultiReducedMetric(new PerSecondReducer()),
-                        metricsTimeBucketSecs);
+                CrawlerMetrics.registerPerSecMetric(
+                        context, stormConf, "fetcher_average_persec", metricsTimeBucketSecs);
 
         protocolFactory = ProtocolFactory.getInstance(conf);
 

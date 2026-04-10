@@ -32,7 +32,6 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.html.dom.HTMLDocumentImpl;
 import org.apache.http.HttpHeaders;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -43,6 +42,8 @@ import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilters;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.parse.Outlink;
 import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
@@ -83,7 +84,7 @@ public class ParserBolt extends BaseRichBolt {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(ParserBolt.class);
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     private boolean upperCaseElementNames = true;
     private Class<? extends HtmlMapper> htmlMapperClass = IdentityHtmlMapper.class;
@@ -144,7 +145,7 @@ public class ParserBolt extends BaseRichBolt {
         this.collector = collector;
 
         this.eventCounter =
-                context.registerMetric(this.getClass().getSimpleName(), new MultiCountMetric(), 10);
+                CrawlerMetrics.registerCounter(context, conf, this.getClass().getSimpleName(), 10);
 
         this.metadataTransfer = MetadataTransfer.getInstance(conf);
     }

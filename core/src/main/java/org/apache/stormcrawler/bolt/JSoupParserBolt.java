@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -44,6 +43,8 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.parse.DocumentFragmentBuilder;
 import org.apache.stormcrawler.parse.JSoupFilter;
 import org.apache.stormcrawler.parse.JSoupFilters;
@@ -82,7 +83,7 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(JSoupParserBolt.class);
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     private ParseFilter parseFilters = null;
 
@@ -132,7 +133,7 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         super.prepare(conf, context, collector);
 
         eventCounter =
-                context.registerMetric(this.getClass().getSimpleName(), new MultiCountMetric(), 10);
+                CrawlerMetrics.registerCounter(context, conf, this.getClass().getSimpleName(), 10);
 
         parseFilters = ParseFilters.fromConf(conf);
 

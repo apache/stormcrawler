@@ -24,8 +24,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.storm.metric.api.MultiCountMetric;
-import org.apache.storm.metric.api.MultiReducedMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
@@ -33,12 +31,14 @@ import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.indexing.AbstractIndexerBolt;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
+import org.apache.stormcrawler.metrics.ScopedReducedMetric;
 import org.apache.stormcrawler.opensearch.IndexCreation;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.opensearch.WaitAckCache;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.apache.stormcrawler.util.PerSecondReducer;
 import org.opensearch.action.bulk.BulkProcessor;
 import org.opensearch.action.bulk.BulkRequest;
 import org.opensearch.action.bulk.BulkResponse;
@@ -75,11 +75,11 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
     // overwritten
     private boolean create = false;
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     private OpenSearchConnection connection;
 
-    private MultiReducedMetric perSecMetrics;
+    private ScopedReducedMetric perSecMetrics;
 
     private WaitAckCache waitAck;
 
@@ -109,16 +109,13 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
             throw new RuntimeException(e1);
         }
 
-        this.eventCounter = context.registerMetric("OpensearchIndexer", new MultiCountMetric(), 10);
+        this.eventCounter = CrawlerMetrics.registerCounter(context, conf, "OpensearchIndexer", 10);
 
         this.perSecMetrics =
-                context.registerMetric(
-                        "Indexer_average_persec",
-                        new MultiReducedMetric(new PerSecondReducer()),
-                        10);
+                CrawlerMetrics.registerPerSecMetric(context, conf, "Indexer_average_persec", 10);
 
         waitAck = new WaitAckCache(LOG, _collector::fail);
-        waitAck.registerMetric(context, "waitAck", 10);
+        CrawlerMetrics.registerGauge(context, conf, "waitAck", waitAck::estimatedSize, 10);
 
         // use the default status schema if none has been specified
         try {

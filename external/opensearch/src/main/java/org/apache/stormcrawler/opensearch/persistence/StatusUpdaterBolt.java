@@ -23,12 +23,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.storm.metric.api.MultiCountMetric;
-import org.apache.storm.metric.api.MultiReducedMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
+import org.apache.stormcrawler.metrics.ScopedReducedMetric;
 import org.apache.stormcrawler.opensearch.Constants;
 import org.apache.stormcrawler.opensearch.IndexCreation;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
@@ -36,7 +37,6 @@ import org.apache.stormcrawler.opensearch.WaitAckCache;
 import org.apache.stormcrawler.persistence.AbstractStatusUpdaterBolt;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.apache.stormcrawler.util.PerSecondReducer;
 import org.apache.stormcrawler.util.URLPartitioner;
 import org.opensearch.action.bulk.BulkProcessor;
 import org.opensearch.action.bulk.BulkRequest;
@@ -79,9 +79,9 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt implements Bulk
 
     private WaitAckCache waitAck;
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
-    private MultiReducedMetric receivedPerSecMetrics;
+    private ScopedReducedMetric receivedPerSecMetrics;
 
     public StatusUpdaterBolt() {
         super();
@@ -141,10 +141,6 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt implements Bulk
 
         int metrics_time_bucket_secs = 30;
 
-        this.eventCounter =
-                context.registerMetric(
-                        "counters", new MultiCountMetric(), metrics_time_bucket_secs);
-
         String defaultSpec =
                 String.format(
                         Locale.ROOT,
@@ -164,14 +160,18 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt implements Bulk
                         });
 
         // create gauge for waitAck
-        waitAck.registerMetric(context, "waitAck", metrics_time_bucket_secs);
+        CrawlerMetrics.registerGauge(
+                context, stormConf, "waitAck", waitAck::estimatedSize, metrics_time_bucket_secs);
 
         // benchmarking - average number of items received back by Elastic per second
         this.receivedPerSecMetrics =
-                context.registerMetric(
-                        "average_persec",
-                        new MultiReducedMetric(new PerSecondReducer()),
-                        metrics_time_bucket_secs);
+                CrawlerMetrics.registerPerSecMetric(
+                        context, stormConf, "average_persec", metrics_time_bucket_secs);
+
+        this.eventCounter =
+                CrawlerMetrics.registerCounter(
+                        context, stormConf, "counters", metrics_time_bucket_secs);
+
 
         try {
             connection = OpenSearchConnection.getConnection(stormConf, OSBoltType, this);

@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.storm.metric.api.MultiCountMetric;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.storm.tuple.Tuple;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -160,7 +160,7 @@ class WaitAckCacheTest {
         Tuple t = mockTuple("http://example.com");
         cache.addTuple("doc1", t);
 
-        MultiCountMetric counter = new MultiCountMetric();
+        ScopedCounter counter = scopeName -> incrementBy -> {};
         BulkResponse response = bulkResponse(failedItem(0, "doc1", RestStatus.CONFLICT));
 
         cache.processBulkResponse(

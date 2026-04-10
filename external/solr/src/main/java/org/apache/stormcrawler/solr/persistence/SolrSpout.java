@@ -23,9 +23,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.solr.client.solrj.SolrQuery;
-import org.apache.solr.client.solrj.SolrQuery.ORDER;
 import org.apache.solr.client.solrj.request.QueryRequest;
+import org.apache.solr.client.solrj.request.SolrQuery;
+import org.apache.solr.client.solrj.request.SolrQuery.ORDER;
 import org.apache.solr.client.solrj.response.Group;
 import org.apache.solr.client.solrj.response.GroupCommand;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -202,7 +202,7 @@ public class SolrSpout extends AbstractQueryingSpout {
 
         markQueryReceivedNow();
 
-        queryTimes.addMeasurement(timeTaken);
+        queryTimes.accept(timeTaken);
 
         SolrDocumentList docs = new SolrDocumentList();
 

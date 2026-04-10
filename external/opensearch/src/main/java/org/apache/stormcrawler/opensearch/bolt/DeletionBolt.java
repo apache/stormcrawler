@@ -25,6 +25,7 @@ import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.opensearch.WaitAckCache;
 import org.apache.stormcrawler.util.ConfUtils;
@@ -78,7 +79,7 @@ public class DeletionBolt extends BaseRichBolt implements Listener {
         }
 
         waitAck = new WaitAckCache(LOG, _collector::fail);
-        waitAck.registerMetric(context, "waitAck", 10);
+        CrawlerMetrics.registerGauge(context, conf, "waitAck", waitAck::estimatedSize, 10);
     }
 
     @Override
@@ -136,7 +137,7 @@ public class DeletionBolt extends BaseRichBolt implements Listener {
         waitAck.processBulkResponse(
                 response,
                 executionId,
-                null,
+                null, // no conflict counter — deletion conflicts are expected and only logged at debug
                 (id, t, selected) -> {
                     if (!selected.failed) {
                         _collector.ack(t);

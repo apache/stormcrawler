@@ -32,10 +32,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
-import org.apache.solr.client.solrj.impl.ConcurrentUpdateHttp2SolrClient;
-import org.apache.solr.client.solrj.impl.Http2SolrClient;
-import org.apache.solr.client.solrj.impl.LBHttp2SolrClient;
+import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.client.solrj.impl.LBAsyncSolrClient;
 import org.apache.solr.client.solrj.impl.LBSolrClient;
+import org.apache.solr.client.solrj.jetty.ConcurrentUpdateJettySolrClient;
+import org.apache.solr.client.solrj.jetty.HttpJettySolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -107,8 +108,12 @@ public class SolrConnection {
                 return;
             }
 
-            CloudHttp2SolrClient cloudHttp2SolrClient = (CloudHttp2SolrClient) client;
-            DocCollection col = cloudHttp2SolrClient.getClusterState().getCollection(collection);
+            CloudSolrClient cloudClient = (CloudSolrClient) client;
+            DocCollection col =
+                    cloudClient
+                            .getClusterStateProvider()
+                            .getClusterState()
+                            .getCollection(collection);
 
             // Flush all slices
             for (var entry : updateQueues.entrySet()) {
@@ -125,7 +130,7 @@ public class SolrConnection {
                     return;
                 }
 
-                flushUpdates(leader, waitingUpdates, cloudHttp2SolrClient);
+                flushUpdates(leader, waitingUpdates, cloudClient);
             }
         }
     }
@@ -134,8 +139,12 @@ public class SolrConnection {
         synchronized (lock) {
             lastUpdate = System.currentTimeMillis();
 
-            CloudHttp2SolrClient cloudHttp2SolrClient = (CloudHttp2SolrClient) client;
-            DocCollection col = cloudHttp2SolrClient.getClusterState().getCollection(collection);
+            CloudSolrClient cloudClient = (CloudSolrClient) client;
+            DocCollection col =
+                    cloudClient
+                            .getClusterStateProvider()
+                            .getClusterState()
+                            .getCollection(collection);
 
             // Find slice for this update
             Slice slice = null;
@@ -165,7 +174,7 @@ public class SolrConnection {
                     return;
                 }
 
-                flushUpdates(leader, waitingUpdates, cloudHttp2SolrClient);
+                flushUpdates(leader, waitingUpdates, cloudClient);
             }
         }
     }
@@ -175,14 +184,8 @@ public class SolrConnection {
      * leader goes down before handling it.
      */
     private void flushUpdates(
-            Replica leader,
-            List<Update> waitingUpdates,
-            CloudHttp2SolrClient cloudHttp2SolrClient) {
+            Replica leader, List<Update> waitingUpdates, CloudSolrClient cloudClient) {
 
-        List<LBSolrClient.Endpoint> endpoints = new ArrayList<>();
-        endpoints.add(new LBSolrClient.Endpoint(leader.getBaseUrl(), leader.getCoreName()));
-
-        // Separate deletions and documents
         List<String> deletionIds = new ArrayList<>();
         List<SolrInputDocument> docs = new ArrayList<>();
 
@@ -194,24 +197,46 @@ public class SolrConnection {
             }
         }
 
+        if (docs.isEmpty() && deletionIds.isEmpty()) {
+            return;
+        }
+
         UpdateRequest updateRequest = new UpdateRequest();
-        updateRequest.add(docs);
-        updateRequest.deleteById(deletionIds);
+        if (!docs.isEmpty()) {
+            updateRequest.add(docs);
+        }
+        if (!deletionIds.isEmpty()) {
+            updateRequest.deleteById(deletionIds);
+        }
 
         List<Update> batch = new ArrayList<>(waitingUpdates);
         waitingUpdates.clear();
 
-        // Get the async client
-        LBHttp2SolrClient lbHttp2SolrClient = cloudHttp2SolrClient.getLbClient();
+        // Building the endpoint for the current leader
+        LBSolrClient.Endpoint endpoint =
+                new LBSolrClient.Endpoint(leader.getBaseUrl(), leader.getCoreName());
+        List<LBSolrClient.Endpoint> endpoints = new ArrayList<>();
+        endpoints.add(endpoint);
+
+        // Shuffle the endpoints for basic load balancing
+        Collections.shuffle(endpoints);
+
         LBSolrClient.Req req = new LBSolrClient.Req(updateRequest, endpoints);
 
-        lbHttp2SolrClient
+        /*
+         * Retrieve the async LB client from the CloudSolrClient.
+         * NOTE: CloudSolrClient wraps CloudHttp2SolrClient in Solr 10
+         * see Major Changes: https://solr.apache.org/guide/solr/latest/upgrade-notes/major-changes-in-solr-10.html#solrj
+         */
+        LBAsyncSolrClient lbAsyncSolrClient =
+                (LBAsyncSolrClient) ((CloudHttp2SolrClient) cloudClient).getLbClient();
+
+        lbAsyncSolrClient
                 .requestAsync(req)
                 .whenComplete(
-                        (futureResponse, throwable) -> {
+                        (response, throwable) -> {
                             if (throwable != null) {
                                 LOG.error("Exception caught while updating", throwable);
-
                                 // The request failed => add the batch back to the pending updates
                                 synchronized (lock) {
                                     waitingUpdates.addAll(batch);
@@ -250,7 +275,7 @@ public class SolrConnection {
 
     public CompletableFuture<QueryResponse> requestAsync(QueryRequest request) {
         if (cloud) {
-            CloudHttp2SolrClient cloudHttp2SolrClient = (CloudHttp2SolrClient) client;
+            CloudSolrClient cloudClient = (CloudSolrClient) client;
 
             // Find the shard to route the request to
             String shardId = request.getParams().get("shards");
@@ -258,11 +283,17 @@ public class SolrConnection {
                 shardId = "shard1";
             }
 
-            Slice slice =
-                    cloudHttp2SolrClient
+            DocCollection col =
+                    cloudClient
+                            .getClusterStateProvider()
                             .getClusterState()
-                            .getCollection(collection)
-                            .getSlice(shardId);
+                            .getCollection(collection);
+            Slice slice = col.getSlice(shardId);
+
+            if (slice == null) {
+                return CompletableFuture.failedFuture(
+                        new RuntimeException("Could not find shard " + shardId));
+            }
 
             // Will get results from the first successful replica of this shard
             List<LBSolrClient.Endpoint> endpoints = new ArrayList<>();
@@ -277,17 +308,32 @@ public class SolrConnection {
             // Shuffle the endpoints for basic load balancing
             Collections.shuffle(endpoints);
 
-            // Get the async client
-            LBHttp2SolrClient lbHttp2SolrClient = cloudHttp2SolrClient.getLbClient();
+            /*
+             * Retrieve the async LB client from the CloudSolrClient.
+             * NOTE: CloudSolrClient wraps CloudHttp2SolrClient in Solr 10
+             * see Major Changes: https://solr.apache.org/guide/solr/latest/upgrade-notes/major-changes-in-solr-10.html#solrj
+             */
+            LBAsyncSolrClient lbAsyncSolrClient =
+                    (LBAsyncSolrClient) ((CloudHttp2SolrClient) cloudClient).getLbClient();
             LBSolrClient.Req req = new LBSolrClient.Req(request, endpoints);
 
-            return lbHttp2SolrClient
+            return lbAsyncSolrClient
                     .requestAsync(req)
-                    .thenApply(rsp -> new QueryResponse(rsp.getResponse(), lbHttp2SolrClient));
+                    .thenApply(
+                            rsp -> {
+                                QueryResponse qr = new QueryResponse();
+                                qr.setResponse(rsp.getResponse());
+                                return qr;
+                            });
         } else {
-            return ((Http2SolrClient) client)
+            return ((HttpJettySolrClient) client)
                     .requestAsync(request)
-                    .thenApply(nl -> new QueryResponse(nl, client));
+                    .thenApply(
+                            resp -> {
+                                QueryResponse qr = new QueryResponse();
+                                qr.setResponse(resp);
+                                return qr;
+                            });
         }
     }
 
@@ -315,20 +361,21 @@ public class SolrConnection {
         boolean statusCollection = boltType.equals("status");
 
         if (StringUtils.isNotBlank(zkHost)) {
+            HttpJettySolrClient jettyClient = new HttpJettySolrClient.Builder().build();
 
-            CloudHttp2SolrClient.Builder builder =
-                    new CloudHttp2SolrClient.Builder(
-                            Collections.singletonList(zkHost), Optional.empty());
+            CloudSolrClient.Builder builder =
+                    new CloudSolrClient.Builder(Collections.singletonList(zkHost), Optional.empty())
+                            .withHttpClient(jettyClient);
 
             if (StringUtils.isNotBlank(collection)) {
                 builder.withDefaultCollection(collection);
             }
 
-            CloudHttp2SolrClient cloudHttp2SolrClient = builder.build();
+            CloudSolrClient cloudClient = builder.build();
 
             return new SolrConnection(
-                    cloudHttp2SolrClient,
-                    cloudHttp2SolrClient,
+                    cloudClient,
+                    cloudClient,
                     true,
                     collection,
                     statusCollection,
@@ -337,18 +384,38 @@ public class SolrConnection {
 
         } else if (StringUtils.isNotBlank(solrUrl)) {
 
-            Http2SolrClient http2SolrClient = new Http2SolrClient.Builder(solrUrl).build();
+            String rootUrl = solrUrl;
+            String defaultColl = collection;
 
-            ConcurrentUpdateHttp2SolrClient concurrentUpdateHttp2SolrClient =
-                    new ConcurrentUpdateHttp2SolrClient.Builder(solrUrl, http2SolrClient, true)
-                            .withQueueSize(queueSize)
-                            .build();
+            if (!solrUrl.endsWith("/solr")) {
+                int lastSlash = solrUrl.lastIndexOf('/');
+                if (lastSlash != -1) {
+                    rootUrl = solrUrl.substring(0, lastSlash);
+                    if (StringUtils.isBlank(defaultColl)) {
+                        defaultColl = solrUrl.substring(lastSlash + 1);
+                    }
+                }
+            }
+
+            HttpJettySolrClient.Builder httpBuilder = new HttpJettySolrClient.Builder(rootUrl);
+            if (StringUtils.isNotBlank(defaultColl)) {
+                httpBuilder.withDefaultCollection(defaultColl);
+            }
+            HttpJettySolrClient httpJettySolrClient = httpBuilder.build();
+
+            ConcurrentUpdateJettySolrClient concurrentUpdateJettySolrClient =
+                    (ConcurrentUpdateJettySolrClient)
+                            new ConcurrentUpdateJettySolrClient.Builder(
+                                            rootUrl, httpJettySolrClient, true)
+                                    .withDefaultCollection(defaultColl)
+                                    .withQueueSize(queueSize)
+                                    .build();
 
             return new SolrConnection(
-                    http2SolrClient,
-                    concurrentUpdateHttp2SolrClient,
+                    httpJettySolrClient,
+                    concurrentUpdateJettySolrClient,
                     false,
-                    collection,
+                    defaultColl,
                     statusCollection,
                     updateQueueSize,
                     noUpdateThreshold);

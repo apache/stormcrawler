@@ -39,10 +39,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.storm.Config;
-import org.apache.storm.metric.api.IMetric;
-import org.apache.storm.metric.api.MeanReducer;
-import org.apache.storm.metric.api.MultiCountMetric;
-import org.apache.storm.metric.api.MultiReducedMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -52,13 +48,15 @@ import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
+import org.apache.stormcrawler.metrics.ScopedReducedMetric;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.Protocol;
 import org.apache.stormcrawler.protocol.ProtocolFactory;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.RobotRules;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.apache.stormcrawler.util.PerSecondReducer;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 
@@ -85,9 +83,9 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
     private Config conf;
 
-    private MultiCountMetric eventCounter;
-    private MultiReducedMetric averagedMetrics;
-    private MultiReducedMetric perSecMetrics;
+    private ScopedCounter eventCounter;
+    private ScopedReducedMetric averagedMetrics;
+    private ScopedReducedMetric perSecMetrics;
 
     private ProtocolFactory protocolFactory;
 
@@ -174,40 +172,26 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
         int metricsTimeBucketSecs = ConfUtils.getInt(conf, "fetcher.metrics.time.bucket.secs", 10);
 
         this.eventCounter =
-                context.registerMetric(
-                        "fetcher_counter", new MultiCountMetric(), metricsTimeBucketSecs);
+                CrawlerMetrics.registerCounter(
+                        context, stormConf, "fetcher_counter", metricsTimeBucketSecs);
 
         this.averagedMetrics =
-                context.registerMetric(
-                        "fetcher_average",
-                        new MultiReducedMetric(new MeanReducer()),
-                        metricsTimeBucketSecs);
+                CrawlerMetrics.registerMeanMetric(
+                        context, stormConf, "fetcher_average", metricsTimeBucketSecs);
 
         this.perSecMetrics =
-                context.registerMetric(
-                        "fetcher_average_persec",
-                        new MultiReducedMetric(new PerSecondReducer()),
-                        metricsTimeBucketSecs);
+                CrawlerMetrics.registerPerSecMetric(
+                        context, stormConf, "fetcher_average_persec", metricsTimeBucketSecs);
 
         // create gauges
-        context.registerMetric(
-                "activethreads",
-                new IMetric() {
-                    @Override
-                    public Object getValueAndReset() {
-                        return activeThreads.get();
-                    }
-                },
-                metricsTimeBucketSecs);
+        CrawlerMetrics.registerGauge(
+                context, stormConf, "activethreads", activeThreads::get, metricsTimeBucketSecs);
 
-        context.registerMetric(
+        CrawlerMetrics.registerGauge(
+                context,
+                stormConf,
                 "throttler_size",
-                new IMetric() {
-                    @Override
-                    public Object getValueAndReset() {
-                        return throttler.estimatedSize();
-                    }
-                },
+                throttler::estimatedSize,
                 metricsTimeBucketSecs);
 
         protocolFactory = ProtocolFactory.getInstance(conf);

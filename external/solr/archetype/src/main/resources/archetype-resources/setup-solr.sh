@@ -29,15 +29,15 @@ if [ -z "$ROUTER_FIELD" ]; then
 fi
 
 SOLR_PORT=8983
-SOLR_HOME=/opt/solr-9.8.0
+SOLR_HOME=/opt/solr-10.0.0
 
 $SOLR_HOME/bin/solr start -c -p $SOLR_PORT
 
 echo -e "\n\e[1mUploading configsets ...\e[0m\n"
 
-$SOLR_HOME/bin/solr zk upconfig -n "docs" -d configsets/docs -z localhost:9983
-$SOLR_HOME/bin/solr zk upconfig -n "status" -d configsets/status -z localhost:9983
-$SOLR_HOME/bin/solr zk upconfig -n "metrics" -d configsets/metrics -z localhost:9983
+$SOLR_HOME/bin/solr zk upconfig --conf-name "docs" --conf-dir configsets/docs --zk-host localhost:9983
+$SOLR_HOME/bin/solr zk upconfig --conf-name "status" --conf-dir configsets/status --zk-host localhost:9983
+$SOLR_HOME/bin/solr zk upconfig --conf-name "metrics" --conf-dir configsets/metrics --zk-host localhost:9983
 
 echo -e "\n\n\e[1mCreating 'docs' collection ...\e[0m\n"
 curl -X POST "http://localhost:$SOLR_PORT/api/collections" -H "Content-type:application/json" -d '

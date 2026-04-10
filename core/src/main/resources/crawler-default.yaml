@@ -55,6 +55,9 @@ config:
   # time bucket to use for the metrics sent by the Fetcher
   fetcher.metrics.time.bucket.secs: 10
 
+  # metrics version: "v1" (legacy), "v2" (Storm V2 native), or "both"
+  stormcrawler.metrics.version: "v1"
+
   # SimpleFetcherBolt: if the delay required by the politeness
   # is above this value, the tuple is sent back to the Storm queue
   # for the bolt on the _throttle_ stream (in msec)

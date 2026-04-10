@@ -38,13 +38,89 @@ under the License.
     <description>Solr resources for StormCrawler</description>
 
     <properties>
-        <solr.version>9.10.1</solr.version>
+        <solr.version>10.0.0</solr.version>
     </properties>
+
+    <build>
+        <plugins>
+            <!--
+                Shade Jetty classes used by solr-solrj-jetty to avoid version conflicts
+                with the Jetty version shipped by Apache Storm at runtime.
+
+                Storm 2.8.x bundles Jetty 12.1.x, while Solr 10 depends on Jetty 12.0.x.
+                The mismatch causes NoSuchMethodError at runtime (e.g. in HTTP2Client,
+                ClientConnector). Relocating Jetty under a private package lets both
+                versions coexist on the classpath.
+
+                NOTE: relocated classes will not be matched by CVE scanners — Jetty
+                vulnerabilities must be tracked manually when upgrading Solr.
+
+                See: https://github.com/apache/stormcrawler/issues/1859
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createSourcesJar>true</createSourcesJar>
+                            <useBaseVersion>true</useBaseVersion>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <useDependencyReducedPomInJar>true</useDependencyReducedPomInJar>
+                            <artifactSet>
+                                <includes>
+                                    <include>org.apache.solr:solr-solrj-jetty</include>
+                                    <include>org.eclipse.jetty:*</include>
+                                    <include>org.eclipse.jetty.http2:*</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.eclipse.jetty</pattern>
+                                    <shadedPattern>org.apache.stormcrawler.solr.shaded.org.eclipse.jetty</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 
     <dependencies>
         <dependency>
             <groupId>org.apache.solr</groupId>
             <artifactId>solr-solrj</artifactId>
+            <version>${solr.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.solr</groupId>
+            <artifactId>solr-solrj-jetty</artifactId>
+            <version>${solr.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.solr</groupId>
+            <artifactId>solr-solrj-zookeeper</artifactId>
             <version>${solr.version}</version>
         </dependency>
 
