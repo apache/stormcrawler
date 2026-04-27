@@ -28,3 +28,22 @@ mvn exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="inst
 
 The setting `playwright.skip.download` to `true` in the configuration will assume that the browser has been installed and will not trigger the installation of all the different browsers.
 
+## Configuration
+
+| Property | Default | Description |
+|---|---|---|
+| `playwright.cdp.url` | _unset_ | If set, connect to an existing Chrome instance via the Chrome DevTools Protocol (e.g. `http://localhost:9222`) instead of launching a browser. |
+| `playwright.remote.ws` | _unset_ | If set, connect to a remote Playwright server over WebSocket (e.g. `ws://localhost:3000/`). Mutually exclusive with `playwright.cdp.url`. |
+| `playwright.skip.download` | `false` | If `true`, sets `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true` so Playwright will not install browsers. Implicitly forced to `true` when `playwright.cdp.url` or `playwright.remote.ws` is set. |
+| `playwright.load.event` | `load` | The Playwright `WaitUntilState` to wait for before considering the page ready. Accepts `load`, `domcontentloaded`, or `networkidle`. |
+| `playwright.skip.resource.types` | _empty_ | List of resource types to abort during navigation (`document`, `stylesheet`, `image`, `media`, `font`, `script`, `texttrack`, `xhr`, `fetch`, `eventsource`, `websocket`, `manifest`, `other`). |
+| `playwright.evaluations` | _empty_ | List of JavaScript expressions evaluated on the page after load. Each result is JSON-serialized and stored in the response metadata under the expression itself as the key. |
+| `playwright.capture.content.on.error` | `false` | By default the rendered DOM is only captured when the origin returns a 2xx status. Set to `true` to also capture `page.content()` for non-2xx responses — useful for Single-Page Applications that return a non-2xx stub document and then hydrate the real content via JavaScript. |
+| `playwright.override.status.on.content` | `false` | When the rendered DOM was captured for a non-2xx response, override the reported HTTP status with `200` so downstream components treat the URL as `FETCHED`. The original origin status is preserved in the response metadata under the key `playwright.origin.status`. No-op unless `playwright.capture.content.on.error` is also `true`. |
+
+Per-URL metadata triggers:
+
+| Metadata key | Effect |
+|---|---|
+| `playwright.trace` | If present on the input metadata, a Playwright trace zip is recorded for the navigation and its path is returned in the response metadata under the same key. |
+

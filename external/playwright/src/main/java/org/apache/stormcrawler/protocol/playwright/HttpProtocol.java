@@ -62,6 +62,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     private int timeout = 10000;
 
+    private boolean captureContentOnError = false;
+
+    private boolean overrideStatusOnContent = false;
+
     private BrowserContext context;
 
     private Set<String> resourceTypesToSkip;
@@ -129,6 +133,12 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
 
         timeout = ConfUtils.getInt(conf, "http.timeout", timeout);
+
+        captureContentOnError =
+                ConfUtils.getBoolean(conf, "playwright.capture.content.on.error", false);
+
+        overrideStatusOnContent =
+                ConfUtils.getBoolean(conf, "playwright.override.status.on.content", false);
 
         final String ua = getAgentString(conf);
 
@@ -245,12 +255,24 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                         responseMetaData.addValue(k, v);
                                     });
 
-                    if (Status.FETCHED == Status.fromHTTPCode(response.status())) {
+                    int httpStatus = response.status();
+                    boolean fetched = Status.FETCHED == Status.fromHTTPCode(httpStatus);
+                    boolean contentCaptured = false;
+
+                    if (fetched || captureContentOnError) {
                         // retrieve the rendered content
                         content = page.content().getBytes(StandardCharsets.UTF_8);
+                        contentCaptured = true;
                     }
 
-                    status.set(response.status());
+                    if (!fetched && contentCaptured && overrideStatusOnContent) {
+                        // expose the original origin status for diagnostics
+                        responseMetaData.setValue(
+                                "playwright.origin.status", Integer.toString(httpStatus));
+                        status.set(200);
+                    } else {
+                        status.set(httpStatus);
+                    }
 
                     // evaluate an expression and store the results
                     // in the metadata using the same string as key

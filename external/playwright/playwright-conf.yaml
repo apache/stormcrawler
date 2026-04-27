@@ -24,3 +24,15 @@ config:
   # com.microsoft.playwright.options.WaitUntilState
   # playwright.load.event: "domcontentloaded"
 
+  # By default the rendered DOM is only captured when the origin returns a 2xx
+  # status. Enable this to also capture page.content() for non-2xx responses
+  # (useful for SPAs that return e.g. a 404 stub and then hydrate via JS).
+  # playwright.capture.content.on.error: false
+
+  # When the rendered DOM was captured for a non-2xx response, override the
+  # reported HTTP status with 200 so downstream components treat the URL as
+  # FETCHED. The original origin status is preserved in the response metadata
+  # under the key "playwright.origin.status". No-op unless
+  # playwright.capture.content.on.error is also true.
+  # playwright.override.status.on.content: false
+
