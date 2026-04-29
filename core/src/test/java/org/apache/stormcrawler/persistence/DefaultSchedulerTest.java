@@ -18,14 +18,11 @@
 package org.apache.stormcrawler.persistence;
 
 import java.net.MalformedURLException;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TimeZone;
-import org.apache.commons.lang3.time.DateUtils;
+import java.util.concurrent.TimeUnit;
 import org.apache.stormcrawler.Metadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -41,18 +38,14 @@ class DefaultSchedulerTest {
         scheduler.init(stormConf);
         Metadata metadata = new Metadata();
         metadata.addValue("testKey", "someValue");
+        Date before = new Date();
         Optional<Date> nextFetch = scheduler.schedule(Status.FETCHED, metadata);
-        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"), Locale.ROOT);
-        cal.add(Calendar.MINUTE, 360);
-        Assertions.assertEquals(
-                DateUtils.round(cal.getTime(), Calendar.SECOND),
-                DateUtils.round(nextFetch.get(), Calendar.SECOND));
+        Date after = new Date();
+        assertScheduleWithin(nextFetch, before, after, 360);
+        before = new Date();
         nextFetch = scheduler.schedule(Status.ERROR, metadata);
-        cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"), Locale.ROOT);
-        cal.add(Calendar.MINUTE, 3600);
-        Assertions.assertEquals(
-                DateUtils.round(cal.getTime(), Calendar.SECOND),
-                DateUtils.round(nextFetch.get(), Calendar.SECOND));
+        after = new Date();
+        assertScheduleWithin(nextFetch, before, after, 3600);
     }
 
     @Test
@@ -63,12 +56,10 @@ class DefaultSchedulerTest {
         scheduler.init(stormConf);
         Metadata metadata = new Metadata();
         metadata.addValue("testKey.key2", "someValue");
+        Date before = new Date();
         Optional<Date> nextFetch = scheduler.schedule(Status.FETCHED, metadata);
-        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"), Locale.ROOT);
-        cal.add(Calendar.MINUTE, 360);
-        Assertions.assertEquals(
-                DateUtils.round(cal.getTime(), Calendar.SECOND),
-                DateUtils.round(nextFetch.get(), Calendar.SECOND));
+        Date after = new Date();
+        assertScheduleWithin(nextFetch, before, after, 360);
     }
 
     @Test
@@ -106,5 +97,18 @@ class DefaultSchedulerTest {
         metadata.setValue("isSpam", "true");
         Optional<Date> nextFetch = scheduler.schedule(Status.FETCHED, metadata);
         Assertions.assertFalse(nextFetch.isPresent());
+    }
+
+    private static void assertScheduleWithin(
+            Optional<Date> nextFetch, Date beforeScheduling, Date afterScheduling, int minutes) {
+        Assertions.assertTrue(nextFetch.isPresent());
+        Date earliest = addMinutes(beforeScheduling, minutes);
+        Date lastest = addMinutes(afterScheduling, minutes);
+        Assertions.assertFalse(nextFetch.get().before(earliest));
+        Assertions.assertFalse(nextFetch.get().after(lastest));
+    }
+
+    private static Date addMinutes(Date date, int minutes) {
+        return new Date(date.getTime() + TimeUnit.MINUTES.toMillis(minutes));
     }
 }

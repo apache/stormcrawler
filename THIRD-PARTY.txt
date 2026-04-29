@@ -407,7 +407,7 @@ List of third-party dependencies grouped by their license type.
 
     The GNU General Public License, v2 with Universal FOSS Exception, v1.0
 
-        * MySQL Connector/J (com.mysql:mysql-connector-j:9.6.0 - http://dev.mysql.com/doc/connector-j/en/)
+        * MySQL Connector/J (com.mysql:mysql-connector-j:9.7.0 - http://dev.mysql.com/doc/connector-j/en/)
 
     Unicode-3.0
 
