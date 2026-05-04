@@ -82,6 +82,7 @@ The filter applies four heuristics, cheapest-first, and short-circuits on the fi
 | `minOutlinks` | int | `2` | Outcome-based threshold for extracted outlinks. |
 | `fingerprints` | string array | _see above_ | Substrings searched in raw HTML; replaces defaults when set. |
 | `emptyRootIds` | string array | `["root","app","__next","__nuxt"]` | Element IDs treated as empty SPA hydration roots. |
+| `requiredMessages` | string array | _empty_ | Additional substrings that, when found anywhere in the HTML, flag the URL. Use for site-specific JS-required prompts and loader text that don't fit the noscript pattern (e.g. `"Loading..."`, `"[object Object]"`, `"Please enable cookies"`). |
 | `skipIfMetadataPresent` | string | `playwright.protocol.end` | Short-circuit when this metadata key is set. Empty string disables. |
 | `recordReason` | bool | `true` | Also set `metadataKey + ".reason"` describing which signal fired. |
 
@@ -113,7 +114,41 @@ A few wiring notes:
 
 - The dotted metadata key (`fetch.with`) is quoted in the YAML above to make it unambiguous to a human reader; SnakeYAML treats unquoted `fetch.with: "playwright"` as the same single-key scalar, so either parses correctly.
 - `DelegatorProtocol` requires the **last** entry in `protocol.delegator.config` to have no `filters:` — it acts as the fallback. Keep OkHttp (or whichever cheap protocol you pick) at the bottom of the list.
-- The first fetch on an unknown URL goes through the cheap protocol; if the detector flags it, the metadata sticks via the status backend and the next fetch is dispatched to Playwright. Sibling URLs on the same host don't inherit the flag — that requires a host-keyed metadata transfer scheme and is intentionally out of scope.
+- The filter alone does **not** trigger an immediate refetch. It only sets the metadata; the URL is rescheduled by `DefaultScheduler` according to the FETCHED interval (`fetchInterval.default`, 24h by default), and `DelegatorProtocol` picks Playwright on the next scheduled fetch. To get faster turnaround, either drop in the `JsRenderingRedirectionBolt` described below, or add a per-metadata-key fetch interval to your YAML: `fetchInterval.fetch.with=playwright: 5` (refetch flagged URLs in 5 minutes instead of 24 hours).
+- Sibling URLs on the same host don't inherit the flag — that requires a host-keyed metadata transfer scheme and is intentionally out of scope.
+
+### Forcing an immediate refetch — `JsRenderingRedirectionBolt`
+
+The detector flags URLs but doesn't, on its own, prevent the cheap fetch's stub document from flowing downstream into the parser, indexer, and outlink emission. For most crawls that's fine — the next scheduled fetch replaces the stub with the rendered version. If you want the stub to be discarded and the URL refetched immediately through Playwright, drop `JsRenderingRedirectionBolt` between the parser and the indexer. The bolt:
+
+- reads the routing flag set by the detector (or any other upstream component),
+- on hit, emits **only** to `StatusStreamName` with `Status.FETCHED` so the URL is rescheduled and the stub never reaches the index,
+- on miss, passes the tuple through unchanged,
+- short-circuits when `playwright.protocol.end` is already on the URL — the loop guard.
+
+The bolt has no detection logic of its own; it just acts on the metadata flag. That keeps the heuristics in one place (the parse filter) and lets you swap or extend the bolt independently.
+
+Topology fragment:
+
+```text
+... -> JSoupParserBolt -> JsRenderingRedirectionBolt -> IndexerBolt -> ...
+                                                    \-> StatusStream
+```
+
+YAML:
+
+```yaml
+# refetch flagged URLs in 5 minutes rather than 24 hours
+fetchInterval.fetch.with=playwright: 5
+```
+
+Configuration keys:
+
+| Key | Default | Notes |
+|---|---|---|
+| `playwright.redirect.metadata.key` | `fetch.with` | Routing key the bolt watches for. |
+| `playwright.redirect.metadata.value` | `playwright` | Value the bolt watches for. |
+| `playwright.redirect.skip.if.metadata.present` | `playwright.protocol.end` | Loop guard — pass through unchanged when this key is set on the URL. Empty string disables. |
 
 ### When _not_ to use it
 

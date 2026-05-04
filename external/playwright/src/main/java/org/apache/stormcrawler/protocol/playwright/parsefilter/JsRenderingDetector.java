@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.playwright.parsefilter;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -92,6 +93,10 @@ import org.w3c.dom.DocumentFragment;
  *   <li>{@code minOutlinks} (int, default 2) — outcome-based threshold for extracted outlinks
  *   <li>{@code fingerprints} (string array) — substrings searched in raw HTML; replaces defaults
  *   <li>{@code emptyRootIds} (string array) — element IDs treated as empty SPA hydration roots
+ *   <li>{@code requiredMessages} (string array, default empty) — additional substrings that, when
+ *       found anywhere in the HTML, flag the URL. Use this for site-specific JS-required prompts
+ *       and loader text that don't fit the noscript pattern (e.g. {@code "Loading..."},
+ *       {@code "[object Object]"}, {@code "Please enable cookies"}).
  *   <li>{@code skipIfMetadataPresent} (string, default {@link HttpProtocol#MD_KEY_END}) — short-circuit
  *       when this metadata key is set; defeat with empty string to always re-evaluate
  *   <li>{@code recordReason} (bool, default true) — also set {@code metadataKey + ".reason"}
@@ -131,6 +136,7 @@ public class JsRenderingDetector extends ParseFilter {
     private int minOutlinks = 2;
     private List<String> fingerprints = DEFAULT_FINGERPRINTS;
     private List<String> emptyRootIds = DEFAULT_EMPTY_ROOT_IDS;
+    private List<String> requiredMessages = List.of();
     private String skipIfMetadataPresent = HttpProtocol.MD_KEY_END;
     private boolean recordReason = true;
 
@@ -140,21 +146,33 @@ public class JsRenderingDetector extends ParseFilter {
     public void configure(
             @NotNull final Map<String, Object> stormConf, @NotNull final JsonNode params) {
         if (params != null && !params.isMissingNode() && !params.isNull()) {
-            if (params.has("metadataKey")) this.metadataKey = params.get("metadataKey").asText();
-            if (params.has("metadataValue"))
+            if (params.has("metadataKey")) {
+                this.metadataKey = params.get("metadataKey").asText();
+            }
+            if (params.has("metadataValue")) {
                 this.metadataValue = params.get("metadataValue").asText();
-            if (params.has("minTextLength"))
+            }
+            if (params.has("minTextLength")) {
                 this.minTextLength = params.get("minTextLength").asInt(this.minTextLength);
-            if (params.has("minOutlinks"))
+            }
+            if (params.has("minOutlinks")) {
                 this.minOutlinks = params.get("minOutlinks").asInt(this.minOutlinks);
-            if (params.has("fingerprints"))
+            }
+            if (params.has("fingerprints")) {
                 this.fingerprints = readStringArray(params.get("fingerprints"));
-            if (params.has("emptyRootIds"))
+            }
+            if (params.has("emptyRootIds")) {
                 this.emptyRootIds = readStringArray(params.get("emptyRootIds"));
-            if (params.has("skipIfMetadataPresent"))
+            }
+            if (params.has("requiredMessages")) {
+                this.requiredMessages = readStringArray(params.get("requiredMessages"));
+            }
+            if (params.has("skipIfMetadataPresent")) {
                 this.skipIfMetadataPresent = params.get("skipIfMetadataPresent").asText();
-            if (params.has("recordReason"))
+            }
+            if (params.has("recordReason")) {
                 this.recordReason = params.get("recordReason").asBoolean(this.recordReason);
+            }
         }
         emptyRootPatterns.clear();
         for (final String id : emptyRootIds) {
@@ -179,7 +197,9 @@ public class JsRenderingDetector extends ParseFilter {
             final byte[] content,
             final DocumentFragment doc,
             final ParseResult parse) {
-        if (content == null || content.length == 0) return;
+        if (content == null || content.length == 0) {
+            return;
+        }
 
         final Metadata md = parse.get(url).getMetadata();
         if (skipIfMetadataPresent != null
@@ -187,7 +207,9 @@ public class JsRenderingDetector extends ParseFilter {
                 && md.containsKey(skipIfMetadataPresent)) {
             return;
         }
-        if (md.containsKey(metadataKey)) return;
+        if (md.containsKey(metadataKey)) {
+            return;
+        }
 
         final String reason = detectReason(url, content, parse);
         if (reason != null) {
@@ -205,12 +227,21 @@ public class JsRenderingDetector extends ParseFilter {
 
         // 1. SPA framework fingerprints
         for (final String fp : fingerprints) {
-            if (html.contains(fp)) return "fingerprint:" + fp;
+            if (html.contains(fp)) {
+                return "fingerprint:" + fp;
+            }
         }
 
         // 2. <noscript> with explicit JS-required language
         if (NOSCRIPT_JS_REQUIRED.matcher(html).find()) {
             return "noscript-js-required";
+        }
+
+        // 2b. Free-form JS-required / loader / cookie-required messages
+        for (final String msg : requiredMessages) {
+            if (!msg.isEmpty() && html.contains(msg)) {
+                return "required-message:" + msg;
+            }
         }
 
         // 3. Empty SPA hydration root
@@ -222,7 +253,9 @@ public class JsRenderingDetector extends ParseFilter {
 
         // 4. Outcome-based: gated on at least one <script> being present so we don't flag
         //    plain HTML stubs (e.g. very short error pages).
-        if (!HAS_SCRIPT_TAG.matcher(html).find()) return null;
+        if (!HAS_SCRIPT_TAG.matcher(html).find()) {
+            return null;
+        }
 
         final ParseData data = parse.get(url);
         final String text = data.getText();
@@ -235,7 +268,9 @@ public class JsRenderingDetector extends ParseFilter {
     }
 
     private static List<String> readStringArray(final JsonNode node) {
-        if (node == null || !node.isArray()) return List.of();
+        if (node == null || !node.isArray()) {
+            return List.of();
+        }
         final List<String> list = new ArrayList<>(node.size());
         node.forEach(n -> list.add(n.asText()));
         return list;

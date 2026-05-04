@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.playwright.parsefilter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -144,5 +145,37 @@ class JsRenderingDetectorTest {
                 applyTo(d, "u", "<html><body><div data-reactroot></div></body></html>");
         Assertions.assertEquals("yes", p.get("u").getMetadata().getFirstValue("render"));
         Assertions.assertNotNull(p.get("u").getMetadata().getFirstValue("render.reason"));
+    }
+
+    @Test
+    void requiredMessageMatchesAnywhere() throws Exception {
+        // free-form list, fires outside <noscript> on a substring match
+        final JsRenderingDetector d =
+                detector(
+                        "{\"requiredMessages\":[\"Loading...\",\"[object Object]\","
+                                + "\"This page requires JavaScript\"]}");
+        final ParseResult p =
+                applyTo(
+                        d,
+                        "u",
+                        "<html><body><div id=\"app\"><span>Loading...</span></div></body></html>");
+        Assertions.assertEquals(
+                "playwright", p.get("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertEquals(
+                "required-message:Loading...",
+                p.get("u").getMetadata().getFirstValue("fetch.with.reason"));
+    }
+
+    @Test
+    void requiredMessageNoHitDoesNotFlag() throws Exception {
+        final JsRenderingDetector d = detector("{\"requiredMessages\":[\"Loading...\"]}");
+        final ParseResult p =
+                applyTo(
+                        d,
+                        "u",
+                        "<html><body><p>"
+                                + "A".repeat(1000)
+                                + "</p><a href='/x'>x</a><a href='/y'>y</a><a href='/z'>z</a></body></html>");
+        Assertions.assertNull(p.get("u").getMetadata().getFirstValue("fetch.with"));
     }
 }

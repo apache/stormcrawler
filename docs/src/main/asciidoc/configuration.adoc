@@ -544,8 +544,12 @@ unquoted form too. Note that `DelegatorProtocol` requires the *last* entry in
 `protocol.delegator.config` to have no `filters:` — it acts as the fallback, so keep the cheap
 protocol at the bottom of the list.
 
-The first fetch on an unknown URL goes through the cheap protocol; once the detector flags it the
-metadata sticks via the status backend and the next fetch is dispatched to Playwright. The full
+The parse filter alone does **not** trigger an immediate refetch — it only sets the metadata flag
+on the current fetch, and `DefaultScheduler` reschedules the URL according to the FETCHED interval
+(`fetchInterval.default`, 24h by default). For faster turnaround, either add a per-metadata-key
+fetch interval (`fetchInterval.fetch.with=playwright: 5`) or drop `JsRenderingRedirectionBolt`
+between the parser and indexer. The bolt reads the routing flag and, on hit, emits only to the
+status stream with `Status.FETCHED` so the stub document never reaches the index. The full
 parameter list and tuning notes are in the link:https://github.com/apache/stormcrawler/tree/main/external/playwright[playwright module README].
 
 ==== Language ID
