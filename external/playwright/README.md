@@ -47,3 +47,77 @@ Per-URL metadata triggers:
 |---|---|
 | `playwright.trace` | If present on the input metadata, a Playwright trace zip is recorded for the navigation and its path is returned in the response metadata under the same key. |
 
+## JS rendering detection
+
+Browser-based fetching is expensive — typically 10–50× slower than a plain HTTP fetch and limited by how many browsers a host can run concurrently. Most operators only want Playwright on the URLs that actually need it. The `JsRenderingDetector` parse filter solves the routing question without adding new infrastructure: it inspects the parsed page from a cheap fetch and, when the content looks JS-rendered, sets a metadata flag that `DelegatorProtocol` (already part of `core`) routes on.
+
+### How detection works
+
+The filter applies four heuristics, cheapest-first, and short-circuits on the first hit:
+
+1. **SPA framework fingerprints** in raw HTML — `data-reactroot`, `ng-version=`, `__NEXT_DATA__`, `window.__NUXT__`, `data-svelte-h=`, `data-vue-app`, `data-astro-cid`, `<router-outlet`. Defaults are overridable via the `fingerprints` parameter.
+2. **`<noscript>` blocks** that explicitly request JavaScript — match patterns like _"enable JavaScript"_, _"requires JavaScript"_, _"JavaScript is disabled"_.
+3. **Empty SPA hydration roots** — `<div id="root"></div>` / `#app` / `#__next` / `#__nuxt` with no children. IDs override­able via `emptyRootIds`.
+4. **Outcome-based fallback** — when at least one `<script>` is present and both `text.length < minTextLength` (default 200) and `outlinks.size() < minOutlinks` (default 2), the URL is flagged as a thin SPA. The `<script>` gate keeps the filter from flagging static error stubs.
+
+### What the filter sets
+
+| Metadata key | Value | Notes |
+|---|---|---|
+| `fetch.with` | `playwright` | Routing key, override­able via `metadataKey` / `metadataValue`. |
+| `fetch.with.reason` | e.g. `fingerprint:data-reactroot`, `noscript-js-required`, `empty-root:root`, `thin-content:text=12,outlinks=0` | Diagnostic — set unless `recordReason: false`. |
+
+### Loop guards
+
+- Detection is skipped when `playwright.protocol.end` is already present on the URL — i.e. the URL was just fetched by Playwright; reapplying the heuristic would just reflag it. Override the watch key via `skipIfMetadataPresent`.
+- Detection is also skipped when the routing key is already set, so the filter is idempotent and safe to leave permanently in `parsefilters.json`.
+
+### Parameters
+
+| Name | Type | Default | Notes |
+|---|---|---|---|
+| `metadataKey` | string | `fetch.with` | Routing key set on a hit. |
+| `metadataValue` | string | `playwright` | Value to set. |
+| `minTextLength` | int | `200` | Outcome-based threshold for visible text. |
+| `minOutlinks` | int | `2` | Outcome-based threshold for extracted outlinks. |
+| `fingerprints` | string array | _see above_ | Substrings searched in raw HTML; replaces defaults when set. |
+| `emptyRootIds` | string array | `["root","app","__next","__nuxt"]` | Element IDs treated as empty SPA hydration roots. |
+| `skipIfMetadataPresent` | string | `playwright.protocol.end` | Short-circuit when this metadata key is set. Empty string disables. |
+| `recordReason` | bool | `true` | Also set `metadataKey + ".reason"` describing which signal fired. |
+
+### Wiring
+
+Add the filter to your `parsefilters.json`:
+
+```json
+{
+  "class": "org.apache.stormcrawler.protocol.playwright.parsefilter.JsRenderingDetector",
+  "name": "js-rendering-detector",
+  "params": { "minTextLength": 200, "minOutlinks": 2 }
+}
+```
+
+Route on the metadata key it sets via `DelegatorProtocol`:
+
+```yaml
+http.protocol.implementation:  "org.apache.stormcrawler.protocol.DelegatorProtocol"
+https.protocol.implementation: "org.apache.stormcrawler.protocol.DelegatorProtocol"
+protocol.delegator.config:
+  - className: "org.apache.stormcrawler.protocol.playwright.HttpProtocol"
+    filters:
+      "fetch.with": "playwright"
+  - className: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
+```
+
+A few wiring notes:
+
+- The dotted metadata key (`fetch.with`) is quoted in the YAML above to make it unambiguous to a human reader; SnakeYAML treats unquoted `fetch.with: "playwright"` as the same single-key scalar, so either parses correctly.
+- `DelegatorProtocol` requires the **last** entry in `protocol.delegator.config` to have no `filters:` — it acts as the fallback. Keep OkHttp (or whichever cheap protocol you pick) at the bottom of the list.
+- The first fetch on an unknown URL goes through the cheap protocol; if the detector flags it, the metadata sticks via the status backend and the next fetch is dispatched to Playwright. Sibling URLs on the same host don't inherit the flag — that requires a host-keyed metadata transfer scheme and is intentionally out of scope.
+
+### When _not_ to use it
+
+- **Operator allowlist suffices.** If you already know which hosts need a browser, add them as a `urlPatterns` rule on the Playwright leg of `DelegatorProtocol` and skip the filter.
+- **Anti-bot / WAF challenge pages.** Cloudflare, DataDome, and Akamai challenge fingerprints aren't covered here; those usually need a stealth-mode browser, not just rendering.
+- **Aggressively first-fetch-sensitive crawls.** The first fetch on an unknown SPA host is always wasted (you get a stub document) before the filter learns about the host. If that's unacceptable, prefer the operator allowlist.
+
