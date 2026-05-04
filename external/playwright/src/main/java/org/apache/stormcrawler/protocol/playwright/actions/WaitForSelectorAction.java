@@ -20,6 +20,7 @@ package org.apache.stormcrawler.protocol.playwright.actions;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.WaitForSelectorState;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.playwright.PageAction;
@@ -68,7 +69,7 @@ public class WaitForSelectorAction extends PageAction {
             this.required = params.get("required").asBoolean(false);
         }
         if (params.has("state")) {
-            final String s = params.get("state").asText().toUpperCase();
+            final String s = params.get("state").asText().toUpperCase(Locale.ROOT);
             switch (s) {
                 case "ATTACHED":
                     this.state = WaitForSelectorState.ATTACHED;

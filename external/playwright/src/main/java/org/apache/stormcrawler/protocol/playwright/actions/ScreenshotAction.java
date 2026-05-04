@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.ScreenshotType;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.playwright.PageAction;
@@ -66,7 +67,7 @@ public class ScreenshotAction extends PageAction {
             this.fullPage = params.get("fullPage").asBoolean(false);
         }
         if (params.has("type")) {
-            final String t = params.get("type").asText().toLowerCase();
+            final String t = params.get("type").asText().toLowerCase(Locale.ROOT);
             switch (t) {
                 case "jpeg":
                 case "jpg":
