@@ -85,7 +85,8 @@ class JsRenderingRedirectionBoltTest {
 
         final List<List<Object>> def = output.getEmitted();
         Assertions.assertEquals(1, def.size(), "should pass through default stream");
-        Assertions.assertEquals(4, def.get(0).size(), "default emission has url/content/metadata/text");
+        Assertions.assertEquals(
+                4, def.get(0).size(), "default emission has url/content/metadata/text");
 
         Assertions.assertEquals(
                 0,

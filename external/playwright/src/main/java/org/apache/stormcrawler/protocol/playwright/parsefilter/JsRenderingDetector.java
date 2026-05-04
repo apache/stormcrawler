@@ -41,14 +41,14 @@ import org.w3c.dom.DocumentFragment;
  * of the following signals, in cheapest-first order:
  *
  * <ol>
- *   <li>SPA framework fingerprints found in the raw HTML (Angular {@code ng-version}, React
- *       {@code data-reactroot}, Next.js {@code __NEXT_DATA__}, Nuxt {@code window.__NUXT__},
- *       Svelte {@code data-svelte-h}, Astro islands, Angular {@code <router-outlet>}, ...).
+ *   <li>SPA framework fingerprints found in the raw HTML (Angular {@code ng-version}, React {@code
+ *       data-reactroot}, Next.js {@code __NEXT_DATA__}, Nuxt {@code window.__NUXT__}, Svelte {@code
+ *       data-svelte-h}, Astro islands, Angular {@code <router-outlet>}, ...).
  *   <li>{@code <noscript>} blocks containing language like "enable JavaScript".
  *   <li>An empty SPA hydration root: {@code <div id="root"></div>} / {@code #app} / {@code #__next}
  *       / {@code #__nuxt} with no children.
- *   <li>Outcome-based fallback: very short text and few outlinks despite at least one
- *       {@code <script>} tag being present.
+ *   <li>Outcome-based fallback: very short text and few outlinks despite at least one {@code
+ *       <script>} tag being present.
  * </ol>
  *
  * <p>To avoid loops, detection is skipped when the URL was just fetched by Playwright (recognised
@@ -95,18 +95,17 @@ import org.w3c.dom.DocumentFragment;
  *   <li>{@code emptyRootIds} (string array) — element IDs treated as empty SPA hydration roots
  *   <li>{@code requiredMessages} (string array, default empty) — additional substrings that, when
  *       found anywhere in the HTML, flag the URL. Use this for site-specific JS-required prompts
- *       and loader text that don't fit the noscript pattern (e.g. {@code "Loading..."},
- *       {@code "[object Object]"}, {@code "Please enable cookies"}).
- *   <li>{@code skipIfMetadataPresent} (string, default {@link HttpProtocol#MD_KEY_END}) — short-circuit
- *       when this metadata key is set; defeat with empty string to always re-evaluate
+ *       and loader text that don't fit the noscript pattern (e.g. {@code "Loading..."}, {@code
+ *       "[object Object]"}, {@code "Please enable cookies"}).
+ *   <li>{@code skipIfMetadataPresent} (string, default {@link HttpProtocol#MD_KEY_END}) —
+ *       short-circuit when this metadata key is set; defeat with empty string to always re-evaluate
  *   <li>{@code recordReason} (bool, default true) — also set {@code metadataKey + ".reason"}
  *       describing which signal fired (useful for triage)
  * </ul>
  */
 public class JsRenderingDetector extends ParseFilter {
 
-    private static final org.slf4j.Logger LOG =
-            LoggerFactory.getLogger(JsRenderingDetector.class);
+    private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(JsRenderingDetector.class);
 
     private static final List<String> DEFAULT_FINGERPRINTS =
             List.of(
@@ -221,8 +220,7 @@ public class JsRenderingDetector extends ParseFilter {
         }
     }
 
-    private String detectReason(
-            final String url, final byte[] content, final ParseResult parse) {
+    private String detectReason(final String url, final byte[] content, final ParseResult parse) {
         final String html = new String(content, StandardCharsets.UTF_8);
 
         // 1. SPA framework fingerprints

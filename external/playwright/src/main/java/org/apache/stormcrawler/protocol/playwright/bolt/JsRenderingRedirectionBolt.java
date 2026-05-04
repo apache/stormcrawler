@@ -38,14 +38,13 @@ import org.slf4j.LoggerFactory;
  * upstream component) and forces an immediate refetch through Playwright instead of letting the
  * cheap fetch's stub document propagate downstream.
  *
- * <p>Pipeline placement: between the parser bolt (which produces tuples of
- * {@code (url, content, metadata, text)}) and the indexer / persistence bolts. On hit, the bolt
- * emits only to the {@link Constants#StatusStreamName} with status {@link Status#FETCHED}, so the
- * URL is rescheduled and the stub never reaches the index. On miss, the tuple passes through to
- * the default stream unchanged.
+ * <p>Pipeline placement: between the parser bolt (which produces tuples of {@code (url, content,
+ * metadata, text)}) and the indexer / persistence bolts. On hit, the bolt emits only to the {@link
+ * Constants#StatusStreamName} with status {@link Status#FETCHED}, so the URL is rescheduled and the
+ * stub never reaches the index. On miss, the tuple passes through to the default stream unchanged.
  *
- * <p>Pair this with a per-metadata-key fetch interval to control how soon the refetch happens —
- * by default {@code Status.FETCHED} reschedules at {@code fetchInterval.default} (24h):
+ * <p>Pair this with a per-metadata-key fetch interval to control how soon the refetch happens — by
+ * default {@code Status.FETCHED} reschedules at {@code fetchInterval.default} (24h):
  *
  * <pre>{@code
  * # refetch flagged URLs in 5 minutes rather than 24 hours
@@ -57,10 +56,10 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>{@code playwright.redirect.metadata.key} (default {@code fetch.with})
  *   <li>{@code playwright.redirect.metadata.value} (default {@code playwright})
- *   <li>{@code playwright.redirect.skip.if.metadata.present} (default
- *       {@link HttpProtocol#MD_KEY_END}) — passes the tuple through unchanged when this metadata key
- *       is already set, preventing loops with content that came back from Playwright. Set to empty
- *       to disable the loop guard.
+ *   <li>{@code playwright.redirect.skip.if.metadata.present} (default {@link
+ *       HttpProtocol#MD_KEY_END}) — passes the tuple through unchanged when this metadata key is
+ *       already set, preventing loops with content that came back from Playwright. Set to empty to
+ *       disable the loop guard.
  * </ul>
  */
 public class JsRenderingRedirectionBolt extends BaseRichBolt {
@@ -103,9 +102,7 @@ public class JsRenderingRedirectionBolt extends BaseRichBolt {
         if (shouldRedirect(metadata)) {
             LOG.debug("Redirecting {} to Playwright (status stream)", url);
             collector.emit(
-                    Constants.StatusStreamName,
-                    tuple,
-                    new Values(url, metadata, Status.FETCHED));
+                    Constants.StatusStreamName, tuple, new Values(url, metadata, Status.FETCHED));
         } else {
             collector.emit(tuple, new Values(url, content, metadata, text));
         }
@@ -128,7 +125,6 @@ public class JsRenderingRedirectionBolt extends BaseRichBolt {
     @Override
     public void declareOutputFields(final OutputFieldsDeclarer declarer) {
         declarer.declare(new Fields("url", "content", "metadata", "text"));
-        declarer.declareStream(
-                Constants.StatusStreamName, new Fields("url", "metadata", "status"));
+        declarer.declareStream(Constants.StatusStreamName, new Fields("url", "metadata", "status"));
     }
 }
