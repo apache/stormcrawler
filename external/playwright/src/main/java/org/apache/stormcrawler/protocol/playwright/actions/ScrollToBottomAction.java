@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.playwright.actions;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -52,11 +53,18 @@ public class ScrollToBottomAction extends PageAction {
     @Override
     public void configure(
             @NotNull final Map<String, Object> stormConf, @NotNull final JsonNode params) {
-        if (params == null || params.isMissingNode() || params.isNull()) return;
-        if (params.has("waitMs")) this.waitMs = params.get("waitMs").asInt(this.waitMs);
-        if (params.has("maxSteps")) this.maxSteps = params.get("maxSteps").asInt(this.maxSteps);
-        if (params.has("maxDurationMs"))
+        if (params == null || params.isMissingNode() || params.isNull()) {
+            return;
+        }
+        if (params.has("waitMs")) {
+            this.waitMs = params.get("waitMs").asInt(this.waitMs);
+        }
+        if (params.has("maxSteps")) {
+            this.maxSteps = params.get("maxSteps").asInt(this.maxSteps);
+        }
+        if (params.has("maxDurationMs")) {
             this.maxDurationMs = params.get("maxDurationMs").asInt(this.maxDurationMs);
+        }
     }
 
     @Override
@@ -70,7 +78,9 @@ public class ScrollToBottomAction extends PageAction {
         int steps = 0;
         while (steps < maxSteps && System.currentTimeMillis() < deadline) {
             final long height = ((Number) page.evaluate(HEIGHT_JS)).longValue();
-            if (height == previousHeight) break;
+            if (height == previousHeight) {
+                break;
+            }
             previousHeight = height;
             page.evaluate(SCROLL_JS);
             page.waitForTimeout(waitMs);

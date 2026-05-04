@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.playwright.actions;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -53,14 +54,18 @@ public class EvaluateAction extends PageAction {
     @Override
     public void configure(
             @NotNull final Map<String, Object> stormConf, @NotNull final JsonNode params) {
-        if (params == null || params.isMissingNode() || params.isNull()) return;
+        if (params == null || params.isMissingNode() || params.isNull()) {
+            return;
+        }
         final JsonNode exprs = params.get("expressions");
         if (exprs != null && exprs.isArray()) {
             final List<String> list = new ArrayList<>(exprs.size());
             exprs.forEach(n -> list.add(n.asText()));
             this.expressions = list;
         }
-        if (params.has("keyPrefix")) this.keyPrefix = params.get("keyPrefix").asText();
+        if (params.has("keyPrefix")) {
+            this.keyPrefix = params.get("keyPrefix").asText();
+        }
         if (expressions.isEmpty()) {
             throw new IllegalArgumentException("EvaluateAction requires non-empty 'expressions'");
         }
@@ -76,7 +81,9 @@ public class EvaluateAction extends PageAction {
             final String expression = expressions.get(i);
             try {
                 final Object result = page.evaluate(expression);
-                if (result == null) continue;
+                if (result == null) {
+                    continue;
+                }
                 final String json =
                         mapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
                 final String key = keyPrefix == null ? expression : keyPrefix + i;

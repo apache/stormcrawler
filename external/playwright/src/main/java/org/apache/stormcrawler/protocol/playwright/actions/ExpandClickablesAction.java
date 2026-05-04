@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.playwright.actions;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -93,11 +94,18 @@ public class ExpandClickablesAction extends PageAction {
             sels.forEach(n -> list.add(n.asText()));
             this.selectors = list;
         }
-        if (params.has("root")) this.rootSelector = params.get("root").asText();
-        if (params.has("body")) this.bodySelector = params.get("body").asText();
-        if (params.has("waitMs")) this.waitMs = params.get("waitMs").asInt(this.waitMs);
-        if (params.has("clickTimeoutMs"))
+        if (params.has("root")) {
+            this.rootSelector = params.get("root").asText();
+        }
+        if (params.has("body")) {
+            this.bodySelector = params.get("body").asText();
+        }
+        if (params.has("waitMs")) {
+            this.waitMs = params.get("waitMs").asInt(this.waitMs);
+        }
+        if (params.has("clickTimeoutMs")) {
             this.clickTimeoutMs = params.get("clickTimeoutMs").asInt(this.clickTimeoutMs);
+        }
 
         if (rootSelector == null || bodySelector == null) {
             throw new IllegalArgumentException(

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.playwright.actions;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -56,10 +57,14 @@ public class DismissOverlayAction extends PageAction {
     @Override
     public void configure(
             @NotNull final Map<String, Object> stormConf, @NotNull final JsonNode params) {
-        if (params == null || params.isMissingNode() || params.isNull()) return;
+        if (params == null || params.isMissingNode() || params.isNull()) {
+            return;
+        }
         this.selectors = readStringArray(params, "selectors");
         this.removeSelectors = readStringArray(params, "removeSelectors");
-        if (params.has("timeoutMs")) this.timeoutMs = params.get("timeoutMs").asInt(this.timeoutMs);
+        if (params.has("timeoutMs")) {
+            this.timeoutMs = params.get("timeoutMs").asInt(this.timeoutMs);
+        }
         if (selectors.isEmpty() && removeSelectors.isEmpty()) {
             throw new IllegalArgumentException(
                     "DismissOverlayAction requires non-empty 'selectors' or 'removeSelectors'");
@@ -75,7 +80,9 @@ public class DismissOverlayAction extends PageAction {
         for (final String selector : selectors) {
             try {
                 final ElementHandle handle = page.querySelector(selector);
-                if (handle == null) continue;
+                if (handle == null) {
+                    continue;
+                }
                 handle.click(new ElementHandle.ClickOptions().setTimeout(timeoutMs));
             } catch (final Exception e) {
                 LOG.debug("Could not click overlay {} on {}: {}", selector, url, e.getMessage());
@@ -94,7 +101,9 @@ public class DismissOverlayAction extends PageAction {
 
     private static List<String> readStringArray(final JsonNode params, final String key) {
         final JsonNode node = params.get(key);
-        if (node == null || !node.isArray()) return List.of();
+        if (node == null || !node.isArray()) {
+            return List.of();
+        }
         final List<String> list = new ArrayList<>(node.size());
         node.forEach(n -> list.add(n.asText()));
         return list;

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.playwright.actions;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -55,9 +56,15 @@ public class ScreenshotAction extends PageAction {
     @Override
     public void configure(
             @NotNull final Map<String, Object> stormConf, @NotNull final JsonNode params) {
-        if (params == null || params.isMissingNode() || params.isNull()) return;
-        if (params.has("metadataKey")) this.metadataKey = params.get("metadataKey").asText();
-        if (params.has("fullPage")) this.fullPage = params.get("fullPage").asBoolean(false);
+        if (params == null || params.isMissingNode() || params.isNull()) {
+            return;
+        }
+        if (params.has("metadataKey")) {
+            this.metadataKey = params.get("metadataKey").asText();
+        }
+        if (params.has("fullPage")) {
+            this.fullPage = params.get("fullPage").asBoolean(false);
+        }
         if (params.has("type")) {
             final String t = params.get("type").asText().toLowerCase();
             switch (t) {
@@ -73,7 +80,9 @@ public class ScreenshotAction extends PageAction {
                             "Unknown screenshot type '" + t + "' (expected png or jpeg)");
             }
         }
-        if (params.has("quality")) this.quality = params.get("quality").asInt();
+        if (params.has("quality")) {
+            this.quality = params.get("quality").asInt();
+        }
     }
 
     @Override

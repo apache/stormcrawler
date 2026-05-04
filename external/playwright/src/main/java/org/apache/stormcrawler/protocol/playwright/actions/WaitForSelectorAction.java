@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.playwright.actions;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -57,9 +58,15 @@ public class WaitForSelectorAction extends PageAction {
         if (params == null || params.isMissingNode() || params.isNull()) {
             throw new IllegalArgumentException("WaitForSelectorAction requires 'selector'");
         }
-        if (params.has("selector")) this.selector = params.get("selector").asText();
-        if (params.has("timeoutMs")) this.timeoutMs = params.get("timeoutMs").asInt(this.timeoutMs);
-        if (params.has("required")) this.required = params.get("required").asBoolean(false);
+        if (params.has("selector")) {
+            this.selector = params.get("selector").asText();
+        }
+        if (params.has("timeoutMs")) {
+            this.timeoutMs = params.get("timeoutMs").asInt(this.timeoutMs);
+        }
+        if (params.has("required")) {
+            this.required = params.get("required").asBoolean(false);
+        }
         if (params.has("state")) {
             final String s = params.get("state").asText().toUpperCase();
             switch (s) {
@@ -99,7 +106,9 @@ public class WaitForSelectorAction extends PageAction {
                     selector,
                     new Page.WaitForSelectorOptions().setState(state).setTimeout(timeoutMs));
         } catch (final Exception e) {
-            if (required) throw e;
+            if (required) {
+                throw e;
+            }
             LOG.debug(
                     "Selector {} did not reach state {} within {}ms on {}: {}",
                     selector,
