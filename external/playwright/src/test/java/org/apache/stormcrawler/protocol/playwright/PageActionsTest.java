@@ -39,24 +39,21 @@ class PageActionsTest {
     @Test
     void emptyJsonChainHasZeroActions() {
         final PageActions actions =
-                PageActions.fromConf(
-                        Map.of(PageActions.CONFIG_KEY, "page-actions.empty.json"));
+                PageActions.fromConf(Map.of(PageActions.CONFIG_KEY, "page-actions.empty.json"));
         Assertions.assertEquals(0, actions.size());
     }
 
     @Test
     void singleActionChainLoads() {
         final PageActions actions =
-                PageActions.fromConf(
-                        Map.of(PageActions.CONFIG_KEY, "page-actions.single.json"));
+                PageActions.fromConf(Map.of(PageActions.CONFIG_KEY, "page-actions.single.json"));
         Assertions.assertEquals(1, actions.size());
     }
 
     @Test
     void multiActionChainLoadsInOrder() {
         final PageActions actions =
-                PageActions.fromConf(
-                        Map.of(PageActions.CONFIG_KEY, "page-actions.chain.json"));
+                PageActions.fromConf(Map.of(PageActions.CONFIG_KEY, "page-actions.chain.json"));
         Assertions.assertEquals(4, actions.size());
     }
 
@@ -66,7 +63,9 @@ class PageActionsTest {
                 RuntimeException.class,
                 () ->
                         PageActions.fromConf(
-                                Map.of(PageActions.CONFIG_KEY, "page-actions.does-not-exist.json")));
+                                Map.of(
+                                        PageActions.CONFIG_KEY,
+                                        "page-actions.does-not-exist.json")));
     }
 
     @Test

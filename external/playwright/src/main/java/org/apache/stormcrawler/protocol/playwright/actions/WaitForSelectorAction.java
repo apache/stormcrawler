@@ -35,11 +35,11 @@ import org.slf4j.LoggerFactory;
  *
  * <ul>
  *   <li>{@code selector} (required, string)
- *   <li>{@code state} (optional, string, default {@code visible}): one of {@code attached},
- *       {@code detached}, {@code visible}, {@code hidden}
+ *   <li>{@code state} (optional, string, default {@code visible}): one of {@code attached}, {@code
+ *       detached}, {@code visible}, {@code hidden}
  *   <li>{@code timeoutMs} (optional, int, default 5000)
- *   <li>{@code required} (optional, bool, default false): if true, a timeout aborts the action
- *       (and is logged and swallowed by the chain wrapper)
+ *   <li>{@code required} (optional, bool, default false): if true, a timeout aborts the action (and
+ *       is logged and swallowed by the chain wrapper)
  * </ul>
  */
 public class WaitForSelectorAction extends PageAction {

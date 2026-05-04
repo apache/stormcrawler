@@ -30,10 +30,10 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 
 /**
- * Clicks every element matching a list of selectors and, after each click, clones the rendered
- * body container into a hidden cache under the same widget root. After the action runs,
- * {@link Page#content()} contains the HTML of every panel a tab/accordion would normally hide
- * behind user interaction — useful for SPAs whose visible markup depends on the active tab.
+ * Clicks every element matching a list of selectors and, after each click, clones the rendered body
+ * container into a hidden cache under the same widget root. After the action runs, {@link
+ * Page#content()} contains the HTML of every panel a tab/accordion would normally hide behind user
+ * interaction — useful for SPAs whose visible markup depends on the active tab.
  *
  * <p>Anchor elements with an {@code href} are skipped to avoid following links.
  *
@@ -41,8 +41,8 @@ import org.slf4j.LoggerFactory;
  *
  * <ul>
  *   <li>{@code selectors} (required, array): selectors whose matches will be clicked
- *   <li>{@code root} (required, string): selector for the widget root containing both the
- *       clickable and its body
+ *   <li>{@code root} (required, string): selector for the widget root containing both the clickable
+ *       and its body
  *   <li>{@code body} (required, string): selector for the body container that should be cached
  *   <li>{@code waitMs} (optional, int, default 200): time to wait after each click before caching
  *   <li>{@code clickTimeoutMs} (optional, int, default 2000): per-click timeout

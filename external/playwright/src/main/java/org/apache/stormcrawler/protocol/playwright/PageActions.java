@@ -109,8 +109,10 @@ public class PageActions implements JSONResource {
         actions = list.toArray(new PageAction[0]);
     }
 
-    /** Run every action in order. Failures are logged and swallowed so one bad action cannot
-     * abort the rest of the chain. */
+    /**
+     * Run every action in order. Failures are logged and swallowed so one bad action cannot abort
+     * the rest of the chain.
+     */
     public void apply(
             @NotNull final Page page,
             @NotNull final String url,

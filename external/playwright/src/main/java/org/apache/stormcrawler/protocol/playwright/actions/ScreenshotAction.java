@@ -35,8 +35,8 @@ import org.slf4j.LoggerFactory;
  * <h3>Parameters</h3>
  *
  * <ul>
- *   <li>{@code metadataKey} (optional, string, default {@code playwright.screenshot}): metadata
- *       key under which the base64 string is stored
+ *   <li>{@code metadataKey} (optional, string, default {@code playwright.screenshot}): metadata key
+ *       under which the base64 string is stored
  *   <li>{@code fullPage} (optional, bool, default false): capture the entire scrollable page
  *   <li>{@code type} (optional, string, default {@code png}): {@code png} or {@code jpeg}
  *   <li>{@code quality} (optional, int, 0-100): only honoured for {@code jpeg}

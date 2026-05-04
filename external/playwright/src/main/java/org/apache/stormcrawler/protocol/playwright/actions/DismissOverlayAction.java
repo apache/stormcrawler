@@ -30,18 +30,18 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Dismisses cookie banners, GDPR walls, paywalls, newsletter modals, etc. by clicking the first
- * matching element of each configured selector. Each click is independently bounded by
- * {@code timeoutMs}; missing elements and click failures are silently skipped, so it is safe to
- * pass an over-broad set of fallback selectors.
+ * matching element of each configured selector. Each click is independently bounded by {@code
+ * timeoutMs}; missing elements and click failures are silently skipped, so it is safe to pass an
+ * over-broad set of fallback selectors.
  *
  * <h3>Parameters</h3>
  *
  * <ul>
  *   <li>{@code selectors} (required, array of strings)
  *   <li>{@code timeoutMs} (optional, int, default 1500): per-click timeout
- *   <li>{@code removeSelectors} (optional, array of strings): elements matching these selectors
- *       are removed from the DOM after the clicks (useful for sticky overlays that don't have a
- *       close button)
+ *   <li>{@code removeSelectors} (optional, array of strings): elements matching these selectors are
+ *       removed from the DOM after the clicks (useful for sticky overlays that don't have a close
+ *       button)
  * </ul>
  */
 public class DismissOverlayAction extends PageAction {

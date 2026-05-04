@@ -102,12 +102,9 @@ class PageActionsLiveTest extends AbstractProtocolTest {
                     "DismissOverlayAction click should have triggered the overlay removal");
 
             // ExpandClickablesAction: every tab body should now be cached under the widget root
-            Assertions.assertTrue(
-                    content.contains("CONTENT_TAB1"), "tab1 body should be cached");
-            Assertions.assertTrue(
-                    content.contains("CONTENT_TAB2"), "tab2 body should be cached");
-            Assertions.assertTrue(
-                    content.contains("CONTENT_TAB3"), "tab3 body should be cached");
+            Assertions.assertTrue(content.contains("CONTENT_TAB1"), "tab1 body should be cached");
+            Assertions.assertTrue(content.contains("CONTENT_TAB2"), "tab2 body should be cached");
+            Assertions.assertTrue(content.contains("CONTENT_TAB3"), "tab3 body should be cached");
             Assertions.assertTrue(
                     content.contains("__sc_cache"), "hidden cache element should be present");
 
@@ -117,8 +114,7 @@ class PageActionsLiveTest extends AbstractProtocolTest {
                     "ScrollToBottomAction should have triggered lazy loading");
 
             // EvaluateAction: title is JSON-serialised under the expression key
-            final String title =
-                    response.getMetadata().getFirstValue("document.title");
+            final String title = response.getMetadata().getFirstValue("document.title");
             Assertions.assertNotNull(title);
             Assertions.assertTrue(
                     title.contains("StormCrawler PageActions Fixture"),
@@ -175,8 +171,10 @@ class PageActionsLiveTest extends AbstractProtocolTest {
         }
     }
 
-    /** Drives a single action against a live page bypassing the protocol — useful for failure
-     * paths that the chain wrapper otherwise swallows. */
+    /**
+     * Drives a single action against a live page bypassing the protocol — useful for failure paths
+     * that the chain wrapper otherwise swallows.
+     */
     @Test
     @Timeout(value = 30, unit = TimeUnit.SECONDS)
     void waitForSelectorRequiredPropagates() throws Exception {
@@ -204,7 +202,8 @@ class PageActionsLiveTest extends AbstractProtocolTest {
         action.configure(
                 java.util.Map.of(),
                 new ObjectMapper()
-                        .readTree("{\"selector\":\"#never\",\"timeoutMs\":250,\"required\":false}"));
+                        .readTree(
+                                "{\"selector\":\"#never\",\"timeoutMs\":250,\"required\":false}"));
 
         try (final Playwright pw = Playwright.create();
                 final Browser browser = pw.chromium().launch();
@@ -247,7 +246,8 @@ class PageActionsLiveTest extends AbstractProtocolTest {
         final ScrollToBottomAction action = new ScrollToBottomAction();
         action.configure(
                 java.util.Map.of(),
-                new ObjectMapper().readTree("{\"waitMs\":50,\"maxSteps\":3,\"maxDurationMs\":2000}"));
+                new ObjectMapper()
+                        .readTree("{\"waitMs\":50,\"maxSteps\":3,\"maxDurationMs\":2000}"));
 
         try (final Playwright pw = Playwright.create();
                 final Browser browser = pw.chromium().launch();

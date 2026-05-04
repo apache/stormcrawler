@@ -71,7 +71,8 @@ class ActionConfigureTest {
     void evaluateAcceptsExpressions() throws Exception {
         final EvaluateAction action = new EvaluateAction();
         action.configure(
-                EMPTY_CONF, params("{\"expressions\":[\"window.location.href\"],\"keyPrefix\":\"e\"}"));
+                EMPTY_CONF,
+                params("{\"expressions\":[\"window.location.href\"],\"keyPrefix\":\"e\"}"));
     }
 
     // --- ScrollToBottomAction ---
@@ -86,8 +87,7 @@ class ActionConfigureTest {
     void scrollToBottomAcceptsOverrides() throws Exception {
         final ScrollToBottomAction action = new ScrollToBottomAction();
         action.configure(
-                EMPTY_CONF,
-                params("{\"waitMs\":100,\"maxSteps\":5,\"maxDurationMs\":2000}"));
+                EMPTY_CONF, params("{\"waitMs\":100,\"maxSteps\":5,\"maxDurationMs\":2000}"));
     }
 
     // --- WaitForSelectorAction ---
@@ -168,7 +168,6 @@ class ActionConfigureTest {
         final ScreenshotAction jpeg = new ScreenshotAction();
         jpeg.configure(
                 EMPTY_CONF,
-                params(
-                        "{\"type\":\"jpeg\",\"quality\":80,\"metadataKey\":\"my.shot\"}"));
+                params("{\"type\":\"jpeg\",\"quality\":80,\"metadataKey\":\"my.shot\"}"));
     }
 }

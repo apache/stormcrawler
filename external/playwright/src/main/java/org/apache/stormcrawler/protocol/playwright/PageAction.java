@@ -29,8 +29,8 @@ import org.jetbrains.annotations.NotNull;
  * makes are reflected in the rendered content returned by the protocol.
  *
  * <p>Actions are loaded as an ordered chain via {@link PageActions} from a JSON file referenced by
- * the {@code playwright.page.actions.config.file} configuration key. They follow the same
- * {@link org.apache.stormcrawler.util.Configurable} pattern as URL/parse filters.
+ * the {@code playwright.page.actions.config.file} configuration key. They follow the same {@link
+ * org.apache.stormcrawler.util.Configurable} pattern as URL/parse filters.
  */
 public abstract class PageAction extends AbstractConfigurable {
 
@@ -49,9 +49,7 @@ public abstract class PageAction extends AbstractConfigurable {
             @NotNull final Metadata responseMetadata)
             throws Exception;
 
-    /**
-     * Release any resources held by the action. See {@link IBolt#cleanup()} for more details.
-     */
+    /** Release any resources held by the action. See {@link IBolt#cleanup()} for more details. */
     public void cleanup() {
         // nothing to do here
     }
