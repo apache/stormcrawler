@@ -36,3 +36,10 @@ config:
   # playwright.capture.content.on.error is also true.
   # playwright.override.status.on.content: false
 
+  # JSON file declaring an ordered chain of PageAction implementations applied
+  # after navigate() succeeds and before page.content() is captured. Use this
+  # to plug in site-specific post-navigate behaviour (tab/accordion expansion,
+  # cookie-banner dismissal, infinite-scroll, custom evaluate calls, ...)
+  # without subclassing the protocol. See README for the JSON shape.
+  # playwright.page.actions.config.file: "page-actions.json"
+

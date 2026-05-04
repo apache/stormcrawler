@@ -1,0 +1,38 @@
+{
+  "org.apache.stormcrawler.protocol.playwright.PageActions": [
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.DismissOverlayAction",
+      "name": "cookies-and-paywall",
+      "params": {
+        "selectors": ["#cookie-accept"],
+        "removeSelectors": [".paywall"]
+      }
+    },
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.ExpandClickablesAction",
+      "name": "tabs",
+      "params": {
+        "selectors": [".tab-widget .tab-header"],
+        "root": ".tab-widget",
+        "body": ".tab-widget-body",
+        "waitMs": 50,
+        "clickTimeoutMs": 2000
+      }
+    },
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.ScrollToBottomAction",
+      "name": "scroll",
+      "params": { "waitMs": 200, "maxSteps": 5, "maxDurationMs": 5000 }
+    },
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.EvaluateAction",
+      "name": "title",
+      "params": { "expressions": ["document.title"] }
+    },
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.ScreenshotAction",
+      "name": "shot",
+      "params": { "fullPage": false, "type": "png", "metadataKey": "test.screenshot" }
+    }
+  ]
+}

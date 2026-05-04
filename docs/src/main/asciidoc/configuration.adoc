@@ -488,11 +488,65 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/playwrigh
 |===
 | key | default value | description
 
-| playwright.cdp.url | - | Chrome DevTools Protocol URL for connecting to an existing browser instance.
-| playwright.remote.ws | - | Remote WebSocket URL for Playwright (alternative to CDP).
-| playwright.skip.download | true | Skip automatic browser download. Set to false to let Playwright manage its own browser.
-| playwright.load.event | - | Page load event to wait for (e.g., "domcontentloaded", "networkidle").
+| playwright.cdp.url | - | Chrome DevTools Protocol URL for connecting to an existing browser instance (e.g. `http://localhost:9222`). Mutually exclusive with `playwright.remote.ws`.
+| playwright.remote.ws | - | Remote WebSocket URL for Playwright (alternative to CDP, e.g. `ws://localhost:3000/`).
+| playwright.skip.download | false | Skip automatic browser download. Implicitly forced to `true` when `playwright.cdp.url` or `playwright.remote.ws` is set.
+| playwright.load.event | load | Page load event to wait for. One of `load`, `domcontentloaded`, `networkidle`.
+| playwright.skip.resource.types | - | List of resource types aborted during navigation (`document`, `stylesheet`, `image`, `media`, `font`, `script`, `texttrack`, `xhr`, `fetch`, `eventsource`, `websocket`, `manifest`, `other`).
+| playwright.evaluations | - | List of JavaScript expressions evaluated after load; each JSON-serialised result is stored in response metadata under the expression itself.
+| playwright.capture.content.on.error | false | If `true`, also capture `page.content()` for non-2xx responses — useful for SPAs that return a stub then hydrate via JS.
+| playwright.override.status.on.content | false | When content was captured for a non-2xx response, override the reported HTTP status with `200`. The original status is preserved under the `playwright.origin.status` response metadata key. No-op unless `playwright.capture.content.on.error` is also `true`.
+| playwright.page.actions.config.file | - | JSON file declaring an ordered chain of `PageAction` implementations applied after navigate succeeds and before content capture. See _Page actions_ below.
 |===
+
+===== Page actions
+
+The Playwright protocol exposes a `PageAction` extension point — an ordered chain of post-navigate
+DOM transformations loaded from a JSON file referenced by `playwright.page.actions.config.file`. Use
+this to plug site-specific behaviour (tab/accordion expansion, cookie-banner dismissal,
+infinite-scroll, custom `evaluate()` calls, screenshotting, ...) into the protocol without
+subclassing it. The chain runs only when content would otherwise be captured (on 2xx, or on non-2xx
+when `playwright.capture.content.on.error` is `true`). Per-action failures are logged and swallowed
+so one bad action cannot abort the rest of the chain.
+
+[source,json]
+----
+{
+  "org.apache.stormcrawler.protocol.playwright.PageActions": [
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.DismissOverlayAction",
+      "name": "cookies",
+      "params": { "selectors": ["#cookie-accept"] }
+    },
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.ExpandClickablesAction",
+      "name": "tabs",
+      "params": {
+        "selectors": [".tab-widget .tab-header"],
+        "root": ".tab-widget",
+        "body": ".tab-widget-body",
+        "waitMs": 300
+      }
+    }
+  ]
+}
+----
+
+Built-in actions:
+
+[cols="1,3", options="header"]
+|===
+| Class | Purpose
+
+| `ExpandClickablesAction` | Clicks every element matching the configured selectors and clones the resulting body container into a hidden cache under the same widget root, so `page.content()` ends up containing the HTML of every tab/accordion panel rather than only the active one.
+| `EvaluateAction` | Evaluates a list of JavaScript expressions and stores each JSON-serialised result in response metadata.
+| `ScrollToBottomAction` | Repeatedly scrolls to the bottom of the page until the document height stops growing, the step cap is reached, or the time budget elapses — useful for infinite-scroll feeds.
+| `WaitForSelectorAction` | Waits for a selector to reach an `attached` / `detached` / `visible` / `hidden` state. Soft-fails on timeout by default; set `required: true` to fail.
+| `DismissOverlayAction` | Dismisses cookie banners, GDPR walls, newsletter modals, etc. by clicking the first match of each selector, and optionally removes sticky overlays from the DOM via `removeSelectors`.
+| `ScreenshotAction` | Captures a screenshot of the page and stores it base64-encoded in response metadata. For diagnostics / small-volume use; larger crawls should write to a blob store.
+|===
+
+See the link:https://github.com/apache/stormcrawler/tree/main/external/playwright[playwright module README] for the full parameter list of each built-in action and a guide on writing your own.
 
 ==== Language ID
 

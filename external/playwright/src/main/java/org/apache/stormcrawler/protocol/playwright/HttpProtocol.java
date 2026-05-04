@@ -79,6 +79,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     private WaitUntilState loadEvent;
 
+    private PageActions pageActions = PageActions.emptyPageActions;
+
     @Override
     public void configure(final Config conf) {
         super.configure(conf);
@@ -172,6 +174,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         // expressions to evaluate
         evaluations = ConfUtils.loadListFromConf(MD_EVALUATIONS, conf);
+
+        // optional chain of page actions applied after navigate, before content capture
+        pageActions = PageActions.fromConf(conf);
     }
 
     @Override
@@ -260,6 +265,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     boolean contentCaptured = false;
 
                     if (fetched || captureContentOnError) {
+                        // run any configured post-navigate actions before capturing content
+                        pageActions.apply(page, url, md, responseMetaData);
                         // retrieve the rendered content
                         content = page.content().getBytes(StandardCharsets.UTF_8);
                         contentCaptured = true;
@@ -320,6 +327,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
     public void cleanup() {
         synchronized (this) {
             super.cleanup();
+            pageActions.cleanup();
             context.close();
             browser.close();
         }

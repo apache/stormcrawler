@@ -1,0 +1,14 @@
+{
+  "org.apache.stormcrawler.protocol.playwright.PageActions": [
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.ExpandClickablesAction",
+      "name": "tabs",
+      "params": {
+        "selectors": [".tab .header"],
+        "root": ".tab",
+        "body": ".tab-body",
+        "waitMs": 50
+      }
+    }
+  ]
+}

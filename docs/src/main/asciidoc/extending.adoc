@@ -162,6 +162,57 @@ https.protocol.implementation: "com.example.MyProtocol"
 
 Use the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/DelegatorProtocol.java[DelegatorProtocol] when you need to route URLs to different protocol implementations based on metadata or URL patterns.
 
+==== Custom Page Action (Playwright)
+
+The link:https://github.com/apache/stormcrawler/tree/main/external/playwright[Playwright protocol] exposes a `PageAction` extension point so you can plug site-specific post-navigate behaviour (tab/accordion expansion, cookie-banner dismissal, infinite-scroll, custom `evaluate()` calls, screenshotting, ...) into the protocol without subclassing it. Actions are loaded as an ordered chain from a JSON file referenced by `playwright.page.actions.config.file` and follow the same `Configurable` lifecycle as URL/parse filters. The chain runs after `page.navigate()` succeeds and before `page.content()` is captured, so any DOM mutations land in the rendered content returned by the protocol.
+
+A handful of built-in actions ship with the module — `DismissOverlayAction`, `ExpandClickablesAction`, `ScrollToBottomAction`, `EvaluateAction`, `WaitForSelectorAction`, `ScreenshotAction`. Reach for a custom action when none of those fit. Extend `PageAction` and implement `apply`:
+
+[source,java]
+----
+import org.apache.stormcrawler.protocol.playwright.PageAction;
+import org.apache.stormcrawler.Metadata;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.microsoft.playwright.Page;
+import java.util.Map;
+
+public class MyPageAction extends PageAction {
+
+    private String selector;
+
+    @Override
+    public void configure(Map<String, Object> stormConf, JsonNode params) {
+        if (!params.has("selector")) {
+            throw new IllegalArgumentException("MyPageAction requires 'selector'");
+        }
+        this.selector = params.get("selector").asText();
+    }
+
+    @Override
+    public void apply(Page page, String url,
+                      Metadata sourceMetadata, Metadata responseMetadata) {
+        page.locator(selector).click();
+    }
+}
+----
+
+Reference the action by its fully-qualified class name in the chain JSON:
+
+[source,json]
+----
+{
+  "org.apache.stormcrawler.protocol.playwright.PageActions": [
+    {
+      "class": "com.example.MyPageAction",
+      "name": "my-action",
+      "params": { "selector": "#load-more" }
+    }
+  ]
+}
+----
+
+Per-action failures in `apply()` are logged and swallowed by the chain wrapper so one bad action cannot abort the rest. If you need a hard failure on misconfiguration, throw from `configure()` — that propagates at topology start-up, before any URL is fetched.
+
 ==== Custom Bolt or Spout
 
 For a bolt that emits on the status stream (like fetchers and parsers), extend link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/StatusEmitterBolt.java[StatusEmitterBolt]:

@@ -1,0 +1,9 @@
+{
+  "org.apache.stormcrawler.protocol.playwright.PageActions": [
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.ExpandClickablesAction",
+      "name": "missing-root-and-body",
+      "params": { "selectors": [".tab"] }
+    }
+  ]
+}
