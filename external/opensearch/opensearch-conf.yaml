@@ -86,7 +86,7 @@ config:
   #  - "-(key:stormcrawler.net)"
   #  - "-(key:apache.stormcrawler.org)"
 
-  # time in secs for which the URLs will be considered for fetching after a ack of fail
+  # time in secs for which the URLs will be considered for fetching after a ack or fail
   spout.ttl.purgatory: 30
 
   # Min time (in msecs) to allow between 2 successive queries to OpenSearch
