@@ -18,6 +18,7 @@
 package org.apache.stormcrawler.protocol.okhttp;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.Proxy;
@@ -159,6 +160,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
                         .connectTimeout(timeout, TimeUnit.MILLISECONDS)
                         .writeTimeout(timeout, TimeUnit.MILLISECONDS)
                         .readTimeout(timeout, TimeUnit.MILLISECONDS);
+
+        if (completionTimeout >= 0) {
+            builder.callTimeout(completionTimeout, TimeUnit.SECONDS);
+        }
 
         // protocols in order of preference, see
         // https://square.github.io/okhttp/4.x/okhttp/okhttp3/-ok-http-client/-builder/protocols/
@@ -430,17 +435,18 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 responsemetadata.addValue(key.toLowerCase(Locale.ROOT), value);
             }
 
-            final MutableObject trimmed = new MutableObject(TrimmedContentReason.NOT_TRIMMED);
+            final MutableObject<TrimmedContentReason> trimmed =
+                    new MutableObject<>(TrimmedContentReason.NOT_TRIMMED);
             final byte[] bytes = toByteArray(response.body(), pageMaxContent, trimmed);
-            if (trimmed.getValue() != TrimmedContentReason.NOT_TRIMMED) {
+            if (trimmed.get() != TrimmedContentReason.NOT_TRIMMED) {
                 if (!call.isCanceled()) {
                     call.cancel();
                 }
                 responsemetadata.setValue(ProtocolResponse.TRIMMED_RESPONSE_KEY, "true");
                 responsemetadata.setValue(
                         ProtocolResponse.TRIMMED_RESPONSE_REASON_KEY,
-                        trimmed.getValue().toString().toLowerCase(Locale.ROOT));
-                LOG.warn("HTTP content trimmed to {}", bytes.length);
+                        trimmed.get().toString().toLowerCase(Locale.ROOT));
+                LOG.warn("HTTP content trimmed to {} (reason: {})", bytes.length, trimmed.get());
             }
 
             final Long dnsResolution = DNStimes.remove(call.toString());
@@ -453,7 +459,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
     }
 
     private byte[] toByteArray(
-            final ResponseBody responseBody, int maxContent, MutableObject trimmed)
+            final ResponseBody responseBody,
+            int maxContent,
+            MutableObject<TrimmedContentReason> trimmed)
             throws IOException {
 
         if (responseBody == null) {
@@ -493,7 +501,12 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 // requesting more content failed, e.g. by a socket timeout
                 if (partialContentAsTrimmed && source.getBuffer().size() > 0) {
                     // treat already fetched content as trimmed
-                    trimmed.setValue(TrimmedContentReason.DISCONNECT);
+                    if (e instanceof InterruptedIOException) {
+                        // thrown by OkHttp if the call timeout is hit
+                        trimmed.setValue(TrimmedContentReason.TIME);
+                    } else {
+                        trimmed.setValue(TrimmedContentReason.DISCONNECT);
+                    }
                     LOG.debug("Exception while fetching {}", e);
                 } else {
                     throw e;

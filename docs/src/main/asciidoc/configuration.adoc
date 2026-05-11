@@ -548,6 +548,64 @@ Built-in actions:
 
 See the link:https://github.com/apache/stormcrawler/tree/main/external/playwright[playwright module README] for the full parameter list of each built-in action and a guide on writing your own.
 
+===== JS rendering detection
+
+Browser fetching is much more expensive than a plain HTTP fetch, so most operators only want
+Playwright on URLs that actually need it. The `JsRenderingDetector` parse filter inspects the
+parsed page from a cheap fetch and sets a metadata flag (default `fetch.with=playwright`) on URLs
+that look JavaScript-rendered. Pair it with link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/DelegatorProtocol.java[DelegatorProtocol]
+to route subsequent fetches of those URLs to the Playwright protocol while leaving everything else
+on a fast HTTP client.
+
+Detection signals (cheapest first, short-circuiting):
+
+* SPA framework fingerprints in raw HTML — `data-reactroot`, `ng-version=`, `__NEXT_DATA__`,
+  `window.__NUXT__`, `data-svelte-h=`, `data-vue-app`, `data-astro-cid`, `<router-outlet`.
+* `<noscript>` blocks containing language like _"enable JavaScript"_.
+* Empty SPA hydration roots: `<div id="root"></div>` / `#app` / `#__next` / `#__nuxt`.
+* Outcome-based fallback: at least one `<script>` is present and both `text.length` and the
+  outlink count are below configurable thresholds.
+
+Detection is skipped when `playwright.protocol.end` is already on the URL (i.e. it was just
+fetched by Playwright) or when the routing key is already set, so the filter is idempotent.
+
+Register the filter in `parsefilters.json`:
+
+[source,json]
+----
+{
+  "class": "org.apache.stormcrawler.protocol.playwright.parsefilter.JsRenderingDetector",
+  "name": "js-rendering-detector",
+  "params": { "minTextLength": 200, "minOutlinks": 2 }
+}
+----
+
+And route on the metadata key it sets:
+
+[source,yaml]
+----
+http.protocol.implementation:  "org.apache.stormcrawler.protocol.DelegatorProtocol"
+https.protocol.implementation: "org.apache.stormcrawler.protocol.DelegatorProtocol"
+protocol.delegator.config:
+  - className: "org.apache.stormcrawler.protocol.playwright.HttpProtocol"
+    filters:
+      "fetch.with": "playwright"
+  - className: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
+----
+
+The dotted metadata key is quoted in the YAML above for readability; SnakeYAML accepts the
+unquoted form too. Note that `DelegatorProtocol` requires the *last* entry in
+`protocol.delegator.config` to have no `filters:` — it acts as the fallback, so keep the cheap
+protocol at the bottom of the list.
+
+The parse filter alone does **not** trigger an immediate refetch — it only sets the metadata flag
+on the current fetch, and `DefaultScheduler` reschedules the URL according to the FETCHED interval
+(`fetchInterval.default`, 24h by default). For faster turnaround, either add a per-metadata-key
+fetch interval (`fetchInterval.fetch.with=playwright: 5`) or drop `JsRenderingRedirectionBolt`
+between the parser and indexer. The bolt reads the routing flag and, on hit, emits only to the
+status stream with `Status.FETCHED` so the stub document never reaches the index. The full
+parameter list and tuning notes are in the link:https://github.com/apache/stormcrawler/tree/main/external/playwright[playwright module README].
+
 ==== Language ID
 
 Language identification for crawled documents using the lang-detect library.
