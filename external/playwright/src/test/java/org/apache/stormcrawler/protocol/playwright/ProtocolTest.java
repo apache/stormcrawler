@@ -27,9 +27,7 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.storm.Config;
 import org.apache.storm.utils.MutableObject;
 import org.apache.stormcrawler.Metadata;
-import org.apache.stormcrawler.protocol.playwright.BasePlaywrightTest;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
-import org.eclipse.jetty.server.Handler;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,8 +40,6 @@ import org.junit.jupiter.api.Timeout;
 class ProtocolTest extends BasePlaywrightTest {
 
     private static final String USER_AGENT = "StormCrawlerTest";
-
-
 
     public HttpProtocol getProtocol() {
         Config conf = new Config();
