@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.protocol;
+package org.apache.stormcrawler.protocol.playwright;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
@@ -32,8 +32,8 @@ import org.eclipse.jetty.server.handler.HandlerList;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
-/** Takes care of initialising Jetty for testing protocol implementation * */
-public abstract class AbstractProtocolTest {
+/** Base test class for Playwright tests with isolated Jetty server * */
+public abstract class BasePlaywrightTest {
 
     protected static Server httpServer;
 
@@ -57,8 +57,8 @@ public abstract class AbstractProtocolTest {
         }
     }
 
-    protected Handler[] getHandlers() {
-        return new Handler[] {new WildcardResourceHandler()};
+    protected static Handler[] getHandlers() {
+        return new Handler[] {new LocalResourceHandler(), new WildcardResourceHandler()};
     }
 
     private static Integer findRandomOpenPortOnAllLocalInterfaces() {
