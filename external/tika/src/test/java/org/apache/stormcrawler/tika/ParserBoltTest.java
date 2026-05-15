@@ -45,12 +45,12 @@ class ParserBoltTest extends ParsingTester {
         setupParserBolt(bolt);
     }
 
-    @Test
     /**
-     * Checks that recursive docs are handled correctly
+     * Checks that recursive docs are handled correctly.
      *
-     * @see https://issues.apache.org/jira/browse/TIKA-2096
+     * @see <a href="https://issues.apache.org/jira/browse/TIKA-2096">TIKA-2096</a>
      */
+    @Test
     void testRecursiveDoc() throws IOException {
         Map<String, Object> conf = new HashMap<>();
         conf.put("parser.extract.embedded", true);
@@ -71,12 +71,12 @@ class ParserBoltTest extends ParsingTester {
                         .contains("Life, Liberty and the pursuit of Happiness"));
     }
 
-    @Test
     /**
-     * Checks that the mimetype whitelists are handled correctly
+     * Checks that the mimetype whitelists are handled correctly.
      *
-     * @see https://github.com/apache/stormcrawler/issues/712
+     * @see <a href="https://github.com/apache/stormcrawler/issues/712">#712</a>
      */
+    @Test
     void testMimeTypeWhileList() throws IOException {
         Map<String, Object> conf = new HashMap<>();
         conf.put("parser.mimetype.whitelist", "application/.+word.*");

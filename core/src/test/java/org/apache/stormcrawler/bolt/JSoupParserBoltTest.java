@@ -115,8 +115,8 @@ class JSoupParserBoltTest extends ParsingTester {
         setupParserBolt(bolt);
     }
 
+    /** Checks that content in script is not included in the text representation. */
     @Test
-    /** Checks that content in script is not included in the text representation */
     void testNoScriptInText() throws IOException {
         bolt.prepare(
                 new HashMap<>(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
@@ -129,8 +129,8 @@ class JSoupParserBoltTest extends ParsingTester {
                 "Text should not contain the content of script tags");
     }
 
+    /** Checks that individual links marked as rel="nofollow" are not followed. */
     @Test
-    /** Checks that individual links marked as rel="nofollow" are not followed */
     void testNoFollowOutlinks() throws IOException {
         bolt.prepare(
                 new HashMap<>(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
