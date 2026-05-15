@@ -59,8 +59,8 @@ public class WARCHdfsBolt extends GzipHdfsBolt {
         withFsUrl("file:///");
     }
 
-    public WARCHdfsBolt withHeader(Map<String, String> header_fields) {
-        this.header_fields = header_fields;
+    public WARCHdfsBolt withHeader(Map<String, String> headerFields) {
+        this.header_fields = headerFields;
         return this;
     }
 

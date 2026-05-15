@@ -66,8 +66,8 @@ public class JSONResourceWrapper extends ParseFilter {
     }
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
-        refresher.getDelegate().filter(URL, content, doc, parse);
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+        refresher.getDelegate().filter(url, content, doc, parse);
     }
 
     @Override

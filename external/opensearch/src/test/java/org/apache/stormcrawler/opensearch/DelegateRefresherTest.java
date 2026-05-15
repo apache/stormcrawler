@@ -84,7 +84,7 @@ class DelegateRefresherTest {
         }
 
         @Override
-        public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {}
+        public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {}
 
         @Override
         public String getResourceFile() {
