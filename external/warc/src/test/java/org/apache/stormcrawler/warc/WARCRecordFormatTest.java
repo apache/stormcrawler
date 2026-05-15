@@ -122,15 +122,12 @@ class WARCRecordFormatTest {
         byte[] content = txt.getBytes(StandardCharsets.UTF_8);
         String sha1str = "sha1:D6FMCDZDYW23YELHXWUEXAZ6LQCXU56S";
         Metadata metadata = new Metadata();
-        metadata.addValue( //
-                protocolMDprefix + ProtocolResponse.RESPONSE_HEADERS_KEY, //
+        metadata.addValue(
+                protocolMDprefix + ProtocolResponse.RESPONSE_HEADERS_KEY,
                 "HTTP/1.1 200 OK\r\n"
-                        + //
-                        "Content-Type: text/html\r\n"
-                        + //
-                        "Content-Encoding: gzip\r\n"
-                        + //
-                        "Content-Length: 26\r\n"
+                        + "Content-Type: text/html\r\n"
+                        + "Content-Encoding: gzip\r\n"
+                        + "Content-Length: 26\r\n"
                         + "Connection: close");
         metadata.addValue(protocolMDprefix + ProtocolResponse.RESPONSE_IP_KEY, "123.123.123.123");
         Tuple tuple = mock(Tuple.class);
@@ -165,15 +162,12 @@ class WARCRecordFormatTest {
         String txt = "abcdef";
         byte[] content = txt.getBytes(StandardCharsets.UTF_8);
         Metadata metadata = new Metadata();
-        metadata.addValue( //
-                protocolMDprefix + ProtocolResponse.RESPONSE_HEADERS_KEY, //
+        metadata.addValue(
+                protocolMDprefix + ProtocolResponse.RESPONSE_HEADERS_KEY,
                 "HTTP/2 200 OK\r\n"
-                        + //
-                        "Content-Type: text/html\r\n"
-                        + //
-                        "Content-Encoding: gzip\r\n"
-                        + //
-                        "Content-Length: 26\r\n"
+                        + "Content-Type: text/html\r\n"
+                        + "Content-Encoding: gzip\r\n"
+                        + "Content-Length: 26\r\n"
                         + "Connection: close");
         metadata.addValue(
                 protocolMDprefix + ProtocolResponse.PROTOCOL_VERSIONS_KEY,
@@ -208,17 +202,13 @@ class WARCRecordFormatTest {
         String txt = "abcdef";
         byte[] content = txt.getBytes(StandardCharsets.UTF_8);
         Metadata metadata = new Metadata();
-        metadata.addValue( //
-                protocolMDprefix + ProtocolResponse.REQUEST_HEADERS_KEY, //
+        metadata.addValue(
+                protocolMDprefix + ProtocolResponse.REQUEST_HEADERS_KEY,
                 "GET / HTTP/2\r\n"
-                        + //
-                        "User-Agent: mybot\r\n"
-                        + //
-                        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-                        + //
-                        "Accept-Language: en-us,en-gb,en;q=0.7,*;q=0.3\r\n"
-                        + //
-                        "Accept-Encoding: br,gzip\r\n"
+                        + "User-Agent: mybot\r\n"
+                        + "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
+                        + "Accept-Language: en-us,en-gb,en;q=0.7,*;q=0.3\r\n"
+                        + "Accept-Encoding: br,gzip\r\n"
                         + "Connection: Keep-Alive\r\n\r\n");
         metadata.addValue(protocolMDprefix + ProtocolResponse.RESPONSE_IP_KEY, "123.123.123.123");
         Tuple tuple = mock(Tuple.class);

@@ -190,34 +190,24 @@ class WARCHdfsBoltTest {
         String txt = "abcdef";
         byte[] content = txt.getBytes(StandardCharsets.UTF_8);
         Metadata metadata = new Metadata();
-        metadata.addValue( //
+        metadata.addValue(
                 protocolMDprefix + ProtocolResponse.REQUEST_HEADERS_KEY,
                 "GET / "
                         + httpVersionString
-                        + //
-                        "\r\n"
-                        + //
-                        "User-Agent: myBot/1.0 (https://example.org/bot/; bot@example.org)\r\n"
-                        + //
-                        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-                        + //
-                        "Accept-Language: en-us,en-gb,en;q=0.7,*;q=0.3\r\n"
-                        + //
-                        "Accept-Encoding: br,gzip\r\n"
-                        + //
-                        "Host: example.org\r\n"
+                        + "\r\n"
+                        + "User-Agent: myBot/1.0 (https://example.org/bot/; bot@example.org)\r\n"
+                        + "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
+                        + "Accept-Language: en-us,en-gb,en;q=0.7,*;q=0.3\r\n"
+                        + "Accept-Encoding: br,gzip\r\n"
+                        + "Host: example.org\r\n"
                         + "Connection: Keep-Alive\r\n\r\n");
-        metadata.addValue( //
+        metadata.addValue(
                 protocolMDprefix + ProtocolResponse.RESPONSE_HEADERS_KEY,
                 httpVersionString
-                        + //
-                        " 200 OK\r\n"
-                        + //
-                        "Content-Type: text/html\r\n"
-                        + //
-                        "Content-Encoding: gzip\r\n"
-                        + //
-                        "Content-Length: 26\r\n"
+                        + " 200 OK\r\n"
+                        + "Content-Type: text/html\r\n"
+                        + "Content-Encoding: gzip\r\n"
+                        + "Content-Length: 26\r\n"
                         + "Connection: close\r\n\r\n");
         metadata.addValue(
                 protocolMDprefix + ProtocolResponse.PROTOCOL_VERSIONS_KEY,
