@@ -229,7 +229,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 // NOTE: The handler will only be called for the first url if the
                 // response is a redirect.
                 page.route(
-                        _url -> true,
+                        lambdaUrl -> true,
                         route -> {
                             // abort if we know the main page is a redirection
                             if (status.get() != -1) {
