@@ -30,6 +30,7 @@ import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.protocol.AbstractProtocolTest;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.playwright.actions.DismissOverlayAction;
 import org.apache.stormcrawler.protocol.playwright.actions.EvaluateAction;
@@ -37,6 +38,7 @@ import org.apache.stormcrawler.protocol.playwright.actions.ExpandClickablesActio
 import org.apache.stormcrawler.protocol.playwright.actions.ScreenshotAction;
 import org.apache.stormcrawler.protocol.playwright.actions.ScrollToBottomAction;
 import org.apache.stormcrawler.protocol.playwright.actions.WaitForSelectorAction;
+import org.eclipse.jetty.server.Handler;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,10 +49,15 @@ import org.junit.jupiter.api.Timeout;
  * implementations. Requires a working Playwright/Chrome install (or a {@code playwright.cdp.url})
  * and is skipped when {@code CI_ENV=true}, mirroring the gate used by {@link ProtocolTest}.
  */
-class PageActionsLiveTest extends BasePlaywrightTest {
+class PageActionsLiveTest extends AbstractProtocolTest {
 
     private static final String USER_AGENT = "StormCrawlerTest";
     private static final String FIXTURE_PATH = "/page-actions-fixture.html";
+
+    @Override
+    protected Handler[] getHandlers() {
+        return new Handler[] {new LocalResourceHandler(), new WildcardResourceHandler()};
+    }
 
     @BeforeEach
     void setup() {

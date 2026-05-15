@@ -27,7 +27,9 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.storm.Config;
 import org.apache.storm.utils.MutableObject;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.protocol.AbstractProtocolTest;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
+import org.eclipse.jetty.server.Handler;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,9 +39,14 @@ import org.junit.jupiter.api.Timeout;
  * Tests for Playwright protocol implementation. Chrome should be running on localhost, whether is
  * has been launched manually or by Playwright.
  */
-class ProtocolTest extends BasePlaywrightTest {
+class ProtocolTest extends AbstractProtocolTest {
 
     private static final String USER_AGENT = "StormCrawlerTest";
+
+    @Override
+    protected Handler[] getHandlers() {
+        return new Handler[] {new LocalResourceHandler(), new WildcardResourceHandler()};
+    }
 
     public HttpProtocol getProtocol() {
         Config conf = new Config();
