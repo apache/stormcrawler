@@ -123,7 +123,7 @@ public class MetadataTransfer {
      * the URL path.
      */
     public Metadata getMetaForOutlink(String targetUrl, String sourceUrl, Metadata parentMetadata) {
-        Metadata md = _filter(parentMetadata, mdToTransfer);
+        Metadata md = filter(parentMetadata, mdToTransfer);
 
         // keep the path?
         if (trackPath) {
@@ -150,11 +150,11 @@ public class MetadataTransfer {
      * not necessarily transferred to the outlinks.
      */
     public Metadata filter(Metadata metadata) {
-        Metadata filteredMetadata = _filter(metadata, mdToTransfer);
+        Metadata filteredMetadata = filter(metadata, mdToTransfer);
 
         // add the features that are only persisted but
         // not transferred like __redirTo_
-        filteredMetadata.putAll(_filter(metadata, mdToPersistOnly));
+        filteredMetadata.putAll(filter(metadata, mdToPersistOnly));
 
         return filteredMetadata;
     }
@@ -163,7 +163,7 @@ public class MetadataTransfer {
      * Filter the metadata based on a set of keys. If a key ends with a * then all the keys starting
      * with the prefix will be added.
      */
-    private Metadata _filter(Metadata metadata, Set<String> filter) {
+    private Metadata filter(Metadata metadata, Set<String> filter) {
         Metadata filteredMetadata = new Metadata();
 
         for (String key : filter) {

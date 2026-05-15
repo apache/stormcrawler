@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 class InitialisationUtilTest {
 
     @Test
-    void can_initialize_a_simple_class() {
+    void can_initialize_simple_class() {
         final SimpleOpenClass simpleOpenClass =
                 InitialisationUtil.initializeFromQualifiedName(
                         SimpleOpenClass.class.getName(), SimpleOpenClass.class);
@@ -150,7 +150,7 @@ class InitialisationUtilTest {
     }
 
     @Test
-    void fails_if_class_to_initialize_not_extending_classes_to_test_1() {
+    void fails_if_class_to_initialize_not_extending_classes_to_test() {
         Assertions.assertThrows(
                 RuntimeException.class,
                 () ->
@@ -161,7 +161,7 @@ class InitialisationUtilTest {
     }
 
     @Test
-    void fails_if_class_to_initialize_not_extending_classes_to_test_2() {
+    void fails_if_class_to_initialize_not_extending_classes_to_test_other() {
         Assertions.assertThrows(
                 RuntimeException.class,
                 () ->
