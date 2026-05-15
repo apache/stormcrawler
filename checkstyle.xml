@@ -254,7 +254,6 @@ under the License.
             <property name="tokens" value="CLASS_DEF"/>
             <message key="name.invalidPattern"
                      value="Type name ''{0}'' must match pattern ''{1}''."/>
-            <property name="severity" value="warning"/>
         </module>
         <module name="TypeName">
             <property name="tokens" value="INTERFACE_DEF, ENUM_DEF,

@@ -68,7 +68,7 @@ class MetadataTransferTest {
         conf = new HashMap<>();
         conf.put(
                 MetadataTransfer.metadataTransferClassParamName,
-                myCustomTransferClass.class.getName());
+                MyCustomTransferClass.class.getName());
         hasThrownException = false;
         try {
             MetadataTransfer.getInstance(conf);
@@ -114,4 +114,4 @@ class MetadataTransferTest {
     }
 }
 
-class myCustomTransferClass extends MetadataTransfer {}
+class MyCustomTransferClass extends MetadataTransfer {}
