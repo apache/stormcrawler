@@ -66,16 +66,14 @@ public class MemorySpout extends BaseRichSpout {
      * statusupdaterbolt.
      *
      * @param withDiscoveredStatus whether the tuples generated should contain a Status field with
-     *                             DISCOVERED as value and be emitted on the status stream
+     *     DISCOVERED as value and be emitted on the status stream
      */
     public MemorySpout(boolean withDiscoveredStatus, String... urls) {
         this.withDiscoveredStatus = withDiscoveredStatus;
         startingUrls = urls;
     }
 
-    /**
-     * Add a new URL with the given metadata and nextFetch-date.
-     */
+    /** Add a new URL with the given metadata and nextFetch-date. */
     public static void add(String url, Metadata md, Date nextFetch) {
         LOG.debug("Adding {} with md {} and nextFetch {}", url, md, nextFetch);
         ScheduledURL tuple = new ScheduledURL(url, md, nextFetch);
@@ -86,7 +84,7 @@ public class MemorySpout extends BaseRichSpout {
 
     @Override
     public void open(
-        Map<String, Object> conf, TopologyContext context, SpoutOutputCollector collector) {
+            Map<String, Object> conf, TopologyContext context, SpoutOutputCollector collector) {
         this.collector = collector;
 
         // check that there is only one instance of it
@@ -99,7 +97,7 @@ public class MemorySpout extends BaseRichSpout {
         for (String u : startingUrls) {
             LOG.debug("About to deserialize {} ", u);
             List<Object> tuple =
-                scheme.deserialize(ByteBuffer.wrap(u.getBytes(StandardCharsets.UTF_8)));
+                    scheme.deserialize(ByteBuffer.wrap(u.getBytes(StandardCharsets.UTF_8)));
             add((String) tuple.get(0), (Metadata) tuple.get(1), now);
         }
         CrawlerMetrics.registerGauge(context, conf, "queue_size", queue::size, 10);
@@ -179,9 +177,7 @@ public class MemorySpout extends BaseRichSpout {
             return url + "\t" + nextFetchDate;
         }
 
-        /**
-         * Sort by next fetch date then URl. *
-         */
+        /** Sort by next fetch date then URl. * */
         @Override
         public int compareTo(ScheduledURL o) {
             // compare the URL

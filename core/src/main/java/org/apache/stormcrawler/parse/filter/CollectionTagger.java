@@ -70,8 +70,7 @@ public class CollectionTagger extends ParseFilter implements JSONResource {
     private static final Logger LOG = LoggerFactory.getLogger(CollectionTagger.class);
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final TypeReference<Collections> reference = new TypeReference<>() {
-    };
+    private static final TypeReference<Collections> reference = new TypeReference<>() {};
 
     private Collections collections = new Collections();
 
@@ -97,7 +96,7 @@ public class CollectionTagger extends ParseFilter implements JSONResource {
         }
         if (this.resourceFile == null) {
             this.resourceFile =
-                ConfUtils.getString(stormConf, "collections.file", "collections.json");
+                    ConfUtils.getString(stormConf, "collections.file", "collections.json");
         }
 
         try {
@@ -115,7 +114,7 @@ public class CollectionTagger extends ParseFilter implements JSONResource {
 
     @Override
     public void loadJSONResources(InputStream inputStream)
-        throws JsonParseException, JsonMappingException, IOException {
+            throws JsonParseException, JsonMappingException, IOException {
         collections = (Collections) objectMapper.readValue(inputStream, reference);
     }
 

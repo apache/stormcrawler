@@ -90,7 +90,7 @@ public class FastURLFilter extends URLFilter implements JSONResource {
         // config via json failed - trying from global config
         if (this.resourceFile == null) {
             this.resourceFile =
-                ConfUtils.getString(stormConf, "fast.urlfilter.file", "fast.urlfilter.json");
+                    ConfUtils.getString(stormConf, "fast.urlfilter.file", "fast.urlfilter.json");
         }
 
         try {
@@ -108,7 +108,7 @@ public class FastURLFilter extends URLFilter implements JSONResource {
 
     @Override
     public void loadJSONResources(InputStream inputStream)
-        throws JsonParseException, JsonMappingException, IOException {
+            throws JsonParseException, JsonMappingException, IOException {
 
         JsonNode rootNode = objectMapper.readTree(inputStream);
 
@@ -171,9 +171,9 @@ public class FastURLFilter extends URLFilter implements JSONResource {
 
     @Override
     public @Nullable String filter(
-        @Nullable URL sourceUrl,
-        @Nullable Metadata sourceMetadata,
-        @NotNull String urlToFilter) {
+            @Nullable URL sourceUrl,
+            @Nullable Metadata sourceMetadata,
+            @NotNull String urlToFilter) {
         try {
             if (rules.filter(urlToFilter, sourceMetadata)) {
                 return null;
@@ -205,8 +205,8 @@ public class FastURLFilter extends URLFilter implements JSONResource {
 
         /**
          * Try the rules from the hostname, domain name, metadata and global scopes in this order.
-         * Returns true if the URL should be removed, false otherwise. The value returns the value of
-         * the first matching rule, be it positive or negative.
+         * Returns true if the URL should be removed, false otherwise. The value returns the value
+         * of the first matching rule, be it positive or negative.
          *
          * @throws MalformedURLException
          */
@@ -238,10 +238,10 @@ public class FastURLFilter extends URLFilter implements JSONResource {
                 for (String v : vals) {
                     if (v.equalsIgnoreCase(scope.getValue())) {
                         FastURLFilter.LOG.debug(
-                            "Filtering {} matching metadata {}:{}",
-                            url,
-                            scope.getKey(),
-                            scope.getValue());
+                                "Filtering {} matching metadata {}:{}",
+                                url,
+                                scope.getKey(),
+                                scope.getValue());
                         if (checkScope(scope, u)) {
                             return true;
                         }

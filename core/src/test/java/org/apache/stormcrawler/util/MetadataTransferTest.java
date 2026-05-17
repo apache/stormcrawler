@@ -39,16 +39,16 @@ class MetadataTransferTest {
         parentMD.addValue("cookie.source", "example.com");
         parentMD.addValue("fetchInterval", "200");
         Metadata outlinkMD =
-            mdt.getMetaForOutlink(
-                "http://www.example.com/outlink.html", "http://www.example.com", parentMD);
+                mdt.getMetaForOutlink(
+                        "http://www.example.com/outlink.html", "http://www.example.com", parentMD);
         // test the value of track seed, depth and fetch fields
         Assertions.assertEquals("1", outlinkMD.getFirstValue(MetadataTransfer.depthKeyName));
         Set<String> expectedFields =
-            Set.of(
-                MetadataTransfer.urlPathKeyName,
-                MetadataTransfer.depthKeyName,
-                "cookie.id",
-                "cookie.source");
+                Set.of(
+                        MetadataTransfer.urlPathKeyName,
+                        MetadataTransfer.depthKeyName,
+                        "cookie.id",
+                        "cookie.source");
         Assertions.assertEquals(expectedFields, outlinkMD.keySet());
         String[] urlpath = outlinkMD.getValues(MetadataTransfer.urlPathKeyName);
         Assertions.assertEquals(1, urlpath.length);
@@ -67,8 +67,8 @@ class MetadataTransferTest {
         Assertions.assertTrue(hasThrownException);
         conf = new HashMap<>();
         conf.put(
-            MetadataTransfer.metadataTransferClassParamName,
-            MyCustomTransferClass.class.getName());
+                MetadataTransfer.metadataTransferClassParamName,
+                MyCustomTransferClass.class.getName());
         hasThrownException = false;
         try {
             MetadataTransfer.getInstance(conf);
@@ -113,6 +113,5 @@ class MetadataTransferTest {
         Assertions.assertEquals(6, filteredMetadata.size());
     }
 
-    static class MyCustomTransferClass extends MetadataTransfer {
-    }
+    static class MyCustomTransferClass extends MetadataTransfer {}
 }

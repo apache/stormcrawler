@@ -37,9 +37,9 @@ public class PerSecondReducer implements IReducer<PerSecondReducer.TimeReducerSt
             accumulator.sum += ((Integer) input).doubleValue();
         } else {
             throw new RuntimeException(
-                "MeanReducer::reduce called with unsupported input type `"
-                    + input.getClass()
-                    + "`. Supported types are Double, Long, Integer.");
+                    "MeanReducer::reduce called with unsupported input type `"
+                            + input.getClass()
+                            + "`. Supported types are Double, Long, Integer.");
         }
         return accumulator;
     }
