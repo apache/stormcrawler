@@ -95,9 +95,7 @@ under the License.
             <property name="allowNonPrintableEscapes" value="true"/>
         </module>
         <module name="AvoidStarImport"/>
-        <module name="OneTopLevelClass">
-            <property name="severity" value="warning"/>
-        </module>
+        <module name="OneTopLevelClass" />
         <module name="NoLineWrap">
             <property name="tokens" value="PACKAGE_DEF, IMPORT, STATIC_IMPORT"/>
         </module>
