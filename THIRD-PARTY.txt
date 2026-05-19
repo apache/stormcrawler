@@ -175,11 +175,11 @@ List of third-party dependencies grouped by their license type.
         * jwarc (org.netpreserve:jwarc:0.35.0 - https://github.com/iipc/jwarc)
         * jwarc (org.netpreserve:jwarc:0.36.0 - https://github.com/iipc/jwarc)
         * Kotlin Stdlib (org.jetbrains.kotlin:kotlin-stdlib:2.2.21 - https://kotlinlang.org/)
-        * LangChain4j :: Core (dev.langchain4j:langchain4j-core:1.14.1 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-core)
-        * LangChain4j :: HTTP Client :: JDK HttpClient (dev.langchain4j:langchain4j-http-client-jdk:1.14.1 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-http-client-jdk)
-        * LangChain4j :: HTTP Client (dev.langchain4j:langchain4j-http-client:1.14.1 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-http-client)
-        * LangChain4j :: Integration :: OpenAI (dev.langchain4j:langchain4j-open-ai:1.14.1 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-open-ai)
-        * LangChain4j (dev.langchain4j:langchain4j:1.14.1 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j)
+        * LangChain4j :: Core (dev.langchain4j:langchain4j-core:1.15.0 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-core)
+        * LangChain4j :: HTTP Client :: JDK HttpClient (dev.langchain4j:langchain4j-http-client-jdk:1.15.0 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-http-client-jdk)
+        * LangChain4j :: HTTP Client (dev.langchain4j:langchain4j-http-client:1.15.0 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-http-client)
+        * LangChain4j :: Integration :: OpenAI (dev.langchain4j:langchain4j-open-ai:1.15.0 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j-open-ai)
+        * LangChain4j (dev.langchain4j:langchain4j:1.15.0 - https://github.com/langchain4j/langchain4j/tree/main/langchain4j)
         * lang-mustache (org.opensearch.plugin:lang-mustache-client:2.19.5 - https://github.com/opensearch-project/OpenSearch.git)
         * language-detector (com.optimaize.languagedetector:language-detector:0.6 - https://github.com/optimaize/language-detector)
         * mapper-extras (org.opensearch.plugin:mapper-extras-client:2.19.5 - https://github.com/opensearch-project/OpenSearch.git)
@@ -396,6 +396,7 @@ List of third-party dependencies grouped by their license type.
         * SLF4J API Module (org.slf4j:slf4j-api:1.7.36 - http://www.slf4j.org)
         * SLF4J API Module (org.slf4j:slf4j-api:1.7.6 - http://www.slf4j.org)
         * SLF4J API Module (org.slf4j:slf4j-api:2.0.17 - http://www.slf4j.org)
+        * SLF4J API Module (org.slf4j:slf4j-api:2.0.18 - http://www.slf4j.org)
 
     Similar to Apache License but with the acknowledgment clause removed
 
