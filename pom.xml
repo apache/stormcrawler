@@ -65,15 +65,15 @@ under the License.
         <additionalparam>-Xdoclint:none</additionalparam>
         <!-- dependency versions -->
         <junit.version>6.0.3</junit.version>
-        <storm-client.version>2.8.7</storm-client.version>
+        <storm-client.version>2.8.8</storm-client.version>
         <!-- Jackson's version should be in-line with the one in Storm -->
-        <jackson-annotations.version>2.20</jackson-annotations.version>
-        <jackson.version>2.20.1</jackson.version>
+        <jackson-annotations.version>2.21</jackson-annotations.version>
+        <jackson.version>2.21.3</jackson.version>
         <tika.version>3.3.0</tika.version>
         <mockito.version>5.23.0</mockito.version>
         <slf4j-simple.version>2.0.18</slf4j-simple.version>
         <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
-        <commons.io.version>2.17.0</commons.io.version>
+        <commons.io.version>2.22.0</commons.io.version>
         <commons.compress.version>1.28.0</commons.compress.version>
         <commons.codec.version>1.22.0</commons.codec.version>
         <git-code-format-maven-plugin.version>5.4</git-code-format-maven-plugin.version>
