@@ -71,6 +71,7 @@ under the License.
                             <useBaseVersion>true</useBaseVersion>
                             <createDependencyReducedPom>true</createDependencyReducedPom>
                             <useDependencyReducedPomInJar>true</useDependencyReducedPomInJar>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
                             <artifactSet>
                                 <includes>
                                     <include>org.apache.solr:solr-solrj-jetty</include>
