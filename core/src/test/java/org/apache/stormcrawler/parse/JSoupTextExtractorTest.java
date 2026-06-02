@@ -65,6 +65,36 @@ class JSoupTextExtractorTest {
     }
 
     @Test
+    void testBlockFollowedByInlineElement() {
+        Config conf = new Config();
+        JSoupTextExtractor extractor = new JSoupTextExtractor(conf);
+        // Real-world case from https://www.acai-island.com/contact where
+        // "Email" and the address were concatenated as "Emailacaiisland1300@gmail.com"
+        String content =
+                "<html><body><div>"
+                        + "<h3>Email</h3>"
+                        + "<a href=\"mailto:acaiisland1300@gmail.com\">acaiisland1300@gmail.com</a>"
+                        + "</div></body></html>";
+        Document jsoupDoc = Parser.htmlParser().parseInput(content, "http://example.com");
+        String text = extractor.text(jsoupDoc.body());
+        assertEquals("Email acaiisland1300@gmail.com", text);
+    }
+
+    @Test
+    void testBlockFollowedByInlineSpan() {
+        Config conf = new Config();
+        JSoupTextExtractor extractor = new JSoupTextExtractor(conf);
+        String content =
+                "<html><body><div>"
+                        + "<div>Phone</div>"
+                        + "<span>(631) 656-0088</span>"
+                        + "</div></body></html>";
+        Document jsoupDoc = Parser.htmlParser().parseInput(content, "http://example.com");
+        String text = extractor.text(jsoupDoc.body());
+        assertEquals("Phone (631) 656-0088", text);
+    }
+
+    @Test
     void testTrimContent() throws IOException {
         Config conf = new Config();
         List<String> listinc = new LinkedList<>();

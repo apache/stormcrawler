@@ -146,7 +146,7 @@ public class JSoupTextExtractor implements TextExtractor {
                                 excluded = null;
                             }
                             if (element.isBlock()
-                                    && (node.nextSibling() instanceof TextNode)
+                                    && node.nextSibling() != null
                                     && !lastCharIsWhitespace(accum)) {
                                 accum.append(' ');
                             }
