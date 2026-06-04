@@ -28,10 +28,14 @@ import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.xml.serialize.XMLSerializer;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
 
 /** Dumps the DOM representation of a document into a file. */
 public class DebugParseFilter extends ParseFilter {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DebugParseFilter.class);
 
     private OutputStream os;
 
@@ -43,7 +47,7 @@ public class DebugParseFilter extends ParseFilter {
             serializer.serialize(doc);
             os.flush();
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Exception while serializing DOM", e);
         }
     }
 
@@ -53,12 +57,23 @@ public class DebugParseFilter extends ParseFilter {
             File outFile = Files.createTempFile("DOMDump", ".xml").toFile();
             os = FileUtils.openOutputStream(outFile);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Exception while configuring DebugParseFilter", e);
         }
     }
 
     @Override
     public boolean needsDOM() {
         return true;
+    }
+
+    @Override
+    public void cleanup() {
+        if (os != null) {
+            try {
+                os.close();
+            } catch (IOException e) {
+                LOG.error("Exception while closing output stream in DebugParseFilter", e);
+            }
+        }
     }
 }
