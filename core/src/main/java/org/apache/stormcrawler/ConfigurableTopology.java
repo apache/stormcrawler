@@ -30,8 +30,12 @@ import org.apache.storm.topology.TopologyBuilder;
 import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class ConfigurableTopology {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ConfigurableTopology.class);
 
     protected Config conf = new Config();
 
@@ -70,7 +74,7 @@ public abstract class ConfigurableTopology {
         try {
             StormSubmitter.submitTopology(name, conf, builder.createTopology());
         } catch (Exception e) {
-            e.printStackTrace();
+            LOG.error("Failed to submit topology: {}", name, e);
             return -1;
         }
         return 0;

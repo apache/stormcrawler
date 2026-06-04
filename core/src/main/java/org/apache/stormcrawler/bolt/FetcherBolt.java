@@ -364,12 +364,26 @@ public class FetcherBolt extends StatusEmitterBolt {
                 // custom crawl delay from metadata?
                 String v = metadata.getFirstValue(CRAWL_DELAY_KEY_NAME);
                 if (v != null) {
-                    delay = Long.parseLong(v);
+                    try {
+                        delay = Long.parseLong(v);
+                    } catch (NumberFormatException e) {
+                        LOG.warn(
+                                "Invalid crawl delay value '{}' in metadata for queue '{}', using default.",
+                                v,
+                                id);
+                    }
                 }
                 // custom min crawl delay from metadata?
                 v = metadata.getFirstValue(CRAWL_MIN_DELAY_KEY_NAME);
                 if (v != null) {
-                    minDelay = Long.parseLong(v);
+                    try {
+                        minDelay = Long.parseLong(v);
+                    } catch (NumberFormatException e) {
+                        LOG.warn(
+                                "Invalid min crawl delay value '{}' in metadata for queue '{}', using default.",
+                                v,
+                                id);
+                    }
                 }
             }
 
@@ -388,7 +402,14 @@ public class FetcherBolt extends StatusEmitterBolt {
                 if (metadata != null) {
                     final String val = metadata.getFirstValue(CRAWL_MAX_THREAD_KEY_NAME);
                     if (val != null) {
-                        threadVal = Integer.parseInt(val);
+                        try {
+                            threadVal = Integer.parseInt(val);
+                        } catch (NumberFormatException e) {
+                            LOG.warn(
+                                    "Invalid max threads value '{}' in metadata for queue '{}', using default.",
+                                    val,
+                                    id);
+                        }
                     }
                 }
 

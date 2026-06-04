@@ -23,7 +23,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Reader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -80,24 +79,27 @@ public abstract class RegexURLFilterBase extends URLFilter {
     private List<RegexRule> readRules(String rulesFile) {
         List<RegexRule> rules = new ArrayList<>();
 
-        try {
-            InputStream regexStream = getClass().getClassLoader().getResourceAsStream(rulesFile);
-            Reader reader = new InputStreamReader(regexStream, StandardCharsets.UTF_8);
-            BufferedReader in = new BufferedReader(reader);
-            String line;
-
-            while ((line = in.readLine()) != null) {
-                if (line.length() == 0) {
-                    continue;
-                }
-                RegexRule rule = createRule(line);
-                if (rule != null) {
-                    rules.add(rule);
+        try (InputStream regexStream = getClass().getClassLoader().getResourceAsStream(rulesFile)) {
+            if (regexStream == null) {
+                LOG.error("Regex filter file '{}' not found in classpath", rulesFile);
+                return rules;
+            }
+            try (BufferedReader in =
+                    new BufferedReader(
+                            new InputStreamReader(regexStream, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = in.readLine()) != null) {
+                    if (line.length() == 0) {
+                        continue;
+                    }
+                    RegexRule rule = createRule(line);
+                    if (rule != null) {
+                        rules.add(rule);
+                    }
                 }
             }
         } catch (IOException e) {
-            LOG.error("There was an error reading the default-regex-filters file");
-            e.printStackTrace();
+            LOG.error("There was an error reading the default-regex-filters file", e);
         }
         return rules;
     }

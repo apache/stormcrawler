@@ -24,8 +24,6 @@ import java.lang.invoke.MethodHandles;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Locale;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHeaders;
@@ -37,8 +35,9 @@ import org.slf4j.LoggerFactory;
 
 public class FileResponse {
 
-    static final SimpleDateFormat dateFormat =
-            new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US);
+    static final java.time.format.DateTimeFormatter DATE_FORMATTER =
+            java.time.format.DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
+                    .withZone(java.time.ZoneId.systemDefault());
     static final org.slf4j.Logger LOG =
             LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -101,8 +100,8 @@ public class FileResponse {
             return;
         }
 
-        try {
-            content = IOUtils.toByteArray(new FileInputStream(file), size);
+        try (FileInputStream fis = new FileInputStream(file)) {
+            content = IOUtils.toByteArray(fis, size);
         } catch (IOException | IllegalArgumentException e) {
             LOG.error("Exception while fetching file response {} ", file.getPath(), e);
             statusCode = HttpStatus.SC_METHOD_FAILURE;
@@ -122,7 +121,7 @@ public class FileResponse {
     }
 
     private static String formatDate(long date) {
-        return dateFormat.format(new Date(date));
+        return DATE_FORMATTER.format(java.time.Instant.ofEpochMilli(date));
     }
 
     private byte[] generateSitemap(File dir) {

@@ -22,7 +22,6 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Map;
 import org.apache.storm.task.OutputCollector;
@@ -94,12 +93,7 @@ public abstract class S3Cacher extends AbstractS3CacheBolt {
         }
 
         // normalises URL
-        String key = "";
-        try {
-            key = URLEncoder.encode(url, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            // ignore it - we know UTF-8 is valid
-        }
+        String key = URLEncoder.encode(url, java.nio.charset.StandardCharsets.UTF_8);
         // check size of the key
         if (key.length() >= 1024) {
             LOG.info("Key too large : {}", key);

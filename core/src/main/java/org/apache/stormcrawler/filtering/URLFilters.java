@@ -210,7 +210,7 @@ public class URLFilters extends URLFilter implements JSONResource {
                 LOG.error("URL filtering threw exception", e);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Failed to initialize URLFilters", e);
             System.exit(-1);
         }
         System.exit(0);

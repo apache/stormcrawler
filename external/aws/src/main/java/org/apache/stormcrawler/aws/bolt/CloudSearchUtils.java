@@ -18,26 +18,14 @@
 package org.apache.stormcrawler.aws.bolt;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import java.util.regex.Pattern;
-import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.codec.digest.DigestUtils;
 
 public class CloudSearchUtils {
 
-    private static MessageDigest digester;
-
     private static final Pattern INVALID_XML_CHARS =
             Pattern.compile("[^\\t\\n\\r -\\uD7FF\\uE000-\\uFFFD]");
-
-    static {
-        try {
-            digester = MessageDigest.getInstance("SHA-512");
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     private CloudSearchUtils() {}
 
@@ -51,8 +39,7 @@ public class CloudSearchUtils {
         // letter or number and the following characters: _ - = # ; : / ? @
         // &. Document IDs must be at least 1 and no more than 128
         // characters long.
-        byte[] dig = digester.digest(url.getBytes(StandardCharsets.UTF_8));
-        String ID = Hex.encodeHexString(dig);
+        String ID = DigestUtils.sha512Hex(url.getBytes(StandardCharsets.UTF_8));
         // is that even possible?
         if (ID.length() > 128) {
             throw new RuntimeException("ID larger than max 128 chars");
@@ -81,7 +68,7 @@ public class CloudSearchUtils {
             throw new RuntimeException("Field name must be between 3 and 64 chars : " + lowercase);
         }
         if (lowercase.equals("score")) {
-            throw new RuntimeException("Field name must be score");
+            throw new RuntimeException("Field name must NOT be score");
         }
         return lowercase;
     }
