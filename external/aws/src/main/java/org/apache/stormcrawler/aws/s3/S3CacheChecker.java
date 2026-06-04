@@ -19,7 +19,6 @@ package org.apache.stormcrawler.aws.s3;
 
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.S3Object;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Map;
 import org.apache.commons.io.IOUtils;
@@ -65,12 +64,7 @@ public class S3CacheChecker extends AbstractS3CacheBolt {
         Metadata metadata = (Metadata) tuple.getValueByField("metadata");
 
         // normalises URL
-        String key = "";
-        try {
-            key = URLEncoder.encode(url, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            // ignore it - we know UTF-8 is valid
-        }
+        String key = URLEncoder.encode(url, java.nio.charset.StandardCharsets.UTF_8);
         // check size of the key
         if (key.length() >= 1024) {
             LOG.info("Key too large : {}", key);

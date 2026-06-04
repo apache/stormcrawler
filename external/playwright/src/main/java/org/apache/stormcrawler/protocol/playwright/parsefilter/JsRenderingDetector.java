@@ -28,6 +28,7 @@ import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.protocol.playwright.HttpProtocol;
+import org.apache.stormcrawler.util.CharsetIdentification;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
@@ -221,7 +222,15 @@ public class JsRenderingDetector extends ParseFilter {
     }
 
     private String detectReason(final String url, final byte[] content, final ParseResult parse) {
-        final String html = new String(content, StandardCharsets.UTF_8);
+        final Metadata md = parse.get(url).getMetadata();
+        final String charsetName = CharsetIdentification.getCharsetFast(md, content, -1);
+        java.nio.charset.Charset cs;
+        try {
+            cs = java.nio.charset.Charset.forName(charsetName);
+        } catch (Exception e) {
+            cs = StandardCharsets.UTF_8;
+        }
+        final String html = new String(content, cs);
 
         // 1. SPA framework fingerprints
         for (final String fp : fingerprints) {
