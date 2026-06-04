@@ -18,8 +18,6 @@
 package org.apache.stormcrawler.util;
 
 import java.net.URL;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -30,8 +28,8 @@ import org.apache.http.impl.cookie.BasicClientCookie;
 /** Helper to extract cookies from cookies string. */
 public class CookieConverter {
 
-    private static final SimpleDateFormat DATE_FORMAT =
-            new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
+    private static final org.slf4j.Logger LOG =
+            org.slf4j.LoggerFactory.getLogger(CookieConverter.class);
 
     /**
      * Get a list of cookies based on the cookies string taken from response header and the target
@@ -110,17 +108,17 @@ public class CookieConverter {
             // check expiration
             if (expires != null) {
                 try {
-                    Date expirationDate = DATE_FORMAT.parse(expires);
-                    cookie.setExpiryDate(expirationDate);
+                    Date expirationDate = org.apache.http.client.utils.DateUtils.parseDate(expires);
+                    if (expirationDate != null) {
+                        cookie.setExpiryDate(expirationDate);
 
-                    // check that it hasn't expired?
-                    if (cookie.isExpired(new Date())) {
-                        continue;
+                        // check that it hasn't expired?
+                        if (cookie.isExpired(new Date())) {
+                            continue;
+                        }
                     }
-
-                    cookie.setExpiryDate(expirationDate);
-                } catch (ParseException e) {
-                    // ignore exceptions
+                } catch (Exception e) {
+                    LOG.debug("Could not parse cookie expiry date: {}", expires, e);
                 }
             }
 

@@ -28,8 +28,8 @@ import org.jsoup.select.QueryParser;
 // Utility class used to extract refresh tags from HTML pages
 public abstract class RefreshTag {
 
-    private static final Matcher MATCHER =
-            Pattern.compile("^.*;\\s*URL='?(.+?)'?$", Pattern.CASE_INSENSITIVE).matcher("");
+    private static final Pattern PATTERN =
+            Pattern.compile("^.*;\\s*URL='?(.+?)'?$", Pattern.CASE_INSENSITIVE);
 
     private static final Evaluator EVALUATOR =
             QueryParser.parse("meta[http-equiv~=(?i)refresh][content]");
@@ -42,8 +42,9 @@ public abstract class RefreshTag {
 
         // 0;URL=http://www.apollocolors.com/site
         try {
-            if (MATCHER.reset(value).matches()) {
-                return MATCHER.group(1);
+            Matcher matcher = PATTERN.matcher(value);
+            if (matcher.matches()) {
+                return matcher.group(1);
             }
         } catch (Exception e) {
         }
