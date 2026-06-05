@@ -558,6 +558,8 @@ under the License.
                                 <exclude>NOTICE</exclude>
                                 <exclude>CONTRIBUTING.md</exclude>
                                 <exclude>RELEASING.md</exclude>
+                                <exclude>AGENTS.md</exclude>
+                                <exclude>SECURITY.md</exclude>
                                 <exclude>external/opensearch/dashboards/**</exclude>
                                 <exclude>external/solr/archetype/src/main/resources/archetype-resources/configsets/**</exclude>
                                 <exclude>THIRD-PARTY.properties</exclude>
