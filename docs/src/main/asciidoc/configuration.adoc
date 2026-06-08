@@ -55,7 +55,7 @@ This is what the configuration `http.robots.agents` allows you to do. It is a co
 
 StormCrawler's proxy system is built on top of the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/proxy/SCProxy.java[SCProxy] class and the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/proxy/ProxyManager.java[ProxyManager] interface. Every proxy used in the system is formatted as a **SCProxy**. The **ProxyManager** implementations handle the management and delegation of their internal proxies. At the call of `Protocol#getProtocolOutput()`, the `ProxyManager.getProxy()` is called to retrieve a proxy for the individual request.
 
-The **ProxyManager** interface can be implemented in a custom class to create custom logic for proxy management and load balancing. The default **ProxyManager** implementation is **SingleProxyManager**. This ensures backwards compatibility for prior StormCrawler releases. To use **MultiProxyManager** or custom implementations, pass the class path and name via the config parameter `http.proxy.manager`:
+The **ProxyManager** interface can be implemented in a custom class to create custom logic for proxy management and load balancing. When `http.proxy.manager` is omitted, the core HTTP protocol implementations create **SingleProxyManager** only if `http.proxy.host` is configured. To use **SingleProxyManager** with only a full `http.proxy` connection string, or to use **MultiProxyManager** or custom implementations, pass the class path and name via the config parameter `http.proxy.manager`:
 
 ----
 http.proxy.manager: "org.apache.stormcrawler.proxy.MultiProxyManager"
@@ -67,6 +67,7 @@ StormCrawler implements two **ProxyManager** classes by default:
 Manages a single proxy passed by the backwards compatible proxy fields in the configuration:
 
   ----
+  http.proxy
   http.proxy.host
   http.proxy.port
   http.proxy.type
@@ -91,6 +92,16 @@ Randomly selects proxies using the native Java random number generator. RNG is s
 Selects the proxy with the least amount of usage. This is performed lazily for speed and therefore will not account for changes to usages during the selection process. If no custom implementations are made this should theoretically operate the same as **ROUND_ROBIN**
 
 The **SCProxy** class contains all of the information associated with proxy connection. In addition, it tracks the total usage of the proxy and optionally tracks the location of the proxy IP. Usage information is used for the **LEAST_USED** load balancing scheme. The location information is currently unused but left to enable custom implementations the ability to select proxies by location.
+
+The built-in proxy managers also support per-URL proxy selection from metadata. Metadata is checked before configured defaults or rotation. Set `http.proxy.skip` to `true` in a URL's metadata to fetch that URL without a proxy; this takes precedence over both metadata overrides and configured proxies. To override the proxy, either set `http.proxy` to a full proxy connection string such as `http://user:pass@proxy.example.com:8080`, or use the same component keys as the configuration: `http.proxy.host`, `http.proxy.port`, `http.proxy.type`, `http.proxy.user`, and `http.proxy.pass`. When both forms are present, the full `http.proxy` connection string takes precedence over component keys. Component metadata values are trimmed, blank host, type, and port values are rejected, and component `http.proxy.port` must be an integer from 1 through 65535. Invalid metadata proxy values throw `IllegalArgumentException` instead of falling back to the configured proxy.
+
+When credentials contain URL-reserved separator characters such as `:` or `@`, prefer the component keys (`http.proxy.user` and `http.proxy.pass`) so the values are passed as fields. Component key values preserve those separator characters but trim leading and trailing whitespace. Full `http.proxy` connection strings and `http.proxy.file` entries are parsed as **SCProxy** connection strings.
+
+Metadata component authentication is fail-fast: blank `http.proxy.user` and `http.proxy.pass` values are treated as unset, but if either non-blank value is set, both must be non-blank. Configured **SingleProxyManager** component authentication is more permissive for backwards compatibility and uses unauthenticated proxying unless both configured values are non-empty.
+
+With **SingleProxyManager**, explicitly configuring `http.proxy.manager` without a default proxy is valid. URLs with proxy metadata use the metadata proxy, and URLs without proxy metadata return no proxy.
+
+With **MultiProxyManager**, a metadata proxy matching one of the configured proxies reuses the configured `SCProxy` instance so usage accounting remains meaningful. Metadata proxies outside the configured rotation are allowed and are used only for that request.
 
 === Metadata
 
@@ -192,10 +203,15 @@ is defined.
 | http.content.limit | -1 | Maximum HTTP response body size (bytes). Default: no limit.
 | http.protocol.implementation | org.apache.stormcrawler.protocol.httpclient.HttpProtocol | HTTP Protocol
 implementation.
-| http.proxy.host | - | HTTP proxy host.
-| http.proxy.pass | - | Proxy password.
-| http.proxy.port | 8080 | Proxy port.
-| http.proxy.user | - | Proxy username.
+| http.proxy | - | Full **SCProxy** connection string read by SingleProxyManager when that manager is selected, e.g. `http://user:pass@proxy.example.com:8080`.
+| http.proxy.file | - | Proxy connection-string file read by MultiProxyManager when that manager is selected.
+| http.proxy.host | - | SingleProxyManager component proxy host.
+| http.proxy.manager | - | ProxyManager implementation class. If omitted, the core HTTP protocols create SingleProxyManager only when `http.proxy.host` is set.
+| http.proxy.pass | - | SingleProxyManager component proxy password, used with `http.proxy.user`.
+| http.proxy.port | 8080 | SingleProxyManager component proxy port. Must be from 1 through 65535.
+| http.proxy.rotation | ROUND_ROBIN | MultiProxyManager proxy rotation scheme when that manager is selected.
+| http.proxy.type | HTTP | SingleProxyManager component proxy type.
+| http.proxy.user | - | SingleProxyManager component proxy username, used with `http.proxy.pass`.
 | http.retry.on.connection.failure | true | (OkHttp only) Retry fetching on connection failure. See link:https://square.github.io/okhttp/5.x/okhttp/okhttp3/-ok-http-client/-builder/retry-on-connection-failure.html[OkHttp docs].
 | http.robots.403.allow | true | Allow crawling when robots.txt returns HTTP 403.
 | http.robots.5xx.allow | false | Allow crawling when robots.txt returns a server error (5xx).

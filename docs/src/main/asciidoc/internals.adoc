@@ -475,6 +475,12 @@ The `metadata` argument to link:https://github.com/apache/stormcrawler/blob/main
 
 * `protocol.set-headers`: If this key is present in metadata, the protocol adds the specified headers to the request. See link:https://github.com/apache/stormcrawler/pull/993[#993]
 
+* `http.proxy.skip`: If this key is set to `true` in `metadata`, the built-in proxy managers return no proxy for the request, even when a default proxy, proxy rotation, or metadata proxy override is configured. If present, the value must be `true` or `false`.
+
+* `http.proxy`: If this key is present in `metadata`, the built-in proxy managers use it as a full proxy connection string for the request, e.g. `http://user:pass@proxy.example.com:8080`. It takes precedence over component proxy metadata keys. Invalid values throw `IllegalArgumentException`.
+
+* `http.proxy.host`, `http.proxy.port`, `http.proxy.type`, `http.proxy.user`, `http.proxy.pass`: If these keys are present in `metadata`, the built-in proxy managers build a per-request proxy from the component values. These metadata keys use the same names and defaults as the proxy configuration keys, except blank `http.proxy.user` and `http.proxy.pass` values are treated as unset, and non-blank authentication values must be supplied together. Component metadata values are trimmed. The `http.proxy.port` value must be an integer from `1` through `65535`. Use the component keys for credentials containing URL-reserved separator characters such as `:` or `@`; those characters are preserved in component values, while full `http.proxy` values are parsed as **SCProxy** connection strings. Invalid values throw `IllegalArgumentException`.
+
 Example:
 
 [source,json]
@@ -506,5 +512,3 @@ metadata.persist:
 metadata.transfer:
   - set-cookie
 ----
-
-

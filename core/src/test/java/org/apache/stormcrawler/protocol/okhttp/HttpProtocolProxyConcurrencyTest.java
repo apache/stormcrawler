@@ -17,7 +17,9 @@
 
 package org.apache.stormcrawler.protocol.okhttp;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Optional;
 import okhttp3.OkHttpClient;
@@ -26,6 +28,7 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.AbstractProtocolTest;
 import org.apache.stormcrawler.proxy.ProxyManager;
 import org.apache.stormcrawler.proxy.SCProxy;
+import org.apache.stormcrawler.proxy.SingleProxyManager;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -42,6 +45,35 @@ import org.junit.jupiter.api.Test;
  */
 class HttpProtocolProxyConcurrencyTest extends AbstractProtocolTest {
 
+    @Test
+    void omittedProxyManagerWithoutProxyHostDoesNotCreateDefaultManager() {
+        HttpProtocol protocol = new HttpProtocol();
+        protocol.configure(protocolConfig());
+
+        assertNull(protocol.proxyManager);
+    }
+
+    @Test
+    void omittedProxyManagerWithProxyHostCreatesSingleProxyManager() {
+        HttpProtocol protocol = new HttpProtocol();
+        Config conf = protocolConfig();
+        conf.put("http.proxy.host", "proxy.example.com");
+        protocol.configure(conf);
+
+        assertInstanceOf(SingleProxyManager.class, protocol.proxyManager);
+    }
+
+    @Test
+    void explicitSingleProxyManagerWithoutDefaultProxySupportsMetadataOnlyUrls() {
+        HttpProtocol protocol = new HttpProtocol();
+        Config conf = protocolConfig();
+        conf.put("http.proxy.manager", "org.apache.stormcrawler.proxy.SingleProxyManager");
+        protocol.configure(conf);
+
+        assertInstanceOf(SingleProxyManager.class, protocol.proxyManager);
+        assertTrue(protocol.proxyManager.getProxy(new Metadata()).isEmpty());
+    }
+
     /**
      * After a proxied request completes, the shared builder should not retain any proxy
      * configuration. With the old buggy code, {@code builder.proxy(proxy)} permanently set the
@@ -50,13 +82,7 @@ class HttpProtocolProxyConcurrencyTest extends AbstractProtocolTest {
     @Test
     void proxiedRequestShouldNotPolluteSharedBuilder() throws Exception {
         HttpProtocol protocol = new HttpProtocol();
-        Config conf = new Config();
-        conf.put("http.agent.name", "test");
-        conf.put("http.agent.version", "1.0");
-        conf.put("http.agent.description", "test");
-        conf.put("http.agent.url", "http://test.example.com");
-        conf.put("http.agent.email", "test@example.com");
-        protocol.configure(conf);
+        protocol.configure(protocolConfig());
 
         protocol.proxyManager =
                 new ProxyManager() {
@@ -92,5 +118,15 @@ class HttpProtocolProxyConcurrencyTest extends AbstractProtocolTest {
                 "Shared builder should not retain proxy settings from a previous request. "
                         + "This indicates the bug where getProtocolOutput() mutates the shared "
                         + "builder instead of using a per-request builder.");
+    }
+
+    private Config protocolConfig() {
+        Config conf = new Config();
+        conf.put("http.agent.name", "test");
+        conf.put("http.agent.version", "1.0");
+        conf.put("http.agent.description", "test");
+        conf.put("http.agent.url", "http://test.example.com");
+        conf.put("http.agent.email", "test@example.com");
+        return conf;
     }
 }

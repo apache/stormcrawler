@@ -214,8 +214,29 @@ public class MultiProxyManager implements ProxyManager {
         return this.proxies.length;
     }
 
+    private Optional<SCProxy> getConfiguredProxy(SCProxy proxy) {
+        String proxyString = proxy.toString();
+        for (SCProxy configuredProxy : this.proxies) {
+            if (configuredProxy.toString().equals(proxyString)) {
+                return Optional.of(configuredProxy);
+            }
+        }
+        return Optional.empty();
+    }
+
     @Override
     public Optional<SCProxy> getProxy(Metadata metadata) {
+        if (ProxyMetadata.shouldSkipProxy(metadata)) {
+            return Optional.empty();
+        }
+
+        Optional<SCProxy> metadataProxy = ProxyMetadata.getProxy(metadata);
+        if (metadataProxy.isPresent()) {
+            SCProxy proxy = getConfiguredProxy(metadataProxy.get()).orElse(metadataProxy.get());
+            proxy.incrementUsage();
+            return Optional.of(proxy);
+        }
+
         // create a variable to hold the proxy generated in the following switch statement
         SCProxy proxy;
 

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.persistence.Status;
+import org.apache.stormcrawler.protocol.ProtocolFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -149,5 +151,50 @@ abstract class AbstractFetcherBoltTest {
 
         // nothing on the default stream — no content was fetched
         Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+    }
+
+    @Test
+    void invalidProxyMetadataEmitsFetchError(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(get(urlMatching("/invalid-proxy")).willReturn(aResponse().withStatus(200)));
+
+        resetProtocolFactory();
+        TestOutputCollector output = new TestOutputCollector();
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("http.proxy.manager", "org.apache.stormcrawler.proxy.SingleProxyManager");
+        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        Metadata metadata = new Metadata();
+        metadata.setValue("http.proxy.host", "proxy.example.com");
+        metadata.setValue("http.proxy.port", "not-a-port");
+
+        Tuple tuple = mock(Tuple.class);
+        String url = "http://localhost:" + wmRuntimeInfo.getHttpPort() + "/invalid-proxy";
+        when(tuple.getSourceComponent()).thenReturn("source");
+        when(tuple.contains("metadata")).thenReturn(true);
+        when(tuple.getStringByField("url")).thenReturn(url);
+        when(tuple.getValueByField("metadata")).thenReturn(metadata);
+        bolt.execute(tuple);
+
+        await().atMost(8, TimeUnit.SECONDS).until(() -> output.getAckedTuples().contains(tuple));
+
+        Assertions.assertFalse(output.getFailedTuples().contains(tuple));
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(1, statusTuples.size());
+        Assertions.assertEquals(url, statusTuples.get(0).get(0));
+        Metadata statusMetadata = (Metadata) statusTuples.get(0).get(1);
+        Assertions.assertEquals(Status.FETCH_ERROR, statusTuples.get(0).get(2));
+        Assertions.assertEquals(
+                IllegalArgumentException.class.getName(),
+                statusMetadata.getFirstValue("fetch.exception"));
+
+        Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+    }
+
+    private void resetProtocolFactory() throws ReflectiveOperationException {
+        Field instance = ProtocolFactory.class.getDeclaredField("single_instance");
+        instance.setAccessible(true);
+        instance.set(null, null);
     }
 }

@@ -39,30 +39,52 @@ public class SingleProxyManager implements ProxyManager {
 
         // values for single proxy
         String proxyHost = ConfUtils.getString(conf, "http.proxy.host", null);
+        if (proxyHost == null) {
+            this.proxy = null;
+            return;
+        }
+
         String proxyType = ConfUtils.getString(conf, "http.proxy.type", "HTTP");
         int proxyPort = ConfUtils.getInt(conf, "http.proxy.port", 8080);
         String proxyUsername = ConfUtils.getString(conf, "http.proxy.user", null);
         String proxyPassword = ConfUtils.getString(conf, "http.proxy.pass", null);
-
-        // assemble proxy connection string
-        String proxyString = proxyType.toLowerCase(Locale.ROOT) + "://";
-
-        // conditionally append authentication info
-        if (proxyUsername != null
-                && !proxyUsername.isEmpty()
-                && proxyPassword != null
-                && !proxyPassword.isEmpty()) {
-            proxyString += proxyUsername + ":" + proxyPassword + "@";
+        if (proxyPort < 1 || proxyPort > 65535) {
+            throw new IllegalArgumentException(
+                    "config key `http.proxy.port` must be between 1 and 65535, got `"
+                            + proxyPort
+                            + "`");
         }
 
-        // complete proxy string and create proxy
+        boolean hasAuth =
+                proxyUsername != null
+                        && !proxyUsername.isEmpty()
+                        && proxyPassword != null
+                        && !proxyPassword.isEmpty();
+
         this.proxy =
                 new SCProxy(
-                        proxyString + String.format(Locale.ROOT, "%s:%d", proxyHost, proxyPort));
+                        proxyType.toLowerCase(Locale.ROOT),
+                        proxyHost,
+                        Integer.toString(proxyPort),
+                        hasAuth ? proxyUsername : "",
+                        hasAuth ? proxyPassword : "",
+                        "",
+                        "",
+                        "",
+                        "");
     }
 
     @Override
     public Optional<SCProxy> getProxy(Metadata metadata) {
-        return Optional.of(proxy);
+        if (ProxyMetadata.shouldSkipProxy(metadata)) {
+            return Optional.empty();
+        }
+
+        Optional<SCProxy> metadataProxy = ProxyMetadata.getProxy(metadata);
+        if (metadataProxy.isPresent()) {
+            return metadataProxy;
+        }
+
+        return Optional.ofNullable(proxy);
     }
 }
