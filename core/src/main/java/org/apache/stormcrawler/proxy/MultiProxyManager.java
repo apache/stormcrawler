@@ -215,9 +215,8 @@ public class MultiProxyManager implements ProxyManager {
     }
 
     private Optional<SCProxy> getConfiguredProxy(SCProxy proxy) {
-        String proxyString = proxy.toString();
         for (SCProxy configuredProxy : this.proxies) {
-            if (configuredProxy.toString().equals(proxyString)) {
+            if (ProxyUtils.isSameProxy(configuredProxy, proxy)) {
                 return Optional.of(configuredProxy);
             }
         }

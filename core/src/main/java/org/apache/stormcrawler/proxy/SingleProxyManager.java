@@ -48,12 +48,8 @@ public class SingleProxyManager implements ProxyManager {
         int proxyPort = ConfUtils.getInt(conf, "http.proxy.port", 8080);
         String proxyUsername = ConfUtils.getString(conf, "http.proxy.user", null);
         String proxyPassword = ConfUtils.getString(conf, "http.proxy.pass", null);
-        if (proxyPort < 1 || proxyPort > 65535) {
-            throw new IllegalArgumentException(
-                    "config key `http.proxy.port` must be between 1 and 65535, got `"
-                            + proxyPort
-                            + "`");
-        }
+        ProxyUtils.validatePortRange(
+                proxyPort, "config key `http.proxy.port`", Integer.toString(proxyPort));
 
         boolean hasAuth =
                 proxyUsername != null

@@ -143,13 +143,6 @@ final class ProxyMetadata {
                     "metadata key `" + PROXY_PORT + "` must be an integer, got `" + port + "`", e);
         }
 
-        if (parsedPort < 1 || parsedPort > 65535) {
-            throw new IllegalArgumentException(
-                    "metadata key `"
-                            + PROXY_PORT
-                            + "` must be between 1 and 65535, got `"
-                            + port
-                            + "`");
-        }
+        ProxyUtils.validatePortRange(parsedPort, "metadata key `" + PROXY_PORT + "`", port);
     }
 }

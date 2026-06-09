@@ -240,6 +240,32 @@ class MultiProxyManagerTest {
     }
 
     @Test
+    void metadataComponentOverrideUsesConfiguredProxyInstanceWhenProtocolCaseDiffers() {
+        String[] proxyStrings = {
+            "http://first.example.com:8080", "HTTP://second.example.com:8080",
+        };
+        MultiProxyManager pm = new MultiProxyManager();
+        pm.configure(MultiProxyManager.ProxyRotation.LEAST_USED, proxyStrings);
+
+        SCProxy firstProxy = pm.getProxy(null).get();
+        Assertions.assertEquals("http://first.example.com:8080", firstProxy.toString());
+        Assertions.assertEquals(1, firstProxy.getUsage());
+
+        Metadata metadata = new Metadata();
+        metadata.setValue("http.proxy.host", "second.example.com");
+        metadata.setValue("http.proxy.port", "8080");
+        metadata.setValue("http.proxy.type", "HTTP");
+
+        SCProxy metadataProxy = pm.getProxy(metadata).get();
+        Assertions.assertEquals("HTTP://second.example.com:8080", metadataProxy.toString());
+        Assertions.assertEquals(1, metadataProxy.getUsage());
+
+        SCProxy nextProxy = pm.getProxy(null).get();
+        Assertions.assertEquals("http://first.example.com:8080", nextProxy.toString());
+        Assertions.assertEquals(2, nextProxy.getUsage());
+    }
+
+    @Test
     void metadataOverrideCanUseProxyOutsideConfiguredRotation() {
         String[] proxyStrings = {
             "http://first.example.com:8080", "http://second.example.com:8080",
