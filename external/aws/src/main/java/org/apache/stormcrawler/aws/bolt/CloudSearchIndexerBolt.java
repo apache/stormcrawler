@@ -19,26 +19,12 @@ package org.apache.stormcrawler.aws.bolt;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
 
-import com.amazonaws.regions.RegionUtils;
-import com.amazonaws.services.cloudsearchdomain.AmazonCloudSearchDomainClient;
-import com.amazonaws.services.cloudsearchdomain.model.ContentType;
-import com.amazonaws.services.cloudsearchdomain.model.DocumentServiceWarning;
-import com.amazonaws.services.cloudsearchdomain.model.UploadDocumentsRequest;
-import com.amazonaws.services.cloudsearchdomain.model.UploadDocumentsResult;
-import com.amazonaws.services.cloudsearchv2.AmazonCloudSearchClient;
-import com.amazonaws.services.cloudsearchv2.model.DescribeDomainsRequest;
-import com.amazonaws.services.cloudsearchv2.model.DescribeDomainsResult;
-import com.amazonaws.services.cloudsearchv2.model.DescribeIndexFieldsRequest;
-import com.amazonaws.services.cloudsearchv2.model.DescribeIndexFieldsResult;
-import com.amazonaws.services.cloudsearchv2.model.DomainStatus;
-import com.amazonaws.services.cloudsearchv2.model.IndexFieldStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.ParseException;
@@ -65,6 +51,20 @@ import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.cloudsearch.CloudSearchClient;
+import software.amazon.awssdk.services.cloudsearch.model.DescribeDomainsRequest;
+import software.amazon.awssdk.services.cloudsearch.model.DescribeDomainsResponse;
+import software.amazon.awssdk.services.cloudsearch.model.DescribeIndexFieldsRequest;
+import software.amazon.awssdk.services.cloudsearch.model.DescribeIndexFieldsResponse;
+import software.amazon.awssdk.services.cloudsearch.model.DomainStatus;
+import software.amazon.awssdk.services.cloudsearch.model.IndexFieldStatus;
+import software.amazon.awssdk.services.cloudsearchdomain.CloudSearchDomainClient;
+import software.amazon.awssdk.services.cloudsearchdomain.model.ContentType;
+import software.amazon.awssdk.services.cloudsearchdomain.model.DocumentServiceWarning;
+import software.amazon.awssdk.services.cloudsearchdomain.model.UploadDocumentsRequest;
+import software.amazon.awssdk.services.cloudsearchdomain.model.UploadDocumentsResponse;
 
 /** Writes documents to CloudSearch. */
 public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
@@ -77,7 +77,7 @@ public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
     private static final SimpleDateFormat DATE_FORMAT =
             new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT);
 
-    private AmazonCloudSearchDomainClient client;
+    private CloudSearchDomainClient client;
 
     private int maxDocsInBatch = -1;
 
@@ -132,38 +132,44 @@ public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
 
         String regionName = ConfUtils.getString(conf, CloudSearchConstants.REGION);
 
-        AmazonCloudSearchClient cl = new AmazonCloudSearchClient();
-        if (StringUtils.isNotBlank(regionName)) {
-            cl.setRegion(RegionUtils.getRegion(regionName));
-        }
-
         String domainName = null;
 
-        // retrieve the domain name
-        DescribeDomainsResult domains = cl.describeDomains(new DescribeDomainsRequest());
+        var clBuilder = CloudSearchClient.builder();
+        if (StringUtils.isNotBlank(regionName)) {
+            clBuilder.region(Region.of(regionName));
+        }
+        try (CloudSearchClient cl = clBuilder.build()) {
+            // retrieve the domain name
+            DescribeDomainsResponse domains =
+                    cl.describeDomains(DescribeDomainsRequest.builder().build());
 
-        for (DomainStatus ds : domains.getDomainStatusList()) {
-            if (ds.getDocService().getEndpoint().equals(endpoint)) {
-                domainName = ds.getDomainName();
-                break;
+            for (DomainStatus ds : domains.domainStatusList()) {
+                if (ds.docService().endpoint().equals(endpoint)) {
+                    domainName = ds.domainName();
+                    break;
+                }
+            }
+            // check domain name
+            if (StringUtils.isBlank(domainName)) {
+                throw new RuntimeException("No domain name found for CloudSearch endpoint");
+            }
+
+            DescribeIndexFieldsResponse indexDescription =
+                    cl.describeIndexFields(
+                            DescribeIndexFieldsRequest.builder().domainName(domainName).build());
+            for (IndexFieldStatus ifs : indexDescription.indexFields()) {
+                String indexname = ifs.options().indexFieldName();
+                String indextype = ifs.options().indexFieldTypeAsString();
+                LOG.info("CloudSearch index name {} of type {}", indexname, indextype);
+                csfields.put(indexname, indextype);
             }
         }
-        // check domain name
-        if (StringUtils.isBlank(domainName)) {
-            throw new RuntimeException("No domain name found for CloudSearch endpoint");
-        }
 
-        DescribeIndexFieldsResult indexDescription =
-                cl.describeIndexFields(new DescribeIndexFieldsRequest().withDomainName(domainName));
-        for (IndexFieldStatus ifs : indexDescription.getIndexFields()) {
-            String indexname = ifs.getOptions().getIndexFieldName();
-            String indextype = ifs.getOptions().getIndexFieldType();
-            LOG.info("CloudSearch index name {} of type {}", indexname, indextype);
-            csfields.put(indexname, indextype);
+        var builder = CloudSearchDomainClient.builder().endpointOverride(URI.create(endpoint));
+        if (StringUtils.isNotBlank(regionName)) {
+            builder.region(Region.of(regionName));
         }
-
-        client = new AmazonCloudSearchDomainClient();
-        client.setEndpoint(endpoint);
+        client = builder.build();
     }
 
     @Override
@@ -382,20 +388,22 @@ public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
             return;
         }
         // not in debug mode
-        try (InputStream inputStream = new ByteArrayInputStream(bb)) {
-            UploadDocumentsRequest batch = new UploadDocumentsRequest();
-            batch.setContentLength((long) bb.length);
-            batch.setContentType(ContentType.Applicationjson);
-            batch.setDocuments(inputStream);
-            UploadDocumentsResult result = client.uploadDocuments(batch);
-            LOG.info(result.getStatus());
-            for (DocumentServiceWarning warning : result.getWarnings()) {
-                LOG.info(warning.getMessage());
+        try {
+            UploadDocumentsRequest batch =
+                    UploadDocumentsRequest.builder()
+                            .contentLength((long) bb.length)
+                            .contentType(ContentType.APPLICATION_JSON)
+                            .build();
+            UploadDocumentsResponse result =
+                    client.uploadDocuments(batch, RequestBody.fromBytes(bb));
+            LOG.info(result.status());
+            for (DocumentServiceWarning warning : result.warnings()) {
+                LOG.info(warning.message());
             }
-            if (!result.getWarnings().isEmpty()) {
-                eventCounter.scope("Warnings").incrBy(result.getWarnings().size());
+            if (!result.warnings().isEmpty()) {
+                eventCounter.scope("Warnings").incrBy(result.warnings().size());
             }
-            eventCounter.scope("Added").incrBy(result.getAdds());
+            eventCounter.scope("Added").incrBy(result.adds());
             // ack the tuples
             for (Tuple t : unacked) {
                 String url = t.getStringByField("url");
@@ -423,7 +431,9 @@ public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
     public void cleanup() {
         // This will flush any unsent documents.
         sendBatch();
-        client.shutdown();
+        if (client != null) {
+            client.close();
+        }
     }
 
     @Override

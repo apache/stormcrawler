@@ -458,6 +458,7 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/aws[aws m
 | s3.region | - | AWS region for S3 operations.
 | s3.bucket | - | S3 bucket name for content caching.
 | s3.endpoint | - | Custom S3 endpoint (optional, for S3-compatible services).
+| s3.path.style.access | false | Use path-style access (`http://host/bucket`) instead of virtual-hosted style. Required for S3-compatible endpoints such as LocalStack or MinIO.
 |===
 
 ==== AI (LLM Text Extraction)

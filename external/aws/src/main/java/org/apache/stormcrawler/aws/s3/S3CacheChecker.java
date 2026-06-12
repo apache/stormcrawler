@@ -17,8 +17,7 @@
 
 package org.apache.stormcrawler.aws.s3;
 
-import com.amazonaws.services.s3.model.AmazonS3Exception;
-import com.amazonaws.services.s3.model.S3Object;
+import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.Map;
 import org.apache.commons.io.IOUtils;
@@ -33,6 +32,11 @@ import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /**
  * Checks whether a URL can be found in the cache, if not delegate to the following bolt e.g.
@@ -50,7 +54,7 @@ public class S3CacheChecker extends AbstractS3CacheBolt {
         super.prepare(conf, context, collector);
         bucketName = ConfUtils.getString(conf, BUCKET);
 
-        boolean bucketExists = client.doesBucketExist(bucketName);
+        boolean bucketExists = doesBucketExist(bucketName);
         if (!bucketExists) {
             String message = "Bucket " + bucketName + " does not exist";
             throw new RuntimeException(message);
@@ -76,32 +80,30 @@ public class S3CacheChecker extends AbstractS3CacheBolt {
         }
 
         long preCacheQueryTime = System.currentTimeMillis();
-        S3Object obj = null;
-        try {
-            obj = client.getObject(bucketName, key);
-        } catch (AmazonS3Exception e) {
+        byte[] content = null;
+        try (ResponseInputStream<GetObjectResponse> obj =
+                client.getObject(GetObjectRequest.builder().bucket(bucketName).key(key).build())) {
+            content = IOUtils.toByteArray(obj);
+        } catch (NoSuchKeyException e) {
             eventCounter.scope("result_misses").incrBy(1);
             // key does not exist?
             // no need for logging
+        } catch (S3Exception | IOException e) {
+            eventCounter.scope("result.exception").incrBy(1);
+            LOG.error("Exception when fetching from S3 cache", e);
         }
         long postCacheQueryTime = System.currentTimeMillis();
         LOG.debug("Queried S3 cache in {} msec", (postCacheQueryTime - preCacheQueryTime));
 
-        if (obj != null) {
-            try {
-                byte[] content = IOUtils.toByteArray(obj.getObjectContent());
-                eventCounter.scope("result_hits").incrBy(1);
-                eventCounter.scope("bytes_fetched").incrBy(content.length);
+        if (content != null) {
+            eventCounter.scope("result_hits").incrBy(1);
+            eventCounter.scope("bytes_fetched").incrBy(content.length);
 
-                metadata.setValue(INCACHE, "true");
+            metadata.setValue(INCACHE, "true");
 
-                _collector.emit(CACHE_STREAM, tuple, new Values(url, content, metadata));
-                _collector.ack(tuple);
-                return;
-            } catch (Exception e) {
-                eventCounter.scope("result.exception").incrBy(1);
-                LOG.error("IOException when extracting byte array", e);
-            }
+            _collector.emit(CACHE_STREAM, tuple, new Values(url, content, metadata));
+            _collector.ack(tuple);
+            return;
         }
 
         _collector.emit(tuple, new Values(url, metadata));

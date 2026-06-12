@@ -17,12 +17,7 @@
 
 package org.apache.stormcrawler.aws.s3;
 
-import com.amazonaws.ClientConfiguration;
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
-import com.amazonaws.regions.RegionUtils;
-import com.amazonaws.services.s3.AmazonS3Client;
+import java.net.URI;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.task.OutputCollector;
@@ -32,6 +27,12 @@ import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Fields;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.util.ConfUtils;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 
 public abstract class AbstractS3CacheBolt extends BaseRichBolt {
 
@@ -42,33 +43,52 @@ public abstract class AbstractS3CacheBolt extends BaseRichBolt {
     // is the region needed?
     public static final String REGION = S3_PREFIX + "region";
 
+    /**
+     * Enables path-style access ({@code http://host/bucket}) instead of the default virtual-hosted
+     * style ({@code http://bucket.host}). Useful when targeting a non-AWS S3 endpoint such as
+     * LocalStack or MinIO.
+     */
+    public static final String PATH_STYLE_ACCESS = S3_PREFIX + "path.style.access";
+
     public static final String INCACHE = S3_PREFIX + "inCache";
 
     protected OutputCollector _collector;
     protected ScopedCounter eventCounter;
 
-    protected AmazonS3Client client;
+    protected S3Client client;
 
     protected String bucketName;
 
     /** Returns an S3 client given the configuration * */
-    public static AmazonS3Client getS3Client(Map<String, Object> conf) {
-        AWSCredentialsProvider provider = new DefaultAWSCredentialsProviderChain();
-        AWSCredentials credentials = provider.getCredentials();
-        ClientConfiguration config = new ClientConfiguration();
-
-        AmazonS3Client client = new AmazonS3Client(credentials, config);
+    public static S3Client getS3Client(Map<String, Object> conf) {
+        S3ClientBuilder builder =
+                S3Client.builder().credentialsProvider(DefaultCredentialsProvider.create());
 
         String regionName = ConfUtils.getString(conf, REGION);
         if (StringUtils.isNotBlank(regionName)) {
-            client.setRegion(RegionUtils.getRegion(regionName));
+            builder.region(Region.of(regionName));
         }
 
         String endpoint = ConfUtils.getString(conf, ENDPOINT);
         if (StringUtils.isNotBlank(endpoint)) {
-            client.setEndpoint(endpoint);
+            builder.endpointOverride(URI.create(endpoint));
         }
-        return client;
+
+        if (ConfUtils.getBoolean(conf, PATH_STYLE_ACCESS, false)) {
+            builder.forcePathStyle(true);
+        }
+
+        return builder.build();
+    }
+
+    /** Checks whether the given bucket exists and is accessible. */
+    protected boolean doesBucketExist(String bucket) {
+        try {
+            client.headBucket(HeadBucketRequest.builder().bucket(bucket).build());
+            return true;
+        } catch (NoSuchBucketException e) {
+            return false;
+        }
     }
 
     @Override
