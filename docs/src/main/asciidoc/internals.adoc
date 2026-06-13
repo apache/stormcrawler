@@ -128,7 +128,7 @@ This parser calls the xref:urlfilters[URLFilters] and xref:parsefilters[ParseFil
 The **JSoupParserBolt** automatically identifies the charset of the documents. It uses the status stream to report parsing errors but also for the outlinks it extracts from a page. These would typically be used by an extension of link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/AbstractStatusUpdaterBolt.java[AbstractStatusUpdaterBolt] and persisted in some form of storage.
 
 ==== SiteMapParserBolt
-StormCrawler can handle sitemap files thanks to the **SiteMapParserBolt**. This bolt should be placed before the standard **ParserBolt** in the topology, as illustrated in link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/java/CrawlTopology.java[CrawlTopology].
+StormCrawler can handle sitemap files thanks to the **SiteMapParserBolt**. This bolt should be placed before the standard **ParserBolt** in the topology, as illustrated in the link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/crawler.flux[crawler Flux topology].
 
 The reason for this is that the **SiteMapParserBolt** acts as a filter: it passes on any incoming tuples to the default stream so that they get processed by the **ParserBolt**, unless the tuple contains `isSitemap=true` in its metadata, in which case the **SiteMapParserBolt** will parse it itself. Any outlinks found in the sitemap files are then emitted on the [[StatusStream]].
 
@@ -161,7 +161,7 @@ The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org
 [[parsefilters]]
 ==== Parse Filters
 
-ParseFilters are called from parsing bolts such as link:https://github.com/apache/stormcrawler/wiki/JSoupParserBolt[JSoupParserBolt] and link:https://github.com/apache/stormcrawler/wiki/SiteMapParserBolt[SiteMapParserBolt] to extract data from web pages. The extracted data is stored in the Metadata object. ParseFilters can also modify the Outlinks and, in that sense, act as URLFilters.
+ParseFilters are called from parsing bolts such as link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] and link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/SiteMapParserBolt.java[SiteMapParserBolt] to extract data from web pages. The extracted data is stored in the Metadata object. ParseFilters can also modify the Outlinks and, in that sense, act as URLFilters.
 
 ParseFilters need to implement the interface link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/ParseFilter.java[ParseFilter], which defines three methods:
 
@@ -178,7 +178,7 @@ public boolean needsDOM();
 * The `needsDOM` method indicates whether the ParseFilter instance requires the DOM structure. If no ParseFilters need it, the parsing bolt will skip generating the DOM, slightly improving performance.
 * The `configure` method takes a JSON object loaded by the wrapper class ParseFilters. The Storm configuration map can also be used to configure the filters, as described in xref:configuration.adoc[Configuration].
 
-Here is the default link:https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/parsefilters.json[JSON configuration file] for ParseFilters. The configuration allows multiple instances of the same filter class with different parameters and supports complex parameter objects. ParseFilters are executed in the order they appear in the JSON file.
+The archetype includes a default link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/parsefilters.json[JSON configuration file] for ParseFilters. The configuration allows multiple instances of the same filter class with different parameters and supports complex parameter objects. ParseFilters are executed in the order they appear in the JSON file.
 
 ===== Provided ParseFilters
 
@@ -233,7 +233,7 @@ and inherits a default one from link:https://github.com/apache/stormcrawler/blob
 public void configure(Map stormConf, JsonNode jsonNode);
 ----
 
-The configuration is done via a JSON file which is loaded by the wrapper class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/URLFilters.java[URLFilters]. The URLFilter instances can be used directly, but it is easier to use the class URLFilters instead. Some filter implementations can also be configured with the link:https://github.com/apache/stormcrawler/wiki/Configuration[standard configuration mechanism].
+The configuration is done via a JSON file which is loaded by the wrapper class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/URLFilters.java[URLFilters]. The URLFilter instances can be used directly, but it is easier to use the class URLFilters instead. Some filter implementations can also be configured with the xref:configuration.adoc[standard configuration mechanism].
 
 Here is an example of a link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/urlfilters.json[JSON configuration file].
 
