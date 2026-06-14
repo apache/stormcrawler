@@ -24,7 +24,10 @@ import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -93,6 +96,26 @@ public class FetcherBolt extends StatusEmitterBolt {
      * timeout, relying solely on the protocol-level socket timeouts.
      */
     public static final String FETCH_TIMEOUT_PARAM_KEY = "fetcher.thread.timeout";
+
+    /**
+     * Maximum delay in seconds the fetcher will wait when a server requests a back-off via the
+     * <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a>
+     * HTTP response header. A value of {@code -1} (the default) means the delay requested by the
+     * server is honored as-is, with no upper bound.
+     */
+    public static final String MAX_RETRY_AFTER_PARAM_KEY = "fetcher.max.retry.after";
+
+    /** Name of the Retry-After HTTP header, lower-cased as stored by the protocol layer. */
+    private static final String RETRY_AFTER_KEY = "retry-after";
+
+    /**
+     * Formatter for the HTTP-date form of the Retry-After header, e.g. {@code Wed, 21 Oct 2015
+     * 07:28:00 GMT}. {@link DateTimeFormatter} is immutable and thread-safe, unlike {@code
+     * SimpleDateFormat}, which matters here as it is shared across fetcher threads.
+     */
+    private static final DateTimeFormatter HTTP_DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ROOT)
+                    .withZone(ZoneOffset.UTC);
 
     /** Key name of the custom crawl delay for a queue that may be present in the metadata. */
     private static final String CRAWL_DELAY_KEY_NAME = "crawl.delay";
@@ -233,10 +256,16 @@ public class FetcherBolt extends StatusEmitterBolt {
             return inProgress.get();
         }
 
-        public void finishFetchItem(FetchItem it, boolean asap) {
+        public void finishFetchItem(FetchItem it, boolean asap, long retryAfterMS) {
             if (it != null) {
                 inProgress.decrementAndGet();
                 setNextFetchTime(System.currentTimeMillis(), asap);
+                if (retryAfterMS > 0) {
+                    // the server asked us to back off: push the next fetch time for
+                    // this queue further out if needed, but never bring it earlier
+                    final long earliest = System.currentTimeMillis() + retryAfterMS;
+                    nextFetchTime.getAndUpdate(prev -> Math.max(prev, earliest));
+                }
             }
         }
 
@@ -345,13 +374,13 @@ public class FetcherBolt extends StatusEmitterBolt {
             return added;
         }
 
-        public synchronized void finishFetchItem(FetchItem it, boolean asap) {
+        public synchronized void finishFetchItem(FetchItem it, boolean asap, long retryAfterMS) {
             FetchItemQueue fiq = queues.get(it.queueId);
             if (fiq == null) {
                 LOG.warn("Attempting to finish item from unknown queue: {}", it.queueId);
                 return;
             }
-            fiq.finishFetchItem(it, asap);
+            fiq.finishFetchItem(it, asap, retryAfterMS);
         }
 
         public synchronized FetchItemQueue getFetchItemQueue(String id, Metadata metadata) {
@@ -483,6 +512,41 @@ public class FetcherBolt extends StatusEmitterBolt {
         }
     }
 
+    /**
+     * Parses the value of a <a
+     * href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a>
+     * HTTP response header into a delay expressed in milliseconds, relative to now. The value is
+     * either a number of seconds (e.g. {@code 120}) or an HTTP date (e.g. {@code Wed, 21 Oct 2015
+     * 07:28:00 GMT}).
+     *
+     * @return the delay in milliseconds, or {@code -1} if the header is absent, malformed or in the
+     *     past.
+     */
+    static long parseRetryAfterDelay(String retryAfter) {
+        if (StringUtils.isBlank(retryAfter)) {
+            return -1;
+        }
+        retryAfter = retryAfter.trim();
+        // delay expressed as a number of seconds
+        if (retryAfter.matches("[0-9]+")) {
+            try {
+                return Long.parseLong(retryAfter) * 1000L;
+            } catch (NumberFormatException e) {
+                // value too large to fit in a long - ignore
+                return -1;
+            }
+        }
+        // delay expressed as an HTTP date
+        try {
+            Instant date = Instant.from(HTTP_DATE_FORMATTER.parse(retryAfter));
+            long delay = date.toEpochMilli() - System.currentTimeMillis();
+            return delay > 0 ? delay : -1;
+        } catch (DateTimeException e) {
+            LOG.debug("Invalid Retry-After header value: {}", retryAfter);
+            return -1;
+        }
+    }
+
     /** This class picks items from queues and fetches the pages. */
     private class FetcherThread extends Thread {
 
@@ -500,6 +564,9 @@ public class FetcherBolt extends StatusEmitterBolt {
 
         /** Hard timeout in seconds for a single protocol fetch. -1 means disabled. */
         private long fetchTimeout = -1;
+
+        /** Upper bound in ms for honoring the Retry-After header; -1 means no cap. */
+        private long maxRetryAfter = -1;
 
         /**
          * Single-thread executor used to run the protocol call so that it can be interrupted via
@@ -521,6 +588,8 @@ public class FetcherBolt extends StatusEmitterBolt {
             this.threadNum = num;
             timeoutInQueues = ConfUtils.getLong(conf, QUEUED_TIMEOUT_PARAM_KEY, timeoutInQueues);
             fetchTimeout = ConfUtils.getLong(conf, FETCH_TIMEOUT_PARAM_KEY, fetchTimeout);
+            long maxRetryAfterSecs = ConfUtils.getLong(conf, MAX_RETRY_AFTER_PARAM_KEY, -1L);
+            maxRetryAfter = maxRetryAfterSecs < 0 ? -1L : maxRetryAfterSecs * 1000L;
             protocolMetadataPrefix =
                     ConfUtils.getString(
                             conf,
@@ -585,6 +654,9 @@ public class FetcherBolt extends StatusEmitterBolt {
                 metadata.remove("fetch.exception");
 
                 boolean asap = false;
+
+                // delay in ms requested by the server via the Retry-After header; -1 if none
+                long retryAfter = -1;
 
                 try {
                     URL url = URLUtil.toURL(fit.url);
@@ -783,6 +855,21 @@ public class FetcherBolt extends StatusEmitterBolt {
                             response.getStatusCode(),
                             timeFetching);
 
+                    // honour a Retry-After response header (e.g. on 429 or 503) by
+                    // delaying the next fetch from this queue accordingly
+                    // https://github.com/apache/stormcrawler/issues/784
+                    retryAfter =
+                            parseRetryAfterDelay(
+                                    response.getMetadata().getFirstValue(RETRY_AFTER_KEY));
+                    if (retryAfter > 0 && maxRetryAfter >= 0 && retryAfter > maxRetryAfter) {
+                        LOG.debug(
+                                "Capping Retry-After for {} from {} to {} ms",
+                                fit.url,
+                                retryAfter,
+                                maxRetryAfter);
+                        retryAfter = maxRetryAfter;
+                    }
+
                     // merges the original MD and the ones returned by the
                     // protocol
                     Metadata mergedMetadata = new Metadata();
@@ -885,7 +972,7 @@ public class FetcherBolt extends StatusEmitterBolt {
 
                     eventCounter.scope("exception").incrBy(1);
                 } finally {
-                    fetchQueues.finishFetchItem(fit, asap);
+                    fetchQueues.finishFetchItem(fit, asap, retryAfter);
                     activeThreads.decrementAndGet(); // count threads
                     // ack it whatever happens
                     collector.ack(fit.tuple);
@@ -1013,7 +1100,9 @@ public class FetcherBolt extends StatusEmitterBolt {
     @Override
     public void cleanup() {
         super.cleanup();
-        protocolFactory.cleanup();
+        if (protocolFactory != null) {
+            protocolFactory.cleanup();
+        }
     }
 
     @Override

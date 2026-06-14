@@ -52,6 +52,13 @@ config:
   #    use the delay specified in the robots.txt
   fetcher.server.delay.force: false
 
+  # max. delay in seconds honored when a server requests a back-off via the
+  # Retry-After HTTP response header (e.g. on a 429 or 503). The next fetch from
+  # the affected internal queue is delayed accordingly.
+  #  (-1) honor the delay requested by the server as-is, with no upper bound
+  #  (>=0) cap the honored delay to this many seconds
+  fetcher.max.retry.after: -1
+
   # time bucket to use for the metrics sent by the Fetcher
   fetcher.metrics.time.bucket.secs: 10
 
