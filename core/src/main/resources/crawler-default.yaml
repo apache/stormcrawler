@@ -144,6 +144,20 @@ config:
   # Follow redirect HTTP responses:
   http.allow.redirects: false
 
+  # IP address filtering (okhttp protocol only). Optionally limit or block
+  # connections to IP address ranges once the host name has been resolved. This
+  # prevents information leakage to a public index when a DNS entry points to a
+  # private or loopback address. Rules can be given as a comma-separated string
+  # or as a list and may be:
+  #   - a single IP address, e.g. "127.0.0.1" or "::1"
+  #   - a CIDR block, e.g. "192.168.0.0/16" or "fd00::/8"
+  #   - "localhost" / "loopback" (matches InetAddress.isLoopbackAddress())
+  #   - "sitelocal" (matches InetAddress.isSiteLocalAddress())
+  # Only addresses matching an include rule are fetched (empty means all are
+  # allowed), addresses matching an exclude rule are always blocked.
+  # http.filter.ipaddress.include:
+  # http.filter.ipaddress.exclude: "localhost,sitelocal"
+
   # Allow all if robots.txt cannot be parsed due to code 403 (Forbidden):
   http.robots.403.allow: true
 

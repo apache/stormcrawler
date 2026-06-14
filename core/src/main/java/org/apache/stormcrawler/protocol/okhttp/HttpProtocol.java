@@ -19,6 +19,7 @@ package org.apache.stormcrawler.protocol.okhttp;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.Proxy;
@@ -225,6 +226,14 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
 
         customHeaders.forEach(customRequestHeaders::add);
+
+        // optionally block connections to forbidden IP address ranges
+        // (e.g. localhost/loopback, private/site-local addresses), see
+        // https://github.com/apache/stormcrawler/issues/1107
+        final IPFilterRules ipFilterRules = new IPFilterRules(conf);
+        if (!ipFilterRules.isEmpty()) {
+            builder.addNetworkInterceptor(new HTTPFilterIPAddressInterceptor(ipFilterRules));
+        }
 
         if (storeHttpHeaders) {
             builder.addNetworkInterceptor(new HTTPHeadersInterceptor());
@@ -536,6 +545,36 @@ public class HttpProtocol extends AbstractHttpProtocol {
         final byte[] arr = new byte[bytesToCopy];
         source.getBuffer().readFully(arr);
         return arr;
+    }
+
+    /**
+     * Network interceptor blocking connections to IP addresses rejected by the configured {@link
+     * IPFilterRules}. The IP address is only known once the connection has been established, hence
+     * the filtering happens at the protocol level rather than by filtering URLs.
+     */
+    static class HTTPFilterIPAddressInterceptor implements Interceptor {
+
+        private final IPFilterRules rules;
+
+        HTTPFilterIPAddressInterceptor(IPFilterRules rules) {
+            this.rules = rules;
+        }
+
+        @NotNull
+        @Override
+        public Response intercept(Interceptor.Chain chain) throws IOException {
+            final Connection connection = Objects.requireNonNull(chain.connection());
+            final InetAddress address = connection.socket().getInetAddress();
+            final Request request = chain.request();
+
+            if (rules.accept(address)) {
+                return chain.proceed(request);
+            }
+
+            final String hostAddress = address == null ? "unknown" : address.getHostAddress();
+            LOG.warn("Blocked connection to IP address {}: {}", hostAddress, request.url());
+            throw new IOException("Forbidden connection to IP address " + hostAddress);
+        }
     }
 
     static class HTTPHeadersInterceptor implements Interceptor {

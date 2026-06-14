@@ -255,6 +255,8 @@ header.
 | http.accept.language | en-us,en-gb,en;q=0.7,*;q=0.3 | HTTP Accept-Language
 header.
 | http.content.partial.as.trimmed | false | Accepts partially fetched content in OKHTTP.
+| http.filter.ipaddress.include | - | (OkHttp only) Comma-separated list (or YAML list) of allowed IP ranges. If empty, all addresses are allowed unless excluded. See <<IP Address Filtering>>.
+| http.filter.ipaddress.exclude | - | (OkHttp only) Comma-separated list (or YAML list) of blocked IP ranges. See <<IP Address Filtering>>.
 | http.trust.everything | true | If true, trust all SSL/TLS connections.
 | navigationfilters.config.file | - | JSON config for NavigationFilter (used by the Selenium protocol module).
 | selenium.addresses | - | WebDriver server addresses.
@@ -267,6 +269,39 @@ header.
 | selenium.setScriptTimeout | 0 | WebDriver script execution timeout.
 | topology.message.timeout.secs | -1 | OKHTTP message timeout.
 |===
+
+[[IP Address Filtering]]
+===== IP Address Filtering
+
+The OkHttp protocol implementation (`org.apache.stormcrawler.protocol.okhttp.HttpProtocol`) can
+optionally limit or block connections to IP address ranges. Because a DNS entry of an arbitrary host
+name may resolve to a private or loopback address, filtering URLs is not sufficient to prevent
+information leakage to a public search index or web archive. The filtering therefore happens at the
+protocol level, once the IP address is known.
+
+Two properties control the behaviour:
+
+* `http.filter.ipaddress.include` — defines the allowed IP ranges. If empty, all addresses are
+allowed unless explicitly excluded.
+* `http.filter.ipaddress.exclude` — defines the blocked IP ranges. An excluded address is always
+blocked, even if it also matches an include rule.
+
+Each property accepts a comma-separated string or a YAML list of rules. A rule can be:
+
+* a single IP address, e.g. `127.0.0.1` or `::1`
+* a CIDR block, e.g. `192.168.0.0/16` or `fd00::/8`
+* `localhost` or `loopback` — matches any loopback address (`InetAddress.isLoopbackAddress()`)
+* `sitelocal` — matches any site-local address (`InetAddress.isSiteLocalAddress()`)
+
+For example, to block crawling of localhost and private address spaces:
+
+[source,yaml]
+----
+http.filter.ipaddress.exclude: "localhost,sitelocal"
+----
+
+When a connection to a blocked address is attempted, the fetch fails with an `IOException` and a
+warning is logged. If neither property is set, no IP filtering is performed.
 
 ==== Indexing
 
