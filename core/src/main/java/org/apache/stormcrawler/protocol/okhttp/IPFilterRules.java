@@ -45,8 +45,8 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>IP address, e.g. <code>127.0.0.1</code> or <code>::1</code> (IPv6)
  *   <li>CIDR notation, e.g. <code>192.168.0.0/16</code> or <code>fd00::/8</code>
- *   <li><code>localhost</code> or <code>loopback</code> applies to all IP addresses for which {@link
- *       InetAddress#isLoopbackAddress()} is true
+ *   <li><code>localhost</code> or <code>loopback</code> applies to all IP addresses for which
+ *       {@link InetAddress#isLoopbackAddress()} is true
  *   <li><code>sitelocal</code> applies to all IP addresses for which {@link
  *       InetAddress#isSiteLocalAddress()} is true
  * </ul>

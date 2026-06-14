@@ -21,9 +21,8 @@ import com.google.common.net.InetAddresses;
 import java.net.InetAddress;
 
 /**
- * Parse a <a href=
- * "https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing">CIDR</a> block notation and test
- * whether an IP address is contained in the subnet range defined by the CIDR.
+ * Parse a <a href= "https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing">CIDR</a> block
+ * notation and test whether an IP address is contained in the subnet range defined by the CIDR.
  */
 public class CIDR {
 
