@@ -98,8 +98,8 @@ public class FetcherBolt extends StatusEmitterBolt {
     public static final String FETCH_TIMEOUT_PARAM_KEY = "fetcher.thread.timeout";
 
     /**
-     * Maximum delay in seconds the fetcher will wait when a server requests a back-off via the
-     * <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a>
+     * Maximum delay in seconds the fetcher will wait when a server requests a back-off via the <a
+     * href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a>
      * HTTP response header. A value of {@code -1} (the default) means the delay requested by the
      * server is honored as-is, with no upper bound.
      */

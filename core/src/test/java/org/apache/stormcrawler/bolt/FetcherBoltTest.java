@@ -40,7 +40,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.tuple.Tuple;
-import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
 import org.junit.jupiter.api.Assertions;
@@ -72,8 +71,7 @@ public class FetcherBoltTest extends AbstractFetcherBoltTest {
         String future = HTTP_DATE.format(Instant.now().plusSeconds(120));
         long delay = FetcherBolt.parseRetryAfterDelay(future);
         // allow some slack for the clock ticking between formatting and parsing
-        Assertions.assertTrue(
-                delay > 100_000L && delay <= 120_000L, "unexpected delay: " + delay);
+        Assertions.assertTrue(delay > 100_000L && delay <= 120_000L, "unexpected delay: " + delay);
     }
 
     @Test
@@ -107,8 +105,7 @@ public class FetcherBoltTest extends AbstractFetcherBoltTest {
         bolt.execute(tupleForUrl(base + "/b"));
 
         // both URLs are fetched and acked
-        await().atMost(30, TimeUnit.SECONDS)
-                .until(() -> output.getAckedTuples().size() == 2);
+        await().atMost(30, TimeUnit.SECONDS).until(() -> output.getAckedTuples().size() == 2);
 
         List<LoggedRequest> a = findAll(getRequestedFor(urlEqualTo("/a")));
         List<LoggedRequest> b = findAll(getRequestedFor(urlEqualTo("/b")));
