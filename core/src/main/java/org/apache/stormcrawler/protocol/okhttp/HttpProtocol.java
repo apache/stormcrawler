@@ -73,6 +73,7 @@ import org.apache.storm.Config;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
+import org.apache.stormcrawler.protocol.IPFilterRules;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.ProtocolResponse.TrimmedContentReason;
 import org.apache.stormcrawler.proxy.SCProxy;
@@ -551,6 +552,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
      * Network interceptor blocking connections to IP addresses rejected by the configured {@link
      * IPFilterRules}. The IP address is only known once the connection has been established, hence
      * the filtering happens at the protocol level rather than by filtering URLs.
+     *
+     * <p>Note that when a proxy is configured the connection is established to the proxy, so the
+     * filter sees the proxy's IP address rather than the target host's resolved address; IP
+     * filtering is therefore effectively disabled for proxied fetches.
      */
     static class HTTPFilterIPAddressInterceptor implements Interceptor {
 

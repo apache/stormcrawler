@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.protocol.okhttp;
+package org.apache.stormcrawler.protocol;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,6 +36,23 @@ class CIDRTest {
         CIDR cidr = new CIDR("127.0.0.1");
         assertTrue(cidr.contains(ip("127.0.0.1")));
         assertFalse(cidr.contains(ip("127.0.0.2")));
+        // a /32 must compare every byte, including the first one
+        assertFalse(cidr.contains(ip("1.0.0.1")));
+    }
+
+    @Test
+    void singleIPv6AddressMatchesOnlyItself() {
+        CIDR cidr = new CIDR("::1");
+        assertTrue(cidr.contains(ip("::1")));
+        // a /128 must compare every byte, including the first one
+        assertFalse(cidr.contains(ip("fd00::1")));
+    }
+
+    @Test
+    void outOfRangeMaskThrows() {
+        assertThrows(IllegalArgumentException.class, () -> new CIDR("10.0.0.0/-1"));
+        assertThrows(IllegalArgumentException.class, () -> new CIDR("10.0.0.0/33"));
+        assertThrows(IllegalArgumentException.class, () -> new CIDR("::1/129"));
     }
 
     @Test

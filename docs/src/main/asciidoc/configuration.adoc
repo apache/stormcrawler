@@ -303,6 +303,10 @@ http.filter.ipaddress.exclude: "localhost,sitelocal"
 When a connection to a blocked address is attempted, the fetch fails with an `IOException` and a
 warning is logged. If neither property is set, no IP filtering is performed.
 
+NOTE: When a proxy is configured, the connection is established to the proxy and the filter sees the
+proxy's IP address rather than the target host's resolved address. IP filtering is therefore
+effectively disabled for proxied fetches.
+
 ==== Indexing
 
 The values below are used by sub-classes of `AbstractIndexerBolt`.

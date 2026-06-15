@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.protocol.okhttp;
+package org.apache.stormcrawler.protocol;
 
 import com.google.common.net.InetAddresses;
 import java.net.InetAddress;
@@ -52,6 +52,11 @@ public class CIDR {
             // need to shift the mask
             parsedMask = Math.max(0, parsedMask - 96);
         }
+        int maxMask = addr.getAddress().length * 8;
+        if (parsedMask < 0 || parsedMask > maxMask) {
+            throw new IllegalArgumentException(
+                    "Invalid CIDR mask /" + parsedMask + " for " + ipStr);
+        }
         this.mask = parsedMask;
     }
 
@@ -67,7 +72,8 @@ public class CIDR {
             if (remainingMaskBits <= 0) {
                 return true;
             }
-            int m = ~(0xff >> remainingMaskBits); // mask for byte under cursor
+            // keep the mask within one byte so the shift can't wrap (Java shifts mod 32)
+            int m = remainingMaskBits >= 8 ? 0xff : (0xff << (8 - remainingMaskBits)) & 0xff;
             if ((addr0[i] & m) != (addr1[i] & m)) {
                 return false;
             }

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.protocol.okhttp;
+package org.apache.stormcrawler.protocol;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
