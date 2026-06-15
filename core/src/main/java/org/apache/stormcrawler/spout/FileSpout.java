@@ -17,21 +17,16 @@
 
 package org.apache.stormcrawler.spout;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
+import java.util.zip.GZIPInputStream;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.spout.Scheme;
 import org.apache.storm.spout.SpoutOutputCollector;
@@ -46,27 +41,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Reads the lines from a UTF-8 file and use them as a spout. Load the entire content into memory.
- * Uses StringTabScheme to parse the lines into URLs and Metadata, generates tuples on the default
- * stream unless withDiscoveredStatus is set to true.
+ * Reads the lines from a UTF-8 file and use them as a spout. The spout reads files in chunks of
+ * 10,000 lines, keeping memory usage very low even for extremely large files with millions of seed
+ * URLs. Uses StringTabScheme to parse the lines into URLs and Metadata, generates tuples on the
+ * default stream unless withDiscoveredStatus is set to true.
  */
 public class FileSpout extends BaseRichSpout {
 
     public static final int BATCH_SIZE = 10000;
     public static final Logger LOG = LoggerFactory.getLogger(FileSpout.class);
-
-    protected SpoutOutputCollector collector;
-
     private final Queue<String> inputFiles;
-    private BufferedReader currentBuffer;
-
+    protected SpoutOutputCollector collector;
     protected Scheme scheme = new StringTabScheme();
-
     protected LinkedList<byte[]> buffer = new LinkedList<>();
     protected boolean active;
-    private boolean withDiscoveredStatus = false;
     protected int totalTasks;
     protected int taskIndex;
+    private BufferedReader currentBuffer;
+    private boolean withDiscoveredStatus = false;
 
     /**
      * @param dir containing the seed files
@@ -138,11 +130,20 @@ public class FileSpout extends BaseRichSpout {
                 return;
             }
             Path inputPath = Paths.get(file);
-            currentBuffer =
-                    new BufferedReader(
-                            new InputStreamReader(
-                                    new FileInputStream(inputPath.toFile()),
-                                    StandardCharsets.UTF_8));
+            InputStream is = new FileInputStream(inputPath.toFile());
+            try {
+                String fileLower = file.toLowerCase();
+                if (fileLower.endsWith(".gz") || fileLower.endsWith(".gzip")) {
+                    is = new GZIPInputStream(is);
+                } else if (fileLower.endsWith(".bz2")) {
+                    is = new BZip2CompressorInputStream(is);
+                }
+                currentBuffer =
+                        new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+            } catch (IOException e) {
+                is.close();
+                throw e;
+            }
         }
 
         String line = null;
@@ -228,7 +229,16 @@ public class FileSpout extends BaseRichSpout {
     }
 
     @Override
-    public void close() {}
+    public void close() {
+        if (currentBuffer != null) {
+            try {
+                currentBuffer.close();
+            } catch (IOException e) {
+                LOG.error("Exception thrown when closing current buffer", e);
+            }
+            currentBuffer = null;
+        }
+    }
 
     @Override
     public void activate() {
