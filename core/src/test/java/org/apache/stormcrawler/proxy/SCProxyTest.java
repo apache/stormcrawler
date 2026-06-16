@@ -89,4 +89,75 @@ class SCProxyTest {
         proxy.incrementUsage();
         Assertions.assertEquals(1, proxy.getUsage());
     }
+
+    @Test
+    void testEqualsAndHashCode() {
+        SCProxy a = new SCProxy("http://user1:pass1@example.com:8080");
+        SCProxy b = new SCProxy("http://user1:pass1@example.com:8080");
+
+        // equal on identical identity fields
+        Assertions.assertEquals(a, b);
+        // hashCode equal for equal objects
+        Assertions.assertEquals(a.hashCode(), b.hashCode());
+    }
+
+    @Test
+    void testEqualsCaseInsensitive() {
+        SCProxy a = new SCProxy("http://user1:pass1@example.com:8080");
+        SCProxy b = new SCProxy("HTTP://user1:pass1@EXAMPLE.COM:8080");
+
+        // protocol and address are case-insensitive
+        Assertions.assertEquals(a, b);
+        Assertions.assertEquals(a.hashCode(), b.hashCode());
+    }
+
+    @Test
+    void testNotEqualOnDifferentFields() {
+        SCProxy base = new SCProxy("http://user1:pass1@example.com:8080");
+
+        Assertions.assertNotEquals(
+                base, new SCProxy("http://user1:pass1@example.com:9090")); // different port
+        Assertions.assertNotEquals(
+                base, new SCProxy("http://user2:pass1@example.com:8080")); // different username
+        Assertions.assertNotEquals(
+                base, new SCProxy("http://user1:pass2@example.com:8080")); // different password
+    }
+
+    @Test
+    void testEqualsExcludesNonIdentityFields() {
+        // country, area, location, status are excluded from identity
+        SCProxy a =
+                new SCProxy(
+                        "http",
+                        "example.com",
+                        "8080",
+                        "user1",
+                        "pass1",
+                        "KR",
+                        "Seoul",
+                        "loc1",
+                        "active");
+        SCProxy b =
+                new SCProxy(
+                        "http",
+                        "example.com",
+                        "8080",
+                        "user1",
+                        "pass1",
+                        "US",
+                        "NY",
+                        "loc2",
+                        "inactive");
+
+        Assertions.assertEquals(a, b);
+        Assertions.assertEquals(a.hashCode(), b.hashCode());
+    }
+
+    @Test
+    void testEqualsNullAndDifferentType() {
+        SCProxy proxy = new SCProxy("http://user1:pass1@example.com:8080");
+
+        Assertions.assertNotEquals(proxy, null);
+        Assertions.assertNotEquals(proxy, "not-a-proxy");
+    }
 }

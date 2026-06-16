@@ -17,9 +17,6 @@
 
 package org.apache.stormcrawler.proxy;
 
-import java.util.Locale;
-import java.util.Objects;
-
 final class ProxyUtils {
 
     static final int MIN_PORT = 1;
@@ -39,17 +36,5 @@ final class ProxyUtils {
                             + value
                             + "`");
         }
-    }
-
-    static boolean isSameProxy(SCProxy proxy, SCProxy otherProxy) {
-        return Objects.equals(normalize(proxy.getProtocol()), normalize(otherProxy.getProtocol()))
-                && Objects.equals(normalize(proxy.getAddress()), normalize(otherProxy.getAddress()))
-                && Objects.equals(proxy.getPort(), otherProxy.getPort())
-                && Objects.equals(proxy.getUsername(), otherProxy.getUsername())
-                && Objects.equals(proxy.getPassword(), otherProxy.getPassword());
-    }
-
-    private static String normalize(String value) {
-        return value == null ? null : value.toLowerCase(Locale.ROOT);
     }
 }

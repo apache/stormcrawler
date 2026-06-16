@@ -17,6 +17,8 @@
 
 package org.apache.stormcrawler.proxy;
 
+import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,8 +42,8 @@ public class SCProxy {
     private final String protocol;
     private final String address;
     private final String port;
-    private String username;
-    private String password;
+    private final String username;
+    private final String password;
     private String country;
     private String area;
     private String location;
@@ -78,11 +80,15 @@ public class SCProxy {
         this.port = matcher.group("port");
 
         // load optional authentication data
+        String u = null;
+        String p = null;
         try {
-            this.username = matcher.group("username");
-            this.password = matcher.group("password");
+            u = matcher.group("username");
+            p = matcher.group("password");
         } catch (IllegalArgumentException ignored) {
         }
+        this.username = u;
+        this.password = p;
     }
 
     /** Construct a proxy class from it's variables. */
@@ -106,12 +112,9 @@ public class SCProxy {
         this.port = port;
 
         // load optional parameters
-        if (!username.isBlank()) {
-            this.username = username;
-        }
-        if (!password.isBlank()) {
-            this.password = password;
-        }
+        this.username = username.isBlank() ? null : username;
+        this.password = password.isBlank() ? null : password;
+
         if (!country.isBlank()) {
             this.country = country;
         }
@@ -185,5 +188,37 @@ public class SCProxy {
 
     public String getStatus() {
         return status;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+
+        if (!(o instanceof SCProxy)) {
+            return false;
+        }
+
+        SCProxy other = (SCProxy) o;
+        return Objects.equals(normalize(this.protocol), normalize(other.protocol))
+                && Objects.equals(normalize(this.address), normalize(other.address))
+                && Objects.equals(this.port, other.port)
+                && Objects.equals(this.username, other.username)
+                && Objects.equals(this.password, other.password);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                normalize(this.protocol),
+                normalize(this.address),
+                this.port,
+                this.username,
+                this.password);
+    }
+
+    private static String normalize(String value) {
+        return value == null ? null : value.toLowerCase(Locale.ROOT);
     }
 }

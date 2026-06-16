@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Scanner;
@@ -44,6 +46,7 @@ public class MultiProxyManager implements ProxyManager {
     private SCProxy[] proxies;
     private ProxyRotation rotation;
     private final AtomicInteger lastAccessedIndex = new AtomicInteger(0);
+    private Map<SCProxy, SCProxy> proxyLookupMap;
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(HttpProtocol.class);
 
@@ -146,6 +149,11 @@ public class MultiProxyManager implements ProxyManager {
 
         // assign proxies to class variable
         this.proxies = fileProxies;
+
+        this.proxyLookupMap = new HashMap<>();
+        for (SCProxy proxy : this.proxies) {
+            this.proxyLookupMap.put(proxy, proxy);
+        }
     }
 
     public void configure(ProxyRotation rotation, String[] proxyList) throws RuntimeException {
@@ -170,6 +178,11 @@ public class MultiProxyManager implements ProxyManager {
 
         // assign proxies to class variable
         this.proxies = fileProxies;
+
+        this.proxyLookupMap = new HashMap<>();
+        for (SCProxy proxy : this.proxies) {
+            this.proxyLookupMap.put(proxy, proxy);
+        }
     }
 
     private SCProxy getRandom() {
@@ -215,12 +228,7 @@ public class MultiProxyManager implements ProxyManager {
     }
 
     private Optional<SCProxy> getConfiguredProxy(SCProxy proxy) {
-        for (SCProxy configuredProxy : this.proxies) {
-            if (ProxyUtils.isSameProxy(configuredProxy, proxy)) {
-                return Optional.of(configuredProxy);
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(proxyLookupMap.get(proxy));
     }
 
     @Override
