@@ -116,6 +116,19 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
     private TextExtractor textExtractor;
 
+    /**
+     * Honor {@link TextExtractor#NO_TEXT_PARAM_NAME} on the text/plain path. No extractor is
+     * invoked there, so the value is read directly.
+     */
+    private boolean plainTextNoText;
+
+    /**
+     * Character cap for stored plain text, read from {@link TextExtractor#TEXT_MAX_TEXT_PARAM_NAME}
+     * ({@code -1} = unbounded). Bounds the emitted text only; the raw fetched size is bounded by
+     * {@code http.content.limit}.
+     */
+    private int plainTextMaxSize;
+
     private String protocolMetadataPrefix;
 
     private boolean robotsHeaderSkip;
@@ -188,6 +201,12 @@ public class JSoupParserBolt extends StatusEmitterBolt {
             LOG.warn("Cannot instantiazr textextractor.class '{}'.", clazz, e);
             throw new RuntimeException(e);
         }
+
+        // The text/plain path does not run the TextExtractor (there is no markup to
+        // extract from), so the two size-related knobs are read here and applied
+        // directly. The include/exclude knobs require markup and have no effect.
+        plainTextNoText = ConfUtils.getBoolean(conf, TextExtractor.NO_TEXT_PARAM_NAME, false);
+        plainTextMaxSize = ConfUtils.getInt(conf, TextExtractor.TEXT_MAX_TEXT_PARAM_NAME, -1);
     }
 
     @Override
@@ -202,6 +221,10 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         // check that its content type is HTML
         // look at value found in HTTP headers
         boolean contentTypeIsOk = false;
+
+        // text/plain content needs no markup parsing: the decoded bytes are
+        // the text, there are no outlinks (see issue #466)
+        boolean isPlainText = false;
 
         String mimeType =
                 metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, this.protocolMetadataPrefix);
@@ -219,8 +242,12 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         }
 
         if (StringUtils.isNotBlank(mimeType)) {
-            if (mimeType.toLowerCase(Locale.ROOT).contains("html")) {
+            final String lcMimeType = mimeType.toLowerCase(Locale.ROOT);
+            if (lcMimeType.contains("html")) {
                 contentTypeIsOk = true;
+            } else if (lcMimeType.contains("text/plain")) {
+                contentTypeIsOk = true;
+                isPlainText = true;
             }
         } else {
             // go ahead even if no mimetype is available
@@ -272,79 +299,100 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         try {
             String html = Charset.forName(charset).decode(ByteBuffer.wrap(content)).toString();
 
-            jsoupDoc = Parser.htmlParser().parseInput(html, url);
-
-            if (!robotsMetaSkip) {
-                // extracts the robots directives from the meta tags
-                Element robotelement = jsoupDoc.selectFirst("meta[name~=(?i)robots][content]");
-                if (robotelement != null) {
-                    robotsTags.extractMetaTags(robotelement.attr("content"));
-                }
-            }
-
-            // store a normalised representation in metadata
-            // so that the indexer is aware of it
-            robotsTags.normaliseToMetadata(metadata);
-
-            // do not extract the links if no follow has been set
-            // and we are in strict mode
-            if (robotsTags.isNoFollow() && robotsNoFollowStrict) {
+            if (isPlainText) {
+                // no markup to parse: the decoded content is the text itself and
+                // there are no outlinks. An empty shell document is kept so that
+                // the downstream redirection check and parse filters still work.
+                jsoupDoc = org.jsoup.nodes.Document.createShell(url);
                 slinks = new HashMap<>(0);
+                robotsTags.normaliseToMetadata(metadata);
+                // the decoded content is the text; bound it the same way the
+                // TextExtractor would (no.text / skip.after) while preserving the
+                // original layout, which is the whole point of a .txt
+                if (plainTextNoText) {
+                    text = "";
+                } else if (plainTextMaxSize > 0 && html.length() > plainTextMaxSize) {
+                    text = html.substring(0, plainTextMaxSize);
+                } else {
+                    text = html;
+                }
             } else {
-                final Elements links = jsoupDoc.select("a[href]");
-                slinks = new HashMap<>(links.size());
-                final URL baseUrl = URLUtil.toURL(url);
-                for (Element link : links) {
-                    // nofollow
-                    String[] relkeywords = link.attr("rel").split(" ");
-                    boolean noFollow =
-                            Stream.of(relkeywords).anyMatch(x -> x.equalsIgnoreCase("nofollow"));
+                jsoupDoc = Parser.htmlParser().parseInput(html, url);
 
-                    // remove altogether
-                    if (noFollow && robotsNoFollowStrict) {
-                        continue;
-                    }
-
-                    // link not specifically marked as no follow
-                    // but whole page is
-                    if (!noFollow && robotsTags.isNoFollow()) {
-                        noFollow = true;
-                    }
-
-                    String targetUrl = null;
-
-                    try {
-                        // abs:href tells jsoup to return fully qualified domains
-                        // for relative urls
-                        // but it is very slow as it builds intermediate URL objects
-                        // and normalises the URL of the document every time
-                        targetUrl = URLUtil.resolveUrl(baseUrl, link.attr("href")).toExternalForm();
-                    } catch (MalformedURLException e) {
-                        LOG.debug(
-                                "Cannot resolve URL with baseURL : {} and href : {}",
-                                baseUrl,
-                                link.attr("href"),
-                                e);
-                    }
-
-                    if (StringUtils.isBlank(targetUrl)) {
-                        continue;
-                    }
-
-                    final List<String> anchors =
-                            slinks.computeIfAbsent(targetUrl, a -> new LinkedList<>());
-
-                    // any existing anchors for the same target?
-                    final String anchor = link.text();
-                    // track the anchors only if no follow is false
-                    if (!noFollow && StringUtils.isNotBlank(anchor)) {
-                        anchors.add(anchor);
+                if (!robotsMetaSkip) {
+                    // extracts the robots directives from the meta tags
+                    Element robotelement = jsoupDoc.selectFirst("meta[name~=(?i)robots][content]");
+                    if (robotelement != null) {
+                        robotsTags.extractMetaTags(robotelement.attr("content"));
                     }
                 }
-            }
 
-            Element body = jsoupDoc.body();
-            text = textExtractor.text(body);
+                // store a normalised representation in metadata
+                // so that the indexer is aware of it
+                robotsTags.normaliseToMetadata(metadata);
+
+                // do not extract the links if no follow has been set
+                // and we are in strict mode
+                if (robotsTags.isNoFollow() && robotsNoFollowStrict) {
+                    slinks = new HashMap<>(0);
+                } else {
+                    final Elements links = jsoupDoc.select("a[href]");
+                    slinks = new HashMap<>(links.size());
+                    final URL baseUrl = URLUtil.toURL(url);
+                    for (Element link : links) {
+                        // nofollow
+                        String[] relkeywords = link.attr("rel").split(" ");
+                        boolean noFollow =
+                                Stream.of(relkeywords)
+                                        .anyMatch(x -> x.equalsIgnoreCase("nofollow"));
+
+                        // remove altogether
+                        if (noFollow && robotsNoFollowStrict) {
+                            continue;
+                        }
+
+                        // link not specifically marked as no follow
+                        // but whole page is
+                        if (!noFollow && robotsTags.isNoFollow()) {
+                            noFollow = true;
+                        }
+
+                        String targetUrl = null;
+
+                        try {
+                            // abs:href tells jsoup to return fully qualified domains
+                            // for relative urls
+                            // but it is very slow as it builds intermediate URL objects
+                            // and normalises the URL of the document every time
+                            targetUrl =
+                                    URLUtil.resolveUrl(baseUrl, link.attr("href")).toExternalForm();
+                        } catch (MalformedURLException e) {
+                            LOG.debug(
+                                    "Cannot resolve URL with baseURL : {} and href : {}",
+                                    baseUrl,
+                                    link.attr("href"),
+                                    e);
+                        }
+
+                        if (StringUtils.isBlank(targetUrl)) {
+                            continue;
+                        }
+
+                        final List<String> anchors =
+                                slinks.computeIfAbsent(targetUrl, a -> new LinkedList<>());
+
+                        // any existing anchors for the same target?
+                        final String anchor = link.text();
+                        // track the anchors only if no follow is false
+                        if (!noFollow && StringUtils.isNotBlank(anchor)) {
+                            anchors.add(anchor);
+                        }
+                    }
+                }
+
+                Element body = jsoupDoc.body();
+                text = textExtractor.text(body);
+            }
 
         } catch (Throwable e) {
             String errorMessage = "Exception while parsing " + url + ": " + e;

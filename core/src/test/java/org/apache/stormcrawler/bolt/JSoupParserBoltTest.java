@@ -222,6 +222,78 @@ class JSoupParserBoltTest extends ParsingTester {
         Assertions.assertEquals(25, statusTuples.size());
     }
 
+    /**
+     * text/plain content needs no markup parsing and should be passed on rather than treated as an
+     * error, see issue #466.
+     */
+    @Test
+    void testPlainText() throws IOException {
+        bolt.prepare(
+                new HashMap<>(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        String plain = "This is a plain text document.\nIt has no markup and no links.\n";
+        Metadata metadata = new Metadata();
+        metadata.setValue("Content-Type", "text/plain; charset=UTF-8");
+        parse("http://www.example.com/page.txt", plain.getBytes(StandardCharsets.UTF_8), metadata);
+
+        // not emitted on the status stream as an error
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(0, statusTuples.size(), "plain text should not produce outlinks");
+
+        // emitted on the default stream with the content as text
+        Assertions.assertEquals(1, output.getEmitted().size());
+        List<Object> parsedTuple = output.getEmitted().remove(0);
+        String text = (String) parsedTuple.get(3);
+        Assertions.assertEquals(plain, text, "text should be the verbatim plain text content");
+
+        Metadata md = (Metadata) parsedTuple.get(2);
+        Assertions.assertTrue(
+                md.getFirstValue("parse.Content-Type").contains("text/plain"),
+                "detected content-type should be text/plain");
+        Assertions.assertEquals(JSoupParserBolt.class.getName(), md.getFirstValue("parsed.by"));
+    }
+
+    /**
+     * The plain-text path does not run the TextExtractor, but it still honors {@code
+     * textextractor.skip.after} by truncating the stored text, see issue #466.
+     */
+    @Test
+    void testPlainTextTruncatedAtSkipAfter() throws IOException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put("textextractor.skip.after", 10);
+        bolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        String plain = "0123456789ABCDEFGHIJ"; // 20 chars, cap is 10
+        Metadata metadata = new Metadata();
+        metadata.setValue("Content-Type", "text/plain; charset=UTF-8");
+        parse("http://www.example.com/big.txt", plain.getBytes(StandardCharsets.UTF_8), metadata);
+
+        Assertions.assertEquals(1, output.getEmitted().size());
+        List<Object> parsedTuple = output.getEmitted().remove(0);
+        String text = (String) parsedTuple.get(3);
+        Assertions.assertEquals(
+                "0123456789", text, "plain text should be truncated at textextractor.skip.after");
+    }
+
+    /**
+     * The plain-text path honors {@code textextractor.no.text} and stores no text, see issue #466.
+     */
+    @Test
+    void testPlainTextNoText() throws IOException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put("textextractor.no.text", true);
+        bolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        String plain = "This is a plain text document.\n";
+        Metadata metadata = new Metadata();
+        metadata.setValue("Content-Type", "text/plain; charset=UTF-8");
+        parse("http://www.example.com/page.txt", plain.getBytes(StandardCharsets.UTF_8), metadata);
+
+        Assertions.assertEquals(1, output.getEmitted().size());
+        List<Object> parsedTuple = output.getEmitted().remove(0);
+        String text = (String) parsedTuple.get(3);
+        Assertions.assertEquals("", text, "no text should be stored when textextractor.no.text");
+    }
+
     @Test
     void testExecuteWithJavascriptLink() throws IOException {
         bolt.prepare(stormConf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));

@@ -318,7 +318,7 @@ Configures parsing of fetched text and the handling of discovered URIs
 | detect.mimetype | true | Enable MIME type detection during parsing.
 | feed.filter.hours.since.published | -1 | Discard feeds older than value hours.
 | feed.sniffContent | false | Try to detect feeds automatically.
-| jsoup.treat.non.html.as.error | true | If true, non-HTML content is treated as an error by JSoupParserBolt.
+| jsoup.treat.non.html.as.error | true | If true, non-HTML content is treated as an error by JSoupParserBolt. Note that `text/plain` is always handled directly (the content is used as the text) and never treated as an error. Its stored text honors `textextractor.no.text` and is capped at `textextractor.skip.after`; the raw fetched size is bounded by `http.content.limit`.
 | parsefilters.config.file | parsefilters.json | Path to JSON config defining ParseFilters. See link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/parsefilters.json[default parsefilters.json].
 | parser.emitOutlinks | true | Emit discovered links as DISCOVERED tuples.
 | parser.emitOutlinks.max.per.page | -1 | Limit number of emitted links per page.

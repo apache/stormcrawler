@@ -121,7 +121,7 @@ You can easily build your own custom indexer to integrate with other storage sys
 === Parser Bolts
 ==== JSoupParserBolt
 
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] can be used to parse HTML documents and extract the outlinks, text, and metadata it contains. If you want to parse non-HTML documents, use the link:https://github.com/apache/stormcrawler/tree/main/external/tika/src/main/java/org/apache/stormcrawler/tika[Tika-based ParserBolt] from the external modules.
+The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] can be used to parse HTML documents and extract the outlinks, text, and metadata it contains. `text/plain` content is also handled: since there is no markup to parse, the content is used directly as the text and no outlinks are extracted. If you want to parse other non-HTML documents, use the link:https://github.com/apache/stormcrawler/tree/main/external/tika/src/main/java/org/apache/stormcrawler/tika[Tika-based ParserBolt] from the external modules.
 
 This parser calls the xref:urlfilters[URLFilters] and xref:parsefilters[ParseFilters] defined in the configuration. Please note that it calls xref:metadatatransfer[MetadataTransfer] prior to calling the xref:parsefilters[ParseFilters]. If you create new Outlinks in your [[ParseFilters]], you'll need to make sure that you use MetadataTransfer there to inherit the Metadata from the parent document.
 
