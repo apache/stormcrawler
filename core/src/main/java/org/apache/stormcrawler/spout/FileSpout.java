@@ -17,14 +17,23 @@
 
 package org.apache.stormcrawler.spout;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Queue;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.lang3.StringUtils;
@@ -132,7 +141,7 @@ public class FileSpout extends BaseRichSpout {
             Path inputPath = Paths.get(file);
             InputStream is = new FileInputStream(inputPath.toFile());
             try {
-                String fileLower = file.toLowerCase();
+                String fileLower = file.toLowerCase(Locale.ROOT);
                 if (fileLower.endsWith(".gz") || fileLower.endsWith(".gzip")) {
                     is = new GZIPInputStream(is);
                 } else if (fileLower.endsWith(".bz2")) {
