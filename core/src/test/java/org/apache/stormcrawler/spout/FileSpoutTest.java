@@ -160,8 +160,8 @@ class FileSpoutTest {
     }
 
     @Test
-    void testDirectoryResolvedAtOpenNotConstruction(
-            @org.junit.jupiter.api.io.TempDir Path tempDir) throws Exception {
+    void testDirectoryResolvedAtOpenNotConstruction(@org.junit.jupiter.api.io.TempDir Path tempDir)
+            throws Exception {
         // Build the spout while the directory is still empty.
         final FileSpout spout = new FileSpout(tempDir.toAbsolutePath().toString(), "*.txt");
 
@@ -176,6 +176,54 @@ class FileSpoutTest {
         spout.open(Map.of(), new FileSpoutTopologyContextMock(), collectorMock);
         spout.activate();
         spout.nextTuple();
+
+        final List<Object> tuple = collectorMock.getTuple();
+        assertNotNull(tuple);
+        assertEquals("https://stormcrawler.apache.org", tuple.get(0));
+    }
+
+    @Test
+    void testDirectoryConstructorHappyPath(@org.junit.jupiter.api.io.TempDir Path tempDir)
+            throws Exception {
+        Files.write(
+                tempDir.resolve("seeds.txt"),
+                "https://stormcrawler.apache.org\n".getBytes(StandardCharsets.UTF_8));
+
+        final FileSpout spout = new FileSpout(tempDir.toAbsolutePath().toString(), "*.txt");
+        final FileSpoutOutputCollectorMock collectorMock = new FileSpoutOutputCollectorMock();
+        spout.open(Map.of(), new FileSpoutTopologyContextMock(), collectorMock);
+        spout.activate();
+        spout.nextTuple();
+
+        final List<Object> tuple = collectorMock.getTuple();
+        assertNotNull(tuple);
+        assertEquals("https://stormcrawler.apache.org", tuple.get(0));
+    }
+
+    @Test
+    void testSurvivesSerialization(@org.junit.jupiter.api.io.TempDir Path tempDir)
+            throws Exception {
+        Files.write(
+                tempDir.resolve("seeds.txt"),
+                "https://stormcrawler.apache.org\n".getBytes(StandardCharsets.UTF_8));
+
+        final FileSpout spout = new FileSpout(tempDir.toAbsolutePath().toString(), "*.txt");
+
+        final java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        try (java.io.ObjectOutputStream oos = new java.io.ObjectOutputStream(bos)) {
+            oos.writeObject(spout);
+        }
+        final FileSpout restored;
+        try (java.io.ObjectInputStream ois =
+                new java.io.ObjectInputStream(
+                        new java.io.ByteArrayInputStream(bos.toByteArray()))) {
+            restored = (FileSpout) ois.readObject();
+        }
+
+        final FileSpoutOutputCollectorMock collectorMock = new FileSpoutOutputCollectorMock();
+        restored.open(Map.of(), new FileSpoutTopologyContextMock(), collectorMock);
+        restored.activate();
+        restored.nextTuple();
 
         final List<Object> tuple = collectorMock.getTuple();
         assertNotNull(tuple);
