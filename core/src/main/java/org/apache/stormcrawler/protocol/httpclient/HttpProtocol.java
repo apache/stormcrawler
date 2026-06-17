@@ -20,6 +20,7 @@ package org.apache.stormcrawler.protocol.httpclient;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -235,7 +236,7 @@ public class HttpProtocol extends AbstractHttpProtocol
         }
 
         HttpRequestBase request = new HttpGet(url);
-        ResponseHandler<ProtocolResponse> responseHandler = this;
+        int maxContent = globalMaxContent;
 
         if (md != null) {
 
@@ -269,8 +270,7 @@ public class HttpProtocol extends AbstractHttpProtocol
             String pageMaxContentStr = md.getFirstValue("http.content.limit");
             if (StringUtils.isNotBlank(pageMaxContentStr)) {
                 try {
-                    int pageMaxContent = Integer.parseInt(pageMaxContentStr);
-                    responseHandler = getResponseHandlerWithContentLimit(pageMaxContent);
+                    maxContent = Integer.parseInt(pageMaxContentStr);
                 } catch (NumberFormatException e) {
                     LOG.warn("Invalid http.content.limit in metadata: {}", pageMaxContentStr);
                 }
@@ -282,6 +282,11 @@ public class HttpProtocol extends AbstractHttpProtocol
         }
 
         request.setConfig(reqConfig);
+        // redirects are disabled, so the URL on the wire == what HttpClient parsed from the request
+        final URL fetchedUrl = request.getURI().toURL();
+        final int contentLimit = maxContent;
+        ResponseHandler<ProtocolResponse> responseHandler =
+          response -> handleResponseWithContentLimit(response, contentLimit, fetchedUrl);
 
         return httpClient.execute(request, responseHandler);
     }
@@ -312,10 +317,10 @@ public class HttpProtocol extends AbstractHttpProtocol
 
     @Override
     public ProtocolResponse handleResponse(HttpResponse response) throws IOException {
-        return handleResponseWithContentLimit(response, globalMaxContent);
+        return handleResponseWithContentLimit(response, globalMaxContent, null);
     }
 
-    public ProtocolResponse handleResponseWithContentLimit(HttpResponse response, int maxContent)
+    public ProtocolResponse handleResponseWithContentLimit(HttpResponse response, int maxContent, URL fetcherURL)
             throws IOException {
         StatusLine statusLine = response.getStatusLine();
         int status = statusLine.getStatusCode();
@@ -352,16 +357,7 @@ public class HttpProtocol extends AbstractHttpProtocol
             metadata.setValue(ProtocolResponse.RESPONSE_HEADERS_KEY, verbatim.toString());
         }
 
-        return new ProtocolResponse(bytes, status, metadata);
-    }
-
-    private ResponseHandler<ProtocolResponse> getResponseHandlerWithContentLimit(
-            int pageMaxContent) {
-        return new ResponseHandler<>() {
-            public ProtocolResponse handleResponse(final HttpResponse response) throws IOException {
-                return handleResponseWithContentLimit(response, pageMaxContent);
-            }
-        };
+        return new ProtocolResponse(bytes, status, metadata, fetcherURL);
     }
 
     private static byte[] toByteArray(

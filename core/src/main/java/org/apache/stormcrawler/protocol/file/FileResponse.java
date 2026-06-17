@@ -44,6 +44,7 @@ public class FileResponse {
     private byte[] content;
     private int statusCode;
     private final Metadata metadata;
+    private final URL url;
 
     public FileResponse(String u, Metadata md, FileProtocol fileProtocol) throws IOException {
 
@@ -51,7 +52,7 @@ public class FileResponse {
         content = new byte[0];
         statusCode = HttpStatus.SC_INTERNAL_SERVER_ERROR;
 
-        URL url = URLUtil.toURL(u);
+        this.url = URLUtil.toURL(u);
 
         if (!url.getPath().equals(url.getFile())) {
             LOG.warn("url.getPath() != url.getFile(): {}.", url);
@@ -89,7 +90,7 @@ public class FileResponse {
     }
 
     public ProtocolResponse toProtocolResponse() {
-        return new ProtocolResponse(content, statusCode, metadata);
+        return new ProtocolResponse(content, statusCode, metadata, this.url);
     }
 
     private void getFileAsHttpResponse(File file) {

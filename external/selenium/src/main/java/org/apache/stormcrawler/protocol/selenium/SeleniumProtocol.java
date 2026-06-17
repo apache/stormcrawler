@@ -17,6 +17,7 @@
 
 package org.apache.stormcrawler.protocol.selenium;
 
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -25,6 +26,7 @@ import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
+import org.apache.stormcrawler.util.URLUtil;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.slf4j.LoggerFactory;
 
@@ -78,14 +80,14 @@ public abstract class SeleniumProtocol extends AbstractHttpProtocol {
                 byte[] content = new byte[] {};
                 Metadata m = new Metadata();
                 m.addValue(HttpHeaders.LOCATION, u);
-                return new ProtocolResponse(content, 307, m);
+                return new ProtocolResponse(content, 307, m, URLUtil.toURL(u));
             }
 
             outputMeta.addValue(MD_KEY_END, Instant.now().toString());
 
             // if no filters got triggered
             byte[] content = driver.getPageSource().getBytes(StandardCharsets.UTF_8);
-            return new ProtocolResponse(content, 200, outputMeta);
+            return new ProtocolResponse(content, 200, outputMeta, URLUtil.toURL(u));
 
         } finally {
             // finished with this driver - return it to the queue
