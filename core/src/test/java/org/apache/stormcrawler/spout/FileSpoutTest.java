@@ -159,6 +159,29 @@ class FileSpoutTest {
         assertEquals("https://github.com", tuple.get(0));
     }
 
+    @Test
+    void testDirectoryResolvedAtOpenNotConstruction(
+            @org.junit.jupiter.api.io.TempDir Path tempDir) throws Exception {
+        // Build the spout while the directory is still empty.
+        final FileSpout spout = new FileSpout(tempDir.toAbsolutePath().toString(), "*.txt");
+
+        // Create the seed file AFTER construction but BEFORE open().
+        // On today's code the constructor already listed the (empty) directory,
+        // so nothing is emitted. Once resolution moves to open(), the file is seen.
+        Files.write(
+                tempDir.resolve("seeds.txt"),
+                "https://stormcrawler.apache.org\n".getBytes(StandardCharsets.UTF_8));
+
+        final FileSpoutOutputCollectorMock collectorMock = new FileSpoutOutputCollectorMock();
+        spout.open(Map.of(), new FileSpoutTopologyContextMock(), collectorMock);
+        spout.activate();
+        spout.nextTuple();
+
+        final List<Object> tuple = collectorMock.getTuple();
+        assertNotNull(tuple);
+        assertEquals("https://stormcrawler.apache.org", tuple.get(0));
+    }
+
     private Path getPath(String resource) throws URISyntaxException {
         return Path.of(
                 Objects.requireNonNull(

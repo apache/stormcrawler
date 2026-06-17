@@ -61,6 +61,9 @@ public class FileSpout extends BaseRichSpout {
     public static final int BATCH_SIZE = 10000;
     public static final Logger LOG = LoggerFactory.getLogger(FileSpout.class);
     private final Queue<String> inputFiles;
+    private final String seedDir;
+    private final String fileFilter;
+    private final String[] seedFiles;
     protected SpoutOutputCollector collector;
     protected Scheme scheme = new StringTabScheme();
     protected LinkedList<byte[]> buffer = new LinkedList<>();
@@ -68,7 +71,7 @@ public class FileSpout extends BaseRichSpout {
     protected int totalTasks;
     protected int taskIndex;
     private BufferedReader currentBuffer;
-    private boolean withDiscoveredStatus = false;
+    private final boolean withDiscoveredStatus;
 
     /**
      * @param dir containing the seed files
@@ -94,18 +97,10 @@ public class FileSpout extends BaseRichSpout {
      */
     public FileSpout(String dir, String filter, boolean withDiscoveredStatus) {
         this.withDiscoveredStatus = withDiscoveredStatus;
-        Path pdir = Paths.get(dir);
-        inputFiles = new LinkedList<>();
-        LOG.info("Reading directory: {} (filter: {})", pdir, filter);
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(pdir, filter)) {
-            for (Path entry : stream) {
-                String inputFile = entry.toAbsolutePath().toString();
-                inputFiles.add(inputFile);
-                LOG.info("Input : {}", inputFile);
-            }
-        } catch (IOException ioe) {
-            LOG.error("IOException: %s%n", ioe);
-        }
+        this.seedDir = dir;
+        this.fileFilter = filter;
+        this.seedFiles = null;
+        this.inputFiles = new LinkedList<>();
     }
 
     /**
@@ -115,12 +110,14 @@ public class FileSpout extends BaseRichSpout {
      * @since 1.13
      */
     public FileSpout(boolean withDiscoveredStatus, String... files) {
-        this.withDiscoveredStatus = withDiscoveredStatus;
         if (files.length == 0) {
             throw new IllegalArgumentException("Must configure at least one inputFile");
         }
-        inputFiles = new LinkedList<>();
-        Collections.addAll(inputFiles, files);
+        this.withDiscoveredStatus = withDiscoveredStatus;
+        this.seedDir = null;
+        this.fileFilter = null;
+        this.seedFiles = files;
+        this.inputFiles = new LinkedList<>();
     }
 
     /**
@@ -195,6 +192,34 @@ public class FileSpout extends BaseRichSpout {
         // same as the number of shards
         totalTasks = context.getComponentTasks(context.getThisComponentId()).size();
         taskIndex = context.getThisTaskIndex();
+
+        // Resolve the seeds here, not in the constructor: in distributed mode the
+        // spout is serialised on the submit client and only open() runs on the
+        // workers, where the seed directory/files actually live (issue #1955).
+        populateInputFiles();
+    }
+
+    /**
+     * Resolves the configured seed directory or file list into {@link #inputFiles}. Called from
+     * {@link #open} so the filesystem is read on the worker, not on the client at construction
+     * time.
+     */
+    private void populateInputFiles() {
+        if (seedDir != null) {
+            Path pdir = Paths.get(seedDir);
+            LOG.info("Reading directory: {} (filter: {})", pdir, fileFilter);
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(pdir, fileFilter)) {
+                for (Path entry : stream) {
+                    String inputFile = entry.toAbsolutePath().toString();
+                    inputFiles.add(inputFile);
+                    LOG.info("Input : {}", inputFile);
+                }
+            } catch (IOException ioe) {
+                LOG.error("IOException while reading seed directory {}", pdir, ioe);
+            }
+        } else {
+            Collections.addAll(inputFiles, seedFiles);
+        }
     }
 
     @Override
