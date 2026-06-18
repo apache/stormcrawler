@@ -60,16 +60,16 @@ public class FileSpout extends BaseRichSpout {
 
     public static final int BATCH_SIZE = 10000;
     public static final Logger LOG = LoggerFactory.getLogger(FileSpout.class);
-    private final Queue<String> inputFiles;
+    private transient Queue<String> inputFiles;
     private final String seedDir;
     private final String fileFilter;
     private final String[] seedFiles;
-    protected SpoutOutputCollector collector;
+    protected transient SpoutOutputCollector collector;
     protected Scheme scheme = new StringTabScheme();
     protected LinkedList<byte[]> buffer = new LinkedList<>();
     protected boolean active;
-    protected int totalTasks;
-    protected int taskIndex;
+    protected transient int totalTasks;
+    protected transient int taskIndex;
     private BufferedReader currentBuffer;
     private final boolean withDiscoveredStatus;
 
@@ -100,7 +100,6 @@ public class FileSpout extends BaseRichSpout {
         this.seedDir = dir;
         this.fileFilter = filter;
         this.seedFiles = null;
-        this.inputFiles = new LinkedList<>();
     }
 
     /**
@@ -117,7 +116,6 @@ public class FileSpout extends BaseRichSpout {
         this.seedDir = null;
         this.fileFilter = null;
         this.seedFiles = files;
-        this.inputFiles = new LinkedList<>();
     }
 
     /**
@@ -196,6 +194,7 @@ public class FileSpout extends BaseRichSpout {
         // Resolve the seeds here, not in the constructor: in distributed mode the
         // spout is serialised on the submit client and only open() runs on the
         // workers, where the seed directory/files actually live (issue #1955).
+        inputFiles = new LinkedList<>();
         populateInputFiles();
     }
 
