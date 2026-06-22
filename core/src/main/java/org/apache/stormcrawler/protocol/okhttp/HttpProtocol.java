@@ -464,7 +464,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 responsemetadata.setValue("metrics.dns.resolution.msec", dnsResolution.toString());
             }
 
-            return new ProtocolResponse(bytes, response.code(), responsemetadata, request.url().url());
+            return new ProtocolResponse(
+                    bytes, response.code(), responsemetadata, request.url().url());
         }
     }
 

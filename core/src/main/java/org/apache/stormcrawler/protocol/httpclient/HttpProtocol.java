@@ -286,7 +286,7 @@ public class HttpProtocol extends AbstractHttpProtocol
         final URL fetchedUrl = request.getURI().toURL();
         final int contentLimit = maxContent;
         ResponseHandler<ProtocolResponse> responseHandler =
-          response -> handleResponseWithContentLimit(response, contentLimit, fetchedUrl);
+                response -> handleResponseWithContentLimit(response, contentLimit, fetchedUrl);
 
         return httpClient.execute(request, responseHandler);
     }
@@ -320,8 +320,8 @@ public class HttpProtocol extends AbstractHttpProtocol
         return handleResponseWithContentLimit(response, globalMaxContent, null);
     }
 
-    public ProtocolResponse handleResponseWithContentLimit(HttpResponse response, int maxContent, URL fetcherURL)
-            throws IOException {
+    public ProtocolResponse handleResponseWithContentLimit(
+            HttpResponse response, int maxContent, URL fetcherURL) throws IOException {
         StatusLine statusLine = response.getStatusLine();
         int status = statusLine.getStatusCode();
 

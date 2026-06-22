@@ -17,7 +17,6 @@
 
 package org.apache.stormcrawler.protocol.selenium;
 
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.concurrent.LinkedBlockingQueue;

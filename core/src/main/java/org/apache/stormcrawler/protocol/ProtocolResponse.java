@@ -17,9 +17,8 @@
 
 package org.apache.stormcrawler.protocol;
 
-import org.apache.stormcrawler.Metadata;
-
 import java.net.URL;
+import org.apache.stormcrawler.Metadata;
 
 public class ProtocolResponse {
 

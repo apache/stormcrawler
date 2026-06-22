@@ -317,7 +317,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
                 responseMetaData.addValue(MD_KEY_END, Instant.now().toString());
 
-                return new ProtocolResponse(content, status.get(), responseMetaData, URLUtil.toURL(url));
+                return new ProtocolResponse(
+                        content, status.get(), responseMetaData, URLUtil.toURL(url));
 
             } finally {
                 if (isTracing && responseMetaData.getFirstValue(MD_TRACE) == null) {
