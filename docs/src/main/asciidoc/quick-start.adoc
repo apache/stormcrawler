@@ -53,7 +53,7 @@ mvn archetype:generate `
 ----
 ====
 
-Be sure to replace `<CURRENT_VERSION>` with the latest released version of StormCrawler, which you can find on link:https://search.maven.org/artifact/org.apache.stormcrawler/stormcrawler-archetype[search.maven.org].
+Be sure to replace `<CURRENT_VERSION>` with the latest released version, which you can find on link:https://central.sonatype.com/artifact/org.apache.stormcrawler/stormcrawler-archetype[central.sonatype.com].
 
 During the process, you’ll be prompted to provide the following:
 

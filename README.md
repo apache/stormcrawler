@@ -16,9 +16,10 @@ StormCrawler requires Java 17 or above. To execute tests, it requires you to hav
 Once Storm is installed, the easiest way to get started is to generate a new StormCrawler project following the instructions below:
 
 ```shell
-mvn archetype:generate -DarchetypeGroupId=org.apache.stormcrawler -DarchetypeArtifactId=stormcrawler-archetype -DarchetypeVersion=3.4.0
-
+mvn archetype:generate -DarchetypeGroupId=org.apache.stormcrawler -DarchetypeArtifactId=stormcrawler-archetype -DarchetypeVersion=<CURRENT_VERSION>
 ```
+
+Be sure to replace <CURRENT_VERSION> with the latest released version, which you can find on [search.maven.org](https://central.sonatype.com/artifact/org.apache.stormcrawler/stormcrawler-archetype).
 
 You'll be asked to enter a groupId (e.g. com.mycompany.crawler), an artefactId (e.g. stormcrawler), a version, a package name and details about the user agent to use.
 
