@@ -24,7 +24,10 @@ import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -67,6 +70,7 @@ import org.apache.stormcrawler.protocol.ProtocolFactory;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.RobotRules;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.URLPartitioner;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 
@@ -94,6 +98,38 @@ public class FetcherBolt extends StatusEmitterBolt {
      */
     public static final String FETCH_TIMEOUT_PARAM_KEY = "fetcher.thread.timeout";
 
+    /**
+     * Maximum delay in seconds honoured when a server requests a back-off via the <a
+     * href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a>
+     * HTTP response header. The parsed delay (capped to this value) is emitted on the {@link
+     * Constants#HOST_INFO_STREAM_NAME} stream as {@code blockUntil} for a host-aware consumer to
+     * act on; the fetcher itself does not delay the fetch. A value of {@code -1} disables the cap
+     * and emits the delay as-is; the default caps at 86400 (24h).
+     */
+    public static final String MAX_RETRY_AFTER_PARAM_KEY = "fetcher.max.retry.after";
+
+    /** Name of the Retry-After HTTP header, lower-cased as stored by the protocol layer. */
+    private static final String RETRY_AFTER_KEY = "retry-after";
+
+    /**
+     * Formatter for the HTTP-date form of the Retry-After header, e.g. {@code Wed, 21 Oct 2015
+     * 07:28:00 GMT}. {@link DateTimeFormatter} is immutable and thread-safe, unlike {@code
+     * SimpleDateFormat}, which matters here as it is shared across fetcher threads.
+     */
+    private static final DateTimeFormatter HTTP_DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ROOT)
+                    .withZone(ZoneOffset.UTC);
+
+    /** Pre-compiled matcher for the numeric (delta-seconds) form of the Retry-After header. */
+    private static final Pattern RETRY_AFTER_SECONDS = Pattern.compile("[0-9]+");
+
+    /**
+     * Upper bound on the length of a Retry-After header value we will attempt to parse. A
+     * delta-seconds value is at most 19 digits and an HTTP date ~29 chars; anything longer is
+     * rejected to bound the work done on this attacker-controlled value.
+     */
+    private static final int MAX_RETRY_AFTER_VALUE_LENGTH = 64;
+
     /** Key name of the custom crawl delay for a queue that may be present in the metadata. */
     private static final String CRAWL_DELAY_KEY_NAME = "crawl.delay";
 
@@ -115,6 +151,14 @@ public class FetcherBolt extends StatusEmitterBolt {
     private ScopedReducedMetric averagedMetrics;
 
     private ProtocolFactory protocolFactory;
+
+    /**
+     * Derives the host-info back-off key the same way the frontier keys its queues (via {@code
+     * partition.url.mode}), so a {@code blockUntil} signal targets the right queue. Configured once
+     * and shared across fetcher threads; {@link URLPartitioner#getPartition} holds no mutable
+     * state.
+     */
+    private URLPartitioner partitioner;
 
     private int taskId = -1;
 
@@ -483,6 +527,49 @@ public class FetcherBolt extends StatusEmitterBolt {
         }
     }
 
+    /**
+     * Parses the value of a <a
+     * href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a>
+     * HTTP response header into a delay expressed in milliseconds, relative to now. The value is
+     * either a number of seconds (e.g. {@code 120}) or an HTTP date (e.g. {@code Wed, 21 Oct 2015
+     * 07:28:00 GMT}).
+     *
+     * @return the delay in milliseconds (possibly {@code 0}), or {@code -1} if the header is
+     *     absent, malformed, in the past or implausibly long.
+     */
+    static long parseRetryAfterDelay(String retryAfter) {
+        if (StringUtils.isBlank(retryAfter)) {
+            return -1;
+        }
+        retryAfter = retryAfter.trim();
+        // a valid Retry-After is either a delta-seconds value or an HTTP date;
+        // reject anything implausibly long to bound the work done on this
+        // attacker-controlled header value
+        if (retryAfter.length() > MAX_RETRY_AFTER_VALUE_LENGTH) {
+            return -1;
+        }
+        // delay expressed as a number of seconds
+        if (RETRY_AFTER_SECONDS.matcher(retryAfter).matches()) {
+            try {
+                return Math.multiplyExact(Long.parseLong(retryAfter), 1000L);
+            } catch (NumberFormatException | ArithmeticException e) {
+                // value too large to fit in a long, or its conversion to ms
+                // overflows - ignore
+                return -1;
+            }
+        }
+        // delay expressed as an HTTP date (IMF-fixdate form only, as produced by
+        // virtually all servers; the legacy RFC 850 / asctime forms are not accepted)
+        try {
+            Instant date = Instant.from(HTTP_DATE_FORMATTER.parse(retryAfter));
+            long delay = date.toEpochMilli() - System.currentTimeMillis();
+            return delay > 0 ? delay : -1;
+        } catch (DateTimeException e) {
+            LOG.debug("Invalid Retry-After header value: {}", retryAfter);
+            return -1;
+        }
+    }
+
     /** This class picks items from queues and fetches the pages. */
     private class FetcherThread extends Thread {
 
@@ -500,6 +587,9 @@ public class FetcherBolt extends StatusEmitterBolt {
 
         /** Hard timeout in seconds for a single protocol fetch. -1 means disabled. */
         private long fetchTimeout = -1;
+
+        /** Upper bound in ms for the recorded Retry-After delay; -1 means no cap. */
+        private long maxRetryAfter = -1;
 
         /**
          * Single-thread executor used to run the protocol call so that it can be interrupted via
@@ -521,6 +611,8 @@ public class FetcherBolt extends StatusEmitterBolt {
             this.threadNum = num;
             timeoutInQueues = ConfUtils.getLong(conf, QUEUED_TIMEOUT_PARAM_KEY, timeoutInQueues);
             fetchTimeout = ConfUtils.getLong(conf, FETCH_TIMEOUT_PARAM_KEY, fetchTimeout);
+            long maxRetryAfterSecs = ConfUtils.getLong(conf, MAX_RETRY_AFTER_PARAM_KEY, -1L);
+            maxRetryAfter = maxRetryAfterSecs < 0 ? -1L : maxRetryAfterSecs * 1000L;
             protocolMetadataPrefix =
                     ConfUtils.getString(
                             conf,
@@ -801,6 +893,41 @@ public class FetcherBolt extends StatusEmitterBolt {
 
                     mergedMetadata.setValue("fetch.timeInQueues", Long.toString(timeInQueues));
 
+                    // report a server-requested back-off (Retry-After, e.g. on a
+                    // 429 or 503) on the host-info stream so a host-aware consumer
+                    // can block the host. The fetch itself is not delayed here.
+                    // See #867 / #784.
+                    // only on a rate-limit (429) or unavailable (503) response does
+                    // Retry-After signal a host back-off worth acting on
+                    int statusCode = response.getStatusCode();
+                    if (statusCode == 429 || statusCode == 503) {
+                        long retryAfter =
+                                parseRetryAfterDelay(
+                                        response.getMetadata().getFirstValue(RETRY_AFTER_KEY));
+                        if (retryAfter > 0 && maxRetryAfter >= 0 && retryAfter > maxRetryAfter) {
+                            LOG.debug(
+                                    "Capping Retry-After for {} from {} to {} ms",
+                                    fit.url,
+                                    retryAfter,
+                                    maxRetryAfter);
+                            retryAfter = maxRetryAfter;
+                        }
+                        if (retryAfter > 0) {
+                            long blockUntilSecs = (System.currentTimeMillis() + retryAfter) / 1000L;
+                            // key by the frontier's partition mode (partition.url.mode)
+                            // so the consumer blocks the matching frontier queue.
+                            // fit.queueId uses fetcher.queue.mode, which may differ.
+                            String hostKey = partitioner.getPartition(fit.url, mergedMetadata);
+                            if (hostKey == null) {
+                                hostKey = fit.queueId;
+                            }
+                            collector.emit(
+                                    Constants.HOST_INFO_STREAM_NAME,
+                                    fit.tuple,
+                                    new Values(hostKey, blockUntilSecs));
+                        }
+                    }
+
                     // determine the status based on the status code
                     final Status status = Status.fromHTTPCode(response.getStatusCode());
 
@@ -962,6 +1089,9 @@ public class FetcherBolt extends StatusEmitterBolt {
 
         this.fetchQueues = new FetchItemQueues(conf);
 
+        this.partitioner = new URLPartitioner();
+        this.partitioner.configure(conf);
+
         this.taskId = context.getThisTaskId();
 
         int threadCount = ConfUtils.getInt(conf, "fetcher.threads.number", 10);
@@ -1008,6 +1138,7 @@ public class FetcherBolt extends StatusEmitterBolt {
     public void declareOutputFields(OutputFieldsDeclarer declarer) {
         super.declareOutputFields(declarer);
         declarer.declare(new Fields("url", "content", "metadata"));
+        declarer.declareStream(Constants.HOST_INFO_STREAM_NAME, new Fields("key", "blockUntil"));
     }
 
     @Override
