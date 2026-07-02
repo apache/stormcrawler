@@ -78,20 +78,24 @@ class QueueBoltTest extends AbstractOpenSearchTest {
 
     @BeforeEach
     void setupQueueBolt() throws IOException {
-        bolt = new QueueBolt();
         RestClientBuilder builder =
                 RestClient.builder(
                         new HttpHost(
                                 opensearchContainer.getHost(),
                                 opensearchContainer.getMappedPort(9200)));
         client = new RestHighLevelClient(builder);
-        // configure the queue bolt
+        output = new TestOutputCollector();
+        bolt = prepareQueueBolt();
+    }
+
+    private QueueBolt prepareQueueBolt() {
+        QueueBolt queueBolt = new QueueBolt();
         Map<String, Object> conf = new HashMap<>();
         conf.put(
                 "opensearch.queues.addresses",
                 opensearchContainer.getHost() + ":" + opensearchContainer.getFirstMappedPort());
-        output = new TestOutputCollector();
-        bolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        queueBolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        return queueBolt;
     }
 
     @AfterEach
@@ -119,17 +123,7 @@ class QueueBoltTest extends AbstractOpenSearchTest {
                 });
     }
 
-    @Test
-    @Timeout(value = 2, unit = TimeUnit.MINUTES)
-    void checkQueueIndex()
-            throws IOException, ExecutionException, InterruptedException, TimeoutException {
-        String key = "www.url.net";
-        Metadata md = new Metadata();
-        md.addValue("someKey", "someValue");
-        store(key, md).get(10, TimeUnit.SECONDS);
-        assertEquals(1, output.getAckedTuples().size());
-
-        // Wait until document is indexed in OpenSearch
+    private void awaitIndexed(String key) {
         String id = org.apache.commons.codec.digest.DigestUtils.sha256Hex(key);
         await().atMost(30, TimeUnit.SECONDS)
                 .until(
@@ -144,9 +138,62 @@ class QueueBoltTest extends AbstractOpenSearchTest {
                                 return false;
                             }
                         });
+    }
 
-        GetResponse result = client.get(new GetRequest("queues", id), RequestOptions.DEFAULT);
-        Map<String, Object> sourceAsMap = result.getSourceAsMap();
+    private Map<String, Object> getSource(String key) throws IOException {
+        String id = org.apache.commons.codec.digest.DigestUtils.sha256Hex(key);
+        return client.get(new GetRequest("queues", id), RequestOptions.DEFAULT).getSourceAsMap();
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void checkQueueIndex()
+            throws IOException, ExecutionException, InterruptedException, TimeoutException {
+        String key = "www.url.net";
+        Metadata md = new Metadata();
+        md.addValue("someKey", "someValue");
+        store(key, md).get(10, TimeUnit.SECONDS);
+        assertEquals(1, output.getAckedTuples().size());
+
+        // Wait until document is indexed in OpenSearch
+        awaitIndexed(key);
+
+        Map<String, Object> sourceAsMap = getSource(key);
         assertEquals(key, sourceAsMap.get("key"));
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void checkExistingEntryIsNotOverwritten()
+            throws IOException, ExecutionException, InterruptedException, TimeoutException {
+        String key = "www.url.net";
+        Metadata md = new Metadata();
+        md.addValue("someKey", "someValue");
+        store(key, md).get(10, TimeUnit.SECONDS);
+        awaitIndexed(key);
+        Object lastUpdated = getSource(key).get("lastUpdated");
+
+        // a fresh bolt instance (e.g. after a worker restart) has an empty cache
+        // and re-sends the same key - the resulting version conflict must be
+        // handled gracefully and the existing entry left untouched
+        QueueBolt restartedBolt = prepareQueueBolt();
+        try {
+            Tuple sameKey = mock(Tuple.class);
+            when(sameKey.getStringByField("key")).thenReturn(key);
+            restartedBolt.execute(sameKey);
+
+            // a new key sent in the same bulk signals when the bulk has been processed
+            String otherKey = "www.other.net";
+            Tuple other = mock(Tuple.class);
+            when(other.getStringByField("key")).thenReturn(otherKey);
+            restartedBolt.execute(other);
+            awaitIndexed(otherKey);
+
+            Map<String, Object> sourceAsMap = getSource(key);
+            assertEquals(key, sourceAsMap.get("key"));
+            assertEquals(lastUpdated, sourceAsMap.get("lastUpdated"));
+        } finally {
+            restartedBolt.cleanup();
+        }
     }
 }
