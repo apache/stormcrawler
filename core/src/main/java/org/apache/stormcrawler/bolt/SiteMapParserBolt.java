@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.bolt;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
@@ -41,10 +42,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
-import org.apache.commons.lang.StringUtils;
+import java.util.function.Consumer;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
-import org.apache.storm.metric.api.MeanReducer;
-import org.apache.storm.metric.api.ReducedMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -53,6 +53,7 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.parse.Outlink;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseFilters;
@@ -60,6 +61,7 @@ import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.persistence.DefaultScheduler;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -84,9 +86,9 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
     private int maxOffsetGuess = 300;
 
-    private ReducedMetric averagedMetrics;
+    private Consumer<Number> averagedMetrics;
 
-    /** Delay in minutes used for scheduling sub-sitemaps * */
+    /** Delay in minutes used for scheduling sub-sitemaps. */
     private int scheduleSitemapsWithDelay = -1;
 
     private List<Extension> extensionsToParse;
@@ -109,16 +111,16 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
         String isSitemap = metadata.getFirstValue(isSitemapKey);
 
-        boolean treatAsSM = Boolean.parseBoolean(isSitemap);
+        boolean treatAsSitemap = Boolean.parseBoolean(isSitemap);
 
         // doesn't have the key and want to rely on the clue
         if (isSitemap == null && looksLikeSitemap) {
             LOG.info("{} detected as sitemap based on content", url);
-            treatAsSM = true;
+            treatAsSitemap = true;
         }
 
         // decided that it is not a sitemap file
-        if (!treatAsSM) {
+        if (!treatAsSitemap) {
             LOG.debug("Not a sitemap {}", url);
             // just pass it on
             metadata.setValue(isSitemapKey, "false");
@@ -182,17 +184,17 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
             String url, byte[] content, String contentType, Metadata parentMetadata)
             throws UnknownFormatException, IOException {
 
-        URL sURL = new URL(url);
+        URL url1 = URLUtil.toURL(url);
         long start = System.currentTimeMillis();
         AbstractSiteMap siteMap;
         // let the parser guess what the mimetype is
         if (StringUtils.isBlank(contentType) || contentType.contains("octet-stream")) {
-            siteMap = parser.parseSiteMap(content, sURL);
+            siteMap = parser.parseSiteMap(content, url1);
         } else {
-            siteMap = parser.parseSiteMap(contentType, content, sURL);
+            siteMap = parser.parseSiteMap(contentType, content, url1);
         }
         long end = System.currentTimeMillis();
-        averagedMetrics.update(end - start);
+        averagedMetrics.accept(end - start);
 
         List<Outlink> links = new ArrayList<>();
 
@@ -229,7 +231,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
                 Outlink ol =
                         filterOutlink(
-                                sURL,
+                                url1,
                                 target,
                                 parentMetadata,
                                 isSitemapKey,
@@ -252,16 +254,15 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
                 links.add(ol);
                 LOG.debug("{} : [sitemap] {}", url, target);
             }
-        }
-        // sitemap files
-        else {
+        } else {
+            // sitemap files
             SiteMap sm = (SiteMap) siteMap;
-            // TODO see what we can do with the LastModified info
-            Collection<SiteMapURL> sitemapURLs = sm.getSiteMapUrls();
-            for (SiteMapURL smurl : sitemapURLs) {
-                // TODO handle priority in metadata
+            // TODO: see what we can do with the LastModified info
+            Collection<SiteMapURL> sitemapUrls = sm.getSiteMapUrls();
+            for (SiteMapURL smurl : sitemapUrls) {
+                // TODO: handle priority in metadata
                 double priority = smurl.getPriority();
-                // TODO convert the frequency into a numerical value and handle
+                // TODO: convert the frequency into a numerical value and handle
                 // it in metadata
                 ChangeFrequency freq = smurl.getChangeFrequency();
 
@@ -288,7 +289,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
                 Outlink ol =
                         filterOutlink(
-                                sURL,
+                                url1,
                                 target,
                                 parentMetadata,
                                 isSitemapKey,
@@ -340,10 +341,8 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
         parseFilters = ParseFilters.fromConf(stormConf);
         maxOffsetGuess = ConfUtils.getInt(stormConf, "sitemap.offset.guess", 300);
         averagedMetrics =
-                context.registerMetric(
-                        "sitemap_average_processing_time",
-                        new ReducedMetric(new MeanReducer()),
-                        30);
+                CrawlerMetrics.registerSingleMeanMetric(
+                        context, stormConf, "sitemap_average_processing_time", 30);
         scheduleSitemapsWithDelay =
                 ConfUtils.getInt(stormConf, "sitemap.schedule.delay", scheduleSitemapsWithDelay);
         List<String> extensionsStrings =
@@ -378,6 +377,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
     @Override
     public void cleanup() {
+        super.cleanup();
         if (parseFilters != null) {
             parseFilters.cleanup();
         }

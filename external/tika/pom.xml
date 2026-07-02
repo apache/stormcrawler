@@ -20,62 +20,62 @@ under the License.
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.apache.stormcrawler</groupId>
-		<artifactId>stormcrawler-external</artifactId>
-		<version>3.5.1-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath>
-	</parent>
+    <parent>
+        <groupId>org.apache.stormcrawler</groupId>
+        <artifactId>stormcrawler-external</artifactId>
+        <version>3.6.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
 
-	<artifactId>stormcrawler-tika</artifactId>
-	<packaging>jar</packaging>
+    <artifactId>stormcrawler-tika</artifactId>
+    <packaging>jar</packaging>
 
-	<name>stormcrawler-tika</name>
-	<url>https://github.com/apache/stormcrawler/tree/master/external/tika</url>
-	<description>Tika-based parser bolt for StormCrawler</description>
+    <name>stormcrawler-tika</name>
+    <url>https://github.com/apache/stormcrawler/tree/master/external/tika</url>
+    <description>Tika-based parser bolt for StormCrawler</description>
 
-	<properties>
-		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
-		<jacoco.classRatio>0.25</jacoco.classRatio>
-		<jacoco.instructionRatio>0.36</jacoco.instructionRatio>
-		<jacoco.methodRatio>0.14</jacoco.methodRatio>
-		<jacoco.branchRatio>0.20</jacoco.branchRatio>
-		<jacoco.lineRatio>0.37</jacoco.lineRatio>
-		<jacoco.complexityRatio>0.13</jacoco.complexityRatio>
-	</properties>
+    <properties>
+        <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
+        <jacoco.classRatio>0.25</jacoco.classRatio>
+        <jacoco.instructionRatio>0.36</jacoco.instructionRatio>
+        <jacoco.methodRatio>0.14</jacoco.methodRatio>
+        <jacoco.branchRatio>0.20</jacoco.branchRatio>
+        <jacoco.lineRatio>0.37</jacoco.lineRatio>
+        <jacoco.complexityRatio>0.13</jacoco.complexityRatio>
+    </properties>
 
-	<dependencies>
-		<dependency>
-			<groupId>org.apache.tika</groupId>
-			<artifactId>tika-parsers-standard-package</artifactId>
-			<version>${tika.version}</version>
-			<exclusions>
-				<exclusion>
-					<artifactId>asm</artifactId>
-					<groupId>asm</groupId>
-				</exclusion>
-				<exclusion>
-					<groupId>org.slf4j</groupId>
-					<artifactId>slf4j-log4j12</artifactId>
-				</exclusion>
-				<!-- This comes in through the Tika Image Parser module and has an incompatible BSD license -->
-				<exclusion>
-					<groupId>com.github.jai-imageio</groupId>
-					<artifactId>jai-imageio-core</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+            <version>${tika.version}</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>asm</artifactId>
+                    <groupId>asm</groupId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+                <!-- This comes in through the Tika Image Parser module and has an incompatible BSD license -->
+                <exclusion>
+                    <groupId>com.github.jai-imageio</groupId>
+                    <artifactId>jai-imageio-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
 
-		<dependency>
-			<groupId>org.apache.stormcrawler</groupId>
-			<artifactId>stormcrawler-core</artifactId>
-			<version>${project.version}</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.apache.stormcrawler</groupId>
+            <artifactId>stormcrawler-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
-	</dependencies>
-	
+    </dependencies>
+
 </project>

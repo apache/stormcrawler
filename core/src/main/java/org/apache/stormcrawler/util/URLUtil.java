@@ -14,19 +14,118 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import java.net.IDN;
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Utility class for URL analysis */
+/** Utility class for URL analysis. */
 public class URLUtil {
 
     private URLUtil() {}
+
+    /** Pattern for non-standard {@code %uXXXX} percent encoding (e.g. from JavaScript escape()). */
+    private static final Pattern ILLEGAL_ESCAPE_PATTERN = Pattern.compile("%u([0-9A-Fa-f]{4})");
+
+    /**
+     * Converts a URL string to a {@link URL} object using {@link URI} to avoid the deprecated
+     * {@code new URL(String)} constructor. If strict RFC 3986 parsing fails, common illegal
+     * characters are sanitized and parsing is retried, mimicking the leniency of the old {@code new
+     * URL(String)} constructor.
+     *
+     * @param url the URL string to convert
+     * @return the parsed URL
+     * @throws MalformedURLException if the string is not a valid URL even after sanitization
+     */
+    public static URL toURL(String url) throws MalformedURLException {
+        try {
+            return toURI(url).toURL();
+        } catch (IllegalArgumentException e) {
+            throw (MalformedURLException) new MalformedURLException(e.getMessage()).initCause(e);
+        }
+    }
+
+    /**
+     * Converts a URL string to a {@link URI} object. If strict RFC 3986 parsing fails, common
+     * illegal characters are sanitized and parsing is retried, mimicking the leniency of the old
+     * {@code new URL(String)} constructor.
+     *
+     * @param url the URL string to convert
+     * @return the parsed URI
+     * @throws MalformedURLException if the string is not a valid URI even after sanitization
+     */
+    public static URI toURI(String url) throws MalformedURLException {
+        try {
+            return new URI(url);
+        } catch (URISyntaxException e) {
+            // strict parsing failed — try sanitizing common illegal characters
+            try {
+                return new URI(sanitizeForURI(url));
+            } catch (URISyntaxException e2) {
+                throw (MalformedURLException)
+                        new MalformedURLException(e.getMessage()).initCause(e);
+            }
+        }
+    }
+
+    /**
+     * Pre-sanitize a URL string by encoding characters that are illegal in URIs per RFC 3986 but
+     * commonly found in URLs in the wild. Also converts non-standard {@code %uXXXX} percent
+     * encoding to proper UTF-8 percent encoding.
+     */
+    public static String sanitizeForURI(String url) {
+        // Handle non-standard %uXXXX encoding (e.g. from JavaScript escape())
+        final Matcher matcher = ILLEGAL_ESCAPE_PATTERN.matcher(url);
+        if (matcher.find()) {
+            final StringBuilder sb = new StringBuilder();
+            int end = 0;
+            do {
+                sb.append(url, end, matcher.start());
+                final int codePoint = Integer.parseInt(matcher.group(1), 16);
+                for (byte b :
+                        new String(Character.toChars(codePoint)).getBytes(StandardCharsets.UTF_8)) {
+                    sb.append(String.format(Locale.ROOT, "%%%02X", b & 0xFF));
+                }
+                end = matcher.end();
+            } while (matcher.find());
+            sb.append(url.substring(end));
+            url = sb.toString();
+        }
+
+        // Encode characters that are illegal in URIs but commonly encountered
+        final StringBuilder sb = new StringBuilder(url.length());
+        for (int i = 0; i < url.length(); i++) {
+            final char c = url.charAt(i);
+            switch (c) {
+                case '|':
+                    sb.append("%7C");
+                    break;
+                case '\\':
+                    sb.append("%5C");
+                    break;
+                case ' ':
+                    sb.append("%20");
+                    break;
+                case '{':
+                    sb.append("%7B");
+                    break;
+                case '}':
+                    sb.append("%7D");
+                    break;
+                default:
+                    sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
 
     /**
      * Resolve relative URL-s and fix a few java.net.URL errors in handling of URLs with embedded
@@ -37,7 +136,7 @@ public class URLUtil {
      * @return resolved absolute url.
      * @throws MalformedURLException
      */
-    public static URL resolveURL(URL base, String target) throws MalformedURLException {
+    public static URL resolveUrl(URL base, String target) throws MalformedURLException {
         target = target.trim();
 
         if (target.startsWith("?")) {
@@ -48,7 +147,7 @@ public class URLUtil {
     }
 
     /**
-     * Refactor deprecated URL constructor to use the URI class for resolving relative URLs
+     * Refactor deprecated URL constructor to use the URI class for resolving relative URLs.
      *
      * @param base the base URL
      * @param target the target URL (may be relative)
@@ -97,17 +196,20 @@ public class URLUtil {
         }
 
         // get the base url and it params information
-        String baseURL = base.toString();
-        int startParams = baseURL.indexOf(';');
-        String params = baseURL.substring(startParams);
+        String baseUrl = base.toString();
+        int startParams = baseUrl.indexOf(';');
+        String params = baseUrl.substring(startParams);
 
         // if the target has a query string then put the params information
         // after
         // any path but before the query string, otherwise just append to the
         // path
-        int startQS = target.indexOf('?');
-        if (startQS >= 0) {
-            target = target.substring(0, startQS) + params + target.substring(startQS);
+        int startQueryString = target.indexOf('?');
+        if (startQueryString >= 0) {
+            target =
+                    target.substring(0, startQueryString)
+                            + params
+                            + target.substring(startQueryString);
         } else {
             target += params;
         }
@@ -117,22 +219,24 @@ public class URLUtil {
 
     private static Pattern IP_PATTERN = Pattern.compile("(\\d{1,3}\\.){3}(\\d{1,3})");
 
-    /** Partitions of the hostname of the url by "." */
+    /** Partitions of the hostname of the url by ".". */
     public static String[] getHostSegments(URL url) {
         String host = url.getHost();
         // return whole hostname, if it is an ipv4
-        // TODO : handle ipv6
-        if (IP_PATTERN.matcher(host).matches()) return new String[] {host};
+        // TODO: handle ipv6
+        if (IP_PATTERN.matcher(host).matches()) {
+            return new String[] {host};
+        }
         return host.split("\\.");
     }
 
     /**
-     * Partitions of the hostname of the url by "."
+     * Partitions of the hostname of the url by ".".
      *
      * @throws MalformedURLException
      */
     public static String[] getHostSegments(String url) throws MalformedURLException {
-        return getHostSegments(new URL(url));
+        return getHostSegments(toURL(url));
     }
 
     /**
@@ -143,7 +247,7 @@ public class URLUtil {
      */
     public static String getHost(String url) {
         try {
-            return new URL(url).getHost().toLowerCase(Locale.ROOT);
+            return toURL(url).getHost().toLowerCase(Locale.ROOT);
         } catch (MalformedURLException e) {
             return null;
         }
@@ -161,7 +265,7 @@ public class URLUtil {
             // get the full url, and replace the query string with and empty
             // string
             url = url.toLowerCase(Locale.ROOT);
-            String queryStr = new URL(url).getQuery();
+            String queryStr = toURL(url).getQuery();
             return (queryStr != null) ? url.replace("?" + queryStr, "") : url;
         } catch (MalformedURLException e) {
             return null;
@@ -170,7 +274,7 @@ public class URLUtil {
 
     public static String toASCII(String url) {
         try {
-            URL u = new URL(url);
+            URL u = toURL(url);
             URI p =
                     new URI(
                             u.getProtocol(),
@@ -189,7 +293,7 @@ public class URLUtil {
 
     public static String toUNICODE(String url) {
         try {
-            URL u = new URL(url);
+            URL u = toURL(url);
             URI p =
                     new URI(
                             u.getProtocol(),

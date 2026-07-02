@@ -20,89 +20,87 @@ under the License.
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.apache.stormcrawler</groupId>
-		<artifactId>stormcrawler-external</artifactId>
-		<version>3.5.1-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath>
-	</parent>
+    <parent>
+        <groupId>org.apache.stormcrawler</groupId>
+        <artifactId>stormcrawler-external</artifactId>
+        <version>3.6.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
 
-	<artifactId>stormcrawler-selenium</artifactId>
-	<packaging>jar</packaging>
+    <artifactId>stormcrawler-selenium</artifactId>
+    <packaging>jar</packaging>
 
-	<name>stormcrawler-selenium</name>
-	<url>https://github.com/apache/stormcrawler/tree/master/external/selenium</url>
-	<description>Selenium-based Protocol for StormCrawler</description>
+    <name>stormcrawler-selenium</name>
+    <url>https://github.com/apache/stormcrawler/tree/master/external/selenium</url>
+    <description>Selenium-based Protocol for StormCrawler</description>
 
-	<properties>
-		<selenium.version>4.36.0</selenium.version>
-		<awaitility.version>4.3.0</awaitility.version>
-		<wiremock.version>3.13.1</wiremock.version>
-		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
-		<jacoco.classRatio>1.00</jacoco.classRatio>
-		<jacoco.instructionRatio>0.69</jacoco.instructionRatio>
-		<jacoco.methodRatio>0.80</jacoco.methodRatio>
-		<jacoco.branchRatio>0.62</jacoco.branchRatio>
-		<jacoco.lineRatio>0.66</jacoco.lineRatio>
-		<jacoco.complexityRatio>0.55</jacoco.complexityRatio>
-	</properties>
+    <properties>
+        <selenium.version>4.45.0</selenium.version>
+        <wiremock.version>3.13.2</wiremock.version>
+        <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
+        <jacoco.classRatio>1.00</jacoco.classRatio>
+        <jacoco.instructionRatio>0.69</jacoco.instructionRatio>
+        <jacoco.methodRatio>0.80</jacoco.methodRatio>
+        <jacoco.branchRatio>0.62</jacoco.branchRatio>
+        <jacoco.lineRatio>0.65</jacoco.lineRatio>
+        <jacoco.complexityRatio>0.55</jacoco.complexityRatio>
+    </properties>
 
-	<dependencies>
-		<dependency>
-			<groupId>org.seleniumhq.selenium</groupId>
-			<artifactId>selenium-remote-driver</artifactId>
-			<version>${selenium.version}</version>
-		</dependency>
+    <dependencies>
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-remote-driver</artifactId>
+            <version>${selenium.version}</version>
+        </dependency>
 
-		<dependency>
-			<groupId>org.seleniumhq.selenium</groupId>
-			<artifactId>selenium-support</artifactId>
-			<version>${selenium.version}</version>
-		</dependency>
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-support</artifactId>
+            <version>${selenium.version}</version>
+        </dependency>
 
-		<dependency>
-			<groupId>org.apache.stormcrawler</groupId>
-			<artifactId>stormcrawler-core</artifactId>
-			<version>${project.version}</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.apache.stormcrawler</groupId>
+            <artifactId>stormcrawler-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.wiremock</groupId>
-			<artifactId>wiremock</artifactId>
-			<version>${wiremock.version}</version>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock</artifactId>
+            <version>${wiremock.version}</version>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.awaitility</groupId>
-			<artifactId>awaitility</artifactId>
-			<version>${awaitility.version}</version>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>selenium</artifactId>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>selenium</artifactId>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.seleniumhq.selenium</groupId>
-			<artifactId>selenium-chrome-driver</artifactId>
-			<version>${selenium.version}</version>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-chrome-driver</artifactId>
+            <version>${selenium.version}</version>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
 
-	</dependencies>
+    </dependencies>
 
 </project>

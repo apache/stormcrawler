@@ -14,29 +14,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.sql;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 
 public class SQLUtil {
+
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(SQLUtil.class);
 
     private SQLUtil() {}
 
     public static Connection getConnection(Map<String, Object> stormConf) throws SQLException {
         // SQL connection details
-        Map<String, Object> sqlConf = (Map<String, Object>) stormConf.get("sql.connection");
+        Map<String, String> sqlConf = (Map<String, String>) stormConf.get("sql.connection");
 
         if (sqlConf == null) {
             throw new RuntimeException(
                     "Missing SQL connection config, add a section 'sql.connection' to the configuration");
         }
 
-        String url = (String) sqlConf.get("url");
+        String url = sqlConf.get("url");
         if (url == null) {
             throw new RuntimeException(
                     "Missing SQL url, add an entry 'url' to the section 'sql.connection' of the configuration");
@@ -44,10 +46,18 @@ public class SQLUtil {
 
         Properties props = new Properties();
 
-        for (Entry<String, Object> entry : sqlConf.entrySet()) {
-            props.setProperty(entry.getKey(), (String) entry.getValue());
-        }
+        props.putAll(sqlConf);
 
         return DriverManager.getConnection(url, props);
+    }
+
+    public static void closeResource(final AutoCloseable resource, final String resourceName) {
+        if (resource != null) {
+            try {
+                resource.close();
+            } catch (Exception e) {
+                LOG.error("Error closing {}", resourceName, e);
+            }
+        }
     }
 }

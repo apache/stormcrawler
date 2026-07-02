@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -22,7 +23,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -32,12 +32,13 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.Config;
 import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.JSONResource;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.Configurable;
+import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -45,7 +46,7 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
 
 /**
- * Wrapper for the ParseFilters defined in a JSON configuration
+ * Wrapper for the ParseFilters defined in a JSON configuration.
  *
  * @see Configurable#createConfiguredInstance(Class, Class, Map, JsonNode) for more information.
  */
@@ -59,6 +60,17 @@ public class ParseFilters extends ParseFilter implements JSONResource {
 
     private ParseFilters() {
         filters = new ParseFilter[0];
+    }
+
+    /** loads the filters from a JSON configuration file. */
+    public ParseFilters(Map<String, Object> stormConf, String configFile) throws IOException {
+        this.configFile = configFile;
+        this.stormConf = stormConf;
+        try {
+            loadJSONResources();
+        } catch (Exception e) {
+            throw new IOException("Unable to build JSON object from file", e);
+        }
     }
 
     private String configFile;
@@ -85,17 +97,6 @@ public class ParseFilters extends ParseFilter implements JSONResource {
         return ParseFilters.emptyParseFilter;
     }
 
-    /** loads the filters from a JSON configuration file */
-    public ParseFilters(Map<String, Object> stormConf, String configFile) throws IOException {
-        this.configFile = configFile;
-        this.stormConf = stormConf;
-        try {
-            loadJSONResources();
-        } catch (Exception e) {
-            throw new IOException("Unable to build JSON object from file", e);
-        }
-    }
-
     @Override
     public void loadJSONResources(InputStream inputStream)
             throws JsonParseException, JsonMappingException, IOException {
@@ -120,8 +121,8 @@ public class ParseFilters extends ParseFilter implements JSONResource {
     @Override
     public boolean needsDOM() {
         for (ParseFilter filter : filters) {
-            boolean needsDOM = filter.needsDOM();
-            if (needsDOM) {
+            boolean needsDom = filter.needsDOM();
+            if (needsDom) {
                 return true;
             }
         }
@@ -129,7 +130,7 @@ public class ParseFilters extends ParseFilter implements JSONResource {
     }
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
 
         for (ParseFilter filter : filters) {
             long start = System.currentTimeMillis();
@@ -137,10 +138,10 @@ public class ParseFilters extends ParseFilter implements JSONResource {
                 LOG.info(
                         "ParseFilter {} needs DOM but has none to work on - skip : {}",
                         filter.getClass().getName(),
-                        URL);
+                        url);
                 continue;
             }
-            filter.filter(URL, content, doc, parse);
+            filter.filter(url, content, doc, parse);
             long end = System.currentTimeMillis();
             LOG.debug("ParseFilter {} took {} msec", filter.getClass().getName(), end - start);
         }
@@ -154,7 +155,7 @@ public class ParseFilters extends ParseFilter implements JSONResource {
     }
 
     /**
-     * * Used for quick testing + debugging
+     * * Used for quick testing + debugging.
      *
      * @since 1.17
      */
@@ -163,9 +164,9 @@ public class ParseFilters extends ParseFilter implements JSONResource {
         Config conf = new Config();
 
         // loads the default configuration file
-        Map<String, Object> defaultSCConfig =
+        Map<String, Object> defaultStormCrawlerConfig =
                 Utils.findAndReadConfigFile("crawler-default.yaml", false);
-        conf.putAll(ConfUtils.extractConfigElement(defaultSCConfig));
+        conf.putAll(ConfUtils.extractConfigElement(defaultStormCrawlerConfig));
 
         Options options = new Options();
         options.addOption("c", true, "stormcrawler configuration file");
@@ -186,7 +187,7 @@ public class ParseFilters extends ParseFilter implements JSONResource {
 
         String url = cmd.getArgs()[0];
 
-        byte[] content = IOUtils.toByteArray((new URL(url)).openStream());
+        byte[] content = IOUtils.toByteArray(URLUtil.toURL(url).openStream());
 
         Document doc = Jsoup.parse(new String(content, StandardCharsets.UTF_8), url);
 

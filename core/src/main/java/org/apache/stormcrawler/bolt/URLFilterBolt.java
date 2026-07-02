@@ -14,11 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.bolt;
 
 import java.io.IOException;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -50,7 +51,7 @@ public class URLFilterBolt extends BaseRichBolt {
 
     /**
      * Relies on the file defined in urlfilters.config.file and applied to all tuples regardless of
-     * status
+     * status.
      */
     public URLFilterBolt() {
         this(false, null);
@@ -66,7 +67,9 @@ public class URLFilterBolt extends BaseRichBolt {
         // the input can come from the standard stream or the status one
         // we'll emit to whichever it came from
         String stream = input.getSourceStreamId();
-        if (stream == null) stream = Utils.DEFAULT_STREAM_ID;
+        if (stream == null) {
+            stream = Utils.DEFAULT_STREAM_ID;
+        }
 
         // must have at least a URL and metadata, possibly a status
         String urlString = input.getStringByField("url");
@@ -117,6 +120,13 @@ public class URLFilterBolt extends BaseRichBolt {
             }
         } else {
             urlFilters = URLFilters.fromConf(stormConf);
+        }
+    }
+
+    @Override
+    public void cleanup() {
+        if (urlFilters != null) {
+            urlFilters.cleanup();
         }
     }
 }

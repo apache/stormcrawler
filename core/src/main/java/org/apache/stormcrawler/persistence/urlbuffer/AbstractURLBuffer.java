@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence.urlbuffer;
 
 import java.util.Collections;
@@ -31,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Abstract class for URLBuffer interface, meant to simplify the code of the implementations and
- * provide some default methods
+ * provide some default methods.
  *
  * @since 1.15
  */
@@ -39,7 +40,7 @@ public abstract class AbstractURLBuffer implements URLBuffer {
 
     private static final Logger LOG = LoggerFactory.getLogger(AbstractURLBuffer.class);
 
-    protected Set<String> in_buffer = new HashSet<>();
+    protected Set<String> inBuffer = new HashSet<>();
     protected EmptyQueueListener listener = null;
 
     protected final URLPartitioner partitioner = new URLPartitioner();
@@ -51,7 +52,7 @@ public abstract class AbstractURLBuffer implements URLBuffer {
         partitioner.configure(stormConf);
     }
 
-    /** Total number of queues in the buffer * */
+    /** Total number of queues in the buffer. */
     public synchronized int numQueues() {
         return queues.size();
     }
@@ -61,19 +62,19 @@ public abstract class AbstractURLBuffer implements URLBuffer {
      *
      * @return false if the URL was already in the buffer, true if it wasn't and was added
      */
-    public synchronized boolean add(String URL, Metadata m, String key) {
+    public synchronized boolean add(String url, Metadata m, String key) {
 
-        LOG.debug("Adding {}", URL);
+        LOG.debug("Adding {}", url);
 
-        if (in_buffer.contains(URL)) {
-            LOG.debug("already in buffer {}", URL);
+        if (inBuffer.contains(url)) {
+            LOG.debug("already in buffer {}", url);
             return false;
         }
 
         // determine which queue to use
         // configure with other than hostname
         if (key == null) {
-            key = partitioner.getPartition(URL, m);
+            key = partitioner.getPartition(url, m);
             if (key == null) {
                 key = "_DEFAULT_";
             }
@@ -81,8 +82,8 @@ public abstract class AbstractURLBuffer implements URLBuffer {
 
         // create the queue if it does not exist
         // and add the url
-        queues.computeIfAbsent(key, k -> new LinkedList<>()).add(new URLMetadata(URL, m));
-        return in_buffer.add(URL);
+        queues.computeIfAbsent(key, k -> new LinkedList<>()).add(new URLMetadata(url, m));
+        return inBuffer.add(url);
     }
 
     /**
@@ -90,13 +91,13 @@ public abstract class AbstractURLBuffer implements URLBuffer {
      *
      * @return false if the URL was already in the buffer, true if it wasn't and was added
      */
-    public synchronized boolean add(String URL, Metadata m) {
-        return add(URL, m, null);
+    public synchronized boolean add(String url, Metadata m) {
+        return add(url, m, null);
     }
 
-    /** Total number of URLs in the buffer * */
+    /** Total number of URLs in the buffer. */
     public synchronized int size() {
-        return in_buffer.size();
+        return inBuffer.size();
     }
 
     public void setEmptyQueueListener(EmptyQueueListener l) {

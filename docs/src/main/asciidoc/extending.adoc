@@ -1,0 +1,421 @@
+////
+Licensed under the Apache License, Version 2.0 (the "License");
+You may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+https://www.apache.org/licenses/LICENSE-2.0
+////
+== Extending and Operating StormCrawler
+
+This section provides practical guides for extending StormCrawler with custom components, tuning crawl performance, and operating crawlers in production.
+
+=== Writing Custom Components
+
+==== Custom URL Filter
+
+URL filters accept, reject, or modify URLs during parsing and redirection handling. To create a custom filter, extend the abstract `URLFilter` class and implement the `filter` method.
+
+[source,java]
+----
+import org.apache.stormcrawler.filtering.URLFilter;
+import org.apache.stormcrawler.Metadata;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.net.URL;
+import java.util.Map;
+
+public class MyURLFilter extends URLFilter {
+
+    private int maxLength;
+
+    @Override
+    public void configure(Map<String, Object> stormConf, JsonNode paramNode) {
+        maxLength = paramNode.path("maxLength").asInt(1024);
+    }
+
+    @Override
+    public String filter(URL sourceUrl, Metadata sourceMetadata, String urlToFilter) {
+        if (urlToFilter.length() > maxLength) {
+            return null; // reject
+        }
+        return urlToFilter; // accept (or return a normalized version)
+    }
+}
+----
+
+Register the filter in `urlfilters.json`:
+
+[source,json]
+----
+{
+  "org.apache.stormcrawler.filtering.URLFilters": [
+    {
+      "class": "com.example.MyURLFilter",
+      "name": "MyURLFilter",
+      "params": {
+        "maxLength": 2048
+      }
+    }
+  ]
+}
+----
+
+Filters are executed in the order they appear in the JSON file. Return `null` to reject a URL, or return the (possibly modified) URL string to accept it.
+
+==== Custom Parse Filter
+
+Parse filters extract data from fetched documents and can modify metadata and outlinks. Extend `ParseFilter` and implement the `filter` method.
+
+[source,java]
+----
+import org.apache.stormcrawler.parse.ParseFilter;
+import org.apache.stormcrawler.parse.ParseResult;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.w3c.dom.DocumentFragment;
+import java.util.Map;
+
+public class MyParseFilter extends ParseFilter {
+
+    private String metadataKey;
+
+    @Override
+    public void configure(Map<String, Object> stormConf, JsonNode paramNode) {
+        metadataKey = paramNode.path("key").asText("custom-field");
+    }
+
+    @Override
+    public boolean needsDOM() {
+        return false; // set to true if you need the DOM tree
+    }
+
+    @Override
+    public void filter(String url, byte[] content, DocumentFragment doc,
+                       ParseResult parse) {
+        // Extract data and store in metadata
+        parse.get(url).getMetadata().setValue(metadataKey, "extracted-value");
+    }
+}
+----
+
+Register it in `parsefilters.json`:
+
+[source,json]
+----
+{
+  "org.apache.stormcrawler.parse.ParseFilters": [
+    {
+      "class": "com.example.MyParseFilter",
+      "name": "MyParseFilter",
+      "params": {
+        "key": "custom-field"
+      }
+    }
+  ]
+}
+----
+
+If `needsDOM()` returns `false` for all configured parse filters, the parsing bolt skips DOM generation entirely, improving performance.
+
+==== Custom Protocol
+
+Protocol implementations define how content is fetched. Implement the `Protocol` interface:
+
+[source,java]
+----
+import org.apache.stormcrawler.protocol.Protocol;
+import org.apache.stormcrawler.protocol.ProtocolResponse;
+import org.apache.stormcrawler.Metadata;
+import crawlercommons.robots.BaseRobotRules;
+import org.apache.storm.Config;
+
+public class MyProtocol implements Protocol {
+
+    @Override
+    public void configure(Config conf) {
+        // Initialize from Storm configuration
+    }
+
+    @Override
+    public ProtocolResponse getProtocolOutput(String url, Metadata metadata)
+            throws Exception {
+        byte[] content = /* fetch content */;
+        int statusCode = 200;
+        Metadata responseMeta = new Metadata();
+        return new ProtocolResponse(content, statusCode, responseMeta);
+    }
+
+    @Override
+    public BaseRobotRules getRobotRules(String url) {
+        return RobotRulesParser.EMPTY_RULES;
+    }
+
+    @Override
+    public void cleanup() {}
+}
+----
+
+Register it in your configuration YAML:
+
+[source,yaml]
+----
+http.protocol.implementation: "com.example.MyProtocol"
+https.protocol.implementation: "com.example.MyProtocol"
+----
+
+Use the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/DelegatorProtocol.java[DelegatorProtocol] when you need to route URLs to different protocol implementations based on metadata or URL patterns.
+
+==== Custom Page Action (Playwright)
+
+The link:https://github.com/apache/stormcrawler/tree/main/external/playwright[Playwright protocol] exposes a `PageAction` extension point so you can plug site-specific post-navigate behaviour (tab/accordion expansion, cookie-banner dismissal, infinite-scroll, custom `evaluate()` calls, screenshotting, ...) into the protocol without subclassing it. Actions are loaded as an ordered chain from a JSON file referenced by `playwright.page.actions.config.file` and follow the same `Configurable` lifecycle as URL/parse filters. The chain runs after `page.navigate()` succeeds and before `page.content()` is captured, so any DOM mutations land in the rendered content returned by the protocol.
+
+A handful of built-in actions ship with the module — `DismissOverlayAction`, `ExpandClickablesAction`, `ScrollToBottomAction`, `EvaluateAction`, `WaitForSelectorAction`, `ScreenshotAction`. Reach for a custom action when none of those fit. Extend `PageAction` and implement `apply`:
+
+[source,java]
+----
+import org.apache.stormcrawler.protocol.playwright.PageAction;
+import org.apache.stormcrawler.Metadata;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.microsoft.playwright.Page;
+import java.util.Map;
+
+public class MyPageAction extends PageAction {
+
+    private String selector;
+
+    @Override
+    public void configure(Map<String, Object> stormConf, JsonNode params) {
+        if (!params.has("selector")) {
+            throw new IllegalArgumentException("MyPageAction requires 'selector'");
+        }
+        this.selector = params.get("selector").asText();
+    }
+
+    @Override
+    public void apply(Page page, String url,
+                      Metadata sourceMetadata, Metadata responseMetadata) {
+        page.locator(selector).click();
+    }
+}
+----
+
+Reference the action by its fully-qualified class name in the chain JSON:
+
+[source,json]
+----
+{
+  "org.apache.stormcrawler.protocol.playwright.PageActions": [
+    {
+      "class": "com.example.MyPageAction",
+      "name": "my-action",
+      "params": { "selector": "#load-more" }
+    }
+  ]
+}
+----
+
+Per-action failures in `apply()` are logged and swallowed by the chain wrapper so one bad action cannot abort the rest. If you need a hard failure on misconfiguration, throw from `configure()` — that propagates at topology start-up, before any URL is fetched.
+
+==== Custom Bolt or Spout
+
+For a bolt that emits on the status stream (like fetchers and parsers), extend link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/StatusEmitterBolt.java[StatusEmitterBolt]:
+
+[source,java]
+----
+import org.apache.stormcrawler.bolt.StatusEmitterBolt;
+import org.apache.storm.tuple.Tuple;
+
+public class MyBolt extends StatusEmitterBolt {
+
+    @Override
+    public void execute(Tuple tuple) {
+        String url = tuple.getStringByField("url");
+        byte[] content = tuple.getBinaryByField("content");
+        Metadata metadata = (Metadata) tuple.getValueByField("metadata");
+
+        // Process content...
+
+        collector.emit(tuple, new Values(url, content, metadata));
+        collector.ack(tuple);
+    }
+
+    @Override
+    public void declareOutputFields(OutputFieldsDeclarer declarer) {
+        declarer.declare(new Fields("url", "content", "metadata"));
+        declarer.declareStream(
+            org.apache.stormcrawler.Constants.StatusStreamName,
+            new Fields("url", "metadata", "status"));
+    }
+}
+----
+
+For a custom spout, extend `BaseRichSpout` and implement `open()`, `nextTuple()`, `ack()`, `fail()`, and `declareOutputFields()`. See link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/spout/FileSpout.java[FileSpout] for a simple example. For spouts backed by a storage layer, extend link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/persistence/AbstractQueryingSpout.java[AbstractQueryingSpout] instead.
+
+=== Politeness and Rate Limiting
+
+StormCrawler enforces politeness at multiple levels to avoid overloading target servers.
+
+==== Queue-Based Politeness
+
+The **FetcherBolt** groups incoming URLs into queues based on the `fetcher.queue.mode` setting:
+
+* `byHost` (default) — one queue per hostname
+* `byDomain` — one queue per registered domain (e.g., `sub.example.com` and `example.com` share a queue)
+* `byIP` — one queue per resolved IP address
+
+Each queue enforces a minimum delay between consecutive requests. The delay is determined by:
+
+1. The `Crawl-delay` directive in the site's `robots.txt` (if present and within limits)
+2. The `fetcher.server.delay` default (1 second)
+3. For multi-threaded queues, `fetcher.server.min.delay` is used instead
+
+==== Crawl-Delay Handling
+
+When `robots.txt` specifies a `Crawl-delay`:
+
+* If the delay is *smaller* than `fetcher.server.delay` and `fetcher.server.delay.force` is `true`, the larger default delay is used instead
+* If the delay is *larger* than `fetcher.max.crawl.delay`:
+** `fetcher.max.crawl.delay.force: false` (default) — the queue is skipped and the URL gets an ERROR status
+** `fetcher.max.crawl.delay.force: true` — the delay is capped at `fetcher.max.crawl.delay`
+
+==== Robots.txt Compliance
+
+StormCrawler fetches and caches `robots.txt` rules per host. The cache is configured via:
+
+* `robots.cache.spec` — Guava cache spec for valid rules (default: 6 hour expiry, 10000 entries)
+* `robots.error.cache.spec` — cache spec for error responses (default: 1 hour expiry)
+
+Individual aspects of robot compliance can be toggled:
+
+* `http.robots.file.skip` — ignore `robots.txt` entirely
+* `http.robots.headers.skip` — ignore `X-Robots-Tag` HTTP headers
+* `http.robots.meta.skip` — ignore `<meta name="robots">` HTML tags
+* `robots.noFollow.strict` — if `true`, remove all outlinks from pages marked as `noFollow`
+
+=== Error Handling and Retry Logic
+
+StormCrawler uses a status-based system to handle errors and schedule retries.
+
+==== Status Lifecycle
+
+Each URL has a `Status` value that drives scheduling:
+
+* **DISCOVERED** — new URL, not yet fetched
+* **FETCHED** — successfully retrieved and processed
+* **FETCH_ERROR** — transient error (network timeout, HTTP 5xx). Will be retried.
+* **ERROR** — terminal error (too many retries, HTTP 4xx). Not retried by default.
+* **REDIRECTION** — HTTP 3xx redirect encountered
+
+==== Retry Mechanism
+
+When a URL receives `FETCH_ERROR` status, the `AbstractStatusUpdaterBolt` increments a `fetch.error.count` counter in the URL's metadata. Once this counter reaches `max.fetch.errors` (default: 3), the status is escalated to `ERROR`.
+
+The `DefaultScheduler` computes the next fetch date based on status:
+
+* **FETCHED** — `fetchInterval.default` (default: 1440 minutes = 1 day)
+* **FETCH_ERROR** — `fetchInterval.fetch.error` (default: 120 minutes = 2 hours)
+* **ERROR** — `fetchInterval.error` (default: -1 = never refetch)
+
+On a successful fetch, the error counter and error metadata (`error.cause`, `error.message`, `error.source`) are cleared automatically.
+
+==== Custom Fetch Intervals
+
+You can set fetch intervals based on metadata key-value pairs:
+
+[source,yaml]
+----
+# All feeds refetch every 10 minutes
+fetchInterval.isFeed=true: 10
+
+# Feeds with fetch errors retry after 60 minutes
+fetchInterval.FETCH_ERROR.isFeed=true: 60
+----
+
+=== Monitoring and Metrics
+
+StormCrawler exposes metrics through Apache Storm's built-in metrics system. Bolts register counters, gauges, and averages which are reported at configurable intervals.
+
+==== Key Fetcher Metrics
+
+The `FetcherBolt` tracks:
+
+* `fetcher_counter` — event counts (fetched, error, redirection, robots_rules_fetches)
+* `fetcher_average` — averaged values (download_time, queue_wait_time)
+* `fetcher_average_persec` — throughput rates (fetched_per_sec, error_per_sec)
+* `activethreads` — number of currently active fetching threads
+
+The reporting interval is controlled by `fetcher.metrics.time.bucket.secs` (default: 10 seconds).
+
+==== Metrics Consumers
+
+To persist metrics, register a `MetricsConsumer` in your topology configuration:
+
+[source,yaml]
+----
+topology.metrics.consumer.register:
+  - class: "org.apache.stormcrawler.opensearch.metrics.MetricsConsumer"
+    parallelism.hint: 1
+----
+
+StormCrawler provides MetricsConsumer implementations for link:https://github.com/apache/stormcrawler/tree/main/external/opensearch[OpenSearch], link:https://github.com/apache/stormcrawler/tree/main/external/solr[Solr], and link:https://github.com/apache/stormcrawler/tree/main/external/sql[SQL].
+
+The **Storm UI** (default port 8080) provides real-time visibility into topology health, including execute/process latency, emit counts, and error rates per bolt and spout.
+
+=== Scaling and Tuning
+
+==== Thread and Parallelism Tuning
+
+* `fetcher.threads.number` — total fetching threads across all queues (default: 10). Increase for broader crawls.
+* `fetcher.threads.per.queue` — threads per host/domain/IP queue (default: 1). Increase only for sites that allow aggressive crawling.
+* `fetcher.maxThreads.host/domain/ip` — override threads for a specific queue.
+* `protocol.instances.num` — number of protocol instances (default: 1). Increase for OkHttp connection pool efficiency.
+
+In Flux or topology code, set `parallelism` for each bolt to control Storm executor allocation. Increase spout parallelism when the frontier is the bottleneck.
+
+==== Queue and Buffer Tuning
+
+* `fetcher.max.urls.in.queues` — caps total queued URLs to prevent memory exhaustion. -1 for unlimited.
+* `fetcher.max.queue.size` — caps individual queue length.
+* `urlbuffer.class` — URL buffer implementation used by spouts. The default `SimpleURLBuffer` is suitable for most use cases.
+
+==== Memory and Connection Pooling (OkHttp)
+
+For crawls with many concurrent hosts, tune OkHttp's connection pool:
+
+[source,yaml]
+----
+okhttp.protocol.connection.pool:
+  max.idle.connections: 5
+  connection.keep.alive: 300
+----
+
+Keep the pool size (idle + active) under 1000. For large crawls, increase `protocol.instances.num` to distribute connections across multiple pools.
+
+=== Security Considerations
+
+==== SSL/TLS
+
+By default, StormCrawler's OkHttp protocol trusts all certificates (`http.trust.everything: true`). For production crawls over untrusted networks, consider setting this to `false` and configuring a proper trust store.
+
+==== Authentication
+
+**Basic Authentication** is supported via:
+
+[source,yaml]
+----
+http.basicauth.user: "username"
+http.basicauth.password: "password"
+----
+
+These credentials are sent as an `Authorization` header with every request. For per-site authentication, use metadata-driven headers instead (see <<Metadata-dependent Behavior For HTTP Protocols>> in the Internals section).
+
+==== Proxy Authentication
+
+Proxy credentials can be configured via:
+
+[source,yaml]
+----
+http.proxy.host: "proxy.example.com"
+http.proxy.port: 8080
+http.proxy.user: "proxyuser"
+http.proxy.pass: "proxypass"
+----
+
+For rotating proxies, use the `MultiProxyManager` with a proxy list file. See the xref:configuration.adoc[Proxy configuration section] for details.

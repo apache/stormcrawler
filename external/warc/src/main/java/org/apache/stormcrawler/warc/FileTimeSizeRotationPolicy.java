@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more contributor license
  * agreements. See the NOTICE file distributed with this work for additional information regarding
  * copyright ownership. The ASF licenses this file to you under the Apache License, Version 2.0 (the
@@ -12,6 +12,7 @@
  * express or implied. See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.warc;
 
 import org.apache.storm.hdfs.bolt.rotation.FileRotationPolicy;
@@ -20,7 +21,7 @@ import org.apache.storm.tuple.Tuple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Rotates a file based on size or optionally time, whichever occurs first * */
+/** Rotates a file based on size or optionally time, whichever occurs first. * */
 public class FileTimeSizeRotationPolicy implements FileRotationPolicy {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileSizeRotationPolicy.class);

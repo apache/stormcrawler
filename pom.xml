@@ -20,481 +20,535 @@ under the License.
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.apache</groupId>
-		<artifactId>apache</artifactId>
-		<version>35</version>
-	</parent>
+    <parent>
+        <groupId>org.apache</groupId>
+        <artifactId>apache</artifactId>
+        <version>39</version>
+    </parent>
 
-	<groupId>org.apache.stormcrawler</groupId>
-	<artifactId>stormcrawler</artifactId>
-	<version>3.5.1-SNAPSHOT</version>
-	<packaging>pom</packaging>
+    <groupId>org.apache.stormcrawler</groupId>
+    <artifactId>stormcrawler</artifactId>
+    <version>3.6.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
 
-	<name>stormcrawler</name>
-	<description>A collection of resources for building low-latency, scalable
-		web crawlers on Apache Storm.</description>
-	<url>https://github.com/apache/stormcrawler</url>
+    <name>stormcrawler</name>
+    <description>A collection of resources for building low-latency, scalable
+        web crawlers on Apache Storm.</description>
+    <url>https://github.com/apache/stormcrawler</url>
 
-	<licenses>
-		<license>
-			<name>The Apache License, Version 2.0</name>
-			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-		</license>
-	</licenses>
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
 
-	<scm>
-		<connection>scm:git:https://github.com/apache/stormcrawler.git</connection>
-		<developerConnection>
-			scm:git:git@github.com:apache/stormcrawler.git</developerConnection>
-		<url>https://github.com/apache/stormcrawler</url>
-		<tag>stormcrawler-3.5.0</tag>
-	</scm>
+    <scm>
+        <connection>scm:git:https://github.com/apache/stormcrawler.git</connection>
+        <developerConnection>
+            scm:git:git@github.com:apache/stormcrawler.git</developerConnection>
+        <url>https://github.com/apache/stormcrawler</url>
+        <tag>stormcrawler-3.5.1</tag>
+    </scm>
 
-	<issueManagement>
-		<system>GitHub Issues</system>
-		<url>https://github.com/apache/stormcrawler/issues</url>
-	</issueManagement>
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/apache/stormcrawler/issues</url>
+    </issueManagement>
 
-	<properties>
-		<!-- timestamp for reproducible outputs, updated on release by the release plugin -->
-		<project.build.outputTimestamp>2025-09-16T17:50:07Z</project.build.outputTimestamp>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<additionalparam>-Xdoclint:none</additionalparam>
-		<!-- dependency versions -->
-		<junit.version>6.0.0</junit.version>
-		<storm-client.version>2.8.2</storm-client.version>
-		<!-- Jackson's version should be in-line with the one in Storm -->
-		<jackson.version>2.18.1</jackson.version>
-		<tika.version>3.2.3</tika.version>
-		<mockito.version>5.20.0</mockito.version>
-		<slf4j-simple.version>2.0.17</slf4j-simple.version>
-		<jetbrains.annotations.version>26.0.2-1</jetbrains.annotations.version>
-		<commons.io.version>2.17.0</commons.io.version>
+    <properties>
+        <!-- timestamp for reproducible outputs, updated on release by the release plugin -->
+        <project.build.outputTimestamp>2026-05-22T12:49:09Z</project.build.outputTimestamp>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <additionalparam>-Xdoclint:none</additionalparam>
+        <!-- dependency versions -->
+        <junit.version>6.1.1</junit.version>
+        <storm-client.version>2.8.8</storm-client.version>
+        <!-- Jackson's version should be in-line with the one in Storm -->
+        <jackson-annotations.version>2.21</jackson-annotations.version>
+        <jackson.version>2.21.3</jackson.version>
+        <tika.version>3.3.1</tika.version>
+        <mockito.version>5.23.0</mockito.version>
+        <slf4j-simple.version>2.0.18</slf4j-simple.version>
+        <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
+        <commons.io.version>2.22.0</commons.io.version>
         <commons.compress.version>1.28.0</commons.compress.version>
-        <commons.codec.version>1.19.0</commons.codec.version>
-		<git-code-format-maven-plugin.version>5.4</git-code-format-maven-plugin.version>
-		<testcontainers.version>1.21.3</testcontainers.version>
-		<maven.mojo.license.plugin>2.7.0</maven.mojo.license.plugin>
-		<jacoco.maven.plugin>0.8.13</jacoco.maven.plugin>
-		<jacoco.haltOnFailure>false</jacoco.haltOnFailure>
-		<jacoco.classRatio>1.00</jacoco.classRatio>
-		<jacoco.instructionRatio>1.00</jacoco.instructionRatio>
-		<jacoco.methodRatio>1.00</jacoco.methodRatio>
-		<jacoco.branchRatio>1.00</jacoco.branchRatio>
-		<jacoco.lineRatio>1.00</jacoco.lineRatio>
-		<jacoco.complexityRatio>1.00</jacoco.complexityRatio>
+        <commons.codec.version>1.22.0</commons.codec.version>
+        <git-code-format-maven-plugin.version>5.4</git-code-format-maven-plugin.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
+        <awaitility.version>4.3.0</awaitility.version>
+        <maven.mojo.license.plugin>2.7.1</maven.mojo.license.plugin>
+        <checkstyle-maven-plugin.version>3.6.0</checkstyle-maven-plugin.version>
+        <checkstyle.version>12.3.1</checkstyle.version>
+        <jacoco.maven.plugin>0.8.15</jacoco.maven.plugin>
+        <jacoco.haltOnFailure>false</jacoco.haltOnFailure>
+        <jacoco.classRatio>1.00</jacoco.classRatio>
+        <jacoco.instructionRatio>1.00</jacoco.instructionRatio>
+        <jacoco.methodRatio>1.00</jacoco.methodRatio>
+        <jacoco.branchRatio>1.00</jacoco.branchRatio>
+        <jacoco.lineRatio>1.00</jacoco.lineRatio>
+        <jacoco.complexityRatio>1.00</jacoco.complexityRatio>
+        <mysql-connector-j>9.7.0</mysql-connector-j>
 
-		<skip.format.code>true</skip.format.code>
+        <skip.format.code>true</skip.format.code>
 
-		<maven.compiler.source>17</maven.compiler.source>
-		<maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
 
-		<apache-jar-resource-bundle.version>1.7</apache-jar-resource-bundle.version>
-	</properties>
+        <apache-jar-resource-bundle.version>1.7</apache-jar-resource-bundle.version>
+    </properties>
 
-	<build>
-		<pluginManagement>
-			<plugins>
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-surefire-plugin</artifactId>
-					<version>3.5.4</version>
-					<configuration>
-						<argLine>${argLine}</argLine>
-					</configuration>
-				</plugin>
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-compiler-plugin</artifactId>
-					<version>3.14.1</version>
-					<configuration>
-						<source>17</source>
-						<target>17</target>
-						<release>17</release>
-					</configuration>
-				</plugin>
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-javadoc-plugin</artifactId>
-					<version>3.12.0</version>
-					<configuration>
-						<doclint>none</doclint>
-						<source>17</source>
-						<sourcepath>src/main/java</sourcepath>
-					</configuration>
-					<executions>
-						<execution>
-							<id>create-javadoc-jar</id>
-							<goals>
-								<goal>jar</goal>
-							</goals>
-							<phase>package</phase>
-							<configuration>
-								<show>public</show>
-								<quiet>false</quiet>
-								<use>false</use> <!-- Speeds up the build of the javadocs -->
-							</configuration>
-						</execution>
-					</executions>
-				</plugin>
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-jar-plugin</artifactId>
-					<version>3.4.2</version>
-				</plugin>
-				<plugin>
-					<groupId>org.codehaus.mojo</groupId>
-					<artifactId>license-maven-plugin</artifactId>
-					<version>${maven.mojo.license.plugin}</version>
-					<configuration>
-						<useMissingFile>true</useMissingFile>
-						<failOnMissing>true</failOnMissing>
-						<includeTransitiveDependencies>true</includeTransitiveDependencies>
-						<fileTemplate>/org/codehaus/mojo/license/third-party-file-groupByMultiLicense.ftl</fileTemplate>
-						<excludedScopes>system,test</excludedScopes>
-						<excludedGroups>${project.groupId}</excludedGroups>
-						<licenseMerges>
-							<licenseMerge>
-								Apache License, Version 2.0 |
-								Apache License, version 2.0 |
-								Apache License Version 2 |
-								Apache License Version 2.0 |
-								Apache License version 2.0 |
-								Apache 2 |
-								Apache 2.0 |
-								Apache-2.0 |
-								Apache License, 2.0 |
-								Apache License 2 |
-								Apache License 2.0 |
-								Apache Public License 2.0 |
-								Apache Software License - Version 2.0 |
-								Apache v2 |
-								ASL, version 2 |
-								The Apache License, Version 2.0 |
-								The Apache Software License, Version 2.0 |
-								Apache License v2
-							</licenseMerge>
-							<licenseMerge>
-								Apache License |
-								Apache Software Licenses
-							</licenseMerge>
-							<licenseMerge>
-								BSD License |
-								BSD license |
-								BSD |
-								The BSD License
-							</licenseMerge>
-							<licenseMerge>
-								BSD 2-Clause License |
-								BSD 2-Clause license 
-							</licenseMerge>
-							<licenseMerge>
-								BSD 3-Clause License |
-								BSD 3-Clause |
-								BSD 3-clause |
-								BSD-3-Clause |
-								The BSD 3-Clause License |
-								New BSD License |
-								New BSD license |
-								The BSD 3-Clause License (BSD3)
-							</licenseMerge>
-							<licenseMerge>
-								Common Development and Distribution License (CDDL) v1.0 |
-								COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0 |
-								CDDL 1.0
-							</licenseMerge>
-							<licenseMerge>
-								Common Development and Distribution License (CDDL) v1.1 |
-								COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.1 |
-								CDDL 1.1 |
-								Common Development and Distribution License (CDDL), Version 1.1
-							</licenseMerge>
-							<licenseMerge>
-								Common Development and Distribution License |
-								CDDL License |
-								<!-- Multilicense, choosing CDDL -->
-								CDDL+GPL |
-								CDDL+GPL License |
-								CDDL + GPLv2 with classpath exception
-							</licenseMerge>
-							<licenseMerge>
-								Eclipse Public License, Version 1.0 |
-								Eclipse Public License 1.0 |
-								Eclipse Public License - v 1.0
-							</licenseMerge>
-							<licenseMerge>
-								Eclipse Public License, Version 2.0 |
-								EPL-2.0 |
-								EPL 2.0
-							</licenseMerge>
-							<licenseMerge>
-								Eclipse Distribution License, Version 1.0 |
-								Eclipse Distribution License - v 1.0 |
-								EDL 1.0
-							</licenseMerge>
-							<licenseMerge>
-								MIT License |
-								The MIT License |
-								MIT license |
-								MIT X11 License |
-								MIT
-							</licenseMerge>
-							<licenseMerge>
-								The GNU General Public License (GPL), Version 2, With Classpath Exception |
-								GPL2 w/ CPE
-							</licenseMerge>
-							<licenseMerge>
-								GNU Lesser General Public License (LGPL), Version 2.1 |
-								LGPL, version 2.1 |
-								GNU Lesser General Public License Version 2.1 |
-								GNU Lesser General Public License, version 2.1
-							</licenseMerge>
-							<licenseMerge>
-								Common Public License Version 1.0 |
-								Common Public License - v 1.0
-							</licenseMerge>
-						</licenseMerges>
-					</configuration>
-				</plugin>
-			</plugins>
-		</pluginManagement>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-remote-resources-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>process-resource-bundles</id>
-						<configuration>
-							<properties>
-								<projectName>Apache StormCrawler</projectName>
-							</properties>
-							<resourceBundles>
-								<resourceBundle>org.apache.apache.resources:apache-jar-resource-bundle:${apache-jar-resource-bundle.version}</resourceBundle>
-							</resourceBundles>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.jacoco</groupId>
-				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>${jacoco.maven.plugin}</version>
-				<executions>
-					<execution>
-						<id>prepare-agent</id>
-						<goals>
-							<goal>prepare-agent</goal>
-						</goals>
-					</execution>
-					<execution>
-						<id>post-unit-test</id>
-						<phase>test</phase>
-						<goals>
-							<goal>report</goal>
-						</goals>
-					</execution>
-					<execution>
-						<id>check</id>
-						<goals>
-							<goal>check</goal>
-						</goals>
-						<configuration>
-							<rules>
-								<rule>
-									<element>BUNDLE</element>
-									<limits>
-										<limit>
-											<counter>CLASS</counter>
-											<value>COVEREDRATIO</value>
-											<minimum>${jacoco.classRatio}</minimum>
-										</limit>
-										<limit>
-											<counter>INSTRUCTION</counter>
-											<value>COVEREDRATIO</value>
-											<minimum>${jacoco.instructionRatio}</minimum>
-										</limit>
-										<limit>
-											<counter>METHOD</counter>
-											<value>COVEREDRATIO</value>
-											<minimum>${jacoco.methodRatio}</minimum>
-										</limit>
-										<limit>
-											<counter>BRANCH</counter>
-											<value>COVEREDRATIO</value>
-											<minimum>${jacoco.branchRatio}</minimum>
-										</limit>
-										<limit>
-											<counter>LINE</counter>
-											<value>COVEREDRATIO</value>
-											<minimum>${jacoco.lineRatio}</minimum>
-										</limit>
-										<limit>
-											<counter>COMPLEXITY</counter>
-											<value>COVEREDRATIO</value>
-											<minimum>${jacoco.complexityRatio}</minimum>
-										</limit>
-									</limits>
-								</rule>
-							</rules>
-							<haltOnFailure>${jacoco.haltOnFailure}</haltOnFailure>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>com.cosium.code</groupId>
-				<artifactId>git-code-format-maven-plugin</artifactId>
-				<version>${git-code-format-maven-plugin.version}</version>
-				<executions>
-					<!-- On commit, format the modified java files -->
-					<execution>
-						<id>install-formatter-hook</id>
-						<goals>
-							<goal>install-hooks</goal>
-						</goals>
-					</execution>
-					<!-- On Maven verify phase, fail if any file (including
-					unmodified) 
-						is badly formatted -->
-					<execution>
-						<id>validate-code-format</id>
-						<goals>
-							<goal>validate-code-format</goal>
-						</goals>
-					</execution>
-				</executions>
-				<dependencies>
-					<!-- Enable https://github.com/google/google-java-format -->
-					<dependency>
-						<groupId>com.cosium.code</groupId>
-						<artifactId>google-java-format</artifactId>
-						<version>${git-code-format-maven-plugin.version}</version>
-					</dependency>
-				</dependencies>
-				<configuration>
-					<skip>${skip.format.code}</skip>
-					<formatterOptions>
-						<googleJavaFormat.aosp>true</googleJavaFormat.aosp>
-						<googleJavaFormat.fixImportsOnly>false</googleJavaFormat.fixImportsOnly>
-						<googleJavaFormat.skipSortingImports>false</googleJavaFormat.skipSortingImports>
-						<googleJavaFormat.skipRemovingUnusedImports>false</googleJavaFormat.skipRemovingUnusedImports>
-					</formatterOptions>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-enforcer-plugin</artifactId>
-				<version>3.6.2</version>
-				<executions>
-					<execution>
-						<id>enforce-maven</id>
-						<configuration>
-							<rules>
-								<requireMavenVersion>
-									<version>3.5</version>
-								</requireMavenVersion>
-							</rules>
-						</configuration>
-						<goals>
-							<goal>enforce</goal>
-						</goals>
-					</execution>
-					<execution>
-						<id>exclude-vulnerable-log4j-versions</id>
-						<phase>validate</phase>
-						<goals>
-							<goal>enforce</goal>
-						</goals>
-						<configuration>
-							<rules>
-								<bannedDependencies>
-									<excludes>
-										<exclude>org.apache.logging.log4j:log4j-core:(,2.17.0)</exclude>
-									</excludes>
-								</bannedDependencies>
-							</rules>
-							<fail>true</fail>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>de.thetaphi</groupId>
-				<artifactId>forbiddenapis</artifactId>
-				<version>3.10</version>
-				<configuration>
-					<targetVersion>17</targetVersion>
-					<ignoreSignaturesOfMissingClasses>true</ignoreSignaturesOfMissingClasses>
-					<failOnUnsupportedJava>false</failOnUnsupportedJava>
-					<excludes>test-documents/*.class</excludes>
-					<bundledSignatures>
-						<bundledSignature>jdk-unsafe</bundledSignature>
-						<bundledSignature>jdk-deprecated</bundledSignature>
-						<bundledSignature>jdk-non-portable</bundledSignature>
-						<bundledSignature>jdk-internal</bundledSignature>
-						<bundledSignature>commons-io-unsafe-${commons.io.version}</bundledSignature>
-					</bundledSignatures>
-				</configuration>
-				<executions>
-					<execution>
-						<goals>
-							<goal>check</goal>
-							<goal>testCheck</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>license-maven-plugin</artifactId>
-				<inherited>false</inherited>
-				<configuration>
-					<outputDirectory>${project.basedir}</outputDirectory>
-					<missingFile>${project.basedir}/THIRD-PARTY.properties</missingFile>
-				</configuration>
-				   <executions>
-					  <execution>
-						 <id>generate-and-check-licenses</id>
-							<goals>
-							   <goal>aggregate-add-third-party</goal>
-							</goals>
-					  </execution>
-				  </executions>
-		   </plugin>
-		</plugins>
-	</build>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.6</version>
+                    <configuration>
+                        <argLine>${argLine} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.15.0</version>
+                    <configuration>
+                        <source>17</source>
+                        <target>17</target>
+                        <release>17</release>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>3.12.0</version>
+                    <configuration>
+                        <doclint>none</doclint>
+                        <release>17</release>
+                        <sourcepath>src/main/java</sourcepath>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>create-javadoc-jar</id>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                            <phase>package</phase>
+                            <configuration>
+                                <show>public</show>
+                                <quiet>false</quiet>
+                                <use>false</use> <!-- Speeds up the build of the javadocs -->
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>3.5.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>license-maven-plugin</artifactId>
+                    <version>${maven.mojo.license.plugin}</version>
+                    <configuration>
+                        <useMissingFile>true</useMissingFile>
+                        <failOnMissing>true</failOnMissing>
+                        <includeTransitiveDependencies>true</includeTransitiveDependencies>
+                        <fileTemplate>/org/codehaus/mojo/license/third-party-file-groupByMultiLicense.ftl</fileTemplate>
+                        <excludedScopes>system,test</excludedScopes>
+                        <excludedGroups>${project.groupId}</excludedGroups>
+                        <licenseMerges>
+                            <licenseMerge>
+                                Apache License, Version 2.0 |
+                                Apache License, version 2.0 |
+                                Apache License Version 2 |
+                                Apache License Version 2.0 |
+                                Apache License version 2.0 |
+                                Apache 2 |
+                                Apache 2.0 |
+                                Apache-2.0 |
+                                Apache License, 2.0 |
+                                Apache License 2 |
+                                Apache License 2.0 |
+                                Apache Public License 2.0 |
+                                Apache Software License - Version 2.0 |
+                                Apache v2 |
+                                ASL, version 2 |
+                                The Apache License, Version 2.0 |
+                                The Apache Software License, Version 2.0 |
+                                Apache License v2
+                            </licenseMerge>
+                            <licenseMerge>
+                                Apache License |
+                                Apache Software Licenses
+                            </licenseMerge>
+                            <licenseMerge>
+                                BSD License |
+                                BSD license |
+                                BSD |
+                                The BSD License
+                            </licenseMerge>
+                            <licenseMerge>
+                                BSD 2-Clause License |
+                                BSD 2-Clause license
+                            </licenseMerge>
+                            <licenseMerge>
+                                BSD 3-Clause License |
+                                BSD 3-Clause |
+                                BSD 3-clause |
+                                BSD-3-Clause |
+                                The BSD 3-Clause License |
+                                New BSD License |
+                                New BSD license |
+                                The BSD 3-Clause License (BSD3)
+                            </licenseMerge>
+                            <licenseMerge>
+                                Common Development and Distribution License (CDDL) v1.0 |
+                                COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0 |
+                                CDDL 1.0
+                            </licenseMerge>
+                            <licenseMerge>
+                                Common Development and Distribution License (CDDL) v1.1 |
+                                COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.1 |
+                                CDDL 1.1 |
+                                Common Development and Distribution License (CDDL), Version 1.1
+                            </licenseMerge>
+                            <licenseMerge>
+                                Common Development and Distribution License |
+                                CDDL License |
+                                <!-- Multilicense, choosing CDDL -->
+                                CDDL+GPL |
+                                CDDL+GPL License |
+                                CDDL + GPLv2 with classpath exception
+                            </licenseMerge>
+                            <licenseMerge>
+                                Eclipse Public License, Version 1.0 |
+                                Eclipse Public License 1.0 |
+                                Eclipse Public License - v 1.0
+                            </licenseMerge>
+                            <licenseMerge>
+                                Eclipse Public License, Version 2.0 |
+                                EPL-2.0 |
+                                EPL 2.0
+                            </licenseMerge>
+                            <licenseMerge>
+                                Eclipse Distribution License, Version 1.0 |
+                                Eclipse Distribution License - v 1.0 |
+                                EDL 1.0
+                            </licenseMerge>
+                            <licenseMerge>
+                                MIT License |
+                                The MIT License |
+                                MIT license |
+                                MIT X11 License |
+                                MIT
+                            </licenseMerge>
+                            <licenseMerge>
+                                The GNU General Public License (GPL), Version 2, With Classpath Exception |
+                                GPL2 w/ CPE
+                            </licenseMerge>
+                            <licenseMerge>
+                                GNU Lesser General Public License (LGPL), Version 2.1 |
+                                LGPL, version 2.1 |
+                                GNU Lesser General Public License Version 2.1 |
+                                GNU Lesser General Public License, version 2.1
+                            </licenseMerge>
+                            <licenseMerge>
+                                Common Public License Version 1.0 |
+                                Common Public License - v 1.0
+                            </licenseMerge>
+                        </licenseMerges>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-remote-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>process-resource-bundles</id>
+                        <configuration>
+                            <properties>
+                                <projectName>Apache StormCrawler</projectName>
+                            </properties>
+                            <resourceBundles>
+                                <resourceBundle>org.apache.apache.resources:apache-jar-resource-bundle:${apache-jar-resource-bundle.version}</resourceBundle>
+                            </resourceBundles>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.maven.plugin}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>post-unit-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>CLASS</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.classRatio}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.instructionRatio}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>METHOD</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.methodRatio}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.branchRatio}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.lineRatio}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>COMPLEXITY</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.complexityRatio}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                            <haltOnFailure>${jacoco.haltOnFailure}</haltOnFailure>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.cosium.code</groupId>
+                <artifactId>git-code-format-maven-plugin</artifactId>
+                <version>${git-code-format-maven-plugin.version}</version>
+                <executions>
+                    <!-- On commit, format the modified java files -->
+                    <execution>
+                        <id>install-formatter-hook</id>
+                        <goals>
+                            <goal>install-hooks</goal>
+                        </goals>
+                    </execution>
+                    <!-- On Maven verify phase, fail if any file (including
+                    unmodified)
+                        is badly formatted -->
+                    <execution>
+                        <id>validate-code-format</id>
+                        <goals>
+                            <goal>validate-code-format</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <!-- Enable https://github.com/google/google-java-format -->
+                    <dependency>
+                        <groupId>com.cosium.code</groupId>
+                        <artifactId>google-java-format</artifactId>
+                        <version>${git-code-format-maven-plugin.version}</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <skip>${skip.format.code}</skip>
+                    <formatterOptions>
+                        <googleJavaFormat.aosp>true</googleJavaFormat.aosp>
+                        <googleJavaFormat.fixImportsOnly>false</googleJavaFormat.fixImportsOnly>
+                        <googleJavaFormat.skipSortingImports>false</googleJavaFormat.skipSortingImports>
+                        <googleJavaFormat.skipRemovingUnusedImports>false</googleJavaFormat.skipRemovingUnusedImports>
+                    </formatterOptions>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.6.3</version>
+                <executions>
+                    <execution>
+                        <id>enforce-maven</id>
+                        <configuration>
+                            <rules>
+                                <requireMavenVersion>
+                                    <version>3.5</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>exclude-vulnerable-log4j-versions</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>org.apache.logging.log4j:log4j-core:(,2.17.0)</exclude>
+                                    </excludes>
+                                </bannedDependencies>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>de.thetaphi</groupId>
+                <artifactId>forbiddenapis</artifactId>
+                <version>3.10</version>
+                <configuration>
+                    <targetVersion>17</targetVersion>
+                    <ignoreSignaturesOfMissingClasses>true</ignoreSignaturesOfMissingClasses>
+                    <failOnUnsupportedJava>false</failOnUnsupportedJava>
+                    <excludes>test-documents/*.class</excludes>
+                    <bundledSignatures>
+                        <bundledSignature>jdk-unsafe</bundledSignature>
+                        <bundledSignature>jdk-deprecated</bundledSignature>
+                        <bundledSignature>jdk-non-portable</bundledSignature>
+                        <bundledSignature>jdk-internal</bundledSignature>
+                        <bundledSignature>commons-io-unsafe-${commons.io.version}</bundledSignature>
+                    </bundledSignatures>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                            <goal>testCheck</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <inherited>false</inherited>
+                <configuration>
+                    <outputDirectory>${project.basedir}</outputDirectory>
+                    <missingFile>${project.basedir}/THIRD-PARTY.properties</missingFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>generate-and-check-licenses</id>
+                        <goals>
+                            <goal>aggregate-add-third-party</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${checkstyle-maven-plugin.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>${checkstyle.version}</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <configLocation>checkstyle.xml</configLocation>
+                    <sourceDirectories>
+                        <sourceDirectory>${project.basedir}</sourceDirectory>
+                    </sourceDirectories>
+                    <includes>**/*.java,**/*.xml</includes>
+                    <excludes>**/target/**</excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.ec4j.maven</groupId>
+                <artifactId>editorconfig-maven-plugin</artifactId>
+                <version>0.2.0</version>
+                <executions>
+                    <execution>
+                        <id>check</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <excludes>
+                        <exclude>target/**</exclude>
+                        <exclude>**/*.class</exclude>
+                        <exclude>**/*.jar</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
-	<profiles>
-		<!-- Run Apache Rat license checks in a separate profile, because during local builds it doesn't skip files
+    <profiles>
+        <!-- Run Apache Rat license checks in a separate profile, because during local builds it doesn't skip files
           that are not checked into Git -->
-		<profile>
-			<id>rat</id>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.apache.rat</groupId>
-						<artifactId>apache-rat-plugin</artifactId>
-						<version>0.16.1</version>
-						<executions>
-							<execution>
-								<phase>verify</phase>
-								<goals>
-									<goal>check</goal>
-								</goals>
-							</execution>
-						</executions>
-						<configuration>
-							<outputDirectory>${project.basedir}/rat</outputDirectory>
-							<excludes>
-								<exclude>**/*.ndjson</exclude>
+        <profile>
+            <id>rat</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.rat</groupId>
+                        <artifactId>apache-rat-plugin</artifactId>
+                        <version>0.18</version>
+                        <executions>
+                            <execution>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <outputDirectory>${project.basedir}/rat</outputDirectory>
+                            <excludes>
+                                <exclude>**/*.ndjson</exclude>
                                 <exclude>**/*.mapping</exclude>
                                 <exclude>**/*.flux</exclude>
                                 <exclude>**/*.txt</exclude>
                                 <exclude>**/*.rss</exclude>
+                                <exclude>**/*.pdf</exclude>
                                 <exclude>**/*.tar.gz</exclude>
                                 <exclude>**/README.md</exclude>
                                 <exclude>**/target/**</exclude>
@@ -504,11 +558,13 @@ under the License.
                                 <exclude>NOTICE</exclude>
                                 <exclude>CONTRIBUTING.md</exclude>
                                 <exclude>RELEASING.md</exclude>
-								<exclude>external/opensearch/dashboards/**</exclude>
-								<exclude>external/solr/archetype/src/main/resources/archetype-resources/configsets/**</exclude>
+                                <exclude>AGENTS.md</exclude>
+                                <exclude>SECURITY.md</exclude>
+                                <exclude>external/opensearch/dashboards/**</exclude>
+                                <exclude>external/solr/archetype/src/main/resources/archetype-resources/configsets/**</exclude>
                                 <exclude>THIRD-PARTY.properties</exclude>
                                 <exclude>THIRD-PARTY.txt</exclude>
-								<exclude>.github/ISSUE_TEMPLATE/*.yml</exclude>
+                                <exclude>.github/ISSUE_TEMPLATE/*.yml</exclude>
                                 <exclude>.github/*.md</exclude>
                                 <exclude>.mvn/*.config</exclude>
                                 <exclude>.gitattributes</exclude>
@@ -518,123 +574,130 @@ under the License.
                                 <exclude>**/.classpath</exclude> <!-- Eclipse -->
                                 <exclude>**/.project</exclude> <!-- Eclipse -->
                                 <exclude>**/.idea</exclude> <!-- IntelliJ -->
-							</excludes>
-						</configuration>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-		<profile>
-			<id>apache-release</id>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-assembly-plugin</artifactId>
-						<executions>
-							<execution>
-								<id>source-release-assembly</id>
-								<phase>package</phase>
-								<goals>
-									<goal>single</goal>
-								</goals>
-								<configuration>
-									<finalName>apache-stormcrawler-${project.version}</finalName>
-									<descriptors>
-										<descriptor>assembly.xml</descriptor>
-									</descriptors>
-								</configuration>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-	</profiles>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>apache-release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>source-release-assembly</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                                <configuration>
+                                    <finalName>apache-stormcrawler-${project.version}</finalName>
+                                    <descriptors>
+                                        <descriptor>assembly.xml</descriptor>
+                                    </descriptors>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>org.junit.jupiter</groupId>
-				<artifactId>junit-jupiter-api</artifactId>
-				<version>${junit.version}</version>
-				<scope>test</scope>
-			</dependency>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-api</artifactId>
+                <version>${junit.version}</version>
+                <scope>test</scope>
+            </dependency>
 
-			<dependency>
-				<groupId>org.junit.jupiter</groupId>
-				<artifactId>junit-jupiter</artifactId>
-				<version>${junit.version}</version>
-				<scope>test</scope>
-			</dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit.version}</version>
+                <scope>test</scope>
+            </dependency>
 
-			<dependency>
-				<groupId>org.testcontainers</groupId>
-				<artifactId>junit-jupiter</artifactId>
-				<version>${testcontainers.version}</version>
-				<scope>test</scope>
-			</dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
 
-			<dependency>
-				<groupId>org.slf4j</groupId>
-				<artifactId>slf4j-simple</artifactId>
-				<version>${slf4j-simple.version}</version>
-				<scope>test</scope>
-			</dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>${slf4j-simple.version}</version>
+                <scope>test</scope>
+            </dependency>
 
-			<dependency>
-				<groupId>org.apache.storm</groupId>
-				<artifactId>storm-client</artifactId>
-				<version>${storm-client.version}</version>
-				<!-- keep storm out of the jar-with-dependencies -->
-				<scope>provided</scope>
-				<exclusions>
-					<!-- Exclude Log4j SLF4J implementation to avoid conflicts with slf4j-simple in tests -->
-					<exclusion>
-						<groupId>org.apache.logging.log4j</groupId>
-						<artifactId>log4j-slf4j2-impl</artifactId>
-					</exclusion>
-					<!-- Exclude Log4j over SLF4J bridge as we use slf4j-simple for tests -->
-					<exclusion>
-						<groupId>org.slf4j</groupId>
-						<artifactId>log4j-over-slf4j</artifactId>
-					</exclusion>
-				</exclusions>
-			</dependency>
+            <dependency>
+                <groupId>org.apache.storm</groupId>
+                <artifactId>storm-client</artifactId>
+                <version>${storm-client.version}</version>
+                <!-- keep storm out of the jar-with-dependencies -->
+                <scope>provided</scope>
+                <exclusions>
+                    <!-- Exclude Log4j SLF4J implementation to avoid conflicts with slf4j-simple in tests -->
+                    <exclusion>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-slf4j2-impl</artifactId>
+                    </exclusion>
+                    <!-- Exclude Log4j over SLF4J bridge as we use slf4j-simple for tests -->
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>log4j-over-slf4j</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
 
-			<dependency>
-				<groupId>com.fasterxml.jackson.core</groupId>
-				<artifactId>jackson-databind</artifactId>
-				<version>${jackson.version}</version>
-			</dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
 
-			<dependency>
-				<groupId>com.fasterxml.jackson.core</groupId>
-				<artifactId>jackson-annotations</artifactId>
-				<version>${jackson.version}</version>
-			</dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson-annotations.version}</version>
+            </dependency>
 
-			<dependency>
-				<groupId>com.fasterxml.jackson.core</groupId>
-				<artifactId>jackson-core</artifactId>
-				<version>${jackson.version}</version>
-			</dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
 
-			<!-- https://mvnrepository.com/artifact/org.jetbrains/annotations -->
-			<dependency>
-				<groupId>org.jetbrains</groupId>
-				<artifactId>annotations</artifactId>
-				<version>${jetbrains.annotations.version}</version>
-				<scope>compile</scope>
-			</dependency>
+            <!-- https://mvnrepository.com/artifact/org.jetbrains/annotations -->
+            <dependency>
+                <groupId>org.jetbrains</groupId>
+                <artifactId>annotations</artifactId>
+                <version>${jetbrains.annotations.version}</version>
+                <scope>compile</scope>
+            </dependency>
 
-			<dependency>
-				<groupId>org.testcontainers</groupId>
-				<artifactId>testcontainers-bom</artifactId>
-				<version>${testcontainers.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
+            <dependency>
+                <groupId>org.awaitility</groupId>
+                <artifactId>awaitility</artifactId>
+                <version>${awaitility.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
 
             <dependency>
                 <groupId>org.apache.commons</groupId>
@@ -648,26 +711,28 @@ under the License.
                 <version>${commons.codec.version}</version>
             </dependency>
 
-		</dependencies>
-	</dependencyManagement>
+        </dependencies>
+    </dependencyManagement>
 
-	<modules>
-		<module>core</module>
-		<module>external</module>
-		<module>external/ai</module>
-		<module>external/aws</module>
-		<module>external/langid</module>
-		<module>external/opensearch</module>
-		<module>external/playwright</module>
-		<module>external/selenium</module>
-		<module>external/solr</module>
-		<module>external/sql</module>
-		<module>external/tika</module>
-		<module>external/urlfrontier</module>
-		<module>external/warc</module>
-		<module>archetype</module>
-		<module>external/opensearch/archetype</module>
-		<module>external/solr/archetype</module>
+    <modules>
+        <module>core</module>
+        <module>external</module>
+        <module>external/ai</module>
+        <module>external/aws</module>
+        <module>external/langid</module>
+        <module>external/opensearch</module>
+        <module>external/opensearch-java</module>
+        <module>external/playwright</module>
+        <module>external/selenium</module>
+        <module>external/solr</module>
+        <module>external/sql</module>
+        <module>external/tika</module>
+        <module>external/urlfrontier</module>
+        <module>external/warc</module>
+        <module>archetype</module>
+        <module>external/opensearch/archetype</module>
+        <module>external/solr/archetype</module>
+        <module>docs</module>
     </modules>
 
 </project>

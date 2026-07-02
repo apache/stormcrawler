@@ -1,5 +1,5 @@
 {
-  "org.apache.stormcrawler.parse.JSoupFilters" : [ 
+  "org.apache.stormcrawler.parse.JSoupFilters" : [
   {
       "class": "org.apache.stormcrawler.jsoup.XPathFilter",
       "name": "XPathFilter",

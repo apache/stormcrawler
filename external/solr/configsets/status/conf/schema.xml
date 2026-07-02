@@ -18,18 +18,18 @@ specific language governing permissions and limitations
 under the License.
 -->
 <schema version="1.7" name="simplest-solr">
-	<fieldType name="string" class="solr.StrField"/>
-	<fieldType name="pdate" class="solr.DatePointField" docValues="true"/>
-	
-	<fieldType name="plong" class="solr.LongPointField"/>
-	<field name="_version_" type="plong" indexed="false" stored="false"/>
-	
-	<field name="url" type="string" indexed="true" stored="true" required="true"/>
-	<field name="host" type="string" indexed="true" stored="true" required="true"/>
-	<field name="status" type="string" indexed="true" stored="true" required="true"/>
-	<field name="nextFetchDate" type="pdate" stored="true" indexed="true"/>
-	<dynamicField name="metadata*" type="string" indexed="true" stored="true" multiValued="true"/>
-	<field name="key" type="string" stored="true" indexed="true" multiValued="false"/>
-	<dynamicField name="*" type="string" indexed="true" stored="true" multiValued="false"/>
-	<uniqueKey>url</uniqueKey>
+    <fieldType name="string" class="solr.StrField"/>
+    <fieldType name="pdate" class="solr.DatePointField" docValues="true"/>
+
+    <fieldType name="plong" class="solr.LongPointField"/>
+    <field name="_version_" type="plong" indexed="false" stored="false"/>
+
+    <field name="url" type="string" indexed="true" stored="true" required="true"/>
+    <field name="host" type="string" indexed="true" stored="true" required="true"/>
+    <field name="status" type="string" indexed="true" stored="true" required="true"/>
+    <field name="nextFetchDate" type="pdate" stored="true" indexed="true"/>
+    <dynamicField name="metadata*" type="string" indexed="true" stored="true" multiValued="true"/>
+    <field name="key" type="string" stored="true" indexed="true" multiValued="false"/>
+    <dynamicField name="*" type="string" indexed="true" stored="true" multiValued="false"/>
+    <uniqueKey>url</uniqueKey>
 </schema>

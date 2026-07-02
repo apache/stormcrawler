@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -25,15 +26,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.storm.metric.api.MultiCountMetric;
+import java.util.function.Consumer;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseRichSpout;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.utils.Utils;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.persistence.urlbuffer.URLBuffer;
-import org.apache.stormcrawler.util.CollectionMetric;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,23 +79,23 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
 
     protected int resetFetchDateAfterNSecs = 120;
 
-    protected Instant lastTimeResetToNOW;
+    protected Instant lastTimeResetToNow;
 
     private long timeLastQuerySent = 0;
     private long timeLastQueryReceived = 0;
 
     private long timestampEmptyBuffer = -1;
 
-    protected MultiCountMetric eventCounter;
+    protected ScopedCounter eventCounter;
 
     protected URLBuffer buffer;
 
-    protected SpoutOutputCollector _collector;
+    protected SpoutOutputCollector collector;
 
-    /** Required for implementations doing asynchronous calls * */
+    /** Required for implementations doing asynchronous calls. */
     protected AtomicBoolean isInQuery = new AtomicBoolean(false);
 
-    protected CollectionMetric queryTimes;
+    protected Consumer<Long> queryTimes;
 
     @Override
     public void open(
@@ -110,23 +112,26 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
 
         beingProcessed = new InProcessMap<>(ttlPurgatory, TimeUnit.SECONDS);
 
-        eventCounter = context.registerMetric("counters", new MultiCountMetric(), 10);
+        eventCounter = CrawlerMetrics.registerCounter(context, stormConf, "counters", 10);
 
         buffer = URLBuffer.createInstance(stormConf);
 
-        context.registerMetric("buffer_size", () -> buffer.size(), 10);
-        context.registerMetric("numQueues", () -> buffer.numQueues(), 10);
+        CrawlerMetrics.registerGauge(context, stormConf, "buffer_size", buffer::size, 10);
+        CrawlerMetrics.registerGauge(context, stormConf, "numQueues", buffer::numQueues, 10);
 
-        context.registerMetric("beingProcessed", () -> beingProcessed.size(), 10);
-        context.registerMetric("inPurgatory", () -> beingProcessed.inCache(), 10);
+        CrawlerMetrics.registerGauge(
+                context, stormConf, "beingProcessed", beingProcessed::size, 10);
+        CrawlerMetrics.registerGauge(
+                context, stormConf, "inPurgatory", beingProcessed::inCache, 10);
 
-        queryTimes = new CollectionMetric();
-        context.registerMetric("spout_query_time_msec", queryTimes, 10);
+        queryTimes =
+                CrawlerMetrics.registerCollectionMetric(
+                        context, stormConf, "spout_query_time_msec", 10);
 
         resetFetchDateAfterNSecs =
                 ConfUtils.getInt(stormConf, resetFetchDateParamName, resetFetchDateAfterNSecs);
 
-        _collector = collector;
+        this.collector = collector;
     }
 
     /**
@@ -176,7 +181,9 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
 
     @Override
     public void nextTuple() {
-        if (!active) return;
+        if (!active) {
+            return;
+        }
 
         // force the refresh of the buffer even if the buffer is not empty
         if (!isInQuery.get() && triggerQueries()) {
@@ -194,7 +201,7 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
             }
             List<Object> fields = buffer.next();
             String url = fields.get(0).toString();
-            this._collector.emit(fields, url);
+            this.collector.emit(fields, url);
             beingProcessed.put(url, null);
             eventCounter.scope("emitted").incrBy(1);
             return;
@@ -249,7 +256,7 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
         return timeLastQuerySent;
     }
 
-    /** sets the marker that we are in a query to false and timeLastQueryReceived to now */
+    /** sets the marker that we are in a query to false and timeLastQueryReceived to now. */
     protected void markQueryReceivedNow() {
         isInQuery.set(false);
         LOG.trace("{} isInquery set to false");

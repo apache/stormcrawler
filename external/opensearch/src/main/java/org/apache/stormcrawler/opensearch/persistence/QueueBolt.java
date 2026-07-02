@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch.persistence;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -86,7 +87,9 @@ public class QueueBolt extends BaseRichBolt {
 
     @Override
     public void cleanup() {
-        if (connection != null) connection.close();
+        if (connection != null) {
+            connection.close();
+        }
     }
 
     @Override

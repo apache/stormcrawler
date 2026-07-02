@@ -16,7 +16,9 @@ Getting started
 
 The easiest way is currently to use the archetype for OpenSearch with:
 
-`mvn archetype:generate -DarchetypeGroupId=org.apache.stormcrawler -DarchetypeArtifactId=stormcrawler-opensearch-archetype -DarchetypeVersion=3.4.0`
+`mvn archetype:generate -DarchetypeGroupId=org.apache.stormcrawler -DarchetypeArtifactId=stormcrawler-opensearch-archetype -DarchetypeVersion=<CURRENT_VERSION>`
+
+Be sure to replace <CURRENT_VERSION> with the latest released version, which you can find on [search.maven.org](https://central.sonatype.com/artifact/org.apache.stormcrawler/stormcrawler-opensearch-archetype).
 
 You'll be asked to enter a groupId (e.g. com.mycompany.crawler), an artefactId (e.g. stormcrawler), a version, a package name and details about the user agent to use.
 

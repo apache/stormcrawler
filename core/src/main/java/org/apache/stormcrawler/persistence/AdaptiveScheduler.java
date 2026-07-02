@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence;
 
 import java.time.Duration;
@@ -31,7 +32,7 @@ import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.LoggerFactory;
 
 /**
- * Adaptive fetch scheduler, checks by signature comparison whether a re-fetched page has changed:
+ * Adaptive fetch scheduler, checks by signature comparison whether a re-fetched page has changed.
  *
  * <ul>
  *   <li>if yes, shrink the fetch interval up to a minimum fetch interval
@@ -76,7 +77,8 @@ import org.slf4j.LoggerFactory;
  *
  * <pre>
  * scheduler.class: "org.apache.stormcrawler.persistence.AdaptiveScheduler"
- * # set last-modified time ({@value HttpHeaders#LAST_MODIFIED}) used in HTTP If-Modified-Since request header field
+ * # set last-modified time ({@value HttpHeaders#LAST_MODIFIED})
+ * # used in HTTP If-Modified-Since request header field
  * scheduler.adaptive.setLastModified: true
  * # min. interval in minutes (default: 1h)
  * scheduler.adaptive.fetchInterval.min: 60
@@ -116,7 +118,7 @@ import org.slf4j.LoggerFactory;
  *   }
  * </pre>
  *
- * The order is mandatory: first copy the old signature, than generate the current one.
+ * <p>The order is mandatory: first copy the old signature, than generate the current one.
  */
 public class AdaptiveScheduler extends DefaultScheduler {
 

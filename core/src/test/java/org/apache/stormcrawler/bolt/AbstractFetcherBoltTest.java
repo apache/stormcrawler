@@ -14,28 +14,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.bolt;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.Constants;
+import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
+import org.apache.stormcrawler.persistence.Status;
+import org.apache.stormcrawler.protocol.ProtocolFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -84,12 +91,11 @@ abstract class AbstractFetcherBoltTest {
                 .thenReturn("http://localhost:" + wmRuntimeInfo.getHttpPort() + "/");
         when(tuple.getValueByField("metadata")).thenReturn(null);
         bolt.execute(tuple);
-        while (output.getAckedTuples().size() == 0 && output.getFailedTuples().size() == 0) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-            }
-        }
+        await().atMost(30, TimeUnit.SECONDS)
+                .until(
+                        () ->
+                                output.getAckedTuples().size() > 0
+                                        || output.getFailedTuples().size() > 0);
         boolean acked = output.getAckedTuples().contains(tuple);
         boolean failed = output.getFailedTuples().contains(tuple);
         // should be acked or failed
@@ -101,5 +107,94 @@ abstract class AbstractFetcherBoltTest {
         // and none on the default stream as there is nothing to parse and/or
         // index
         Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+    }
+
+    @Test
+    void testThreadTimeout(WireMockRuntimeInfo wmRuntimeInfo) {
+        // server delays response for 10 seconds — longer than the bolt timeout
+        stubFor(
+                get(urlMatching(".+"))
+                        .willReturn(aResponse().withStatus(200).withFixedDelay(10_000)));
+
+        TestOutputCollector output = new TestOutputCollector();
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        // bolt-level timeout: 2 seconds
+        config.put("fetcher.thread.timeout", 2L);
+        // raise the socket timeout so the bolt timeout fires first
+        config.put("http.timeout", 30_000);
+        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.getSourceComponent()).thenReturn("source");
+        when(tuple.getStringByField("url"))
+                .thenReturn("http://localhost:" + wmRuntimeInfo.getHttpPort() + "/slow");
+        when(tuple.getValueByField("metadata")).thenReturn(null);
+        bolt.execute(tuple);
+
+        // the bolt should ack within ~2s + margin, not wait the full 10s
+        await().atMost(8, TimeUnit.SECONDS).until(() -> output.getAckedTuples().size() > 0);
+
+        Assertions.assertTrue(output.getAckedTuples().contains(tuple));
+
+        // should have emitted a FETCH_ERROR on the status stream
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(1, statusTuples.size());
+        Status status = (Status) statusTuples.get(0).get(2);
+        Assertions.assertEquals(Status.FETCH_ERROR, status);
+
+        // verify the metadata records the timeout reason
+        Metadata metadata = (Metadata) statusTuples.get(0).get(1);
+        String exception = metadata.getFirstValue("fetch.exception");
+        Assertions.assertNotNull(exception);
+        Assertions.assertEquals("Socket timeout fetching", exception);
+
+        // nothing on the default stream — no content was fetched
+        Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+    }
+
+    @Test
+    void invalidProxyMetadataEmitsFetchError(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(get(urlMatching("/invalid-proxy")).willReturn(aResponse().withStatus(200)));
+
+        resetProtocolFactory();
+        TestOutputCollector output = new TestOutputCollector();
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("http.proxy.manager", "org.apache.stormcrawler.proxy.SingleProxyManager");
+        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        Metadata metadata = new Metadata();
+        metadata.setValue("http.proxy.host", "proxy.example.com");
+        metadata.setValue("http.proxy.port", "not-a-port");
+
+        Tuple tuple = mock(Tuple.class);
+        String url = "http://localhost:" + wmRuntimeInfo.getHttpPort() + "/invalid-proxy";
+        when(tuple.getSourceComponent()).thenReturn("source");
+        when(tuple.contains("metadata")).thenReturn(true);
+        when(tuple.getStringByField("url")).thenReturn(url);
+        when(tuple.getValueByField("metadata")).thenReturn(metadata);
+        bolt.execute(tuple);
+
+        await().atMost(8, TimeUnit.SECONDS).until(() -> output.getAckedTuples().contains(tuple));
+
+        Assertions.assertFalse(output.getFailedTuples().contains(tuple));
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(1, statusTuples.size());
+        Assertions.assertEquals(url, statusTuples.get(0).get(0));
+        Metadata statusMetadata = (Metadata) statusTuples.get(0).get(1);
+        Assertions.assertEquals(Status.FETCH_ERROR, statusTuples.get(0).get(2));
+        Assertions.assertEquals(
+                IllegalArgumentException.class.getName(),
+                statusMetadata.getFirstValue("fetch.exception"));
+
+        Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+    }
+
+    private void resetProtocolFactory() throws ReflectiveOperationException {
+        Field instance = ProtocolFactory.class.getDeclaredField("single_instance");
+        instance.setAccessible(true);
+        instance.set(null, null);
     }
 }

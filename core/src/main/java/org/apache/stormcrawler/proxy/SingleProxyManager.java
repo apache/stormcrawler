@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.proxy;
 
 import java.util.Locale;
@@ -22,7 +23,7 @@ import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.util.ConfUtils;
 
-/** SingleProxyManager is a ProxyManager implementation for a single proxy endpoint */
+/** SingleProxyManager is a ProxyManager implementation for a single proxy endpoint. */
 public class SingleProxyManager implements ProxyManager {
     private SCProxy proxy;
 
@@ -38,30 +39,48 @@ public class SingleProxyManager implements ProxyManager {
 
         // values for single proxy
         String proxyHost = ConfUtils.getString(conf, "http.proxy.host", null);
+        if (proxyHost == null) {
+            this.proxy = null;
+            return;
+        }
+
         String proxyType = ConfUtils.getString(conf, "http.proxy.type", "HTTP");
         int proxyPort = ConfUtils.getInt(conf, "http.proxy.port", 8080);
         String proxyUsername = ConfUtils.getString(conf, "http.proxy.user", null);
         String proxyPassword = ConfUtils.getString(conf, "http.proxy.pass", null);
+        ProxyUtils.validatePortRange(
+                proxyPort, "config key `http.proxy.port`", Integer.toString(proxyPort));
 
-        // assemble proxy connection string
-        String proxyString = proxyType.toLowerCase(Locale.ROOT) + "://";
+        boolean hasAuth =
+                proxyUsername != null
+                        && !proxyUsername.isEmpty()
+                        && proxyPassword != null
+                        && !proxyPassword.isEmpty();
 
-        // conditionally append authentication info
-        if (proxyUsername != null
-                && !proxyUsername.isEmpty()
-                && proxyPassword != null
-                && !proxyPassword.isEmpty()) {
-            proxyString += proxyUsername + ":" + proxyPassword + "@";
-        }
-
-        // complete proxy string and create proxy
         this.proxy =
                 new SCProxy(
-                        proxyString + String.format(Locale.ROOT, "%s:%d", proxyHost, proxyPort));
+                        proxyType.toLowerCase(Locale.ROOT),
+                        proxyHost,
+                        Integer.toString(proxyPort),
+                        hasAuth ? proxyUsername : "",
+                        hasAuth ? proxyPassword : "",
+                        "",
+                        "",
+                        "",
+                        "");
     }
 
     @Override
     public Optional<SCProxy> getProxy(Metadata metadata) {
-        return Optional.of(proxy);
+        if (ProxyMetadata.shouldSkipProxy(metadata)) {
+            return Optional.empty();
+        }
+
+        Optional<SCProxy> metadataProxy = ProxyMetadata.getProxy(metadata);
+        if (metadataProxy.isPresent()) {
+            return metadataProxy;
+        }
+
+        return Optional.ofNullable(proxy);
     }
 }

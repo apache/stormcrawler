@@ -18,38 +18,38 @@ specific language governing permissions and limitations
 under the License.
 -->
 <schema version="1.7" name="simplest-solr">
-	<fieldType name="string" class="solr.StrField"/>
+    <fieldType name="string" class="solr.StrField"/>
 
     <!-- A general text field that has reasonable, generic
          cross-language defaults: it tokenizes with StandardTokenizer,
-	       removes stop words from case-insensitive "stopwords.txt"
-	       (empty by default), and down cases.  At query time only, it
-	       also applies synonyms.
-	  -->
+           removes stop words from case-insensitive "stopwords.txt"
+           (empty by default), and down cases.  At query time only, it
+           also applies synonyms.
+      -->
     <fieldType name="text_general" class="solr.TextField" positionIncrementGap="100" multiValued="true">
-      <analyzer type="index">
-        <tokenizer class="solr.StandardTokenizerFactory"/>
-        <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt" />
+        <analyzer type="index">
+            <tokenizer class="solr.StandardTokenizerFactory"/>
+            <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt" />
         <!-- in this example, we will only use synonyms at query time
         <filter class="solr.SynonymGraphFilterFactory" synonyms="index_synonyms.txt" ignoreCase="true" expand="false"/>
         <filter class="solr.FlattenGraphFilterFactory"/>
         -->
-        <filter class="solr.LowerCaseFilterFactory"/>
-      </analyzer>
-      <analyzer type="query">
-        <tokenizer class="solr.StandardTokenizerFactory"/>
-        <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt" />
-        <filter class="solr.SynonymGraphFilterFactory" synonyms="synonyms.txt" ignoreCase="true" expand="true"/>
-        <filter class="solr.LowerCaseFilterFactory"/>
-      </analyzer>
+            <filter class="solr.LowerCaseFilterFactory"/>
+        </analyzer>
+        <analyzer type="query">
+            <tokenizer class="solr.StandardTokenizerFactory"/>
+            <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt" />
+            <filter class="solr.SynonymGraphFilterFactory" synonyms="synonyms.txt" ignoreCase="true" expand="true"/>
+            <filter class="solr.LowerCaseFilterFactory"/>
+        </analyzer>
     </fieldType>
 
     <fieldType name="plong" class="solr.LongPointField"/>
-	  <field name="_version_" type="plong" indexed="false" stored="false"/>
+    <field name="_version_" type="plong" indexed="false" stored="false"/>
 
-	<field name="url" type="string" indexed="true" stored="true" required="true"/>
-	<field name="content" type="text_general" indexed="true" stored="true"/>
+    <field name="url" type="string" indexed="true" stored="true" required="true"/>
+    <field name="content" type="text_general" indexed="true" stored="true"/>
 
-	<dynamicField name="*" type="text_general" indexed="true" stored="true"/>
-	<uniqueKey>url</uniqueKey>
+    <dynamicField name="*" type="text_general" indexed="true" stored="true"/>
+    <uniqueKey>url</uniqueKey>
 </schema>

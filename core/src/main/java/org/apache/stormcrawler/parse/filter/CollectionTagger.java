@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -118,84 +119,84 @@ public class CollectionTagger extends ParseFilter implements JSONResource {
     }
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
-        String[] tags = collections.tag(URL);
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+        String[] tags = collections.tag(url);
         if (tags.length > 0) {
-            parse.get(URL).getMetadata().setValues(key, tags);
+            parse.get(url).getMetadata().setValues(key, tags);
         }
     }
-}
 
-class Collections {
+    static class Collections {
 
-    private Set<Collection> collections;
+        private Set<Collection> collections;
 
-    public void setCollections(Set<Collection> collections) {
-        this.collections = collections;
-    }
+        public void setCollections(Set<Collection> collections) {
+            this.collections = collections;
+        }
 
-    public String[] tag(String url) {
-        Set<String> tags = new HashSet<>();
-        for (Collection collection : collections) {
-            if (collection.matches(url)) {
-                tags.add(collection.getName());
+        public String[] tag(String url) {
+            Set<String> tags = new HashSet<>();
+            for (Collection collection : collections) {
+                if (collection.matches(url)) {
+                    tags.add(collection.getName());
+                }
             }
+            return tags.toArray(new String[0]);
         }
-        return tags.toArray(new String[0]);
-    }
-}
-
-class Collection {
-
-    private String name;
-    private Set<Pattern> includePatterns;
-    private Set<Pattern> excludePatterns;
-
-    public String getName() {
-        return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+    static class Collection {
 
-    /**
-     * @return true if the URL matches a pattern for this collection and no exclusion patterns
-     */
-    public boolean matches(String url) {
-        boolean matches = false;
-        for (Pattern includeP : includePatterns) {
-            Matcher m = includeP.matcher(url);
-            if (m.matches()) {
-                matches = true;
-                break;
+        private String name;
+        private Set<Pattern> includePatterns;
+        private Set<Pattern> excludePatterns;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        /**
+         * @return true if the URL matches a pattern for this collection and no exclusion patterns
+         */
+        public boolean matches(String url) {
+            boolean matches = false;
+            for (Pattern includeP : includePatterns) {
+                Matcher m = includeP.matcher(url);
+                if (m.matches()) {
+                    matches = true;
+                    break;
+                }
             }
-        }
-        // no match
-        if (!matches) {
-            return false;
-        }
+            // no match
+            if (!matches) {
+                return false;
+            }
 
-        if (excludePatterns == null) {
+            if (excludePatterns == null) {
+                return true;
+            }
+
+            // check for antipatterns
+            for (Pattern excludeP : excludePatterns) {
+                Matcher m = excludeP.matcher(url);
+                if (m.matches()) {
+                    return false;
+                }
+            }
+
             return true;
         }
 
-        // check for antipatterns
-        for (Pattern excludeP : excludePatterns) {
-            Matcher m = excludeP.matcher(url);
-            if (m.matches()) {
-                return false;
-            }
+        public void setIncludePatterns(Set<Pattern> includePatterns) {
+            this.includePatterns = includePatterns;
         }
 
-        return true;
-    }
-
-    public void setIncludePatterns(Set<Pattern> includePatterns) {
-        this.includePatterns = includePatterns;
-    }
-
-    public void setExcludePatterns(Set<Pattern> excludePatterns) {
-        this.excludePatterns = excludePatterns;
+        public void setExcludePatterns(Set<Pattern> excludePatterns) {
+            this.excludePatterns = excludePatterns;
+        }
     }
 }

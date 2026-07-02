@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.solr;
 
 import java.io.File;
@@ -37,7 +38,7 @@ import org.testcontainers.utility.MountableFile;
 public abstract class SolrContainerTest {
     protected static ExecutorService executorService;
 
-    private static final DockerImageName image = DockerImageName.parse("solr:9.8.1");
+    private static final DockerImageName image = DockerImageName.parse("solr:10.0.0");
     private static final String configsetsPath = new File("configsets").getAbsolutePath();
 
     @Container
@@ -47,7 +48,7 @@ public abstract class SolrContainerTest {
                     .withCopyFileToContainer(
                             MountableFile.forHostPath(configsetsPath),
                             "/opt/solr/server/solr/configsets")
-                    .withCommand("solr-foreground -c")
+                    .withCommand("solr-foreground")
                     .waitingFor(Wait.forHttp("/solr/admin/cores?action=STATUS").forStatusCode(200));
 
     @BeforeAll
@@ -73,24 +74,24 @@ public abstract class SolrContainerTest {
                 "/opt/solr/bin/solr",
                 "zk",
                 "upconfig",
-                "-n",
+                "--conf-name",
                 collectionName,
-                "-d",
+                "--conf-dir",
                 "/opt/solr/server/solr/configsets/" + collectionName,
-                "-z",
+                "--zk-host",
                 "localhost:9983");
 
         // Create the collection
         return container.execInContainer(
                 "/opt/solr/bin/solr",
                 "create",
-                "-c",
+                "--name",
                 collectionName,
-                "-n",
+                "--conf-name",
                 collectionName,
-                "-sh",
+                "--shards",
                 String.valueOf(shards),
-                "-rf",
+                "--replication-factor",
                 "1");
     }
 }

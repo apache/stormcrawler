@@ -14,12 +14,54 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class MetadataTest {
+
+    @Test
+    void testGetFirstValueIsCaseInsensitive() {
+        Metadata metadata = new Metadata();
+        metadata.addValue("location", "http://example.com");
+
+        Assertions.assertEquals("http://example.com", metadata.getFirstValue("location"));
+        Assertions.assertEquals("http://example.com", metadata.getFirstValue("Location"));
+        Assertions.assertEquals("http://example.com", metadata.getFirstValue("LOCATION"));
+    }
+
+    @Test
+    void testContainsKeyIsCaseInsensitive() {
+        Metadata metadata = new Metadata();
+        metadata.addValue("location", "http://example.com");
+
+        Assertions.assertTrue(metadata.containsKey("location"));
+        Assertions.assertTrue(metadata.containsKey("Location"));
+        Assertions.assertTrue(metadata.containsKey("LOCATION"));
+    }
+
+    @Test
+    void testAddValueIsCaseInsensitive() {
+        Metadata metadata = new Metadata();
+        metadata.addValue("Content-Type", "text/html");
+        metadata.addValue("content-type", "application/json");
+
+        Assertions.assertEquals(2, metadata.getValues("CONTENT-TYPE").length);
+        Assertions.assertEquals(1, metadata.size());
+    }
+
+    @Test
+    void testRemoveIsCaseInsensitive() {
+        Metadata metadata = new Metadata();
+        metadata.addValue("location", "http://example.com");
+
+        metadata.remove("LOCATION");
+
+        Assertions.assertNull(metadata.getFirstValue("location"));
+        Assertions.assertEquals(0, metadata.size());
+    }
 
     @Test
     void testCopyWithPrefix() {

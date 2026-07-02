@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch;
 
 import static org.opensearch.client.RestClientBuilder.DEFAULT_CONNECT_TIMEOUT_MILLIS;
@@ -26,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -34,7 +36,6 @@ import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.ssl.SSLContextBuilder;
-import org.apache.storm.shade.org.apache.commons.lang.StringUtils;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -75,10 +76,6 @@ public final class OpenSearchConnection {
 
     public RestHighLevelClient getClient() {
         return client;
-    }
-
-    public void addToProcessor(final DocWriteRequest<?> request) {
-        processor.add(request);
     }
 
     public static RestHighLevelClient getClient(Map<String, Object> stormConf, String boltType) {
@@ -194,9 +191,8 @@ public final class OpenSearchConnection {
                 requestConfigBuilder ->
                         requestConfigBuilder
                                 .setConnectTimeout(connectTimeout)
-                                .setSocketTimeout(socketTimeout) // Timeout when waiting
-                // for data
-                );
+                                // Timeout when waiting for data
+                                .setSocketTimeout(socketTimeout));
 
         // TODO check if this has gone somewhere else
         // int maxRetryTimeout = ConfUtils.getInt(stormConf, Constants.PARAMPREFIX +
@@ -232,6 +228,10 @@ public final class OpenSearchConnection {
         builder.setCompressionEnabled(compression);
 
         return new RestHighLevelClient(builder);
+    }
+
+    public void addToProcessor(final DocWriteRequest<?> request) {
+        processor.add(request);
     }
 
     /**
@@ -286,27 +286,45 @@ public final class OpenSearchConnection {
                 new HttpAsyncResponseConsumerFactory.HeapBufferedResponseConsumerFactory(
                         bufferSize * 1024 * 1024));
 
-        final BulkProcessor bulkProcessor =
-                BulkProcessor.builder(
-                                (request, bulkListener) ->
-                                        client.bulkAsync(
-                                                request,
-                                                requestOptionsBuilder.build(),
-                                                bulkListener),
-                                listener)
-                        .setFlushInterval(flushInterval)
-                        .setBulkActions(bulkActions)
-                        .setConcurrentRequests(concurrentRequests)
-                        .build();
-
-        boolean sniff =
-                ConfUtils.getBoolean(stormConf, Constants.PARAMPREFIX, dottedType, "sniff", true);
+        BulkProcessor bulkProcessor = null;
         Sniffer sniffer = null;
-        if (sniff) {
-            sniffer = Sniffer.builder(client.getLowLevelClient()).build();
-        }
+        try {
+            bulkProcessor =
+                    BulkProcessor.builder(
+                                    (request, bulkListener) ->
+                                            client.bulkAsync(
+                                                    request,
+                                                    requestOptionsBuilder.build(),
+                                                    bulkListener),
+                                    listener)
+                            .setFlushInterval(flushInterval)
+                            .setBulkActions(bulkActions)
+                            .setConcurrentRequests(concurrentRequests)
+                            .build();
 
-        return new OpenSearchConnection(client, bulkProcessor, sniffer);
+            boolean sniff =
+                    ConfUtils.getBoolean(
+                            stormConf, Constants.PARAMPREFIX, dottedType, "sniff", true);
+            if (sniff) {
+                sniffer = Sniffer.builder(client.getLowLevelClient()).build();
+            }
+
+            return new OpenSearchConnection(client, bulkProcessor, sniffer);
+        } catch (Exception e) {
+            if (bulkProcessor != null) {
+                try {
+                    bulkProcessor.close();
+                } catch (Exception suppressed) {
+                    e.addSuppressed(suppressed);
+                }
+            }
+            try {
+                client.close();
+            } catch (IOException suppressed) {
+                e.addSuppressed(suppressed);
+            }
+            throw e;
+        }
     }
 
     private boolean isClosed = false;

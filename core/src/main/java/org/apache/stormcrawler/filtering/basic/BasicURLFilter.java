@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.basic;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,7 +26,7 @@ import org.apache.stormcrawler.filtering.URLFilter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Simple URL filters : can be used early in the filtering chain */
+/** Simple URL filters : can be used early in the filtering chain. */
 public class BasicURLFilter extends URLFilter {
 
     private int maxPathRepetition = 3;
@@ -53,7 +54,9 @@ public class BasicURLFilter extends URLFilter {
         // check whether a path element is repeated N times
         String[] paths = urlToFilter.split("/");
 
-        if (paths.length < MINIMUM_PATH_LENGTH) return urlToFilter;
+        if (paths.length < MINIMUM_PATH_LENGTH) {
+            return urlToFilter;
+        }
 
         Map<String, Integer> count = new HashMap<>();
         for (String s : paths) {

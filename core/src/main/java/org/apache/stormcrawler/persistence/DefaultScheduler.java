@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence;
 
 import java.util.Calendar;
@@ -29,7 +30,7 @@ import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.util.ConfUtils;
 
-/** Schedules a nextFetchDate based on the configuration */
+/** Schedules a nextFetchDate based on the configuration. */
 public class DefaultScheduler extends Scheduler {
 
     /**
@@ -146,9 +147,11 @@ public class DefaultScheduler extends Scheduler {
         return Optional.of(cal.getTime());
     }
 
-    /** Returns the first matching custom interval */
+    /** Returns the first matching custom interval. */
     protected final Optional<Integer> checkCustomInterval(Metadata metadata, Status s) {
-        if (customIntervals == null) return Optional.empty();
+        if (customIntervals == null) {
+            return Optional.empty();
+        }
 
         for (CustomInterval customInterval : customIntervals) {
             String[] values = metadata.getValues(customInterval.key);

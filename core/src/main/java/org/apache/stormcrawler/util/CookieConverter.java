@@ -14,11 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import java.net.URL;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -29,8 +28,8 @@ import org.apache.http.impl.cookie.BasicClientCookie;
 /** Helper to extract cookies from cookies string. */
 public class CookieConverter {
 
-    private static final SimpleDateFormat DATE_FORMAT =
-            new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
+    private static final org.slf4j.Logger LOG =
+            org.slf4j.LoggerFactory.getLogger(CookieConverter.class);
 
     /**
      * Get a list of cookies based on the cookies string taken from response header and the target
@@ -61,7 +60,9 @@ public class CookieConverter {
 
             for (int i = 1; i < tokens.length; i++) {
                 String ti = tokens[i].trim();
-                if (ti.equalsIgnoreCase("secure")) secure = true;
+                if (ti.equalsIgnoreCase("secure")) {
+                    secure = true;
+                }
                 if (ti.toLowerCase(Locale.ROOT).startsWith("path=")) {
                     path = ti.substring(5);
                 }
@@ -79,36 +80,45 @@ public class CookieConverter {
             if (domain != null) {
                 cookie.setDomain(domain);
 
-                if (!checkDomainMatchToUrl(domain, targetURL.getHost())) continue;
+                if (!checkDomainMatchToUrl(domain, targetURL.getHost())) {
+                    continue;
+                }
             }
 
             // check path
             if (path != null) {
                 cookie.setPath(path);
 
-                if (!path.equals("") && !path.equals("/") && !targetURL.getPath().startsWith(path))
+                if (!path.equals("")
+                        && !path.equals("/")
+                        && !targetURL.getPath().startsWith(path)) {
                     continue;
+                }
             }
 
             // check secure
             if (secure) {
                 cookie.setSecure(secure);
 
-                if (!targetURL.getProtocol().equalsIgnoreCase("https")) continue;
+                if (!targetURL.getProtocol().equalsIgnoreCase("https")) {
+                    continue;
+                }
             }
 
             // check expiration
             if (expires != null) {
                 try {
-                    Date expirationDate = DATE_FORMAT.parse(expires);
-                    cookie.setExpiryDate(expirationDate);
+                    Date expirationDate = org.apache.http.client.utils.DateUtils.parseDate(expires);
+                    if (expirationDate != null) {
+                        cookie.setExpiryDate(expirationDate);
 
-                    // check that it hasn't expired?
-                    if (cookie.isExpired(new Date())) continue;
-
-                    cookie.setExpiryDate(expirationDate);
-                } catch (ParseException e) {
-                    // ignore exceptions
+                        // check that it hasn't expired?
+                        if (cookie.isExpired(new Date())) {
+                            continue;
+                        }
+                    }
+                } catch (Exception e) {
+                    LOG.debug("Could not parse cookie expiry date: {}", expires, e);
                 }
             }
 

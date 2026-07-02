@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more contributor license
  * agreements. See the NOTICE file distributed with this work for additional information regarding
  * copyright ownership. The ASF licenses this file to you under the Apache License, Version 2.0 (the
@@ -12,12 +12,13 @@
  * express or implied. See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.warc;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
 import org.slf4j.Logger;
@@ -61,23 +62,33 @@ public class MetadataRecordFormat extends WARCRecordFormat {
         String url = tuple.getStringByField("url");
         Metadata metadata = (Metadata) tuple.getValueByField("metadata");
 
-        if (metadata == null) return new byte[0];
-        if (url == null) return new byte[0];
+        if (metadata == null) {
+            return new byte[0];
+        }
+        if (url == null) {
+            return new byte[0];
+        }
 
         final StringBuilder payload = new StringBuilder();
 
         // get the metadata key / values to save in the WARCs
         for (String key : metadataKeys) {
             final String[] values = metadata.getValues(key);
-            if (values == null || values.length == 0) continue;
+            if (values == null || values.length == 0) {
+                continue;
+            }
             for (String value : values) {
-                if (StringUtils.isBlank(value)) continue;
+                if (StringUtils.isBlank(value)) {
+                    continue;
+                }
                 payload.append(key).append(": ").append(value).append(CRLF);
             }
         }
 
         // no payload? don't bother
-        if (payload.length() == 0) return new byte[0];
+        if (payload.length() == 0) {
+            return new byte[0];
+        }
 
         final byte[] metadata_representation = payload.toString().getBytes(StandardCharsets.UTF_8);
 

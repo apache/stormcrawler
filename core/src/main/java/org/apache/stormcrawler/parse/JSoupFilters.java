@@ -14,13 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -30,19 +30,20 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.Config;
 import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.JSONResource;
 import org.apache.stormcrawler.util.AbstractConfigurable;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.Configurable;
+import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.slf4j.LoggerFactory;
 
-/** Wrapper for the JSoupFilters defined in a JSON configuration */
+/** Wrapper for the JSoupFilters defined in a JSON configuration. */
 public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, JSONResource {
 
     public static final JSoupFilters emptyParseFilter = new JSoupFilters();
@@ -50,6 +51,17 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(JSoupFilters.class);
 
     private JSoupFilter[] filters;
+
+    /** loads the filters from a JSON configuration file. */
+    public JSoupFilters(Map<String, Object> stormConf, String configFile) throws IOException {
+        this.configFile = configFile;
+        this.stormConf = stormConf;
+        try {
+            loadJSONResources();
+        } catch (Exception e) {
+            throw new IOException("Unable to build JSON object from file", e);
+        }
+    }
 
     private JSoupFilters() {
         filters = new JSoupFilter[0];
@@ -77,17 +89,6 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
         }
 
         return JSoupFilters.emptyParseFilter;
-    }
-
-    /** loads the filters from a JSON configuration file */
-    public JSoupFilters(Map<String, Object> stormConf, String configFile) throws IOException {
-        this.configFile = configFile;
-        this.stormConf = stormConf;
-        try {
-            loadJSONResources();
-        } catch (Exception e) {
-            throw new IOException("Unable to build JSON object from file", e);
-        }
     }
 
     @Override
@@ -124,15 +125,15 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
         }
     }
 
-    /** * Used for quick testing + debugging */
+    /** * Used for quick testing + debugging. */
     public static void main(String[] args) throws IOException, ParseException {
 
         Config conf = new Config();
 
         // loads the default configuration file
-        Map<String, Object> defaultSCConfig =
+        Map<String, Object> defaultStormCrawlerConfig =
                 Utils.findAndReadConfigFile("crawler-default.yaml", false);
-        conf.putAll(ConfUtils.extractConfigElement(defaultSCConfig));
+        conf.putAll(ConfUtils.extractConfigElement(defaultStormCrawlerConfig));
 
         Options options = new Options();
         options.addOption("c", true, "stormcrawler configuration file");
@@ -153,7 +154,7 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
 
         String url = cmd.getArgs()[0];
 
-        byte[] content = IOUtils.toByteArray((new URL(url)).openStream());
+        byte[] content = IOUtils.toByteArray(URLUtil.toURL(url).openStream());
 
         Document doc = Jsoup.parse(new String(content, StandardCharsets.UTF_8), url);
 

@@ -20,87 +20,93 @@ under the License.
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.apache.stormcrawler</groupId>
-		<artifactId>stormcrawler-external</artifactId>
-		<version>3.5.1-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath>
-	</parent>
+    <parent>
+        <groupId>org.apache.stormcrawler</groupId>
+        <artifactId>stormcrawler-external</artifactId>
+        <version>3.6.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
 
-	<artifactId>stormcrawler-urlfrontier</artifactId>
-	<packaging>jar</packaging>
+    <artifactId>stormcrawler-urlfrontier</artifactId>
+    <packaging>jar</packaging>
 
-	<name>stormcrawler-urlfrontier</name>
-	<url>https://github.com/apache/stormcrawler/tree/master/external/urlfrontier</url>
-	<description>URL Frontier resources for StormCrawler</description>
+    <name>stormcrawler-urlfrontier</name>
+    <url>https://github.com/apache/stormcrawler/tree/master/external/urlfrontier</url>
+    <description>URL Frontier resources for StormCrawler</description>
 
-	<properties>
-		<urlfrontier.version>2.4</urlfrontier.version>
-		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
-		<jacoco.classRatio>0.50</jacoco.classRatio>
-		<jacoco.instructionRatio>0.50</jacoco.instructionRatio>
-		<jacoco.methodRatio>0.53</jacoco.methodRatio>
-		<jacoco.branchRatio>0.42</jacoco.branchRatio>
-		<jacoco.lineRatio>0.45</jacoco.lineRatio>
-		<jacoco.complexityRatio>0.33</jacoco.complexityRatio>
-	</properties>
+    <properties>
+        <urlfrontier.version>2.5</urlfrontier.version>
+        <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
+        <jacoco.classRatio>0.50</jacoco.classRatio>
+        <jacoco.instructionRatio>0.49</jacoco.instructionRatio>
+        <jacoco.methodRatio>0.53</jacoco.methodRatio>
+        <jacoco.branchRatio>0.42</jacoco.branchRatio>
+        <jacoco.lineRatio>0.45</jacoco.lineRatio>
+        <jacoco.complexityRatio>0.33</jacoco.complexityRatio>
+    </properties>
 
-	<build>
-		<plugins>
-			<plugin>
-				<artifactId>maven-surefire-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>default-test</id>
-						<phase>test</phase>
-						<goals>
-							<goal>test</goal>
-						</goals>
-					</execution>
-				</executions>
-				<configuration>
-					<systemPropertyVariables>
-						<urlfrontier-version>${urlfrontier.version}</urlfrontier-version>
-					</systemPropertyVariables>
-				</configuration>
-			</plugin>
-		</plugins>
-	</build>
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <systemPropertyVariables>
+                        <urlfrontier-version>${urlfrontier.version}</urlfrontier-version>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
-	<dependencies>
-		<dependency>
-			<groupId>com.github.crawler-commons</groupId>
-			<artifactId>urlfrontier-API</artifactId>
-			<version>${urlfrontier.version}</version>
-		</dependency>
+    <dependencies>
+        <dependency>
+            <groupId>com.github.crawler-commons</groupId>
+            <artifactId>urlfrontier-API</artifactId>
+            <version>${urlfrontier.version}</version>
+        </dependency>
 
-		<dependency>
-			<groupId>org.apache.stormcrawler</groupId>
-			<artifactId>stormcrawler-core</artifactId>
-			<version>${project.version}</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>testcontainers</artifactId>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.apache.stormcrawler</groupId>
+            <artifactId>stormcrawler-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-simple</artifactId>
-			<scope>test</scope>
-		</dependency>
-	</dependencies>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
 </project>

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,7 +32,7 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
@@ -133,6 +134,9 @@ public class XPathFilter extends ParseFilter {
                                 // the value out of the serialized which isn't used in
                                 // this case
                                 continue;
+                            default:
+                                throw new IllegalStateException(
+                                        "Unexpected value: " + node.getNodeType());
                         }
                         String serializedValue = out.toString();
                         if (serializedValue.length() > 0) {
@@ -153,9 +157,9 @@ public class XPathFilter extends ParseFilter {
     }
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
 
-        ParseData parseData = parse.get(URL);
+        ParseData parseData = parse.get(url);
         Metadata metadata = parseData.getMetadata();
 
         // applies the XPATH expression in the order in which they are produced

@@ -14,8 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.solr.bolt;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -28,9 +30,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.jetty.HttpJettySolrClient;
+import org.apache.solr.client.solrj.request.SolrQuery;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.tuple.Tuple;
@@ -82,12 +84,9 @@ class IndexerBoltTest extends SolrContainerTest {
 
         return executorService.submit(
                 () -> {
-                    var outputSize = output.getAckedTuples().size();
-                    while (outputSize == 0) {
-                        Thread.sleep(100);
-                        outputSize = output.getAckedTuples().size();
-                    }
-                    return outputSize;
+                    await().atMost(30, TimeUnit.SECONDS)
+                            .until(() -> output.getAckedTuples().size() > 0);
+                    return output.getAckedTuples().size();
                 });
     }
 
@@ -113,7 +112,7 @@ class IndexerBoltTest extends SolrContainerTest {
         bolt.cleanup();
 
         // Make sure the document is indexed in Solr
-        SolrClient client = new Http2SolrClient.Builder(getSolrBaseUrl() + "/docs").build();
+        SolrClient client = new HttpJettySolrClient.Builder(getSolrBaseUrl() + "/docs").build();
         client.commit();
 
         SolrQuery query = new SolrQuery("*:*");

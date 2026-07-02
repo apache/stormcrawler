@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler;
 
 import java.io.FileNotFoundException;
@@ -22,23 +23,27 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.Config;
 import org.apache.storm.StormSubmitter;
 import org.apache.storm.topology.TopologyBuilder;
 import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class ConfigurableTopology {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ConfigurableTopology.class);
+
     protected Config conf = new Config();
 
-    public static void start(ConfigurableTopology topology, String args[]) {
+    public static void start(ConfigurableTopology topology, String[] args) {
         // loads the default configuration file
-        Map<String, Object> defaultSCConfig =
+        Map<String, Object> defaultStormCrawlerConfig =
                 Utils.findAndReadConfigFile("crawler-default.yaml", false);
-        topology.conf.putAll(ConfUtils.extractConfigElement(defaultSCConfig));
+        topology.conf.putAll(ConfUtils.extractConfigElement(defaultStormCrawlerConfig));
 
         String[] remainingArgs = topology.parse(args);
         topology.run(remainingArgs);
@@ -48,17 +53,18 @@ public abstract class ConfigurableTopology {
         return conf;
     }
 
-    protected abstract int run(String args[]);
+    protected abstract int run(String[] args);
 
-    /** Submits the topology with the name taken from the configuration * */
+    /** Submits the topology with the name taken from the configuration. */
     protected int submit(Config conf, TopologyBuilder builder) {
         String name = ConfUtils.getString(conf, Config.TOPOLOGY_NAME);
-        if (StringUtils.isBlank(name))
+        if (StringUtils.isBlank(name)) {
             throw new RuntimeException("No value found for " + Config.TOPOLOGY_NAME);
+        }
         return submit(name, conf, builder);
     }
 
-    /** Submits the topology under a specific name * */
+    /** Submits the topology under a specific name. */
     protected int submit(String name, Config conf, TopologyBuilder builder) {
 
         // register for serialization with Kryo
@@ -68,13 +74,13 @@ public abstract class ConfigurableTopology {
         try {
             StormSubmitter.submitTopology(name, conf, builder.createTopology());
         } catch (Exception e) {
-            e.printStackTrace();
+            LOG.error("Failed to submit topology: {}", name, e);
             return -1;
         }
         return 0;
     }
 
-    private String[] parse(String args[]) {
+    private String[] parse(String[] args) {
 
         List<String> newArgs = new ArrayList<>();
         Collections.addAll(newArgs, args);

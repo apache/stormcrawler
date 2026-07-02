@@ -24,47 +24,47 @@ under the License.
             http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
       xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
 <!-- created with Free Online Sitemap Generator www.xml-sitemaps.com -->
-  <url>
-    <loc>https://stormcrawler.apache.org/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>1.00</priority>
-    <news:news>
-      <news:publication>
-        <news:name>The Example Times</news:name>
-        <news:language>en</news:language>
-      </news:publication>
-      <news:genres>PressRelease, Blog</news:genres>
-      <news:publication_date>2008-12-23</news:publication_date>
-      <news:title>Companies A, B in Merger Talks</news:title>
-      <news:keywords>business, merger, acquisition, A, B</news:keywords>
-      <news:stock_tickers>NASDAQ:A, NASDAQ:B</news:stock_tickers>
-    </news:news>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/index.html</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/download/index.html</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/getting-started/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/faq/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/support/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>1.00</priority>
+        <news:news>
+            <news:publication>
+                <news:name>The Example Times</news:name>
+                <news:language>en</news:language>
+            </news:publication>
+            <news:genres>PressRelease, Blog</news:genres>
+            <news:publication_date>2008-12-23</news:publication_date>
+            <news:title>Companies A, B in Merger Talks</news:title>
+            <news:keywords>business, merger, acquisition, A, B</news:keywords>
+            <news:stock_tickers>NASDAQ:A, NASDAQ:B</news:stock_tickers>
+        </news:news>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/index.html</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/download/index.html</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/getting-started/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/faq/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/support/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
 
 </urlset>

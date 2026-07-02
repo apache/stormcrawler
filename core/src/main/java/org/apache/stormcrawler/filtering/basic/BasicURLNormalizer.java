@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.basic;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -21,6 +22,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.net.IDN;
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -33,11 +35,12 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilter;
+import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -47,7 +50,7 @@ public class BasicURLNormalizer extends URLFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(BasicURLNormalizer.class);
 
-    /** Nutch 1098 - finds URL encoded parts of the URL */
+    /** Nutch 1098 - finds URL encoded parts of the URL. */
     private static final Pattern unescapeRulePattern = Pattern.compile("%([0-9A-Fa-f]{2})");
 
     /** https://github.com/apache/stormcrawler/issues/401 * */
@@ -56,7 +59,7 @@ public class BasicURLNormalizer extends URLFilter {
     // charset used for encoding URLs before escaping
     private static final Charset utf8 = StandardCharsets.UTF_8;
 
-    /** look-up table for characters which should not be escaped in URL paths */
+    /** look-up table for characters which should not be escaped in URL paths. */
     private static final boolean[] unescapedCharacters = new boolean[128];
 
     private static final Pattern thirtytwobithash = Pattern.compile("[a-fA-F\\d]{32}");
@@ -84,7 +87,7 @@ public class BasicURLNormalizer extends URLFilter {
 
     boolean removeAnchorPart = true;
     boolean unmangleQueryString = true;
-    boolean checkValidURI = true;
+    boolean checkValidUri = true;
     boolean removeHashes = false;
     private boolean hostIDNtoASCII = false;
     final Set<String> queryElementsToRemove = new TreeSet<>();
@@ -114,13 +117,19 @@ public class BasicURLNormalizer extends URLFilter {
             urlToFilter = processQueryElements(urlToFilter);
         }
 
-        if (urlToFilter == null) return null;
+        if (urlToFilter == null) {
+            return null;
+        }
 
         try {
-            URL theURL = new URL(urlToFilter);
-            String file = theURL.getFile();
-            String protocol = theURL.getProtocol();
-            String host = theURL.getHost();
+            URL theUrl = URLUtil.toURL(urlToFilter);
+            // sync the string with what the parser produced — this ensures
+            // illegal characters (pipes, backslashes, %uXXXX, etc.) that were
+            // sanitized during toURL() are reflected in the string we work with
+            urlToFilter = theUrl.toExternalForm();
+            String file = theUrl.getFile();
+            String protocol = theUrl.getProtocol();
+            String host = theUrl.getHost();
             boolean hasChanged = !urlToFilter.startsWith(protocol); // lowercased protocol
 
             if (host != null) {
@@ -141,7 +150,7 @@ public class BasicURLNormalizer extends URLFilter {
                 }
             }
 
-            int port = theURL.getPort();
+            int port = theUrl.getPort();
             // properly encode characters in path/file using percent-encoding
             String file2 = unescapePath(file);
             file2 = escapePath(file2);
@@ -149,17 +158,27 @@ public class BasicURLNormalizer extends URLFilter {
                 hasChanged = true;
             }
             if (hasChanged) {
-                urlToFilter = new URL(protocol, host, port, file2).toString();
+                URI uri =
+                        new URI(
+                                protocol,
+                                null, // userInfo
+                                host,
+                                port,
+                                file2, // path
+                                null, // query
+                                null // fragment
+                                );
+                urlToFilter = uri.toString();
             }
-        } catch (MalformedURLException e) {
+        } catch (MalformedURLException | URISyntaxException e) {
             return null;
         }
 
-        if (checkValidURI) {
+        if (checkValidUri) {
             try {
-                URI uri = URI.create(urlToFilter);
+                URI uri = URLUtil.toURI(urlToFilter);
                 urlToFilter = uri.normalize().toString();
-            } catch (java.lang.IllegalArgumentException e) {
+            } catch (MalformedURLException e) {
                 LOG.info("Invalid URI {} from {} ", urlToFilter, originalURL);
                 return null;
             }
@@ -196,7 +215,7 @@ public class BasicURLNormalizer extends URLFilter {
 
         node = paramNode.get("checkValidURI");
         if (node != null) {
-            checkValidURI = node.booleanValue();
+            checkValidUri = node.booleanValue();
         }
 
         node = paramNode.get("removeHashes");
@@ -220,7 +239,7 @@ public class BasicURLNormalizer extends URLFilter {
         try {
             // Handle illegal characters by making a url first
             // this will clean illegal characters like |
-            final URL url = new URL(urlToFilter);
+            final URL url = URLUtil.toURL(urlToFilter);
 
             String query = url.getQuery();
             String path = url.getPath();
@@ -285,7 +304,7 @@ public class BasicURLNormalizer extends URLFilter {
                     + ((s = url.getRef()) != null ? '#' + s : "");
 
         } catch (MalformedURLException e) {
-            LOG.warn("Invalid urlToFilter {}. {}", urlToFilter, e);
+            LOG.warn("Invalid urlToFilter {}.", urlToFilter, e);
             return null;
         }
     }
@@ -323,8 +342,8 @@ public class BasicURLNormalizer extends URLFilter {
     /**
      * Remove % encoding from path segment in URL for characters which should be unescaped according
      * to <a href="https://tools.ietf.org/html/rfc3986#section-2.2">RFC3986</a> as well as
-     * non-standard implementations of percent encoding, see <https://en.
-     * wikipedia.org/wiki/Percent-encoding#Non-standard_implementations>.
+     * non-standard implementations of percent encoding, see
+     * https://en.wikipedia.org/wiki/Percent-encoding#Non-standard_implementations.
      */
     private String unescapePath(String path) {
         Matcher matcher = illegalEscapePattern.matcher(path);

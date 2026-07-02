@@ -6,13 +6,15 @@ Set of [Apache Solr](https://solr.apache.org/) resources for StormCrawler that a
 
 The easiest way is currently to use the archetype for Solr with:
 
-`mvn archetype:generate -DarchetypeGroupId=org.apache.stormcrawler -DarchetypeArtifactId=stormcrawler-solr-archetype -DarchetypeVersion=3.4.0`
+`mvn archetype:generate -DarchetypeGroupId=org.apache.stormcrawler -DarchetypeArtifactId=stormcrawler-solr-archetype -DarchetypeVersion=<CURRENT_VERSION>`
+
+Be sure to replace <CURRENT_VERSION> with the latest released version, which you can find on [search.maven.org](https://central.sonatype.com/artifact/org.apache.stormcrawler/stormcrawler-solr-archetype).
 
 You'll be asked to enter a groupId (e.g. com.mycompany.crawler), an artefactId (e.g. stormcrawler), a version, a package name and details about the user agent to use.
 
 This will not only create a fully formed project containing a POM with the dependency above but also a set of resources, configuration files and sample topology classes. Enter the directory you just created (should be the same as the artefactId you specified earlier) and follow the instructions on the README file.
 
-You will of course need to have both Apache Storm (2.8.2) and Apache Solr (9.8.0) installed.
+You will of course need to have both Apache Storm (2.8.8) and Apache Solr (10.0.0) installed.
 
 Official references:
 * [Apache Storm: Setting Up a Development Environment](https://storm.apache.org/releases/current/Setting-up-development-environment.html)

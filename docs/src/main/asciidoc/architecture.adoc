@@ -1,0 +1,97 @@
+////
+Licensed under the Apache License, Version 2.0 (the "License");
+You may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+https://www.apache.org/licenses/LICENSE-2.0
+////
+[[architecture]]
+== Understanding StormCrawler's Architecture
+
+=== Architecture Overview
+
+Apache StormCrawler is built as a distributed, stream-oriented web crawling system
+on top of Apache Storm. Its architecture emphasizes clear separation between
+*crawl control* and *content processing*, with the URL frontier acting as the
+central coordination point.
+
+.Architecture overview of StormCrawler
+image::stormcrawler.drawio.jpg[StormCrawler Architecture, width=100%]
+
+Figure 1 illustrates StormCrawler’s stream-processing crawl pipeline, built on Apache Storm.
+The architecture is intentionally modular and centers around two core abstractions:
+
+- The URL frontier: decides *what* to crawl and *when*
+- The parsing and indexing pipeline: decides *what* to *extract*, *keep*, and *store*
+
+Black arrows show the *main data flow*, gray arrows represent URLs *taken from the frontier*, and purple arrows indicate *URL status updates* fed back to the frontier.
+
+==== Crawl Flow and Core Components
+
+The crawl begins with the *Frontier*, which is responsible for scheduling,
+prioritization, politeness, and retry logic. URLs are emitted by a
+`Spout` (e.g., `AggregationSpout`, `SQLSpout`) and partitioned by the `URLPartitioner`, typically using the
+host as a key to enforce politeness constraints.
+
+The `Fetcher` retrieves web resources and emits both the fetched content and
+associated metadata such as HTTP status codes, headers, and MIME types. Based
+on the content type, documents are routed to specialized parsers, including
+`SiteMapParser`, `JSoupParser` for HTML content, and `ParserBolt` (Tika module) for binary
+formats via Apache Tika.
+
+Parsed content is then sent to the `Indexer` and persisted by the `Storage`
+layer. Throughout the pipeline, fetch and parse outcomes are reported to the
+`StatusUpdater`, which feeds URL status information back to the frontier,
+closing the crawl feedback loop.
+
+==== URL Filters
+
+URL Filters determine whether a URL should be accepted, rejected, or modified
+before it is scheduled for fetching. They operate on seed URLs, discovered
+links, and redirect targets, ensuring that only crawl-worthy URLs enter the
+frontier.
+
+In Figure 1, URL Filters are conceptually positioned between link discovery
+and the frontier. Their primary role is to control crawl scope and prevent
+frontier explosion.
+
+Typical URL Filters include:
+
+* *URL Length*: rejects excessively long URLs that often indicate session IDs
+or crawler traps.
+* *Path Repetition*: detects repeating path segments that can lead to infinite
+crawl loops.
+* *URL Normalization*: canonicalizes URLs by removing fragments, sorting query
+parameters, or enforcing consistent schemes.
+* *MIME Type*: avoids scheduling URLs unlikely to yield useful content.
+
+By applying these filters early, StormCrawler prevents unnecessary fetches and
+maintains an efficient, focused crawl.
+
+==== Parse Filters
+
+Parse Filters operate after content has been successfully fetched and parsed.
+They allow fine-grained control over how extracted data and outgoing links are
+processed.
+
+Parse Filters are applied within the parsing bolts, following parsing by
+`SiteMapParser`, `JSoupParser`, or `ParserBolt` (Tika). They can modify extracted text,
+metadata, and links before the content is indexed or new URLs are emitted.
+
+Common Parse Filters include:
+
+* *URL Filters (post-parse)*: further refine outgoing links extracted from
+content.
+* *XPath*: extract structured fields from HTML documents.
+* *Text Extraction*: control which parts of a document contribute to the
+indexed text.
+* *Enrichment*: add custom metadata such as language detection, entity tags,
+or domain-specific signals.
+
+Parse Filters enable domain-specific logic without coupling it directly to the
+crawler’s core components.
+
+==== Interaction Between URL Filters and Parse Filters
+
+URL Filters focus on deciding *what should be crawled*, while Parse
+Filters focus on deciding *what should be kept and how it should be
+interpreted*.

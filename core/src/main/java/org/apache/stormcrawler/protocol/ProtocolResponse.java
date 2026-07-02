@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol;
 
 import org.apache.stormcrawler.Metadata;
@@ -40,7 +41,7 @@ public class ProtocolResponse {
 
     /**
      * Key which holds the protocol version(s) used for this request (for layered protocols this
-     * field may hold multiple comma-separated values)
+     * field may hold multiple comma-separated values).
      */
     public static final String PROTOCOL_VERSIONS_KEY = "_protocol_versions_";
 
@@ -65,15 +66,15 @@ public class ProtocolResponse {
     /** Enum of reasons which may cause that protocol content is trimmed. */
     public enum TrimmedContentReason {
         NOT_TRIMMED,
-        /** fetch exceeded configured http.content.limit */
+        /** fetch exceeded configured http.content.limit. */
         LENGTH,
         /** fetch exceeded configured max. time for fetch */
         TIME,
-        /** network disconnect or timeout during fetch */
+        /** network disconnect or timeout during fetch. */
         DISCONNECT,
-        /** implementation internal reason */
+        /** implementation internal reason. */
         INTERNAL,
-        /** unknown reason */
+        /** unknown reason. */
         UNSPECIFIED
     }
 

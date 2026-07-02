@@ -25,47 +25,47 @@ under the License.
       xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 <!-- created with Free Online Sitemap Generator www.xml-sitemaps.com -->
 
-<url>
-  <loc>http://www.example.com/</loc>
-  <lastmod>2012-12-05T10:59:04+00:00</lastmod>
-  <changefreq>monthly</changefreq>
-  <priority>1.00</priority>
-  <image:image>
-    <image:loc>http://example.com/photo.jpg</image:loc>
-    <image:caption>This is the caption.</image:caption>
-    <image:geo_location>Limerick, Ireland</image:geo_location>
-    <image:title>Example photo shot in Limerick, Ireland</image:title>
-    <image:license>https://creativecommons.org/licenses/by/4.0/legalcode</image:license>
-  </image:image>
-</url>
-  <url>
-    <loc>https://stormcrawler.apache.org/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>1.00</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/index.html</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/download/index.html</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/getting-started/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/faq/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/support/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
+    <url>
+        <loc>http://www.example.com/</loc>
+        <lastmod>2012-12-05T10:59:04+00:00</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>1.00</priority>
+        <image:image>
+            <image:loc>http://example.com/photo.jpg</image:loc>
+            <image:caption>This is the caption.</image:caption>
+            <image:geo_location>Limerick, Ireland</image:geo_location>
+            <image:title>Example photo shot in Limerick, Ireland</image:title>
+            <image:license>https://creativecommons.org/licenses/by/4.0/legalcode</image:license>
+        </image:image>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>1.00</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/index.html</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/download/index.html</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/getting-started/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/faq/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/support/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
 </urlset>

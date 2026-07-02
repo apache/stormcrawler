@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -23,6 +24,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.apache.storm.metric.api.IMetric;
 import org.apache.storm.task.TopologyContext;
@@ -36,16 +39,63 @@ public class TestUtil {
 
     public static TopologyContext getMockedTopologyContext() {
         TopologyContext context = mock(TopologyContext.class);
+        mockMetricRegistration(context);
+        return context;
+    }
+
+    /**
+     * Creates a mocked TopologyContext for testing bucket partitioning.
+     *
+     * @param taskIndex The task index for this spout instance (determines bucket number)
+     * @param totalTasks Total number of tasks in the topology
+     * @param componentId The component ID
+     * @return Mocked TopologyContext
+     */
+    public static TopologyContext getMockedTopologyContextWithBucket(
+            int taskIndex, int totalTasks, String componentId) {
+        TopologyContext context = mock(TopologyContext.class);
+
+        mockMetricRegistration(context);
+
+        // Mock task information for bucket assignment
+        when(context.getThisTaskIndex()).thenReturn(taskIndex);
+        when(context.getThisComponentId()).thenReturn(componentId);
+
+        // Create list of task IDs (0 to totalTasks-1)
+        List<Integer> taskIds = new ArrayList<>();
+        for (int i = 0; i < totalTasks; i++) {
+            taskIds.add(i);
+        }
+        when(context.getComponentTasks(componentId)).thenReturn(taskIds);
+
+        return context;
+    }
+
+    /** Sets up mock responses for both V1 and V2 metric registration on a TopologyContext. */
+    private static void mockMetricRegistration(TopologyContext context) {
+        // V1 metric registration
         when(context.registerMetric(anyString(), any(IMetric.class), anyInt()))
                 .thenAnswer(
                         new Answer<IMetric>() {
-
                             @Override
                             public IMetric answer(InvocationOnMock invocation) throws Throwable {
                                 return invocation.getArgument(1, IMetric.class);
                             }
                         });
-        return context;
+
+        // V2 metric registration
+        when(context.registerCounter(anyString()))
+                .thenAnswer(invocation -> new com.codahale.metrics.Counter());
+        when(context.registerHistogram(anyString()))
+                .thenAnswer(
+                        invocation ->
+                                new com.codahale.metrics.Histogram(
+                                        new com.codahale.metrics.ExponentiallyDecayingReservoir()));
+        when(context.registerMeter(anyString()))
+                .thenAnswer(invocation -> new com.codahale.metrics.Meter());
+        when(context.registerGauge(anyString(), any(com.codahale.metrics.Gauge.class)))
+                .thenAnswer(
+                        invocation -> invocation.getArgument(1, com.codahale.metrics.Gauge.class));
     }
 
     public static Tuple getMockedTestTuple(String url, String content, Metadata metadata) {

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.robots;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -26,6 +27,7 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilter;
 import org.apache.stormcrawler.protocol.HttpRobotRulesParser;
 import org.apache.stormcrawler.protocol.ProtocolFactory;
+import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -60,7 +62,7 @@ public class RobotsFilter extends URLFilter {
             @NotNull String urlToFilter) {
         URL target;
         try {
-            target = new URL(urlToFilter);
+            target = URLUtil.toURL(urlToFilter);
         } catch (MalformedURLException e) {
             return null;
         }

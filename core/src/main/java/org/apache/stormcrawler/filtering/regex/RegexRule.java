@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.regex;
 
 /** A generic regular expression rule. Borrowed from Apache Nutch 1.9. */

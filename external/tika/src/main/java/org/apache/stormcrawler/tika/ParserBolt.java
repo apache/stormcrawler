@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.tika;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
@@ -28,10 +29,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.html.dom.HTMLDocumentImpl;
 import org.apache.http.HttpHeaders;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -42,6 +42,8 @@ import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilters;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.parse.Outlink;
 import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
@@ -70,7 +72,7 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
 import org.xml.sax.ContentHandler;
 
-/** Uses Tika to parse the output of a fetch and extract text + metadata */
+/** Uses Tika to parse the output of a fetch and extract text + metadata. */
 public class ParserBolt extends BaseRichBolt {
 
     private Tika tika;
@@ -82,7 +84,7 @@ public class ParserBolt extends BaseRichBolt {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(ParserBolt.class);
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     private boolean upperCaseElementNames = true;
     private Class<? extends HtmlMapper> htmlMapperClass = IdentityHtmlMapper.class;
@@ -143,7 +145,7 @@ public class ParserBolt extends BaseRichBolt {
         this.collector = collector;
 
         this.eventCounter =
-                context.registerMetric(this.getClass().getSimpleName(), new MultiCountMetric(), 10);
+                CrawlerMetrics.registerCounter(context, conf, this.getClass().getSimpleName(), 10);
 
         this.metadataTransfer = MetadataTransfer.getInstance(conf);
     }
@@ -204,7 +206,7 @@ public class ParserBolt extends BaseRichBolt {
 
         // as well as the filename
         try {
-            URL _url = new URL(url);
+            URL _url = URLUtil.toURL(url);
             md.set(TikaCoreProperties.RESOURCE_NAME_KEY, _url.getFile());
         } catch (MalformedURLException e1) {
             throw new IllegalStateException("Malformed URL", e1);
@@ -389,7 +391,7 @@ public class ParserBolt extends BaseRichBolt {
 
             // build an absolute URL
             try {
-                URL tmpURL = URLUtil.resolveURL(url_, l.getUri());
+                URL tmpURL = URLUtil.resolveUrl(url_, l.getUri());
                 urlOL = tmpURL.toExternalForm();
             } catch (MalformedURLException e) {
                 LOG.debug("MalformedURLException on {}", l.getUri());

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.bolt;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
@@ -32,9 +33,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -43,6 +43,8 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.parse.DocumentFragmentBuilder;
 import org.apache.stormcrawler.parse.JSoupFilter;
 import org.apache.stormcrawler.parse.JSoupFilters;
@@ -76,12 +78,12 @@ import org.w3c.dom.DocumentFragment;
  */
 public class JSoupParserBolt extends StatusEmitterBolt {
 
-    /** Metadata key name for tracking the anchors */
+    /** Metadata key name for tracking the anchors. */
     public static final String ANCHORS_KEY_NAME = "anchors";
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(JSoupParserBolt.class);
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     private ParseFilter parseFilters = null;
 
@@ -97,13 +99,13 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
     private int maxOutlinksPerPage = -1;
 
-    private boolean robots_noFollow_strict = true;
+    private boolean robotsNoFollowStrict = true;
 
     /**
      * If a Tuple is not HTML whether to send it to the status stream as an error or pass it on the
-     * default stream
+     * default stream.
      */
-    private boolean treat_non_html_as_error = true;
+    private boolean treatNonHtmlAsError = true;
 
     /**
      * Length of content to use for detecting the charset. Set to -1 to use the full content (will
@@ -114,7 +116,20 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
     private TextExtractor textExtractor;
 
-    private String protocolMDprefix;
+    /**
+     * Honor {@link TextExtractor#NO_TEXT_PARAM_NAME} on the text/plain path. No extractor is
+     * invoked there, so the value is read directly.
+     */
+    private boolean plainTextNoText;
+
+    /**
+     * Character cap for stored plain text, read from {@link TextExtractor#TEXT_MAX_TEXT_PARAM_NAME}
+     * ({@code -1} = unbounded). Bounds the emitted text only; the raw fetched size is bounded by
+     * {@code http.content.limit}.
+     */
+    private int plainTextMaxSize;
+
+    private String protocolMetadataPrefix;
 
     private boolean robotsHeaderSkip;
 
@@ -131,7 +146,7 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         super.prepare(conf, context, collector);
 
         eventCounter =
-                context.registerMetric(this.getClass().getSimpleName(), new MultiCountMetric(), 10);
+                CrawlerMetrics.registerCounter(context, conf, this.getClass().getSimpleName(), 10);
 
         parseFilters = ParseFilters.fromConf(conf);
 
@@ -141,10 +156,9 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
         trackAnchors = ConfUtils.getBoolean(conf, "track.anchors", true);
 
-        robots_noFollow_strict =
-                ConfUtils.getBoolean(conf, RobotsTags.ROBOTS_NO_FOLLOW_STRICT, true);
+        robotsNoFollowStrict = ConfUtils.getBoolean(conf, RobotsTags.ROBOTS_NO_FOLLOW_STRICT, true);
 
-        treat_non_html_as_error = ConfUtils.getBoolean(conf, "jsoup.treat.non.html.as.error", true);
+        treatNonHtmlAsError = ConfUtils.getBoolean(conf, "jsoup.treat.non.html.as.error", true);
 
         detectMimeType = ConfUtils.getBoolean(conf, "detect.mimetype", true);
 
@@ -154,7 +168,8 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
         maxOutlinksPerPage = ConfUtils.getInt(conf, "parser.emitOutlinks.max.per.page", -1);
 
-        protocolMDprefix = ConfUtils.getString(conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "");
+        protocolMetadataPrefix =
+                ConfUtils.getString(conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "");
 
         robotsHeaderSkip = ConfUtils.getBoolean(conf, "http.robots.headers.skip", false);
 
@@ -177,7 +192,8 @@ public class JSoupParserBolt extends StatusEmitterBolt {
             throw new RuntimeException(e);
         } catch (NoSuchMethodException e) {
             LOG.warn(
-                    "Configured textextractor.class '{}' does not provide a Map argument constructor.",
+                    "Configured textextractor.class '{}' "
+                            + "does not provide a Map argument constructor.",
                     clazz,
                     e);
             throw new RuntimeException(e);
@@ -185,6 +201,12 @@ public class JSoupParserBolt extends StatusEmitterBolt {
             LOG.warn("Cannot instantiazr textextractor.class '{}'.", clazz, e);
             throw new RuntimeException(e);
         }
+
+        // The text/plain path does not run the TextExtractor (there is no markup to
+        // extract from), so the two size-related knobs are read here and applied
+        // directly. The include/exclude knobs require markup and have no effect.
+        plainTextNoText = ConfUtils.getBoolean(conf, TextExtractor.NO_TEXT_PARAM_NAME, false);
+        plainTextMaxSize = ConfUtils.getInt(conf, TextExtractor.TEXT_MAX_TEXT_PARAM_NAME, -1);
     }
 
     @Override
@@ -198,9 +220,14 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
         // check that its content type is HTML
         // look at value found in HTTP headers
-        boolean CT_OK = false;
+        boolean contentTypeIsOk = false;
 
-        String mimeType = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, this.protocolMDprefix);
+        // text/plain content needs no markup parsing: the decoded bytes are
+        // the text, there are no outlinks (see issue #466)
+        boolean isPlainText = false;
+
+        String mimeType =
+                metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, this.protocolMetadataPrefix);
 
         if (detectMimeType) {
             try {
@@ -215,17 +242,20 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         }
 
         if (StringUtils.isNotBlank(mimeType)) {
-            if (mimeType.toLowerCase(Locale.ROOT).contains("html")) {
-                CT_OK = true;
+            final String lcMimeType = mimeType.toLowerCase(Locale.ROOT);
+            if (lcMimeType.contains("html")) {
+                contentTypeIsOk = true;
+            } else if (lcMimeType.contains("text/plain")) {
+                contentTypeIsOk = true;
+                isPlainText = true;
             }
-        }
-        // go ahead even if no mimetype is available
-        else {
-            CT_OK = true;
+        } else {
+            // go ahead even if no mimetype is available
+            contentTypeIsOk = true;
         }
 
-        if (!CT_OK) {
-            if (this.treat_non_html_as_error) {
+        if (!contentTypeIsOk) {
+            if (this.treatNonHtmlAsError) {
                 String errorMessage = "Exception content-type " + mimeType + " for " + url;
                 RuntimeException e = new RuntimeException(errorMessage);
                 handleException(url, e, metadata, tuple, "content-type checking", errorMessage);
@@ -259,7 +289,7 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
         // get the robots tags from the fetch metadata
         if (!robotsHeaderSkip) {
-            robotsTags = new RobotsTags(metadata, this.protocolMDprefix);
+            robotsTags = new RobotsTags(metadata, this.protocolMetadataPrefix);
         }
 
         Map<String, List<String>> slinks;
@@ -269,79 +299,100 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         try {
             String html = Charset.forName(charset).decode(ByteBuffer.wrap(content)).toString();
 
-            jsoupDoc = Parser.htmlParser().parseInput(html, url);
-
-            if (!robotsMetaSkip) {
-                // extracts the robots directives from the meta tags
-                Element robotelement = jsoupDoc.selectFirst("meta[name~=(?i)robots][content]");
-                if (robotelement != null) {
-                    robotsTags.extractMetaTags(robotelement.attr("content"));
-                }
-            }
-
-            // store a normalised representation in metadata
-            // so that the indexer is aware of it
-            robotsTags.normaliseToMetadata(metadata);
-
-            // do not extract the links if no follow has been set
-            // and we are in strict mode
-            if (robotsTags.isNoFollow() && robots_noFollow_strict) {
+            if (isPlainText) {
+                // no markup to parse: the decoded content is the text itself and
+                // there are no outlinks. An empty shell document is kept so that
+                // the downstream redirection check and parse filters still work.
+                jsoupDoc = org.jsoup.nodes.Document.createShell(url);
                 slinks = new HashMap<>(0);
+                robotsTags.normaliseToMetadata(metadata);
+                // the decoded content is the text; bound it the same way the
+                // TextExtractor would (no.text / skip.after) while preserving the
+                // original layout, which is the whole point of a .txt
+                if (plainTextNoText) {
+                    text = "";
+                } else if (plainTextMaxSize > 0 && html.length() > plainTextMaxSize) {
+                    text = html.substring(0, plainTextMaxSize);
+                } else {
+                    text = html;
+                }
             } else {
-                final Elements links = jsoupDoc.select("a[href]");
-                slinks = new HashMap<>(links.size());
-                final URL baseURL = new URL(url);
-                for (Element link : links) {
-                    // nofollow
-                    String[] relkeywords = link.attr("rel").split(" ");
-                    boolean noFollow =
-                            Stream.of(relkeywords).anyMatch(x -> x.equalsIgnoreCase("nofollow"));
+                jsoupDoc = Parser.htmlParser().parseInput(html, url);
 
-                    // remove altogether
-                    if (noFollow && robots_noFollow_strict) {
-                        continue;
-                    }
-
-                    // link not specifically marked as no follow
-                    // but whole page is
-                    if (!noFollow && robotsTags.isNoFollow()) {
-                        noFollow = true;
-                    }
-
-                    String targetURL = null;
-
-                    try {
-                        // abs:href tells jsoup to return fully qualified domains
-                        // for relative urls
-                        // but it is very slow as it builds intermediate URL objects
-                        // and normalises the URL of the document every time
-                        targetURL = URLUtil.resolveURL(baseURL, link.attr("href")).toExternalForm();
-                    } catch (MalformedURLException e) {
-                        LOG.debug(
-                                "Cannot resolve URL with baseURL : {} and href : {}",
-                                baseURL,
-                                link.attr("href"),
-                                e);
-                    }
-
-                    if (StringUtils.isBlank(targetURL)) {
-                        continue;
-                    }
-
-                    final List<String> anchors =
-                            slinks.computeIfAbsent(targetURL, a -> new LinkedList<>());
-
-                    // any existing anchors for the same target?
-                    final String anchor = link.text();
-                    // track the anchors only if no follow is false
-                    if (!noFollow && StringUtils.isNotBlank(anchor)) {
-                        anchors.add(anchor);
+                if (!robotsMetaSkip) {
+                    // extracts the robots directives from the meta tags
+                    Element robotelement = jsoupDoc.selectFirst("meta[name~=(?i)robots][content]");
+                    if (robotelement != null) {
+                        robotsTags.extractMetaTags(robotelement.attr("content"));
                     }
                 }
-            }
 
-            Element body = jsoupDoc.body();
-            text = textExtractor.text(body);
+                // store a normalised representation in metadata
+                // so that the indexer is aware of it
+                robotsTags.normaliseToMetadata(metadata);
+
+                // do not extract the links if no follow has been set
+                // and we are in strict mode
+                if (robotsTags.isNoFollow() && robotsNoFollowStrict) {
+                    slinks = new HashMap<>(0);
+                } else {
+                    final Elements links = jsoupDoc.select("a[href]");
+                    slinks = new HashMap<>(links.size());
+                    final URL baseUrl = URLUtil.toURL(url);
+                    for (Element link : links) {
+                        // nofollow
+                        String[] relkeywords = link.attr("rel").split(" ");
+                        boolean noFollow =
+                                Stream.of(relkeywords)
+                                        .anyMatch(x -> x.equalsIgnoreCase("nofollow"));
+
+                        // remove altogether
+                        if (noFollow && robotsNoFollowStrict) {
+                            continue;
+                        }
+
+                        // link not specifically marked as no follow
+                        // but whole page is
+                        if (!noFollow && robotsTags.isNoFollow()) {
+                            noFollow = true;
+                        }
+
+                        String targetUrl = null;
+
+                        try {
+                            // abs:href tells jsoup to return fully qualified domains
+                            // for relative urls
+                            // but it is very slow as it builds intermediate URL objects
+                            // and normalises the URL of the document every time
+                            targetUrl =
+                                    URLUtil.resolveUrl(baseUrl, link.attr("href")).toExternalForm();
+                        } catch (MalformedURLException e) {
+                            LOG.debug(
+                                    "Cannot resolve URL with baseURL : {} and href : {}",
+                                    baseUrl,
+                                    link.attr("href"),
+                                    e);
+                        }
+
+                        if (StringUtils.isBlank(targetUrl)) {
+                            continue;
+                        }
+
+                        final List<String> anchors =
+                                slinks.computeIfAbsent(targetUrl, a -> new LinkedList<>());
+
+                        // any existing anchors for the same target?
+                        final String anchor = link.text();
+                        // track the anchors only if no follow is false
+                        if (!noFollow && StringUtils.isNotBlank(anchor)) {
+                            anchors.add(anchor);
+                        }
+                    }
+                }
+
+                Element body = jsoupDoc.body();
+                text = textExtractor.text(body);
+            }
 
         } catch (Throwable e) {
             String errorMessage = "Exception while parsing " + url + ": " + e;
@@ -372,7 +423,7 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
                     // https://github.com/apache/stormcrawler/issues/954
                     if (allowRedirs() && StringUtils.isNotBlank(redirection)) {
-                        emitOutlink(tuple, new URL(url), redirection, metadata);
+                        emitOutlink(tuple, URLUtil.toURL(url), redirection, metadata);
                     }
 
                     // Mark URL as redirected
@@ -481,17 +532,17 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         declarer.declare(new Fields("url", "content", "metadata", "text"));
     }
 
-    public String guessMimeType(String URL, String httpCT, byte[] content) {
+    public String guessMimeType(String url, String httpContentType, byte[] content) {
 
         org.apache.tika.metadata.Metadata metadata = new org.apache.tika.metadata.Metadata();
 
-        if (StringUtils.isNotBlank(httpCT)) {
+        if (StringUtils.isNotBlank(httpContentType)) {
             // pass content type from server as a clue
-            metadata.set(org.apache.tika.metadata.Metadata.CONTENT_TYPE, httpCT);
+            metadata.set(org.apache.tika.metadata.Metadata.CONTENT_TYPE, httpContentType);
         }
 
         // use full URL as a clue
-        metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, URL);
+        metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, url);
 
         metadata.set(
                 org.apache.tika.metadata.Metadata.CONTENT_LENGTH, Integer.toString(content.length));
@@ -513,7 +564,7 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
         URL sourceUrl;
         try {
-            sourceUrl = new URL(url);
+            sourceUrl = URLUtil.toURL(url);
         } catch (MalformedURLException e) {
             // we would have known by now as previous components check whether
             // the URL is valid
@@ -536,9 +587,9 @@ public class JSoupParserBolt extends StatusEmitterBolt {
                 break;
             }
 
-            String targetURL = linkEntry.getKey();
+            String targetUrl = linkEntry.getKey();
 
-            Outlink ol = filterOutlink(sourceUrl, targetURL, metadata);
+            Outlink ol = filterOutlink(sourceUrl, targetUrl, metadata);
             if (ol == null) {
                 eventCounter.scope("outlink_filtered").incr();
                 continue;
@@ -568,6 +619,7 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
     @Override
     public void cleanup() {
+        super.cleanup();
         if (parseFilters != null) {
             parseFilters.cleanup();
         }

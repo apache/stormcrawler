@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import javax.xml.xpath.XPath;
@@ -62,12 +63,14 @@ public class RobotsTags {
         }
     }
 
-    /** Get the values from the fetch metadata * */
+    /** Get the values from the fetch metadata. */
     public RobotsTags(Metadata metadata, String protocolMDprefix) {
         // HTTP headers
         // X-Robots-Tag: noindex
         String[] values = metadata.getValues("X-Robots-Tag", protocolMDprefix);
-        if (values == null) return;
+        if (values == null) {
+            return;
+        }
         if (values.length == 1) {
             // just in case they put all the values on a single line
             values = values[0].split(" *, *");
@@ -83,7 +86,9 @@ public class RobotsTags {
     // called by the parser bolts
     public void extractMetaTags(DocumentFragment doc) throws XPathExpressionException {
         NodeList nodes = (NodeList) expression.evaluate(doc, XPathConstants.NODESET);
-        if (nodes == null) return;
+        if (nodes == null) {
+            return;
+        }
         int numNodes = nodes.getLength();
         for (int i = 0; i < numNodes; i++) {
             Node n = (Node) nodes.item(i);
@@ -115,9 +120,11 @@ public class RobotsTags {
         }
     }
 
-    /** Extracts meta tags based on the value of the content attribute * */
+    /** Extracts meta tags based on the value of the content attribute. */
     public void extractMetaTags(String content) {
-        if (content == null) return;
+        if (content == null) {
+            return;
+        }
         String[] vals = content.split(" *, *");
         parseValues(vals);
     }
@@ -139,7 +146,7 @@ public class RobotsTags {
         }
     }
 
-    /** Adds a normalised representation of the directives in the metadata * */
+    /** Adds a normalised representation of the directives in the metadata. */
     public void normaliseToMetadata(Metadata metadata) {
         metadata.setValue(ROBOTS_NO_INDEX, Boolean.toString(noIndex));
         metadata.setValue(ROBOTS_NO_CACHE, Boolean.toString(noCache));

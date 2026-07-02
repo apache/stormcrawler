@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.solr.persistence;
 
 import java.time.Instant;
@@ -21,10 +22,10 @@ import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import org.apache.commons.lang.StringUtils;
-import org.apache.solr.client.solrj.SolrQuery;
-import org.apache.solr.client.solrj.SolrQuery.ORDER;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.request.QueryRequest;
+import org.apache.solr.client.solrj.request.SolrQuery;
+import org.apache.solr.client.solrj.request.SolrQuery.ORDER;
 import org.apache.solr.client.solrj.response.Group;
 import org.apache.solr.client.solrj.response.GroupCommand;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -135,21 +136,20 @@ public class SolrSpout extends AbstractQueryingSpout {
         if (lastNextFetchDate == null) {
             lastNextFetchDate = Instant.now();
             lastStartOffset = 0;
-            lastTimeResetToNOW = Instant.now();
-        }
-        // reset the value for next fetch date if the previous one is too
-        // old
-        else if (resetFetchDateAfterNSecs != -1) {
+            lastTimeResetToNow = Instant.now();
+        } else if (resetFetchDateAfterNSecs != -1) {
+            // reset the value for next fetch date if the previous one is too
+            // old
             Instant changeNeededOn =
                     Instant.ofEpochMilli(
-                            lastTimeResetToNOW.toEpochMilli() + (resetFetchDateAfterNSecs * 1000));
+                            lastTimeResetToNow.toEpochMilli() + (resetFetchDateAfterNSecs * 1000));
             if (Instant.now().isAfter(changeNeededOn)) {
                 LOG.info(
                         "lastDate reset based on resetFetchDateAfterNSecs {}",
                         resetFetchDateAfterNSecs);
                 lastNextFetchDate = Instant.now();
                 lastStartOffset = 0;
-                lastTimeResetToNOW = Instant.now();
+                lastTimeResetToNow = Instant.now();
             }
         }
 
@@ -202,7 +202,7 @@ public class SolrSpout extends AbstractQueryingSpout {
 
         markQueryReceivedNow();
 
-        queryTimes.addMeasurement(timeTaken);
+        queryTimes.accept(timeTaken);
 
         SolrDocumentList docs = new SolrDocumentList();
 

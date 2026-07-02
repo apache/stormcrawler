@@ -1,0 +1,28 @@
+////
+Licensed under the Apache License, Version 2.0 (the "License");
+You may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+https://www.apache.org/licenses/LICENSE-2.0
+////
+== Talks, tutorials, articles and interviews
+
+* **OWler: preliminary results for building a collaborative open web crawler**, Dinzinger and al., OSSYM 2023 link:https://ca-roll.github.io/downloads/owler.pdf[]
+* **Presentation: StormCrawler and OpenSearch** (Feb 2023) link:https://www.youtube.com/watch?v=azHYI9pnjos[]
+* **Crawling the German Health Web: Exploratory Study and Graph Analysis**, Zowalla R, Wetter T, Pfeifer D. J Med Internet Res 2020;22(7):e17853 link:https://www.jmir.org/2020/7/e17853[]
+* **Tutorial: StormCrawler 1.16 + Elasticsearch 7.5.0** link:https://youtu.be/8kpJLPdhvLw[]
+* **StormCrawler open source web crawler strengthened by Elasticsearch, Kibana** link:https://www.elastic.co/blog/stormcrawler-open-source-web-crawler-strengthened-by-elasticsearch-kibana[]
+* **Harvesting Online Health Information**, Richard Zowalla link:https://www.slideshare.net/secret/v8Y0qFlGBk7IbB[slides]
+* _**Tutorial: StormCrawler 1.10 + Apache SOLR 4.7.0**_ link:https://youtu.be/F8nvGj03XLo[]
+* **Patent-Crawler: A Web Crawler to Gather Virtual Patent Marking Information**, Etienne Orliac, l’Université de Lausanne/École Polytechnique Fédérale de Lausanne (UNIL/EPFL) link:https://www.hpcadvisorycouncil.com/events/2018/swiss-workshop/pdf/Weds11April/Orliac_PatentCrawler_Wed110418.pdf[slides] - link:https://youtu.be/2v6Y_3Q0vT0[video]
+* _**DigitalPebble's Blog: Crawl dynamic content with Selenium and StormCrawler**_ link:https://digitalpebble.blogspot.co.uk/2017/04/crawl-dynamic-content-with-selenium-and.html[]
+* _**The Battle of the Crawlers: Apache Nutch vs. StormCrawler**_ link:https://dzone.com/articles/the-battle-of-the-crawlers-apache-nutch-vs-stormcr[]
+* _**Tutorial: StormCrawler + Elasticsearch + Kibana**_ link:https://digitalpebble.blogspot.co.uk/2017/04/video-tutorial-stormcrawler.html[]
+* _**Q&A with InfoQ**_ link:https://www.infoq.com/news/2016/12/nioche-stormcrawler-web-crawler[]
+* _**DigitalPebble's Blog: Index the web with StormCrawler (revisited)**_ link:https://digitalpebble.blogspot.co.uk/2016/09/index-web-with-stormcrawler-revisited.html[]
+* _**DigitalPebble's Blog: Index the web with AWS CloudSearch**_ link:https://digitalpebble.blogspot.co.uk/2015/09/index-web-with-aws-cloudsearch.html[]
+* _**Low latency scalable web crawling on Apache Storm**_ link:https://www.slideshare.net/digitalpebble/j-nioche-berlinbuzzwords20150601[slides] - link:https://t.co/A3bRKroDn3[video], by Julien Nioche. BerlinBuzzwords 2015
+* _**Storm Crawler: A real-time distributed web crawling and monitoring framework**_ link:https://www.slideshare.net/ontopic/storm-crawler-apacheconna2015[slides], by Jake Dodd - link:https://www.ontopic.io/[Ontopic], ApacheCon North America 2015
+* _**A quick introduction to Storm Crawler**_ link:https://www.slideshare.net/digitalpebble/j-nioche-apacheconeu2014fastfeather[slides], by Julien Nioche. ApacheCon Europe, Budapest, Nov 2014
+* _**StormCrawler in the wild**_ link:https://www.slideshare.net/digitalpebble/storm-crawler-ontopic20141113[slides], by Jake Dodd - link:https://www.ontopic.io/[Ontopic], ApacheCon Europe, Budapest, Nov 2014
+
+Drop us a line at mailto:dev@stormcrawler.apache.org[dev@stormcrawler.apache.org] if you want to be added to this page.

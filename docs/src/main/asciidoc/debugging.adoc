@@ -1,0 +1,21 @@
+////
+Licensed under the Apache License, Version 2.0 (the "License");
+You may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+https://www.apache.org/licenses/LICENSE-2.0
+////
+== Debugging a StormCrawler Topology
+
+Assuming you have a StormCrawler setup all ready to use (e.g., generated from the archetype), you can debug it by either:
+
+* Running the Java topology from your IDE in debug mode.
+* Using the following command to enable remote debugging:
+
+[source,bash]
+----
+export STORM_JAR_JVM_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=localhost:8000"
+----
+
+Then run the topology in the usual way with `storm jar ...` and remote debug from your IDE.
+
+In both cases, the topology will need to run in local mode, i.e., not deployed to a Storm cluster.

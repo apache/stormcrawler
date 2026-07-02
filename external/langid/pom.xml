@@ -20,27 +20,27 @@ under the License.
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.apache.stormcrawler</groupId>
-		<artifactId>stormcrawler-external</artifactId>
-		<version>3.5.1-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath>
-	</parent>
+    <parent>
+        <groupId>org.apache.stormcrawler</groupId>
+        <artifactId>stormcrawler-external</artifactId>
+        <version>3.6.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
 
-	<artifactId>stormcrawler-langid</artifactId>
-	<packaging>jar</packaging>
+    <artifactId>stormcrawler-langid</artifactId>
+    <packaging>jar</packaging>
 
-	<name>stormcrawler-langid</name>
-	<url>https://github.com/apache/stormcrawler/tree/master/external/langid</url>
-	<description>Language Identification for StormCrawler</description>
+    <name>stormcrawler-langid</name>
+    <url>https://github.com/apache/stormcrawler/tree/master/external/langid</url>
+    <description>Language Identification for StormCrawler</description>
 
-	<dependencies>
-		<dependency>
-			<groupId>com.optimaize.languagedetector</groupId>
-			<artifactId>language-detector</artifactId>
-			<version>0.6</version>
-		</dependency>
-	</dependencies>
+    <dependencies>
+        <dependency>
+            <groupId>com.optimaize.languagedetector</groupId>
+            <artifactId>language-detector</artifactId>
+            <version>0.6</version>
+        </dependency>
+    </dependencies>
 </project>

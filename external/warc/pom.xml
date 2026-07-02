@@ -20,82 +20,82 @@ under the License.
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.apache.stormcrawler</groupId>
-		<artifactId>stormcrawler-external</artifactId>
-		<version>3.5.1-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath>
-	</parent>
+    <parent>
+        <groupId>org.apache.stormcrawler</groupId>
+        <artifactId>stormcrawler-external</artifactId>
+        <version>3.6.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
 
-	<artifactId>stormcrawler-warc</artifactId>
-	<packaging>jar</packaging>
+    <artifactId>stormcrawler-warc</artifactId>
+    <packaging>jar</packaging>
 
-	<name>stormcrawler-warc</name>
-	<url>https://github.com/apache/stormcrawler/tree/master/external/warc</url>
-	<description>WARC resources for StormCrawler</description>
+    <name>stormcrawler-warc</name>
+    <url>https://github.com/apache/stormcrawler/tree/master/external/warc</url>
+    <description>WARC resources for StormCrawler</description>
 
-	<properties>
-		<commons-codec.version>1.10</commons-codec.version>
-		<jwarc.version>0.32.0</jwarc.version>
-		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
-		<jacoco.classRatio>0.75</jacoco.classRatio>
-		<jacoco.instructionRatio>0.65</jacoco.instructionRatio>
-		<jacoco.methodRatio>0.68</jacoco.methodRatio>
-		<jacoco.branchRatio>0.54</jacoco.branchRatio>
-		<jacoco.lineRatio>0.66</jacoco.lineRatio>
-		<jacoco.complexityRatio>0.41</jacoco.complexityRatio>
-	</properties>
+    <properties>
+        <commons-codec.version>1.10</commons-codec.version>
+        <jwarc.version>0.36.0</jwarc.version>
+        <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
+        <jacoco.classRatio>0.75</jacoco.classRatio>
+        <jacoco.instructionRatio>0.65</jacoco.instructionRatio>
+        <jacoco.methodRatio>0.68</jacoco.methodRatio>
+        <jacoco.branchRatio>0.54</jacoco.branchRatio>
+        <jacoco.lineRatio>0.66</jacoco.lineRatio>
+        <jacoco.complexityRatio>0.41</jacoco.complexityRatio>
+    </properties>
 
-	<dependencies>
-		<!-- Need to set this one explicitly otherwise does not get the right 
-			codec dependencies ?!?!? -->
-		<dependency>
-			<groupId>org.apache.stormcrawler</groupId>
-			<artifactId>stormcrawler-core</artifactId>
-			<version>${project.version}</version>
-		</dependency>
+    <dependencies>
+        <!-- Need to set this one explicitly otherwise does not get the right
+            codec dependencies ?!?!? -->
+        <dependency>
+            <groupId>org.apache.stormcrawler</groupId>
+            <artifactId>stormcrawler-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
-		<dependency>
-			<groupId>org.apache.storm</groupId>
-			<artifactId>storm-hdfs</artifactId>
-			<version>${storm-client.version}</version>
-			<exclusions>
-				<exclusion>
-				    <!-- not available with Java 9 and higher -->
-					<groupId>jdk.tools</groupId>
-					<artifactId>jdk.tools</artifactId>
-				</exclusion>
-				<exclusion>
-				    <!-- subdependency JMS can't be found -->
-					<groupId>org.apache.hive.hcatalog</groupId>
-					<artifactId>hive-webhcat-java-client</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>org.apache.hbase</groupId>
-					<artifactId>hbase-server</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>org.apache.hive.hcatalog</groupId>
-					<artifactId>hive-hcatalog-streaming</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
+        <dependency>
+            <groupId>org.apache.storm</groupId>
+            <artifactId>storm-hdfs</artifactId>
+            <version>${storm-client.version}</version>
+            <exclusions>
+                <exclusion>
+                    <!-- not available with Java 9 and higher -->
+                    <groupId>jdk.tools</groupId>
+                    <artifactId>jdk.tools</artifactId>
+                </exclusion>
+                <exclusion>
+                    <!-- subdependency JMS can't be found -->
+                    <groupId>org.apache.hive.hcatalog</groupId>
+                    <artifactId>hive-webhcat-java-client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hbase</groupId>
+                    <artifactId>hbase-server</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hive.hcatalog</groupId>
+                    <artifactId>hive-hcatalog-streaming</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
 
-		<dependency>
-			<groupId>org.netpreserve</groupId>
-			<artifactId>jwarc</artifactId>
-			<version>${jwarc.version}</version>
-		</dependency>
+        <dependency>
+            <groupId>org.netpreserve</groupId>
+            <artifactId>jwarc</artifactId>
+            <version>${jwarc.version}</version>
+        </dependency>
 
-		<dependency>
-			<groupId>org.apache.stormcrawler</groupId>
-			<artifactId>stormcrawler-core</artifactId>
-			<version>${project.version}</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.apache.stormcrawler</groupId>
+            <artifactId>stormcrawler-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
-	</dependencies>
+    </dependencies>
 </project>

@@ -24,35 +24,35 @@ under the License.
             http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
 <!-- created with Free Online Sitemap Generator www.xml-sitemaps.com -->
-  <url>
-    <loc>https://stormcrawler.apache.org/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>1.00</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="http://www.example.com/english/" />
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/index.html</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/download/index.html</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/getting-started/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/faq/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
-  <url>
-    <loc>https://stormcrawler.apache.org/support/</loc>
-    <lastmod>2024-10-19T11:21:53+00:00</lastmod>
-    <priority>0.80</priority>
-  </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>1.00</priority>
+        <xhtml:link rel="alternate" hreflang="en" href="http://www.example.com/english/" />
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/index.html</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/download/index.html</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/getting-started/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/faq/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
+    <url>
+        <loc>https://stormcrawler.apache.org/support/</loc>
+        <lastmod>2024-10-19T11:21:53+00:00</lastmod>
+        <priority>0.80</priority>
+    </url>
 </urlset>

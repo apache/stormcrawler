@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.solr;
 
 import java.io.File;
@@ -39,7 +40,8 @@ public abstract class SolrCloudContainerTest {
     static ComposeContainer environment =
             new ComposeContainer(new File("src/test/resources/docker-compose.yml"))
                     .withExposedService("solr", 8983, waitStrategy)
-                    .withExposedService("zookeeper", 2181);
+                    .withExposedService("zookeeper", 2181)
+                    .withLocalCompose(true);
 
     @BeforeAll
     static void before() {
@@ -64,24 +66,24 @@ public abstract class SolrCloudContainerTest {
                                         "/opt/solr/bin/solr",
                                         "zk",
                                         "upconfig",
-                                        "-n",
+                                        "--conf-name",
                                         collectionName,
-                                        "-d",
+                                        "--conf-dir",
                                         "/opt/solr/server/solr/configsets/" + collectionName,
-                                        "-z",
+                                        "--zk-host",
                                         "zookeeper:2181");
 
                                 // Create the collection
                                 container.execInContainer(
                                         "/opt/solr/bin/solr",
                                         "create",
-                                        "-c",
+                                        "--name",
                                         collectionName,
-                                        "-n",
+                                        "--conf-name",
                                         collectionName,
-                                        "-sh",
+                                        "--shards",
                                         String.valueOf(shards),
-                                        "-rf",
+                                        "--replication-factor",
                                         String.valueOf(replicas));
                             } catch (Exception e) {
                                 LOG.error("Error while creating collection {}", collectionName, e);

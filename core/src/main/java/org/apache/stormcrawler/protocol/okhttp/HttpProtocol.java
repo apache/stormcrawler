@@ -14,24 +14,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.okhttp;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.Proxy;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
@@ -41,11 +43,13 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import kotlin.Pair;
 import okhttp3.Call;
+import okhttp3.CompressionInterceptor;
 import okhttp3.Connection;
 import okhttp3.ConnectionPool;
 import okhttp3.Credentials;
 import okhttp3.EventListener;
 import okhttp3.EventListener.Factory;
+import okhttp3.Gzip;
 import okhttp3.Handshake;
 import okhttp3.Headers;
 import okhttp3.Interceptor;
@@ -58,21 +62,24 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import okhttp3.Route;
-import okhttp3.brotli.BrotliInterceptor;
+import okhttp3.brotli.Brotli;
+import okhttp3.zstd.Zstd;
 import okio.BufferedSource;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.mutable.MutableObject;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.http.HttpHeaders;
 import org.apache.http.cookie.Cookie;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
+import org.apache.stormcrawler.protocol.IPFilterRules;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.ProtocolResponse.TrimmedContentReason;
 import org.apache.stormcrawler.proxy.SCProxy;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.CookieConverter;
+import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 
@@ -80,7 +87,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(HttpProtocol.class);
 
-    private final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+    private final MediaType json = MediaType.parse("application/json; charset=utf-8");
 
     private OkHttpClient client;
 
@@ -94,7 +101,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
     private final List<KeyValue> customRequestHeaders = new LinkedList<>();
 
     // track the time spent for each URL in DNS resolution
-    private final Map<String, Long> DNStimes = new HashMap<>();
+    private final Map<String, Long> DNStimes = new ConcurrentHashMap<>();
 
     private OkHttpClient.Builder builder;
 
@@ -156,11 +163,15 @@ public class HttpProtocol extends AbstractHttpProtocol {
                         .writeTimeout(timeout, TimeUnit.MILLISECONDS)
                         .readTimeout(timeout, TimeUnit.MILLISECONDS);
 
+        if (completionTimeout >= 0) {
+            builder.callTimeout(completionTimeout, TimeUnit.SECONDS);
+        }
+
         // protocols in order of preference, see
         // https://square.github.io/okhttp/4.x/okhttp/okhttp3/-ok-http-client/-builder/protocols/
         final List<okhttp3.Protocol> protocols = new ArrayList<>();
-        for (String pVersion : protocolVersions) {
-            switch (pVersion) {
+        for (String protocolVersion : protocolVersions) {
+            switch (protocolVersion) {
                 case "h2":
                     protocols.add(okhttp3.Protocol.HTTP_2);
                     break;
@@ -178,11 +189,11 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     LOG.warn("http/1.0 ignored, not supported by okhttp for requests");
                     break;
                 default:
-                    LOG.error("{}: unknown protocol version", pVersion);
+                    LOG.error("{}: unknown protocol version", protocolVersion);
                     break;
             }
         }
-        if (protocols.size() > 0) {
+        if (!protocols.isEmpty()) {
             LOG.info("Using protocol versions: {}", protocols);
             builder.protocols(protocols);
         }
@@ -217,7 +228,15 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         customHeaders.forEach(customRequestHeaders::add);
 
-        if (storeHTTPHeaders) {
+        // optionally block connections to forbidden IP address ranges
+        // (e.g. localhost/loopback, private/site-local addresses), see
+        // https://github.com/apache/stormcrawler/issues/1107
+        final IPFilterRules ipFilterRules = new IPFilterRules(conf);
+        if (!ipFilterRules.isEmpty()) {
+            builder.addNetworkInterceptor(new HTTPFilterIPAddressInterceptor(ipFilterRules));
+        }
+
+        if (storeHttpHeaders) {
             builder.addNetworkInterceptor(new HTTPHeadersInterceptor());
         }
 
@@ -240,8 +259,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     }
                 });
 
-        // enable support for Brotli compression (Content-Encoding)
-        builder.addInterceptor(BrotliInterceptor.INSTANCE);
+        // enable support for Zstd, Brotli, Gzip Content-Encoding
+        builder.addInterceptor(
+                new CompressionInterceptor(Zstd.INSTANCE, Brotli.INSTANCE, Gzip.INSTANCE));
 
         final Map<String, Object> connectionPoolConf =
                 (Map<String, Object>) conf.get("okhttp.protocol.connection.pool");
@@ -260,12 +280,14 @@ public class HttpProtocol extends AbstractHttpProtocol {
     }
 
     private void addCookiesToRequest(Builder rb, String url, Metadata md) {
-        final String[] cookieStrings = md.getValues(RESPONSE_COOKIES_HEADER, protocolMDprefix);
+        final String[] cookieStrings =
+                md.getValues(RESPONSE_COOKIES_HEADER, protocolMetadataPrefix);
         if (cookieStrings == null || cookieStrings.length == 0) {
             return;
         }
         try {
-            final List<Cookie> cookies = CookieConverter.getCookies(cookieStrings, new URL(url));
+            final List<Cookie> cookies =
+                    CookieConverter.getCookies(cookieStrings, URLUtil.toURL(url));
             for (Cookie c : cookies) {
                 rb.addHeader("Cookie", c.getName() + "=" + c.getValue());
             }
@@ -274,7 +296,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
     }
 
     protected void addHeadersToRequest(Builder rb, Metadata md) {
-        final String[] headerStrings = md.getValues(SET_HEADER_BY_REQUEST, protocolMDprefix);
+        final String[] headerStrings = md.getValues(SET_HEADER_BY_REQUEST, protocolMetadataPrefix);
 
         if (headerStrings != null && headerStrings.length > 0) {
             for (String hs : headerStrings) {
@@ -299,6 +321,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 SCProxy prox = proxOptional.get();
                 // conditionally configure proxy authentication
                 if (StringUtils.isNotBlank(prox.getAddress())) {
+                    // create a new builder from the existing client to avoid
+                    // polluting shared state across concurrent requests
+                    OkHttpClient.Builder localBuilder = client.newBuilder();
+
                     // format SCProxy into native Java proxy
                     Proxy proxy =
                             new Proxy(
@@ -307,12 +333,12 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                             prox.getAddress(), Integer.parseInt(prox.getPort())));
 
                     // set proxy in builder
-                    builder.proxy(proxy);
+                    localBuilder.proxy(proxy);
 
                     // conditionally add proxy authentication
                     if (StringUtils.isNotBlank(prox.getUsername())) {
                         // add proxy authentication header to builder
-                        builder.proxyAuthenticator(
+                        localBuilder.proxyAuthenticator(
                                 (Route route, Response response) -> {
                                     String credential =
                                             Credentials.basic(
@@ -323,17 +349,17 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                             .build();
                                 });
                     }
+
+                    // save start time for debugging speed impact of client build
+                    long buildStart = System.currentTimeMillis();
+
+                    // create new local client from local builder using proxy
+                    localClient = localBuilder.build();
+
+                    LOG.debug(
+                            "time to build okhttp client with proxy: {}ms",
+                            System.currentTimeMillis() - buildStart);
                 }
-
-                // save start time for debugging speed impact of client build
-                long buildStart = System.currentTimeMillis();
-
-                // create new local client from builder using proxy
-                localClient = builder.build();
-
-                LOG.debug(
-                        "time to build okhttp client with proxy: {}ms",
-                        System.currentTimeMillis() - buildStart);
 
                 LOG.debug("fetching with proxy {} - {} ", url, prox.toString());
             }
@@ -355,7 +381,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 rb.header(HttpHeaders.IF_MODIFIED_SINCE, formatHttpDate(lastModified));
             }
 
-            final String ifNoneMatch = metadata.getFirstValue(HttpHeaders.ETAG, protocolMDprefix);
+            final String ifNoneMatch =
+                    metadata.getFirstValue(HttpHeaders.ETAG, protocolMetadataPrefix);
             if (StringUtils.isNotBlank(ifNoneMatch)) {
                 rb.header(HttpHeaders.IF_NONE_MATCH, ifNoneMatch);
             }
@@ -383,9 +410,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 addCookiesToRequest(rb, url, metadata);
             }
 
-            final String postJSONData = metadata.getFirstValue("http.post.json");
-            if (StringUtils.isNotBlank(postJSONData)) {
-                RequestBody body = RequestBody.create(postJSONData, JSON);
+            final String postJsonData = metadata.getFirstValue("http.post.json");
+            if (StringUtils.isNotBlank(postJsonData)) {
+                RequestBody body = RequestBody.create(postJsonData, json);
                 rb.post(body);
             }
 
@@ -418,22 +445,23 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 responsemetadata.addValue(key.toLowerCase(Locale.ROOT), value);
             }
 
-            final MutableObject trimmed = new MutableObject(TrimmedContentReason.NOT_TRIMMED);
+            final MutableObject<TrimmedContentReason> trimmed =
+                    new MutableObject<>(TrimmedContentReason.NOT_TRIMMED);
             final byte[] bytes = toByteArray(response.body(), pageMaxContent, trimmed);
-            if (trimmed.getValue() != TrimmedContentReason.NOT_TRIMMED) {
+            if (trimmed.get() != TrimmedContentReason.NOT_TRIMMED) {
                 if (!call.isCanceled()) {
                     call.cancel();
                 }
                 responsemetadata.setValue(ProtocolResponse.TRIMMED_RESPONSE_KEY, "true");
                 responsemetadata.setValue(
                         ProtocolResponse.TRIMMED_RESPONSE_REASON_KEY,
-                        trimmed.getValue().toString().toLowerCase(Locale.ROOT));
-                LOG.warn("HTTP content trimmed to {}", bytes.length);
+                        trimmed.get().toString().toLowerCase(Locale.ROOT));
+                LOG.warn("HTTP content trimmed to {} (reason: {})", bytes.length, trimmed.get());
             }
 
-            final Long DNSResolution = DNStimes.remove(call.toString());
-            if (DNSResolution != null) {
-                responsemetadata.setValue("metrics.dns.resolution.msec", DNSResolution.toString());
+            final Long dnsResolution = DNStimes.remove(call.toString());
+            if (dnsResolution != null) {
+                responsemetadata.setValue("metrics.dns.resolution.msec", dnsResolution.toString());
             }
 
             return new ProtocolResponse(bytes, response.code(), responsemetadata);
@@ -441,7 +469,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
     }
 
     private byte[] toByteArray(
-            final ResponseBody responseBody, int maxContent, MutableObject trimmed)
+            final ResponseBody responseBody,
+            int maxContent,
+            MutableObject<TrimmedContentReason> trimmed)
             throws IOException {
 
         if (responseBody == null) {
@@ -481,7 +511,12 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 // requesting more content failed, e.g. by a socket timeout
                 if (partialContentAsTrimmed && source.getBuffer().size() > 0) {
                     // treat already fetched content as trimmed
-                    trimmed.setValue(TrimmedContentReason.DISCONNECT);
+                    if (e instanceof InterruptedIOException) {
+                        // thrown by OkHttp if the call timeout is hit
+                        trimmed.setValue(TrimmedContentReason.TIME);
+                    } else {
+                        trimmed.setValue(TrimmedContentReason.DISCONNECT);
+                    }
                     LOG.debug("Exception while fetching {}", e);
                 } else {
                     throw e;
@@ -500,7 +535,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
             // okhttp may fetch more content than requested, quickly "increment"
             // bytes
-            bytesRequested = (int) source.getBuffer().size();
+            bytesRequested = source.getBuffer().size();
         }
         int bytesToCopy = (int) source.getBuffer().size(); // bytesBuffered
         if (maxContent != -1 && bytesToCopy > maxContent) {
@@ -511,6 +546,40 @@ public class HttpProtocol extends AbstractHttpProtocol {
         final byte[] arr = new byte[bytesToCopy];
         source.getBuffer().readFully(arr);
         return arr;
+    }
+
+    /**
+     * Network interceptor blocking connections to IP addresses rejected by the configured {@link
+     * IPFilterRules}. The IP address is only known once the connection has been established, hence
+     * the filtering happens at the protocol level rather than by filtering URLs.
+     *
+     * <p>Note that when a proxy is configured the connection is established to the proxy, so the
+     * filter sees the proxy's IP address rather than the target host's resolved address; IP
+     * filtering is therefore effectively disabled for proxied fetches.
+     */
+    static class HTTPFilterIPAddressInterceptor implements Interceptor {
+
+        private final IPFilterRules rules;
+
+        HTTPFilterIPAddressInterceptor(IPFilterRules rules) {
+            this.rules = rules;
+        }
+
+        @NotNull
+        @Override
+        public Response intercept(Interceptor.Chain chain) throws IOException {
+            final Connection connection = Objects.requireNonNull(chain.connection());
+            final InetAddress address = connection.socket().getInetAddress();
+            final Request request = chain.request();
+
+            if (rules.accept(address)) {
+                return chain.proceed(request);
+            }
+
+            final String hostAddress = address == null ? "unknown" : address.getHostAddress();
+            LOG.warn("Blocked connection to IP address {}: {}", hostAddress, request.url());
+            throw new IOException("Forbidden connection to IP address " + hostAddress);
+        }
     }
 
     static class HTTPHeadersInterceptor implements Interceptor {
@@ -621,7 +690,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
     }
 
-    public static void main(String args[]) throws Exception {
+    public static void main(String[] args) throws Exception {
         org.apache.stormcrawler.protocol.Protocol.main(new HttpProtocol(), args);
     }
 }

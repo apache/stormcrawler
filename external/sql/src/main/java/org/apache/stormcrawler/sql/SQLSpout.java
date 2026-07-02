@@ -14,17 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.sql;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.storm.spout.Scheme;
 import org.apache.storm.spout.SpoutOutputCollector;
@@ -43,9 +45,39 @@ public class SQLSpout extends AbstractQueryingSpout {
 
     private static final Scheme SCHEME = new StringTabScheme();
 
-    private String tableName;
+    private static final String BASE_SQL =
+            """
+            SELECT *
+            FROM (
+                SELECT
+                    rank() OVER (PARTITION BY host ORDER BY nextfetchdate DESC, url) AS ranking,
+                    url,
+                    metadata,
+                    nextfetchdate
+                FROM %s
+                WHERE nextfetchdate <= ? %s
+            ) AS urls_ranks
+            WHERE urls_ranks.ranking <= ?
+            ORDER BY ranking %s
+            """;
+
+    private static final String BUCKET_CLAUSE =
+            """
+            AND bucket = ?
+            """;
+
+    private static final String LIMIT_CLAUSE =
+            """
+            LIMIT ?
+            """;
+
+    private static final String URL_COLUMN = "url";
+    private static final String METADATA_COLUMN = "metadata";
+
+    private static String preparedSql;
 
     private Connection connection;
+    private PreparedStatement ps;
 
     /**
      * if more than one instance of the spout exist, each one is in charge of a separate bucket
@@ -70,7 +102,8 @@ public class SQLSpout extends AbstractQueryingSpout {
 
         maxDocsPerBucket = ConfUtils.getInt(conf, Constants.SQL_MAX_DOCS_BUCKET_PARAM_NAME, 5);
 
-        tableName = ConfUtils.getString(conf, Constants.SQL_STATUS_TABLE_PARAM_NAME, "urls");
+        final String tableName =
+                ConfUtils.getString(conf, Constants.SQL_STATUS_TABLE_PARAM_NAME, "urls");
 
         maxNumResults = ConfUtils.getInt(conf, Constants.SQL_MAXRESULTS_PARAM_NAME, 100);
 
@@ -88,6 +121,18 @@ public class SQLSpout extends AbstractQueryingSpout {
                     "[" + context.getThisComponentId() + " #" + context.getThisTaskIndex() + "] ";
             bucketNum = context.getThisTaskIndex();
         }
+
+        final String bucketClause = (bucketNum >= 0) ? BUCKET_CLAUSE : "";
+        final String limitClause = (maxNumResults != -1) ? LIMIT_CLAUSE : "";
+
+        preparedSql = String.format(Locale.ROOT, BASE_SQL, tableName, bucketClause, limitClause);
+
+        try {
+            ps = connection.prepareStatement(preparedSql);
+        } catch (SQLException e) {
+            LOG.error("Failed to prepare statement", e);
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -100,11 +145,11 @@ public class SQLSpout extends AbstractQueryingSpout {
 
         if (lastNextFetchDate == null) {
             lastNextFetchDate = Instant.now();
-            lastTimeResetToNOW = Instant.now();
+            lastTimeResetToNow = Instant.now();
         } else if (resetFetchDateAfterNSecs != -1) {
             Instant changeNeededOn =
                     Instant.ofEpochMilli(
-                            lastTimeResetToNOW.toEpochMilli() + (resetFetchDateAfterNSecs * 1000));
+                            lastTimeResetToNow.toEpochMilli() + (resetFetchDateAfterNSecs * 1000));
             if (Instant.now().isAfter(changeNeededOn)) {
                 LOG.info(
                         "lastDate reset based on resetFetchDateAfterNSecs {}",
@@ -117,97 +162,41 @@ public class SQLSpout extends AbstractQueryingSpout {
         // https://mariadb.com/kb/en/library/window-functions-overview/
         // http://www.mysqltutorial.org/mysql-window-functions/mysql-rank-function/
 
-        String query =
-                "SELECT * from (select rank() over (partition by host order by nextfetchdate desc, url) as ranking, url, metadata, nextfetchdate from "
-                        + tableName;
-
-        query +=
-                " WHERE nextfetchdate <= '" + new Timestamp(lastNextFetchDate.toEpochMilli()) + "'";
-
-        // constraint on bucket num
-        if (bucketNum >= 0) {
-            query += " AND bucket = '" + bucketNum + "'";
-        }
-
-        query +=
-                ") as urls_ranks where (urls_ranks.ranking <= "
-                        + maxDocsPerBucket
-                        + ") order by ranking";
-
-        if (maxNumResults != -1) {
-            query += " LIMIT " + this.maxNumResults;
-        }
-
         int alreadyprocessed = 0;
         int numhits = 0;
 
         long timeStartQuery = System.currentTimeMillis();
 
-        // create the java statement
-        Statement st = null;
-        ResultSet rs = null;
         try {
-            st = this.connection.createStatement();
+            int i = 1;
+            ps.setTimestamp(i++, new Timestamp(lastNextFetchDate.toEpochMilli()));
+
+            if (bucketNum >= 0) {
+                ps.setInt(i++, bucketNum);
+            }
+
+            ps.setInt(i++, maxDocsPerBucket);
+
+            if (maxNumResults != -1) {
+                ps.setInt(i++, maxNumResults);
+            }
 
             // dump query to log
-            LOG.debug("{} SQL query {}", logIdprefix, query);
+            LOG.debug("{} SQL query {}", logIdprefix, preparedSql);
 
-            // execute the query, and get a java resultset
-            rs = st.executeQuery(query);
+            try (ResultSet rs = ps.executeQuery()) {
+                final long timeTaken = recordQueryTiming(timeStartQuery);
 
-            long timeTaken = System.currentTimeMillis() - timeStartQuery;
-            queryTimes.addMeasurement(timeTaken);
-
-            // iterate through the java resultset
-            while (rs.next()) {
-                String url = rs.getString("url");
-                numhits++;
-                // already processed? skip
-                if (beingProcessed.containsKey(url)) {
-                    alreadyprocessed++;
-                    continue;
+                // iterate through the java resultset
+                while (rs.next()) {
+                    numhits++;
+                    alreadyprocessed += processRow(rs);
                 }
-                String metadata = rs.getString("metadata");
-                if (metadata == null) {
-                    metadata = "";
-                } else if (!metadata.startsWith("\t")) {
-                    metadata = "\t" + metadata;
-                }
-                String URLMD = url + metadata;
-                List<Object> v =
-                        SCHEME.deserialize(ByteBuffer.wrap(URLMD.getBytes(StandardCharsets.UTF_8)));
-                buffer.add(url, (Metadata) v.get(1));
+
+                postProcessResults(numhits, alreadyprocessed, timeTaken);
             }
-
-            // no results? reset the date
-            if (numhits == 0) {
-                lastNextFetchDate = null;
-            }
-
-            eventCounter.scope("already_being_processed").incrBy(alreadyprocessed);
-            eventCounter.scope("queries").incrBy(1);
-            eventCounter.scope("docs").incrBy(numhits);
-
-            LOG.info(
-                    "{} SQL query returned {} hits in {} msec with {} already being processed",
-                    logIdprefix,
-                    numhits,
-                    timeTaken,
-                    alreadyprocessed);
-
         } catch (SQLException e) {
             LOG.error("Exception while querying table", e);
-        } finally {
-            try {
-                if (rs != null) rs.close();
-            } catch (SQLException e) {
-                LOG.error("Exception closing resultset", e);
-            }
-            try {
-                if (st != null) st.close();
-            } catch (SQLException e) {
-                LOG.error("Exception closing statement", e);
-            }
         }
     }
 
@@ -226,10 +215,55 @@ public class SQLSpout extends AbstractQueryingSpout {
     @Override
     public void close() {
         super.close();
-        try {
-            connection.close();
-        } catch (SQLException e) {
-            LOG.error("Exception caught while closing SQL connection", e);
+        SQLUtil.closeResource(ps, "prepared statement");
+        SQLUtil.closeResource(connection, "connection");
+    }
+
+    private long recordQueryTiming(long timeStartQuery) {
+        long timeTaken = System.currentTimeMillis() - timeStartQuery;
+        queryTimes.accept(timeTaken);
+        return timeTaken;
+    }
+
+    private int processRow(final ResultSet rs) throws SQLException {
+
+        final String url = rs.getString(URL_COLUMN);
+        final String metadata = rs.getString(METADATA_COLUMN);
+
+        // already processed? skip
+        if (beingProcessed.containsKey(url)) {
+            return 1;
         }
+
+        final String normalisedMetadata =
+                (metadata == null || metadata.startsWith("\t")) ? metadata : "\t" + metadata;
+
+        final String urlWithMetadata = String.format(Locale.ROOT, "%s%s", url, normalisedMetadata);
+        final List<Object> v =
+                SCHEME.deserialize(
+                        ByteBuffer.wrap(urlWithMetadata.getBytes(StandardCharsets.UTF_8)));
+        buffer.add(url, (Metadata) v.get(1));
+
+        return 0;
+    }
+
+    private void postProcessResults(
+            final int numHits, final int alreadyProcessed, final long timeTaken) {
+
+        // no results? reset the date
+        if (numHits == 0) {
+            lastNextFetchDate = null;
+        }
+
+        eventCounter.scope("already_being_processed").incrBy(alreadyProcessed);
+        eventCounter.scope("queries").incrBy(1);
+        eventCounter.scope("docs").incrBy(numHits);
+
+        LOG.info(
+                "{} SQL query returned {} hits in {} msec with {} already being processed",
+                logIdprefix,
+                numHits,
+                timeTaken,
+                alreadyProcessed);
     }
 }

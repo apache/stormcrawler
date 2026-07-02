@@ -14,8 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.urlfrontier;
 
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -23,7 +25,6 @@ import java.util.HashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.storm.task.OutputCollector;
@@ -71,7 +72,9 @@ class StatusUpdaterBoltTest {
     void before() {
         String image = "crawlercommons/url-frontier";
         String version = System.getProperty("urlfrontier-version");
-        if (version != null) image += ":" + version;
+        if (version != null) {
+            image += ":" + version;
+        }
         urlFrontierContainer = new URLFrontierContainer(image);
         urlFrontierContainer.start();
         bolt = new StatusUpdaterBolt();
@@ -106,31 +109,37 @@ class StatusUpdaterBoltTest {
     }
 
     private boolean isAcked(String url, long timeoutSeconds) {
-        return isAcked(url, timeoutSeconds, System.currentTimeMillis());
+        try {
+            await().atMost(timeoutSeconds, TimeUnit.SECONDS)
+                    .until(
+                            () ->
+                                    output.getAckedTuples().stream()
+                                            .anyMatch(
+                                                    tuple ->
+                                                            tuple.getStringByField("url")
+                                                                    .equals(url)));
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private boolean isAcked(String url, long timeoutSeconds, long start) {
-        Future<Boolean> future =
-                executorService.submit(
-                        () -> {
-                            while (output.getAckedTuples().stream()
-                                            .filter(
-                                                    (tuple) ->
-                                                            tuple.getStringByField("url")
-                                                                    .equals(url))
-                                            .count()
-                                    == 0) {
-                                Thread.sleep(100);
-                                // Additional if-clause for checking timeout necessary, otherwise
-                                // the thread would unnecessarily keep running
-                                if (System.currentTimeMillis() - start > timeoutSeconds * 1000) {
-                                    return false;
-                                }
-                            }
-                            return true;
-                        });
+        long elapsed = System.currentTimeMillis() - start;
+        long remaining = timeoutSeconds * 1000 - elapsed;
+        if (remaining <= 0) {
+            return false;
+        }
         try {
-            return future.get(timeoutSeconds, TimeUnit.SECONDS);
+            await().atMost(remaining, TimeUnit.MILLISECONDS)
+                    .until(
+                            () ->
+                                    output.getAckedTuples().stream()
+                                            .anyMatch(
+                                                    tuple ->
+                                                            tuple.getStringByField("url")
+                                                                    .equals(url)));
+            return true;
         } catch (Exception e) {
             return false;
         }

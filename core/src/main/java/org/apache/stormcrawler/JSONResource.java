@@ -1,10 +1,3 @@
-package org.apache.stormcrawler;
-
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import java.io.IOException;
-import java.io.InputStream;
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -22,6 +15,13 @@ import java.io.InputStream;
  * limitations under the License.
  */
 
+package org.apache.stormcrawler;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import java.io.IOException;
+import java.io.InputStream;
+
 /**
  * Defines a generic behaviour for ParseFilters or URLFilters to load resources from a JSON file.
  */
@@ -33,7 +33,7 @@ public interface JSONResource {
     public String getResourceFile();
 
     /**
-     * Load the resources from an input stream
+     * Load the resources from an input stream.
      *
      * @throws JsonParseException
      * @throws JsonMappingException
@@ -43,7 +43,7 @@ public interface JSONResource {
             throws JsonParseException, JsonMappingException, IOException;
 
     /**
-     * Load the resources from the JSON file in the uber jar
+     * Load the resources from the JSON file in the uber jar.
      *
      * @throws Exception
      */

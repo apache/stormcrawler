@@ -14,11 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.spout;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -29,9 +32,12 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
-import org.apache.commons.lang.StringUtils;
+import java.util.zip.GZIPInputStream;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.spout.Scheme;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -45,27 +51,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Reads the lines from a UTF-8 file and use them as a spout. Load the entire content into memory.
- * Uses StringTabScheme to parse the lines into URLs and Metadata, generates tuples on the default
- * stream unless withDiscoveredStatus is set to true.
+ * Reads the lines from a UTF-8 file and use them as a spout. The spout reads files in chunks of
+ * 10,000 lines, keeping memory usage very low even for extremely large files with millions of seed
+ * URLs. Uses StringTabScheme to parse the lines into URLs and Metadata, generates tuples on the
+ * default stream unless withDiscoveredStatus is set to true.
  */
 public class FileSpout extends BaseRichSpout {
 
     public static final int BATCH_SIZE = 10000;
     public static final Logger LOG = LoggerFactory.getLogger(FileSpout.class);
-
-    protected SpoutOutputCollector _collector;
-
-    private final Queue<String> _inputFiles;
-    private BufferedReader currentBuffer;
-
-    protected Scheme _scheme = new StringTabScheme();
-
+    private transient Queue<String> inputFiles;
+    private final String seedDir;
+    private final String fileFilter;
+    private final String[] seedFiles;
+    protected transient SpoutOutputCollector collector;
+    protected Scheme scheme = new StringTabScheme();
     protected LinkedList<byte[]> buffer = new LinkedList<>();
     protected boolean active;
-    private boolean withDiscoveredStatus = false;
-    protected int totalTasks;
-    protected int taskIndex;
+    protected transient int totalTasks;
+    protected transient int taskIndex;
+    private BufferedReader currentBuffer;
+    private final boolean withDiscoveredStatus;
 
     /**
      * @param dir containing the seed files
@@ -91,18 +97,9 @@ public class FileSpout extends BaseRichSpout {
      */
     public FileSpout(String dir, String filter, boolean withDiscoveredStatus) {
         this.withDiscoveredStatus = withDiscoveredStatus;
-        Path pdir = Paths.get(dir);
-        _inputFiles = new LinkedList<>();
-        LOG.info("Reading directory: {} (filter: {})", pdir, filter);
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(pdir, filter)) {
-            for (Path entry : stream) {
-                String inputFile = entry.toAbsolutePath().toString();
-                _inputFiles.add(inputFile);
-                LOG.info("Input : {}", inputFile);
-            }
-        } catch (IOException ioe) {
-            LOG.error("IOException: %s%n", ioe);
-        }
+        this.seedDir = dir;
+        this.fileFilter = filter;
+        this.seedFiles = null;
     }
 
     /**
@@ -112,12 +109,13 @@ public class FileSpout extends BaseRichSpout {
      * @since 1.13
      */
     public FileSpout(boolean withDiscoveredStatus, String... files) {
-        this.withDiscoveredStatus = withDiscoveredStatus;
         if (files.length == 0) {
             throw new IllegalArgumentException("Must configure at least one inputFile");
         }
-        _inputFiles = new LinkedList<>();
-        Collections.addAll(_inputFiles, files);
+        this.withDiscoveredStatus = withDiscoveredStatus;
+        this.seedDir = null;
+        this.fileFilter = null;
+        this.seedFiles = files;
     }
 
     /**
@@ -127,26 +125,41 @@ public class FileSpout extends BaseRichSpout {
      * @since 1.13
      */
     public void setScheme(Scheme scheme) {
-        _scheme = scheme;
+        this.scheme = scheme;
     }
 
     protected void populateBuffer() throws IOException {
         if (currentBuffer == null) {
-            String file = _inputFiles.poll();
-            if (file == null) return;
+            String file = inputFiles.poll();
+            if (file == null) {
+                return;
+            }
             Path inputPath = Paths.get(file);
-            currentBuffer =
-                    new BufferedReader(
-                            new InputStreamReader(
-                                    new FileInputStream(inputPath.toFile()),
-                                    StandardCharsets.UTF_8));
+            InputStream is = new BufferedInputStream(new FileInputStream(inputPath.toFile()));
+            try {
+                String fileLower = file.toLowerCase(Locale.ROOT);
+                if (fileLower.endsWith(".gz") || fileLower.endsWith(".gzip")) {
+                    is = new GZIPInputStream(is);
+                } else if (fileLower.endsWith(".bz2")) {
+                    is = new BZip2CompressorInputStream(is, true);
+                }
+                currentBuffer =
+                        new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+            } catch (IOException e) {
+                is.close();
+                throw e;
+            }
         }
 
         String line = null;
         int linesRead = 0;
         while (linesRead < BATCH_SIZE && (line = currentBuffer.readLine()) != null) {
-            if (StringUtils.isBlank(line)) continue;
-            if (line.startsWith("#")) continue;
+            if (StringUtils.isBlank(line)) {
+                continue;
+            }
+            if (line.startsWith("#")) {
+                continue;
+            }
             // check whether this entry should be skipped?
             // totalTasks could be at 0 if a subclass forgot to
             // call this classes open()
@@ -171,17 +184,48 @@ public class FileSpout extends BaseRichSpout {
     @Override
     public void open(
             Map<String, Object> conf, TopologyContext context, SpoutOutputCollector collector) {
-        _collector = collector;
+        this.collector = collector;
 
         // if more than one instance is used we expect their number to be the
         // same as the number of shards
         totalTasks = context.getComponentTasks(context.getThisComponentId()).size();
         taskIndex = context.getThisTaskIndex();
+
+        // Resolve the seeds here, not in the constructor: in distributed mode the
+        // spout is serialised on the submit client and only open() runs on the
+        // workers, where the seed directory/files actually live (issue #1955).
+        inputFiles = new LinkedList<>();
+        populateInputFiles();
+    }
+
+    /**
+     * Resolves the configured seed directory or file list into {@link #inputFiles}. Called from
+     * {@link #open} so the filesystem is read on the worker, not on the client at construction
+     * time.
+     */
+    private void populateInputFiles() {
+        if (seedDir != null) {
+            Path pdir = Paths.get(seedDir);
+            LOG.info("Reading directory: {} (filter: {})", pdir, fileFilter);
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(pdir, fileFilter)) {
+                for (Path entry : stream) {
+                    String inputFile = entry.toAbsolutePath().toString();
+                    inputFiles.add(inputFile);
+                    LOG.info("Input : {}", inputFile);
+                }
+            } catch (IOException ioe) {
+                LOG.error("IOException while reading seed directory {}", pdir, ioe);
+            }
+        } else {
+            Collections.addAll(inputFiles, seedFiles);
+        }
     }
 
     @Override
     public void nextTuple() {
-        if (!active) return;
+        if (!active) {
+            return;
+        }
 
         if (buffer.isEmpty()) {
             try {
@@ -192,32 +236,43 @@ public class FileSpout extends BaseRichSpout {
         }
 
         // still empty?
-        if (buffer.isEmpty()) return;
+        if (buffer.isEmpty()) {
+            return;
+        }
 
         byte[] head = buffer.removeFirst();
-        List<Object> fields = this._scheme.deserialize(ByteBuffer.wrap(head));
+        List<Object> fields = this.scheme.deserialize(ByteBuffer.wrap(head));
 
         if (withDiscoveredStatus) {
             fields.add(Status.DISCOVERED);
-            this._collector.emit(Constants.StatusStreamName, fields, head);
+            this.collector.emit(Constants.StatusStreamName, fields, head);
         } else {
-            this._collector.emit(fields, head);
+            this.collector.emit(fields, head);
         }
     }
 
     @Override
     public void declareOutputFields(OutputFieldsDeclarer declarer) {
-        declarer.declare(_scheme.getOutputFields());
+        declarer.declare(scheme.getOutputFields());
         if (withDiscoveredStatus) {
             // add status field to output
-            List<String> s = _scheme.getOutputFields().toList();
+            List<String> s = scheme.getOutputFields().toList();
             s.add("status");
             declarer.declareStream(Constants.StatusStreamName, new Fields(s));
         }
     }
 
     @Override
-    public void close() {}
+    public void close() {
+        if (currentBuffer != null) {
+            try {
+                currentBuffer.close();
+            } catch (IOException e) {
+                LOG.error("Exception thrown when closing current buffer", e);
+            }
+            currentBuffer = null;
+        }
+    }
 
     @Override
     public void activate() {

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.urlfrontier;
 
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_ADDRESS_KEY;
@@ -55,11 +56,12 @@ import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.persistence.AbstractStatusUpdaterBolt;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
@@ -92,7 +94,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
     // Faster ways of locking until n messages are processed
     private Semaphore inFlightSemaphore;
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     /** Globally set crawlID * */
     private String globalCrawlID;
@@ -118,7 +120,8 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         throttleTimeMS = ConfUtils.getLong(stormConf, URLFRONTIER_THROTTLING_TIME_MS_KEY, 10);
 
         eventCounter =
-                context.registerMetric(this.getClass().getSimpleName(), new MultiCountMetric(), 30);
+                CrawlerMetrics.registerCounter(
+                        context, stormConf, this.getClass().getSimpleName(), 30);
 
         maxMessagesInFlight =
                 ConfUtils.getInt(
@@ -263,7 +266,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             LOG.info("Failed {} tuple(s) for ID {}", values.size(), url);
             for (Tuple t : values) {
                 eventCounter.scope("failed").incrBy(1);
-                _collector.fail(t);
+                collector.fail(t);
             }
         }
     }
@@ -380,7 +383,9 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             String[] vals = metadata.getValues(k);
             if (vals != null) {
                 Builder builder = StringList.newBuilder();
-                for (String v : vals) builder.addValues(v);
+                for (String v : vals) {
+                    builder.addValues(v);
+                }
                 mdCopy.put(k, builder.build());
             }
         }
@@ -440,7 +445,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
 
             for (Tuple t : values) {
                 eventCounter.scope("failed").incrBy(1);
-                _collector.fail(t);
+                collector.fail(t);
             }
         } else {
             // This should never happen, but log it anyway.

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.indexing;
 
 import java.util.Map;
@@ -30,13 +31,13 @@ import org.apache.stormcrawler.persistence.Status;
  * status stream, as done with the real indexers.
  */
 public class DummyIndexer extends AbstractIndexerBolt {
-    OutputCollector _collector;
+    OutputCollector collector;
 
     @Override
     public void prepare(
             Map<String, Object> conf, TopologyContext context, OutputCollector collector) {
         super.prepare(conf, context, collector);
-        _collector = collector;
+        this.collector = collector;
     }
 
     @Override
@@ -44,10 +45,10 @@ public class DummyIndexer extends AbstractIndexerBolt {
         String url = tuple.getStringByField("url");
         Metadata metadata = (Metadata) tuple.getValueByField("metadata");
 
-        _collector.emit(
+        collector.emit(
                 org.apache.stormcrawler.Constants.StatusStreamName,
                 tuple,
                 new Values(url, metadata, Status.FETCHED));
-        _collector.ack(tuple);
+        collector.ack(tuple);
     }
 }

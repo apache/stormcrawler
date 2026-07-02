@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,6 +32,7 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.basic.BasicURLNormalizer;
+import org.apache.stormcrawler.util.URLUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -81,7 +83,7 @@ class BasicURLNormalizerTest {
     @Test
     void testAnchorFilter() throws MalformedURLException {
         URLFilter allAllowed = createFilter(true, false);
-        URL url = new URL("http://www.sourcedomain.com/#0");
+        URL url = URLUtil.toURL("http://www.sourcedomain.com/#0");
         Metadata metadata = new Metadata();
         String filterResult = allAllowed.filter(url, metadata, url.toExternalForm());
         String expected = "http://www.sourcedomain.com/";
@@ -91,7 +93,7 @@ class BasicURLNormalizerTest {
     @Test
     void testAnchorFilterFalse() throws MalformedURLException {
         URLFilter allAllowed = createFilter(false, false);
-        URL url = new URL("http://www.sourcedomain.com/#0");
+        URL url = URLUtil.toURL("http://www.sourcedomain.com/#0");
         Metadata metadata = new Metadata();
         String filterResult = allAllowed.filter(url, metadata, url.toExternalForm());
         Assertions.assertEquals(url.toExternalForm(), filterResult);
@@ -100,7 +102,7 @@ class BasicURLNormalizerTest {
     @Test
     void testRemoveSomeOfManyQueryParams() throws MalformedURLException {
         URLFilter urlFilter = createFilter(queryParamsToFilter);
-        URL testSourceUrl = new URL("http://google.com");
+        URL testSourceUrl = URLUtil.toURL("http://google.com");
         String testUrl = "http://google.com?keep1=true&a=c&foo=baz&keep2=true";
         String expectedResult = "http://google.com?keep1=true&keep2=true";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
@@ -110,7 +112,7 @@ class BasicURLNormalizerTest {
     @Test
     void testRemoveAllQueryParams() throws MalformedURLException {
         URLFilter urlFilter = createFilter(queryParamsToFilter);
-        URL testSourceUrl = new URL("http://google.com");
+        URL testSourceUrl = URLUtil.toURL("http://google.com");
         String testUrl = "http://google.com?a=c&foo=baz";
         String expectedResult = "http://google.com";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
@@ -120,7 +122,7 @@ class BasicURLNormalizerTest {
     @Test
     void testRemoveDupeQueryParams() throws MalformedURLException {
         URLFilter urlFilter = createFilter(queryParamsToFilter);
-        URL testSourceUrl = new URL("http://google.com");
+        URL testSourceUrl = URLUtil.toURL("http://google.com");
         String testUrl = "http://google.com?a=c&foo=baz&foo=bar&test=true";
         String expectedResult = "http://google.com?test=true";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
@@ -130,7 +132,7 @@ class BasicURLNormalizerTest {
     @Test
     void testPipeInUrlAndFilterStillWorks() throws MalformedURLException {
         URLFilter urlFilter = createFilter(queryParamsToFilter);
-        URL testSourceUrl = new URL("http://google.com");
+        URL testSourceUrl = URLUtil.toURL("http://google.com");
         String testUrl = "http://google.com?a=c|d&foo=baz&foo=bar&test=true";
         String expectedResult = "http://google.com?test=true";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
@@ -140,7 +142,7 @@ class BasicURLNormalizerTest {
     @Test
     void testBothAnchorAndQueryFilter() throws MalformedURLException {
         URLFilter urlFilter = createFilter(true, queryParamsToFilter);
-        URL testSourceUrl = new URL("http://google.com");
+        URL testSourceUrl = URLUtil.toURL("http://google.com");
         String testUrl = "http://google.com?a=c|d&foo=baz&foo=bar&test=true#fragment=ohYeah";
         String expectedResult = "http://google.com?test=true";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
@@ -150,7 +152,7 @@ class BasicURLNormalizerTest {
     @Test
     void testQuerySort() throws MalformedURLException {
         URLFilter urlFilter = createFilter(queryParamsToFilter);
-        URL testSourceUrl = new URL("http://google.com");
+        URL testSourceUrl = URLUtil.toURL("http://google.com");
         String testUrl = "http://google.com?a=c|d&foo=baz&foo=bar&test=true&z=2&d=4";
         String expectedResult = "http://google.com?d=4&test=true&z=2";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
@@ -160,7 +162,7 @@ class BasicURLNormalizerTest {
     @Test
     void testMangledQueryString() throws MalformedURLException {
         URLFilter urlFilter = createFilter(queryParamsToFilter);
-        URL testSourceUrl = new URL("http://google.com");
+        URL testSourceUrl = URLUtil.toURL("http://google.com");
         String testUrl = "http://google.com&d=4&good=true";
         String expectedResult = "http://google.com?d=4&good=true";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
@@ -172,7 +174,7 @@ class BasicURLNormalizerTest {
         ObjectNode filterParams = new ObjectNode(JsonNodeFactory.instance);
         filterParams.put("removeHashes", true);
         URLFilter urlFilter = createFilter(filterParams);
-        URL testSourceUrl = new URL("http://florida-chemical.com");
+        URL testSourceUrl = URLUtil.toURL("http://florida-chemical.com");
         String in =
                 "http://www.florida-chemical.com/Diacetone-Alcohol-DAA-99.html?xid_0b629=12854b827878df26423d933a5baf86d5";
         String out = "http://www.florida-chemical.com/Diacetone-Alcohol-DAA-99.html";
@@ -188,7 +190,7 @@ class BasicURLNormalizerTest {
     @Test
     void testDontFixMangledQueryString() throws MalformedURLException {
         URLFilter urlFilter = createFilter(true, false, queryParamsToFilter);
-        URL testSourceUrl = new URL("http://google.com");
+        URL testSourceUrl = URLUtil.toURL("http://google.com");
         String testUrl = "http://google.com&d=4&good=true";
         String expectedResult = "http://google.com&d=4&good=true";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
@@ -198,12 +200,12 @@ class BasicURLNormalizerTest {
     @Test
     void testFixMangledQueryString() throws MalformedURLException {
         URLFilter urlFilter = createFilter(false, true, queryParamsToFilter);
-        URL testSourceUrl = new URL("http://google.com");
+        URL testSourceUrl = URLUtil.toURL("http://google.com");
         String testUrl = "http://google.com&d=4&good=true";
         String expectedResult = "http://google.com?d=4&good=true";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
         assertEquals(expectedResult, normalizedUrl, "Failed to filter query string");
-        testSourceUrl = new URL("http://dev.com");
+        testSourceUrl = URLUtil.toURL("http://dev.com");
         testUrl = "http://dev.com/s&utax/NEWSRLSEfy18.pdf";
         normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
         expectedResult = "http://dev.com/s&utax/NEWSRLSEfy18.pdf";
@@ -215,7 +217,7 @@ class BasicURLNormalizerTest {
         URLFilter urlFilter = createFilter(queryParamsToFilter);
         String urlWithEscapedCharacters =
                 "http://www.dillards.com/product/ASICS-Womens-GT2000-3-LiteShow%E2%84%A2-Running-Shoes_301_-1_301_504736989";
-        URL testSourceUrl = new URL(urlWithEscapedCharacters);
+        URL testSourceUrl = URLUtil.toURL(urlWithEscapedCharacters);
         String testUrl = urlWithEscapedCharacters;
         String expectedResult = urlWithEscapedCharacters;
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
@@ -227,7 +229,7 @@ class BasicURLNormalizerTest {
         URLFilter urlFilter = createFilter(queryParamsToFilter);
         String urlWithEscapedCharacters =
                 "http://www.dillards.com/product/ASICS-Womens-GT2000-3-LiteShow%E2%84%A2-Running-Shoes_301_-1_301_504736989?how=are&you=doing";
-        URL testSourceUrl = new URL(urlWithEscapedCharacters);
+        URL testSourceUrl = URLUtil.toURL(urlWithEscapedCharacters);
         String testUrl = urlWithEscapedCharacters;
         String expectedResult = urlWithEscapedCharacters;
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
@@ -241,7 +243,7 @@ class BasicURLNormalizerTest {
                 "http://www.voltaix.com/\\SDS\\Silicon\\Trisilane\\Trisilane_SI050_USENG.pdf";
         String expectedResult =
                 "http://www.voltaix.com/%5CSDS%5CSilicon%5CTrisilane%5CTrisilane_SI050_USENG.pdf";
-        URL testSourceUrl = new URL(urlWithEscapedCharacters);
+        URL testSourceUrl = URLUtil.toURL("http://www.voltaix.com/");
         String testUrl = urlWithEscapedCharacters;
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
         assertEquals(expectedResult, normalizedUrl, "Failed to filter query string");
@@ -250,17 +252,17 @@ class BasicURLNormalizerTest {
     @Test
     void testInvalidURI() throws MalformedURLException {
         URLFilter urlFilter = createFilter(true, true);
-        // this one is now handled by the normaliser
+        URL testSourceUrl = URLUtil.toURL("http://www.quanjing.com/");
+        // this one is now handled by the normaliser via sanitizeForURI
         String nonURI = "http://www.quanjing.com/search.aspx?q=top-651451||1|60|1|2||||&Fr=4";
-        URL testSourceUrl = new URL(nonURI);
         String expectedResult =
                 "http://www.quanjing.com/search.aspx?q=top-651451%7C%7C1%7C60%7C1%7C2%7C%7C%7C%7C&Fr=4";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), nonURI);
         assertEquals(expectedResult, normalizedUrl, "Failed to filter query string");
-        // this one is
+        // this one has spaces in query values
+        testSourceUrl = URLUtil.toURL("http://vins.lemonde.fr/");
         nonURI =
                 "http://vins.lemonde.fr?utm_source=LeMonde_partenaire_hp&utm_medium=EMPLACEMENT PARTENAIRE&utm_term=&utm_content=&utm_campaign=LeMonde_partenaire_hp";
-        testSourceUrl = new URL(nonURI);
         expectedResult =
                 "http://vins.lemonde.fr?utm_source=LeMonde_partenaire_hp&utm_medium=EMPLACEMENT%20PARTENAIRE&utm_term=&utm_content=&utm_campaign=LeMonde_partenaire_hp";
         normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), nonURI);
@@ -269,7 +271,7 @@ class BasicURLNormalizerTest {
         // http://docs.oracle.com/javase/7/docs/api/java/net/URI.html#normalize()
         String nonNormURL =
                 "http://docs.oracle.com/javase/7/docs/api/java/net/../net/./URI.html#normalize()";
-        testSourceUrl = new URL(nonNormURL);
+        testSourceUrl = URLUtil.toURL("http://docs.oracle.com/");
         expectedResult = "http://docs.oracle.com/javase/7/docs/api/java/net/URI.html";
         normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), nonNormURL);
         assertEquals(expectedResult, normalizedUrl, "Failed to filter query string");
@@ -278,7 +280,7 @@ class BasicURLNormalizerTest {
     @Test
     void testLowerCasing() throws MalformedURLException {
         URLFilter urlFilter = createFilter(false, false);
-        URL testSourceUrl = new URL("http://blablabla.org/");
+        URL testSourceUrl = URLUtil.toURL("http://blablabla.org/");
         String inputURL = "HTTP://www.quanjing.com/";
         String expectedResult = inputURL.toLowerCase(Locale.ROOT);
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), inputURL);
@@ -293,7 +295,7 @@ class BasicURLNormalizerTest {
     @Test
     void testNonStandardPercentEncoding() throws MalformedURLException {
         URLFilter urlFilter = createFilter(false, false);
-        URL testSourceUrl = new URL("http://www.hurriyet.com.tr/index/?d=20160328&p=13");
+        URL testSourceUrl = URLUtil.toURL("http://www.hurriyet.com.tr/index/?d=20160328&p=13");
         String inputURL = "http://www.hurriyet.com.tr/index/?d=20160328&p=13&s=ni%u011fde";
         String expectedURL = "http://www.hurriyet.com.tr/index/?d=20160328&p=13&s=ni%C4%9Fde";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), inputURL);
@@ -305,7 +307,7 @@ class BasicURLNormalizerTest {
         ObjectNode filterParams = new ObjectNode(JsonNodeFactory.instance);
         filterParams.put("hostIDNtoASCII", true);
         URLFilter urlFilter = createFilter(filterParams);
-        URL testSourceUrl = new URL("http://www.example.com/");
+        URL testSourceUrl = URLUtil.toURL("http://www.example.com/");
         String inputURL = "http://señal6.com.ar/";
         String expectedURL = "http://xn--seal6-pta.com.ar/";
         String normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), inputURL);

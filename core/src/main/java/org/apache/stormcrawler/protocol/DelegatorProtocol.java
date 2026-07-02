@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol;
 
 import crawlercommons.robots.BaseRobotRules;
@@ -107,7 +108,7 @@ public class DelegatorProtocol implements Protocol {
             return protoInstance;
         }
 
-        /** Filterless implementation * */
+        /** Filterless implementation. * */
         public FilteredProtocol(
                 @Nullable String id, @NotNull String protocolImpl, @NotNull Config config) {
             this(id, protocolImpl, config, null, null, null);
@@ -166,7 +167,9 @@ public class DelegatorProtocol implements Protocol {
 
         boolean isMatch(final String url, final Metadata metadata) {
             // if this FP has no filters nor regexps - it can handle anything
-            if (filters.isEmpty() && urlPatterns.isEmpty()) return true;
+            if (filters.isEmpty() && urlPatterns.isEmpty()) {
+                return true;
+            }
 
             boolean atLeastOneMatch = false;
 
@@ -190,11 +193,16 @@ public class DelegatorProtocol implements Protocol {
                         match = false;
                     }
                 }
-                if (match) atLeastOneMatch = true;
+                if (match) {
+                    atLeastOneMatch = true;
+                }
 
                 // optimisation
-                if (operator.equals(Operator.AND) && !match) return false;
-                else if (operator.equals(Operator.OR) && match) return true;
+                if (operator.equals(Operator.AND) && !match) {
+                    return false;
+                } else if (operator.equals(Operator.OR) && match) {
+                    return true;
+                }
             }
 
             // same approach with the URLs
@@ -204,15 +212,20 @@ public class DelegatorProtocol implements Protocol {
                     atLeastOneMatch = true;
                 }
                 // optimisation
-                if (operator.equals(Operator.AND) && !found) return false;
-                else if (operator.equals(Operator.OR) && found) return true;
+                if (operator.equals(Operator.AND) && !found) {
+                    return false;
+                } else if (operator.equals(Operator.OR) && found) {
+                    return true;
+                }
             }
 
             // if we get to this point and the operator is AND, it means everything has
             // matched
             // but if the operator is OR we need to check that something has matched at all
 
-            if (operator.equals(Operator.OR) && !atLeastOneMatch) return false;
+            if (operator.equals(Operator.OR) && !atLeastOneMatch) {
+                return false;
+            }
 
             return true;
         }
@@ -224,8 +237,9 @@ public class DelegatorProtocol implements Protocol {
     public void configure(@NotNull Config conf) {
         Object obj = conf.get(DELEGATOR_CONFIG_KEY);
 
-        if (obj == null)
+        if (obj == null) {
             throw new RuntimeException("DelegatorProtocol declared but no config set for it");
+        }
 
         // should contain a list of maps
         // each map having a className and optionally a number of filters
@@ -308,10 +322,12 @@ public class DelegatorProtocol implements Protocol {
 
     @Override
     public void cleanup() {
-        for (FilteredProtocol p : protocols) p.cleanup();
+        for (FilteredProtocol p : protocols) {
+            p.cleanup();
+        }
     }
 
-    public static void main(String args[]) throws Exception {
+    public static void main(String[] args) throws Exception {
         Protocol.main(new DelegatorProtocol(), args);
     }
 }

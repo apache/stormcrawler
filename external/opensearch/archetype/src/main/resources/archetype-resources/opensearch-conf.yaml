@@ -14,10 +14,10 @@
 # limitations under the License.
 
 # configuration for OpenSearch resources
-  
+
 config:
 
-  # address to use unless a more specific one has been 
+  # address to use unless a more specific one has been
   # defined for a component
   # also accepts a list or multiple values in a single line
   # separated by a semi-colon e.g. "opensearch1:9200; opensearch2:9200"
@@ -60,7 +60,7 @@ config:
   opensearch.status.routing: true
   # stores the value used for grouping the URLs as a separate field
   # needed by the spout implementations
-  # also used for routing if the value above is set to true 
+  # also used for routing if the value above is set to true
   opensearch.status.routing.fieldname: "key"
   opensearch.status.bulkActions: 500
   opensearch.status.flushInterval: "5s"
@@ -68,18 +68,18 @@ config:
   opensearch.status.sniff: true
 
     # spout config #
-    
+
   # positive or negative filters parsable by the Lucene Query Parser
-  # opensearch.status.filterQuery: 
+  # opensearch.status.filterQuery:
   #  - "-(key:stormcrawler.net)"
   #  - "-(key:stormcrawler.apache.org)"
 
   # time in secs for which the URLs will be considered for fetching after a ack of fail
   spout.ttl.purgatory: 30
-  
+
   # Min time (in msecs) to allow between 2 successive queries to OpenSearch
   spout.min.delay.queries: 2000
-  
+
   # Max time (in msecs) to allow between 2 successive queries to OpenSearch
   spout.max.delay.queries: 20000
 
@@ -93,16 +93,16 @@ config:
   # field to group the URLs into buckets
   opensearch.status.bucket.field: "key"
   # fields to sort the URLs within a bucket
-  opensearch.status.bucket.sort.field: 
+  opensearch.status.bucket.sort.field:
    - "nextFetchDate"
    - "url"
   # field to sort the buckets
   opensearch.status.global.sort.field: "nextFetchDate"
-  
+
   # AggregationSpout : sampling improves the performance on large crawls
   opensearch.status.sample: false
 
-  # max allowed duration of a query in sec 
+  # max allowed duration of a query in sec
   opensearch.status.query.timeout: -1
 
   # AggregationSpout (expert): adds this value in mins to the latest date returned in the results and

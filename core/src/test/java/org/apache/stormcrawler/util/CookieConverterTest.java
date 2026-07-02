@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import java.net.MalformedURLException;
@@ -307,7 +308,7 @@ class CookieConverterTest {
 
     private URL getUrl(String urlString) {
         try {
-            return new URL(urlString);
+            return URLUtil.toURL(urlString);
         } catch (MalformedURLException e) {
             return null;
         }

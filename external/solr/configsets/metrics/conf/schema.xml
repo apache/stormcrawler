@@ -18,22 +18,22 @@ specific language governing permissions and limitations
 under the License.
 -->
 <schema version="1.7" name="simplest-solr">
-	<fieldType name="string" class="solr.StrField"/>
-	<fieldType name="pdate" class="solr.DatePointField" docValues="true"/>
+    <fieldType name="string" class="solr.StrField"/>
+    <fieldType name="pdate" class="solr.DatePointField" docValues="true"/>
 
-	<field name="srcComponentId" type="string" indexed="true" stored="true" required="true"/>
-	<field name="srcTaskId" type="string" indexed="true" stored="true" required="true"/>
-	<field name="srcWorkerHost" type="string" indexed="true" stored="true" required="true"/>
-	<field name="srcWorkerPort" type="string" indexed="true" stored="true" required="true"/>
-	<field name="name" type="string" indexed="true" stored="true" required="true"/>
-	<field name="value" type="string" indexed="true" stored="true" required="true"/>
-	<field name="timestamp" type="pdate" indexed="true" stored="true" required="true"/>
+    <field name="srcComponentId" type="string" indexed="true" stored="true" required="true"/>
+    <field name="srcTaskId" type="string" indexed="true" stored="true" required="true"/>
+    <field name="srcWorkerHost" type="string" indexed="true" stored="true" required="true"/>
+    <field name="srcWorkerPort" type="string" indexed="true" stored="true" required="true"/>
+    <field name="name" type="string" indexed="true" stored="true" required="true"/>
+    <field name="value" type="string" indexed="true" stored="true" required="true"/>
+    <field name="timestamp" type="pdate" indexed="true" stored="true" required="true"/>
 
-	<fieldType name="plong" class="solr.LongPointField"/>
-	<field name="_version_" type="plong" indexed="false" stored="false"/>
+    <fieldType name="plong" class="solr.LongPointField"/>
+    <field name="_version_" type="plong" indexed="false" stored="false"/>
 
     <dynamicField name="*" type="string" indexed="true" stored="true"/>
 
-	<field name="id" type="string" indexed="true" stored="true" required="true"/>
-	<uniqueKey>id</uniqueKey>
+    <field name="id" type="string" indexed="true" stored="true" required="true"/>
+    <uniqueKey>id</uniqueKey>
 </schema>

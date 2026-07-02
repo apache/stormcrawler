@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import java.net.MalformedURLException;
@@ -67,7 +68,7 @@ class MetadataTransferTest {
         conf = new HashMap<>();
         conf.put(
                 MetadataTransfer.metadataTransferClassParamName,
-                myCustomTransferClass.class.getName());
+                MyCustomTransferClass.class.getName());
         hasThrownException = false;
         try {
             MetadataTransfer.getInstance(conf);
@@ -111,6 +112,6 @@ class MetadataTransferTest {
         filteredMetadata = mdt.filter(metadata);
         Assertions.assertEquals(6, filteredMetadata.size());
     }
-}
 
-class myCustomTransferClass extends MetadataTransfer {}
+    static class MyCustomTransferClass extends MetadataTransfer {}
+}

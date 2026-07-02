@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.spout;
 
 import java.nio.ByteBuffer;
@@ -30,6 +31,7 @@ import org.apache.storm.topology.base.BaseRichSpout;
 import org.apache.storm.tuple.Fields;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.StringTabScheme;
 import org.slf4j.Logger;
@@ -45,7 +47,7 @@ public class MemorySpout extends BaseRichSpout {
 
     private static final Logger LOG = LoggerFactory.getLogger(MemorySpout.class);
 
-    private SpoutOutputCollector _collector;
+    private SpoutOutputCollector collector;
     private final StringTabScheme scheme = new StringTabScheme();
     private boolean active = true;
 
@@ -53,7 +55,7 @@ public class MemorySpout extends BaseRichSpout {
 
     private static final PriorityQueue<ScheduledURL> queue = new PriorityQueue<>();
 
-    private final String[] startingURLs;
+    private final String[] startingUrls;
 
     public MemorySpout(String... urls) {
         this(false, urls);
@@ -68,10 +70,10 @@ public class MemorySpout extends BaseRichSpout {
      */
     public MemorySpout(boolean withDiscoveredStatus, String... urls) {
         this.withDiscoveredStatus = withDiscoveredStatus;
-        startingURLs = urls;
+        startingUrls = urls;
     }
 
-    /** Add a new URL with the given metadata and nextFetch-date */
+    /** Add a new URL with the given metadata and nextFetch-date. */
     public static void add(String url, Metadata md, Date nextFetch) {
         LOG.debug("Adding {} with md {} and nextFetch {}", url, md, nextFetch);
         ScheduledURL tuple = new ScheduledURL(url, md, nextFetch);
@@ -83,7 +85,7 @@ public class MemorySpout extends BaseRichSpout {
     @Override
     public void open(
             Map<String, Object> conf, TopologyContext context, SpoutOutputCollector collector) {
-        _collector = collector;
+        this.collector = collector;
 
         // check that there is only one instance of it
         int totalTasks = context.getComponentTasks(context.getThisComponentId()).size();
@@ -92,27 +94,31 @@ public class MemorySpout extends BaseRichSpout {
         }
 
         Date now = new Date();
-        for (String u : startingURLs) {
+        for (String u : startingUrls) {
             LOG.debug("About to deserialize {} ", u);
             List<Object> tuple =
                     scheme.deserialize(ByteBuffer.wrap(u.getBytes(StandardCharsets.UTF_8)));
             add((String) tuple.get(0), (Metadata) tuple.get(1), now);
         }
-        context.registerMetric("queue_size", () -> queue.size(), 10);
+        CrawlerMetrics.registerGauge(context, conf, "queue_size", queue::size, 10);
     }
 
     @Override
     public void nextTuple() {
-        if (!active) return;
+        if (!active) {
+            return;
+        }
 
         synchronized (queue) {
             // removes the URL
             ScheduledURL tuple = queue.poll();
-            if (tuple == null) return;
+            if (tuple == null) {
+                return;
+            }
 
             // check whether it is due for fetching
             if (tuple.nextFetchDate.after(new Date())) {
-                LOG.debug("Tuple {} not ready for fetching", tuple.URL);
+                LOG.debug("Tuple {} not ready for fetching", tuple.url);
 
                 // put it back and wait
                 queue.add(tuple);
@@ -120,14 +126,14 @@ public class MemorySpout extends BaseRichSpout {
             }
 
             List<Object> tobs = new LinkedList<>();
-            tobs.add(tuple.URL);
-            tobs.add(tuple.m);
+            tobs.add(tuple.url);
+            tobs.add(tuple.metadata);
 
             if (withDiscoveredStatus) {
                 tobs.add(Status.DISCOVERED);
-                _collector.emit(Constants.StatusStreamName, tobs, tuple.URL);
+                collector.emit(Constants.StatusStreamName, tobs, tuple.url);
             } else {
-                _collector.emit(tobs, tuple.URL);
+                collector.emit(tobs, tuple.url);
             }
         }
     }
@@ -154,35 +160,39 @@ public class MemorySpout extends BaseRichSpout {
         super.deactivate();
         active = false;
     }
-}
 
-class ScheduledURL implements Comparable<ScheduledURL> {
-    Date nextFetchDate;
-    String URL;
-    Metadata m;
+    static class ScheduledURL implements Comparable<ScheduledURL> {
+        Date nextFetchDate;
+        String url;
+        Metadata metadata;
 
-    ScheduledURL(String URL, Metadata m, Date nextFetchDate) {
-        this.nextFetchDate = nextFetchDate;
-        this.URL = URL;
-        this.m = m;
-    }
+        ScheduledURL(String url, Metadata m, Date nextFetchDate) {
+            this.nextFetchDate = nextFetchDate;
+            this.url = url;
+            this.metadata = m;
+        }
 
-    @Override
-    public String toString() {
-        return URL + "\t" + nextFetchDate;
-    }
+        @Override
+        public String toString() {
+            return url + "\t" + nextFetchDate;
+        }
 
-    @Override
-    /** Sort by next fetch date then URl * */
-    public int compareTo(ScheduledURL o) {
-        // compare the URL
-        int compString = URL.compareTo(o.URL);
-        if (compString == 0) return 0;
+        /** Sort by next fetch date then URl. * */
+        @Override
+        public int compareTo(ScheduledURL o) {
+            // compare the URL
+            int compString = url.compareTo(o.url);
+            if (compString == 0) {
+                return 0;
+            }
 
-        // compare the date
-        int comp = nextFetchDate.compareTo(o.nextFetchDate);
-        if (comp != 0) return comp;
+            // compare the date
+            int comp = nextFetchDate.compareTo(o.nextFetchDate);
+            if (comp != 0) {
+                return comp;
+            }
 
-        return compString;
+            return compString;
+        }
     }
 }

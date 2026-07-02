@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence;
 
 import java.util.Date;
@@ -40,7 +41,7 @@ public abstract class Scheduler {
      */
     public abstract Optional<Date> schedule(Status status, Metadata metadata);
 
-    /** Returns a Scheduler instance based on the configuration * */
+    /** Returns a Scheduler instance based on the configuration. */
     public static Scheduler getInstance(Map<String, Object> stormConf) {
         Scheduler scheduler;
 

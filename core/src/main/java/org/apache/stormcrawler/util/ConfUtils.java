@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import java.io.FileInputStream;
@@ -33,8 +34,8 @@ public class ConfUtils {
     private ConfUtils() {}
 
     /**
-     * Returns the value for prefix + optional + suffix, if nothing is found then return prefix +
-     * suffix and if that fails too, the default value
+     * Returns the value for prefix + optional + suffix. If nothing is found then return prefix +
+     * suffix and if that fails too, the default value.
      */
     public static int getInt(
             final Map<String, Object> conf,
@@ -43,7 +44,9 @@ public class ConfUtils {
             final String suffix,
             int defaultValue) {
         Object val = conf.get(prefix + optional + suffix);
-        if (val != null) return ((Number) val).intValue();
+        if (val != null) {
+            return ((Number) val).intValue();
+        }
         return getInt(conf, prefix + suffix, defaultValue);
     }
 
@@ -72,8 +75,8 @@ public class ConfUtils {
     }
 
     /**
-     * Returns the value for prefix + optional + suffix, if nothing is found then return prefix +
-     * suffix and if that fails too, the default value
+     * Returns the value for prefix + optional + suffix. If nothing is found then return prefix +
+     * suffix and if that fails too, the default value.
      */
     public static boolean getBoolean(
             final Map<String, Object> conf,
@@ -106,7 +109,9 @@ public class ConfUtils {
             final String optional,
             final String suffix) {
         String val = getString(stormConf, prefix + optional + suffix);
-        if (val != null) return val;
+        if (val != null) {
+            return val;
+        }
         return getString(stormConf, prefix + suffix);
     }
 
@@ -115,8 +120,8 @@ public class ConfUtils {
     }
 
     /**
-     * Returns the value for prefix + optional + suffix, if nothing is found then return prefix +
-     * suffix and if that fails too, the default value
+     * Returns the value for prefix + optional + suffix. If nothing is found then return prefix +
+     * suffix and if that fails too, the default value.
      */
     public static String getString(
             final Map<String, Object> stormConf,
@@ -125,9 +130,13 @@ public class ConfUtils {
             final String suffix,
             String defaultValue) {
         String val = getString(stormConf, prefix + optional + suffix);
-        if (val != null) return val;
+        if (val != null) {
+            return val;
+        }
         val = getString(stormConf, prefix + suffix);
-        if (val != null) return val;
+        if (val != null) {
+            return val;
+        }
         return defaultValue;
     }
 
@@ -147,7 +156,9 @@ public class ConfUtils {
         Object obj = stormConf.get(paramKey);
         List<String> list = new LinkedList<>();
 
-        if (obj == null) return list;
+        if (obj == null) {
+            return list;
+        }
 
         if (obj instanceof Collection) {
             list.addAll((Collection<String>) obj);
@@ -174,7 +185,9 @@ public class ConfUtils {
             final String suffix,
             Map<String, Object> stormConf) {
         List<String> list = loadListFromConf(prefix + optional + suffix, stormConf);
-        if (!list.isEmpty()) return list;
+        if (!list.isEmpty()) {
+            return list;
+        }
         return loadListFromConf(prefix + suffix, stormConf);
     }
 
@@ -186,9 +199,8 @@ public class ConfUtils {
                                 new FileInputStream(resource), Charset.defaultCharset()));
         if (ret == null) {
             ret = new HashMap<>();
-        }
-        // contains a single config element ?
-        else {
+        } else {
+            // contains a single config element ?
             ret = extractConfigElement(ret);
         }
         conf.putAll(ret);

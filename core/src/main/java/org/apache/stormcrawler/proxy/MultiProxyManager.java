@@ -14,24 +14,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.proxy;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.httpclient.HttpProtocol;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.LoggerFactory;
 
-/** MultiProxyManager is a ProxyManager implementation for a multiple proxy endpoints */
+/** MultiProxyManager is a ProxyManager implementation for a multiple proxy endpoints. */
 public class MultiProxyManager implements ProxyManager {
     public enum ProxyRotation {
         RANDOM,
@@ -43,10 +46,11 @@ public class MultiProxyManager implements ProxyManager {
     private SCProxy[] proxies;
     private ProxyRotation rotation;
     private final AtomicInteger lastAccessedIndex = new AtomicInteger(0);
+    private Map<SCProxy, SCProxy> proxyLookupMap;
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(HttpProtocol.class);
 
-    /** Default constructor for setting up the proxy manager */
+    /** Default constructor for setting up the proxy manager. */
     private void init(ProxyRotation rotation) {
         // create rng with nano seed
         this.rng = new Random(System.nanoTime());
@@ -75,11 +79,12 @@ public class MultiProxyManager implements ProxyManager {
                 proxyRotationScheme = ProxyRotation.LEAST_USED;
                 break;
             default:
-                if (!proxyRot.equals("ROUND_ROBIN"))
+                if (!proxyRot.equals("ROUND_ROBIN")) {
                     LOG.error(
                             "invalid proxy rotation scheme passed `{}` defaulting to ROUND_ROBIN; options: {}",
                             proxyRot,
                             ProxyRotation.values());
+                }
                 proxyRotationScheme = ProxyRotation.ROUND_ROBIN;
                 break;
         }
@@ -124,7 +129,9 @@ public class MultiProxyManager implements ProxyManager {
             if (proxyConnectionString.startsWith("#")
                     || proxyConnectionString.startsWith("//")
                     || proxyConnectionString.isEmpty()
-                    || proxyConnectionString.trim().isEmpty()) continue;
+                    || proxyConnectionString.trim().isEmpty()) {
+                continue;
+            }
 
             // attempt to load proxy connection string and add proxy to proxies array
             fileProxies =
@@ -142,6 +149,11 @@ public class MultiProxyManager implements ProxyManager {
 
         // assign proxies to class variable
         this.proxies = fileProxies;
+
+        this.proxyLookupMap = new HashMap<>();
+        for (SCProxy proxy : this.proxies) {
+            this.proxyLookupMap.put(proxy, proxy);
+        }
     }
 
     public void configure(ProxyRotation rotation, String[] proxyList) throws RuntimeException {
@@ -166,6 +178,11 @@ public class MultiProxyManager implements ProxyManager {
 
         // assign proxies to class variable
         this.proxies = fileProxies;
+
+        this.proxyLookupMap = new HashMap<>();
+        for (SCProxy proxy : this.proxies) {
+            this.proxyLookupMap.put(proxy, proxy);
+        }
     }
 
     private SCProxy getRandom() {
@@ -175,7 +192,9 @@ public class MultiProxyManager implements ProxyManager {
 
     private SCProxy getRoundRobin() {
         // ensure that last accessed does not exceed proxy list length
-        if (this.lastAccessedIndex.get() >= this.proxies.length) this.lastAccessedIndex.set(0);
+        if (this.lastAccessedIndex.get() >= this.proxies.length) {
+            this.lastAccessedIndex.set(0);
+        }
 
         // retrieve the current proxy, increment usage index, and return
         return this.proxies[this.lastAccessedIndex.getAndIncrement()];
@@ -208,8 +227,23 @@ public class MultiProxyManager implements ProxyManager {
         return this.proxies.length;
     }
 
+    private Optional<SCProxy> getConfiguredProxy(SCProxy proxy) {
+        return Optional.ofNullable(proxyLookupMap.get(proxy));
+    }
+
     @Override
     public Optional<SCProxy> getProxy(Metadata metadata) {
+        if (ProxyMetadata.shouldSkipProxy(metadata)) {
+            return Optional.empty();
+        }
+
+        Optional<SCProxy> metadataProxy = ProxyMetadata.getProxy(metadata);
+        if (metadataProxy.isPresent()) {
+            SCProxy proxy = getConfiguredProxy(metadataProxy.get()).orElse(metadataProxy.get());
+            proxy.incrementUsage();
+            return Optional.of(proxy);
+        }
+
         // create a variable to hold the proxy generated in the following switch statement
         SCProxy proxy;
 

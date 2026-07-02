@@ -14,8 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.proxy;
 
+import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,7 +27,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Proxy class is used as the central interface to proxy based interactions with a single remote
  * server The class stores all information relating to the remote server, authentication, and usage
- * activity
+ * activity.
  */
 public class SCProxy {
     // define regex expression used to parse connection strings
@@ -39,8 +42,8 @@ public class SCProxy {
     private final String protocol;
     private final String address;
     private final String port;
-    private String username;
-    private String password;
+    private final String username;
+    private final String password;
     private String country;
     private String area;
     private String location;
@@ -49,13 +52,13 @@ public class SCProxy {
     // define fields for management
     private AtomicInteger totalUsage;
 
-    /** Default constructor for setting up the proxy */
+    /** Default constructor for setting up the proxy. */
     private void init() {
         // initialize usage tracker to 0
         this.totalUsage = new AtomicInteger();
     }
 
-    /** Construct a proxy object from a valid proxy connection string */
+    /** Construct a proxy object from a valid proxy connection string. */
     public SCProxy(String connectionString) throws IllegalArgumentException {
         // call default constructor
         this.init();
@@ -77,14 +80,18 @@ public class SCProxy {
         this.port = matcher.group("port");
 
         // load optional authentication data
+        String u = null;
+        String p = null;
         try {
-            this.username = matcher.group("username");
-            this.password = matcher.group("password");
+            u = matcher.group("username");
+            p = matcher.group("password");
         } catch (IllegalArgumentException ignored) {
         }
+        this.username = u;
+        this.password = p;
     }
 
-    /** Construct a proxy class from it's variables */
+    /** Construct a proxy class from it's variables. */
     public SCProxy(
             String protocol,
             String address,
@@ -105,15 +112,24 @@ public class SCProxy {
         this.port = port;
 
         // load optional parameters
-        if (!username.isBlank()) this.username = username;
-        if (!password.isBlank()) this.password = password;
-        if (!country.isBlank()) this.country = country;
-        if (!area.isBlank()) this.area = area;
-        if (!location.isBlank()) this.location = location;
-        if (!status.isBlank()) this.status = status;
+        this.username = username.isBlank() ? null : username;
+        this.password = password.isBlank() ? null : password;
+
+        if (!country.isBlank()) {
+            this.country = country;
+        }
+        if (!area.isBlank()) {
+            this.area = area;
+        }
+        if (!location.isBlank()) {
+            this.location = location;
+        }
+        if (!status.isBlank()) {
+            this.status = status;
+        }
     }
 
-    /** Formats the proxy information into a URL compatible connection string */
+    /** Formats the proxy information into a URL compatible connection string. */
     public String toString() {
         // assemble base string with address and password
         String proxyString = this.address + ":" + this.port;
@@ -128,12 +144,12 @@ public class SCProxy {
         return this.protocol + "://" + proxyString;
     }
 
-    /** Increments the usage tracker for the proxy */
+    /** Increments the usage tracker for the proxy. */
     public void incrementUsage() {
         this.totalUsage.incrementAndGet();
     }
 
-    /** Retrieves the current usage of the proxy */
+    /** Retrieves the current usage of the proxy. */
     public int getUsage() {
         return this.totalUsage.get();
     }
@@ -172,5 +188,37 @@ public class SCProxy {
 
     public String getStatus() {
         return status;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+
+        if (!(o instanceof SCProxy)) {
+            return false;
+        }
+
+        SCProxy other = (SCProxy) o;
+        return Objects.equals(normalize(this.protocol), normalize(other.protocol))
+                && Objects.equals(normalize(this.address), normalize(other.address))
+                && Objects.equals(this.port, other.port)
+                && Objects.equals(this.username, other.username)
+                && Objects.equals(this.password, other.password);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                normalize(this.protocol),
+                normalize(this.address),
+                this.port,
+                this.username,
+                this.password);
+    }
+
+    private static String normalize(String value) {
+        return value == null ? null : value.toLowerCase(Locale.ROOT);
     }
 }

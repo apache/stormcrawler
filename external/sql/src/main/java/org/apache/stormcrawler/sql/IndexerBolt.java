@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.sql;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
@@ -21,15 +22,20 @@ import static org.apache.stormcrawler.Constants.StatusStreamName;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
-import org.apache.storm.metric.api.MultiCountMetric;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.indexing.AbstractIndexerBolt;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.Logger;
@@ -42,11 +48,13 @@ public class IndexerBolt extends AbstractIndexerBolt {
 
     public static final String SQL_INDEX_TABLE_PARAM_NAME = "sql.index.table";
 
-    private OutputCollector _collector;
+    private OutputCollector collector;
 
-    private MultiCountMetric eventCounter;
+    private ScopedCounter eventCounter;
 
     private Connection connection;
+
+    private PreparedStatement preparedStmt;
 
     private String tableName;
 
@@ -56,9 +64,9 @@ public class IndexerBolt extends AbstractIndexerBolt {
     public void prepare(
             Map<String, Object> conf, TopologyContext context, OutputCollector collector) {
         super.prepare(conf, context, collector);
-        _collector = collector;
+        this.collector = collector;
 
-        this.eventCounter = context.registerMetric("SQLIndexer", new MultiCountMetric(), 10);
+        this.eventCounter = CrawlerMetrics.registerCounter(context, conf, "SQLIndexer", 10);
 
         this.tableName = ConfUtils.getString(conf, SQL_INDEX_TABLE_PARAM_NAME);
 
@@ -74,15 +82,14 @@ public class IndexerBolt extends AbstractIndexerBolt {
         String normalisedurl = valueForURL(tuple);
 
         Metadata metadata = (Metadata) tuple.getValueByField("metadata");
-        String text = tuple.getStringByField("text");
 
         boolean keep = filterDocument(metadata);
         if (!keep) {
             eventCounter.scope("Filtered").incrBy(1);
             // treat it as successfully processed even if
             // we do not index it
-            _collector.emit(StatusStreamName, tuple, new Values(url, metadata, Status.FETCHED));
-            _collector.ack(tuple);
+            collector.emit(StatusStreamName, tuple, new Values(url, metadata, Status.FETCHED));
+            collector.ack(tuple);
             return;
         }
 
@@ -90,35 +97,9 @@ public class IndexerBolt extends AbstractIndexerBolt {
 
             // which metadata to display?
             Map<String, String[]> keyVals = filterMetadata(metadata);
+            List<String> keys = new ArrayList<>(keyVals.keySet());
 
-            StringBuilder query =
-                    new StringBuilder(" insert into ")
-                            .append(tableName)
-                            .append(" (")
-                            .append(fieldNameForURL());
-
-            Object[] keys = keyVals.keySet().toArray();
-
-            for (Object o : keys) {
-                query.append(", ").append((String) o);
-            }
-
-            query.append(") values(?");
-
-            for (int i = 0; i < keys.length; i++) {
-                query.append(", ?");
-            }
-
-            query.append(")");
-
-            query.append(" ON DUPLICATE KEY UPDATE ");
-            for (int i = 0; i < keys.length; i++) {
-                String key = (String) keys[i];
-                if (i > 0) {
-                    query.append(", ");
-                }
-                query.append(key).append("=VALUES(").append(key).append(")");
-            }
+            String query = buildQuery(keys);
 
             if (connection == null) {
                 try {
@@ -131,9 +112,8 @@ public class IndexerBolt extends AbstractIndexerBolt {
 
             LOG.debug("PreparedStatement => {}", query);
 
-            // create the mysql insert preparedstatement
-            PreparedStatement preparedStmt = connection.prepareStatement(query.toString());
-
+            // create the mysql insert PreparedStatement
+            preparedStmt = connection.prepareStatement(query);
             // TODO store the text of the document?
             if (StringUtils.isNotBlank(fieldNameForText())) {
                 // builder.field(fieldNameForText(), trimText(text));
@@ -144,21 +124,21 @@ public class IndexerBolt extends AbstractIndexerBolt {
                 preparedStmt.setString(1, normalisedurl);
             }
 
-            for (int i = 0; i < keys.length; i++) {
-                insert(preparedStmt, i + 2, (String) keys[i], keyVals);
+            // Set all metadata parameters
+            for (int i = 0; i < keys.size(); i++) {
+                insert(preparedStmt, i + 2, keys.get(i), keyVals);
             }
-
+            // Execute the statement (single row insert)
             preparedStmt.executeUpdate();
 
             eventCounter.scope("Indexed").incrBy(1);
 
-            _collector.emit(StatusStreamName, tuple, new Values(url, metadata, Status.FETCHED));
-            _collector.ack(tuple);
-
+            collector.emit(StatusStreamName, tuple, new Values(url, metadata, Status.FETCHED));
+            collector.ack(tuple);
         } catch (Exception e) {
             // do not send to status stream so that it gets replayed
             LOG.error("Error inserting into SQL", e);
-            _collector.fail(tuple);
+            collector.fail(tuple);
             if (connection != null) {
                 // reset the connection
                 try {
@@ -187,5 +167,42 @@ public class IndexerBolt extends AbstractIndexerBolt {
             value = values[0];
         }
         preparedStmt.setString(position, value);
+    }
+
+    private String buildQuery(final List<String> keys) {
+        final String columns = String.join(", ", keys);
+        final String placeholders = keys.stream().map(k -> "?").collect(Collectors.joining(", "));
+
+        final String updates =
+                keys.stream()
+                        .map(k -> String.format(Locale.ROOT, "%s=VALUES(%s)", k, k))
+                        .collect(Collectors.joining(", "));
+
+        // Build the ON DUPLICATE KEY UPDATE clause
+        // If there are metadata keys, update them; otherwise, update the URL field to itself
+        final String updateClause =
+                updates.isEmpty()
+                        ? String.format(
+                                Locale.ROOT, "%s=VALUES(%s)", fieldNameForURL(), fieldNameForURL())
+                        : updates;
+
+        return String.format(
+                Locale.ROOT,
+                """
+                            INSERT INTO %s (%s%s)
+                            VALUES (?%s)
+                            ON DUPLICATE KEY UPDATE %s
+                            """,
+                tableName,
+                fieldNameForURL(),
+                columns.isEmpty() ? "" : ", " + columns,
+                placeholders.isEmpty() ? "" : ", " + placeholders,
+                updateClause);
+    }
+
+    @Override
+    public void cleanup() {
+        SQLUtil.closeResource(preparedStmt, "prepared statement");
+        SQLUtil.closeResource(connection, "connection");
     }
 }

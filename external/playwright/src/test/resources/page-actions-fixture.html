@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<html>
+<head>
+    <title>StormCrawler PageActions Fixture</title>
+</head>
+<body>
+<div id="cookie-overlay">
+    <button id="cookie-accept">Accept</button>
+</div>
+<div class="paywall">PAYWALL_CONTENT_REMOVED</div>
+
+<div class="tab-widget">
+    <button class="tab-header" data-target="tab1">Tab 1</button>
+    <button class="tab-header" data-target="tab2">Tab 2</button>
+    <button class="tab-header" data-target="tab3">Tab 3</button>
+    <div class="tab-widget-body" id="active-body">INITIAL_BODY</div>
+</div>
+
+<div id="scroll-sentinel" style="height:2000px"></div>
+
+<script>
+    document.getElementById('cookie-accept').addEventListener('click', function () {
+        document.getElementById('cookie-overlay').remove();
+    });
+
+    document.querySelectorAll('.tab-header').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var body = document.getElementById('active-body');
+            body.innerHTML = 'CONTENT_' + btn.dataset.target.toUpperCase();
+        });
+    });
+
+    var loaded = 0;
+    window.addEventListener('scroll', function () {
+        if (loaded >= 3) return;
+        if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 10) {
+            loaded++;
+            var d = document.createElement('div');
+            d.textContent = 'LAZY_LOADED_' + loaded;
+            d.style.height = '500px';
+            document.body.appendChild(d);
+        }
+    });
+</script>
+</body>
+</html>

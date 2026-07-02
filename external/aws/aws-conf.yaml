@@ -42,4 +42,9 @@ s3.bucket: "crawl"
 
 # s3.endpoint: ""
 
+# enable path-style access (http://host/bucket) instead of the default
+# virtual-hosted style (http://bucket.host). Required for S3-compatible
+# endpoints such as LocalStack or MinIO.
+# s3.path.style.access: false
+
 

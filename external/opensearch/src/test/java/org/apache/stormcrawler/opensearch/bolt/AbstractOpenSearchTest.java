@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.opensearch.bolt;
 
 import org.junit.jupiter.api.AfterEach;
@@ -25,7 +26,7 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers(disabledWithoutDocker = true)
 public abstract class AbstractOpenSearchTest {
 
-    private static final String OPENSEARCH_VERSION = "2.19.2";
+    private static final String OPENSEARCH_VERSION = "2.19.4";
 
     public static final String PASSWORD = "This1sAPassw0rd";
 

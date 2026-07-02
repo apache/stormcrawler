@@ -1,0 +1,24 @@
+{
+  "org.apache.stormcrawler.protocol.playwright.PageActions": [
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.DismissOverlayAction",
+      "name": "cookies",
+      "params": { "selectors": ["#cookie-accept"] }
+    },
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.ScrollToBottomAction",
+      "name": "scroll",
+      "params": { "waitMs": 50, "maxSteps": 3, "maxDurationMs": 500 }
+    },
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.EvaluateAction",
+      "name": "perf",
+      "params": { "expressions": ["JSON.stringify(performance.timing)"] }
+    },
+    {
+      "class": "org.apache.stormcrawler.protocol.playwright.actions.ScreenshotAction",
+      "name": "shot",
+      "params": { "fullPage": true, "type": "png" }
+    }
+  ]
+}

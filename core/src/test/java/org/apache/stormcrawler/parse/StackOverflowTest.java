@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -28,7 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * @see https://github.com/apache/stormcrawler/pull/653 *
+ * @see <a href="https://github.com/apache/stormcrawler/pull/653">PR #653</a>
  */
 class StackOverflowTest extends ParsingTester {
 
@@ -47,7 +48,7 @@ class StackOverflowTest extends ParsingTester {
     }
 
     /**
-     * @see https://github.com/apache/stormcrawler/issues/666
+     * @see <a href="https://github.com/apache/stormcrawler/issues/666">Issue #666</a>
      */
     @Test
     void testNamespaceExtraction() throws IOException {

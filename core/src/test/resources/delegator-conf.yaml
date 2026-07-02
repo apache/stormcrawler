@@ -39,4 +39,4 @@ config:
         - \.doc
     - className: "org.apache.stormcrawler.protocol.DummyProtocol"
       id: "default"
-    
+

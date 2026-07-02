@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.basic.BasicURLFilter;
+import org.apache.stormcrawler.util.URLUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -43,10 +45,10 @@ class BasicURLFilterTest {
     void testRepetition() throws MalformedURLException {
         URLFilter filter = createFilter(-1, 3);
         Metadata metadata = new Metadata();
-        URL targetURL = new URL("http://www.sourcedomain.com/a/a/a/index.html");
+        URL targetURL = URLUtil.toURL("http://www.sourcedomain.com/a/a/a/index.html");
         String filterResult = filter.filter(targetURL, metadata, targetURL.toExternalForm());
         Assertions.assertNull(filterResult);
-        targetURL = new URL("http://www.sourcedomain.com/a/b/a/index.html");
+        targetURL = URLUtil.toURL("http://www.sourcedomain.com/a/b/a/index.html");
         filterResult = filter.filter(targetURL, metadata, targetURL.toExternalForm());
         Assertions.assertEquals(targetURL.toExternalForm(), filterResult);
     }
@@ -55,10 +57,10 @@ class BasicURLFilterTest {
     void testLength() throws MalformedURLException {
         URLFilter filter = createFilter(32, -1);
         Metadata metadata = new Metadata();
-        URL targetURL = new URL("http://www.sourcedomain.com/a/a/a/index.html");
+        URL targetURL = URLUtil.toURL("http://www.sourcedomain.com/a/a/a/index.html");
         String filterResult = filter.filter(targetURL, metadata, targetURL.toExternalForm());
         Assertions.assertNull(filterResult);
-        targetURL = new URL("http://www.sourcedomain.com/");
+        targetURL = URLUtil.toURL("http://www.sourcedomain.com/");
         filterResult = filter.filter(targetURL, metadata, targetURL.toExternalForm());
         Assertions.assertEquals(targetURL.toExternalForm(), filterResult);
     }

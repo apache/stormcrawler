@@ -52,12 +52,14 @@ class XMLCharacterRecognizer {
      * @param length Number of characters in the array
      * @return True if the characters in the array are XML whitespace; otherwise, false.
      */
-    static boolean isWhiteSpace(char ch[], int start, int length) {
+    static boolean isWhiteSpace(char[] ch, int start, int length) {
 
         int end = start + length;
 
         for (int s = start; s < end; s++) {
-            if (!isWhiteSpace(ch[s])) return false;
+            if (!isWhiteSpace(ch[s])) {
+                return false;
+            }
         }
 
         return true;
@@ -74,7 +76,9 @@ class XMLCharacterRecognizer {
         int n = buf.length();
 
         for (int i = 0; i < n; i++) {
-            if (!isWhiteSpace(buf.charAt(i))) return false;
+            if (!isWhiteSpace(buf.charAt(i))) {
+                return false;
+            }
         }
 
         return true;
@@ -92,7 +96,9 @@ class XMLCharacterRecognizer {
             int n = s.length();
 
             for (int i = 0; i < n; i++) {
-                if (!isWhiteSpace(s.charAt(i))) return false;
+                if (!isWhiteSpace(s.charAt(i))) {
+                    return false;
+                }
             }
         }
 

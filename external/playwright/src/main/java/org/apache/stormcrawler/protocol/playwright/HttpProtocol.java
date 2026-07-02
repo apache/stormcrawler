@@ -37,7 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.Config;
 import org.apache.storm.utils.MutableInt;
 import org.apache.stormcrawler.Metadata;
@@ -62,6 +62,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     private int timeout = 10000;
 
+    private boolean captureContentOnError = false;
+
+    private boolean overrideStatusOnContent = false;
+
     private BrowserContext context;
 
     private Set<String> resourceTypesToSkip;
@@ -74,6 +78,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
     private List<String> evaluations;
 
     private WaitUntilState loadEvent;
+
+    private PageActions pageActions = PageActions.emptyPageActions;
 
     @Override
     public void configure(final Config conf) {
@@ -130,6 +136,12 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         timeout = ConfUtils.getInt(conf, "http.timeout", timeout);
 
+        captureContentOnError =
+                ConfUtils.getBoolean(conf, "playwright.capture.content.on.error", false);
+
+        overrideStatusOnContent =
+                ConfUtils.getBoolean(conf, "playwright.override.status.on.content", false);
+
         final String ua = getAgentString(conf);
 
         NewContextOptions b_c_options =
@@ -162,6 +174,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         // expressions to evaluate
         evaluations = ConfUtils.loadListFromConf(MD_EVALUATIONS, conf);
+
+        // optional chain of page actions applied after navigate, before content capture
+        pageActions = PageActions.fromConf(conf);
     }
 
     @Override
@@ -169,9 +184,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         // https://github.com/microsoft/playwright-java#is-playwright-thread-safe
         synchronized (this) {
-
-            // tracing// Start tracing before creating / navigating a page.
-            if (md.containsKey(MD_TRACE)) {
+            boolean isTracing = md.containsKey(MD_TRACE);
+            if (isTracing) {
                 context.tracing()
                         .start(
                                 new Tracing.StartOptions()
@@ -186,101 +200,128 @@ public class HttpProtocol extends AbstractHttpProtocol {
             final MutableInt status = new MutableInt(-1);
             byte[] content = new byte[0];
 
-            try (Page page = context.newPage()) {
+            try {
+                try (Page page = context.newPage()) {
 
-                page.onResponse(
-                        response -> {
-                            // make sure that this applies to the main page
-                            if (response.url().equals(url)) {
-                                // redirection?
-                                if (Status.REDIRECTION.equals(
-                                        Status.fromHTTPCode(response.status()))) {
-                                    status.set(response.status());
-                                    response.allHeaders()
-                                            .forEach(
-                                                    (k, v) -> {
-                                                        responseMetaData.addValue(k, v);
-                                                    });
+                    page.onResponse(
+                            response -> {
+                                // make sure that this applies to the main page
+                                if (response.url().equals(url)) {
+                                    // redirection?
+                                    if (Status.REDIRECTION.equals(
+                                            Status.fromHTTPCode(response.status()))) {
+                                        status.set(response.status());
+                                        response.allHeaders()
+                                                .forEach(
+                                                        (k, v) -> {
+                                                            responseMetaData.addValue(k, v);
+                                                        });
+                                    }
                                 }
+                            });
+
+                    page.onPageError(
+                            handler -> {
+                                // this applies to any resource - not just the main page
+                                LOG.debug("Error when loading {} {}", url, handler);
+                            });
+
+                    // NOTE: The handler will only be called for the first url if the
+                    // response is a redirect.
+                    page.route(
+                            lambdaUrl -> true,
+                            route -> {
+                                // abort if we know the main page is a redirection
+                                if (status.get() != -1) {
+                                    LOG.debug("Aborting request for {}", route.request().url());
+                                    route.abort();
+                                } else if (resourceTypesToSkip.contains(
+                                        route.request().resourceType())) {
+                                    route.abort();
+                                } else {
+                                    route.resume();
+                                }
+                            });
+
+                    // let playwright do the content loading
+                    com.microsoft.playwright.Response response =
+                            page.navigate(
+                                    url,
+                                    new Page.NavigateOptions()
+                                            .setTimeout(timeout)
+                                            .setWaitUntil(loadEvent));
+
+                    // the status is not set unless
+                    // a redirection
+                    if (status.get() == -1) {
+                        response.allHeaders()
+                                .forEach(
+                                        (k, v) -> {
+                                            responseMetaData.addValue(k, v);
+                                        });
+
+                        int httpStatus = response.status();
+                        boolean fetched = Status.FETCHED == Status.fromHTTPCode(httpStatus);
+                        boolean contentCaptured = false;
+
+                        if (fetched || captureContentOnError) {
+                            // run any configured post-navigate actions before capturing content
+                            pageActions.apply(page, url, md, responseMetaData);
+                            // retrieve the rendered content
+                            content = page.content().getBytes(StandardCharsets.UTF_8);
+                            contentCaptured = true;
+                        }
+
+                        if (!fetched && contentCaptured && overrideStatusOnContent) {
+                            // expose the original origin status for diagnostics
+                            responseMetaData.setValue(
+                                    "playwright.origin.status", Integer.toString(httpStatus));
+                            status.set(200);
+                        } else {
+                            status.set(httpStatus);
+                        }
+
+                        // evaluate an expression and store the results
+                        // in the metadata using the same string as key
+                        for (String expression : evaluations) {
+                            Object performance = page.evaluate(expression);
+                            if (performance != null) {
+                                String json =
+                                        mapper.writerWithDefaultPrettyPrinter()
+                                                .writeValueAsString(performance);
+                                responseMetaData.setValue(expression, json);
                             }
-                        });
-
-                page.onPageError(
-                        handler -> {
-                            // this applies to any resource - not just the main page
-                            LOG.debug("Error when loading {} {}", url, handler);
-                        });
-
-                // NOTE: The handler will only be called for the first url if the
-                // response is a redirect.
-                page.route(
-                        _url -> true,
-                        route -> {
-                            // abort if we know the main page is a redirection
-                            if (status.get() != -1) {
-                                LOG.debug("Aborting request for {}", route.request().url());
-                                route.abort();
-                            } else if (resourceTypesToSkip.contains(
-                                    route.request().resourceType())) {
-                                route.abort();
-                            } else {
-                                route.resume();
-                            }
-                        });
-
-                // let playwright do the content loading
-                com.microsoft.playwright.Response response =
-                        page.navigate(
-                                url,
-                                new Page.NavigateOptions()
-                                        .setTimeout(timeout)
-                                        .setWaitUntil(loadEvent));
-
-                // the status is not set unless
-                // a redirection
-                if (status.get() == -1) {
-                    response.allHeaders()
-                            .forEach(
-                                    (k, v) -> {
-                                        responseMetaData.addValue(k, v);
-                                    });
-
-                    if (Status.FETCHED == Status.fromHTTPCode(response.status())) {
-                        // retrieve the rendered content
-                        content = page.content().getBytes(StandardCharsets.UTF_8);
-                    }
-
-                    status.set(response.status());
-
-                    // evaluate an expression and store the results
-                    // in the metadata using the same string as key
-                    for (String expression : evaluations) {
-                        Object performance = page.evaluate(expression);
-                        if (performance != null) {
-                            String json =
-                                    mapper.writerWithDefaultPrettyPrinter()
-                                            .writeValueAsString(performance);
-                            responseMetaData.setValue(expression, json);
                         }
                     }
                 }
+
+                if (isTracing) {
+                    Path tmp = Files.createTempFile("trace-", ".zip", new FileAttribute[0]);
+                    context.tracing().stop(new Tracing.StopOptions().setPath(tmp));
+                    responseMetaData.setValue(MD_TRACE, tmp.toString());
+                }
+
+                responseMetaData.addValue(MD_KEY_END, Instant.now().toString());
+
+                return new ProtocolResponse(content, status.get(), responseMetaData);
+
+            } finally {
+                if (isTracing && responseMetaData.getFirstValue(MD_TRACE) == null) {
+                    try {
+                        context.tracing().stop(new Tracing.StopOptions());
+                    } catch (Exception e) {
+                        LOG.warn("Exception while stopping tracing on error", e);
+                    }
+                }
             }
-
-            if (md.containsKey(MD_TRACE)) {
-                Path tmp = Files.createTempFile("trace-", ".zip", new FileAttribute[0]);
-                context.tracing().stop(new Tracing.StopOptions().setPath(tmp));
-                responseMetaData.setValue(MD_TRACE, tmp.toString());
-            }
-
-            responseMetaData.addValue(MD_KEY_END, Instant.now().toString());
-
-            return new ProtocolResponse(content, status.get(), responseMetaData);
         }
     }
 
     /** Returns a proxy object if required * */
     private Proxy getProxy(String proxyserver, String proxyuser, String proxypwd) {
-        if (proxyserver == null) return null;
+        if (proxyserver == null) {
+            return null;
+        }
 
         Proxy proxy = new Proxy(proxyserver);
         if (proxyuser != null) {
@@ -296,6 +337,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
     public void cleanup() {
         synchronized (this) {
             super.cleanup();
+            pageActions.cleanup();
             context.close();
             browser.close();
         }

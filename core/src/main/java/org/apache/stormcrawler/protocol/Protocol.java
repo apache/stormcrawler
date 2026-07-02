@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol;
 
 import crawlercommons.robots.BaseRobotRules;
@@ -60,9 +61,9 @@ public interface Protocol {
         Config conf = new Config();
 
         // loads the default configuration file
-        Map<String, Object> defaultSCConfig =
+        Map<String, Object> defaultStormCrawlerConfig =
                 Utils.findAndReadConfigFile("crawler-default.yaml", false);
-        conf.putAll(ConfUtils.extractConfigElement(defaultSCConfig));
+        conf.putAll(ConfUtils.extractConfigElement(defaultStormCrawlerConfig));
 
         Options options = new Options();
         options.addOption("f", true, "configuration file");

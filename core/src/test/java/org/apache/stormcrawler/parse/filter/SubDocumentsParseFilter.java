@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse.filter;
 
 import java.io.ByteArrayInputStream;
@@ -38,7 +39,7 @@ public class SubDocumentsParseFilter extends ParseFilter {
             LoggerFactory.getLogger(SubDocumentsParseFilter.class);
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
 
         InputStream stream = new ByteArrayInputStream(content);
 
@@ -68,7 +69,7 @@ public class SubDocumentsParseFilter extends ParseFilter {
                 }
             }
         } catch (Exception e) {
-            LOG.error("Error processing sitemap from {}: {}", URL, e);
+            LOG.error("Error processing sitemap from {}: {}", url, e);
         }
     }
 

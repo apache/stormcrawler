@@ -1,0 +1,22 @@
+{
+  "org.apache.stormcrawler.parse.JSoupFilters": [
+    {
+      "class": "org.apache.stormcrawler.jsoup.XPathFilter",
+      "name": "XPathFilter",
+      "params": {
+        "tidy_text": "//P[@class=\"intro\"]/tidyText()",
+        "all_text": "//P[@class=\"intro\"]/allText()",
+        "html_content": "//P[@class=\"intro\"]/html()",
+        "attr_content": "//META[@name=\"keywords\"]/@content",
+        "attr_author": "//META[@name=\"author\"]/@content",
+        "title_text": "//TITLE",
+        "concept_upper": "//SPAN[@class=\"concept\"]",
+        "h1_text": "//H1[@class=\"title\"]",
+        "fallback": [
+          "//DIV[@id=\"missing\"]",
+          "//DIV[@id=\"main\"]"
+        ]
+      }
+    }
+  ]
+}

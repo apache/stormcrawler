@@ -14,29 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.aws.bolt;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import java.util.regex.Pattern;
-import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.codec.digest.DigestUtils;
 
 public class CloudSearchUtils {
 
-    private static MessageDigest digester;
-
     private static final Pattern INVALID_XML_CHARS =
-            Pattern.compile("[^\\u0009\\u000A\\u000D\\u0020-\\uD7FF\\uE000-\\uFFFD]");
-
-    static {
-        try {
-            digester = MessageDigest.getInstance("SHA-512");
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-    }
+            Pattern.compile("[^\\t\\n\\r -\\uD7FF\\uE000-\\uFFFD]");
 
     private CloudSearchUtils() {}
 
@@ -50,8 +39,7 @@ public class CloudSearchUtils {
         // letter or number and the following characters: _ - = # ; : / ? @
         // &. Document IDs must be at least 1 and no more than 128
         // characters long.
-        byte[] dig = digester.digest(url.getBytes(StandardCharsets.UTF_8));
-        String ID = Hex.encodeHexString(dig);
+        String ID = DigestUtils.sha512Hex(url.getBytes(StandardCharsets.UTF_8));
         // is that even possible?
         if (ID.length() > 128) {
             throw new RuntimeException("ID larger than max 128 chars");
@@ -76,9 +64,12 @@ public class CloudSearchUtils {
     public static String cleanFieldName(String name) {
         String lowercase = name.toLowerCase(Locale.ROOT);
         lowercase = lowercase.replaceAll("[^a-z_0-9]", "_");
-        if (lowercase.length() < 3 || lowercase.length() > 64)
+        if (lowercase.length() < 3 || lowercase.length() > 64) {
             throw new RuntimeException("Field name must be between 3 and 64 chars : " + lowercase);
-        if (lowercase.equals("score")) throw new RuntimeException("Field name must be score");
+        }
+        if (lowercase.equals("score")) {
+            throw new RuntimeException("Field name must NOT be score");
+        }
         return lowercase;
     }
 }

@@ -52,7 +52,7 @@ streams:
         className: "org.apache.stormcrawler.util.URLStreamGrouping"
         constructorArgs:
           - "byDomain"
-          
+
   - from: "status"
     to: "queues"
     grouping:

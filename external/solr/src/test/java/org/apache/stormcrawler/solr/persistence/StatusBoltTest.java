@@ -14,8 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.solr.persistence;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -77,12 +79,9 @@ class StatusBoltTest extends SolrContainerTest {
 
         return executorService.submit(
                 () -> {
-                    var outputSize = output.getAckedTuples().size();
-                    while (outputSize == 0) {
-                        Thread.sleep(100);
-                        outputSize = output.getAckedTuples().size();
-                    }
-                    return outputSize;
+                    await().atMost(30, TimeUnit.SECONDS)
+                            .until(() -> output.getAckedTuples().size() > 0);
+                    return output.getAckedTuples().size();
                 });
     }
 

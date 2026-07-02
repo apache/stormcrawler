@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.protocol.file;
 
 import java.io.File;
@@ -23,20 +24,20 @@ import java.lang.invoke.MethodHandles;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Locale;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
+import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 
 public class FileResponse {
 
-    static final SimpleDateFormat dateFormat =
-            new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US);
+    static final java.time.format.DateTimeFormatter DATE_FORMATTER =
+            java.time.format.DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
+                    .withZone(java.time.ZoneId.systemDefault());
     static final org.slf4j.Logger LOG =
             LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -50,7 +51,7 @@ public class FileResponse {
         content = new byte[0];
         statusCode = HttpStatus.SC_INTERNAL_SERVER_ERROR;
 
-        URL url = new URL(u);
+        URL url = URLUtil.toURL(u);
 
         if (!url.getPath().equals(url.getFile())) {
             LOG.warn("url.getPath() != url.getFile(): {}.", url);
@@ -99,8 +100,8 @@ public class FileResponse {
             return;
         }
 
-        try {
-            content = IOUtils.toByteArray(new FileInputStream(file), size);
+        try (FileInputStream fis = new FileInputStream(file)) {
+            content = IOUtils.toByteArray(fis, size);
         } catch (IOException | IllegalArgumentException e) {
             LOG.error("Exception while fetching file response {} ", file.getPath(), e);
             statusCode = HttpStatus.SC_METHOD_FAILURE;
@@ -120,11 +121,11 @@ public class FileResponse {
     }
 
     private static String formatDate(long date) {
-        return dateFormat.format(new Date(date));
+        return DATE_FORMATTER.format(java.time.Instant.ofEpochMilli(date));
     }
 
     private byte[] generateSitemap(File dir) {
-        File[] files = dir.listFiles();
+        final File[] files = dir.listFiles();
         StringBuilder sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         sb.append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
         sb.append("<url><loc>file://").append(dir.getPath()).append("</loc>\n");

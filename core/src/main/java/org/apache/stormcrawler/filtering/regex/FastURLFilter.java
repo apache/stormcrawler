@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering.regex;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -36,6 +37,7 @@ import org.apache.stormcrawler.JSONResource;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilter;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -142,11 +144,14 @@ public class FastURLFilter extends URLFilter implements JSONResource {
                 type = Scope.Type.METADATA;
                 offset = "metadata:".length();
                 value = scopeval.substring(offset);
-            } else throw new RuntimeException("Invalid scope: " + scopeval);
+            } else {
+                throw new RuntimeException("Invalid scope: " + scopeval);
+            }
 
             final JsonNode patternsNode = current.get("patterns");
-            if (patternsNode == null)
+            if (patternsNode == null) {
                 throw new RuntimeException("Missing patterns for scope" + scopeval);
+            }
 
             final List<Rule> rlist = new LinkedList<>();
 
@@ -170,186 +175,192 @@ public class FastURLFilter extends URLFilter implements JSONResource {
             @Nullable Metadata sourceMetadata,
             @NotNull String urlToFilter) {
         try {
-            if (rules.filter(urlToFilter, sourceMetadata)) return null;
+            if (rules.filter(urlToFilter, sourceMetadata)) {
+                return null;
+            }
         } catch (MalformedURLException e) {
             return null;
         }
         return urlToFilter;
     }
-}
 
-class Rules {
+    static class Rules {
 
-    private Scope globalRules;
-    private Map<String, Scope> domainRules = new HashMap<>();
-    private Map<String, Scope> hostNameRules = new HashMap<>();
-    private List<MDScope> metadataRules = new ArrayList<>();
+        private Scope globalRules;
+        private Map<String, Scope> domainRules = new HashMap<>();
+        private Map<String, Scope> hostNameRules = new HashMap<>();
+        private List<MDScope> metadataRules = new ArrayList<>();
 
-    public void addScope(Scope s, Scope.Type t, String value) {
-        if (t.equals(Scope.Type.GLOBAL)) {
-            globalRules = s;
-        } else if (t.equals(Scope.Type.DOMAIN)) {
-            domainRules.put(value, s);
-        } else if (t.equals(Scope.Type.HOSTNAME)) {
-            hostNameRules.put(value, s);
-        } else if (t.equals(Scope.Type.METADATA)) {
-            metadataRules.add(new MDScope(value, s.getRules()));
-        }
-    }
-
-    /**
-     * Try the rules from the hostname, domain name, metadata and global scopes in this order.
-     * Returns true if the URL should be removed, false otherwise. The value returns the value of
-     * the first matching rule, be it positive or negative.
-     *
-     * @throws MalformedURLException
-     */
-    public boolean filter(String url, Metadata metadata) throws MalformedURLException {
-        URL u = new URL(url);
-
-        // first try the full hostname
-        String hostname = u.getHost();
-        if (checkScope(hostNameRules.get(hostname), u)) {
-            return true;
+        public void addScope(Scope s, Scope.Type t, String value) {
+            if (t.equals(Scope.Type.GLOBAL)) {
+                globalRules = s;
+            } else if (t.equals(Scope.Type.DOMAIN)) {
+                domainRules.put(value, s);
+            } else if (t.equals(Scope.Type.HOSTNAME)) {
+                hostNameRules.put(value, s);
+            } else if (t.equals(Scope.Type.METADATA)) {
+                metadataRules.add(new MDScope(value, s.getRules()));
+            }
         }
 
-        // then on the various components of the domain
-        final String[] domainParts = hostname.split("\\.");
-        String domain = null;
-        for (int i = domainParts.length - 1; i >= 0; i--) {
-            domain = domainParts[i] + (domain == null ? "" : "." + domain);
-            if (checkScope(domainRules.get(domain), u)) {
+        /**
+         * Try the rules from the hostname, domain name, metadata and global scopes in this order.
+         * Returns true if the URL should be removed, false otherwise. The value returns the value
+         * of the first matching rule, be it positive or negative.
+         *
+         * @throws MalformedURLException
+         */
+        public boolean filter(String url, Metadata metadata) throws MalformedURLException {
+            URL u = URLUtil.toURL(url);
+
+            // first try the full hostname
+            String hostname = u.getHost();
+            if (checkScope(hostNameRules.get(hostname), u)) {
                 return true;
             }
-        }
 
-        // check on parent's URL metadata
-        for (MDScope scope : metadataRules) {
-            final String[] vals = metadata.getValues(scope.getKey());
-            if (vals == null) {
-                continue;
+            // then on the various components of the domain
+            final String[] domainParts = hostname.split("\\.");
+            String domain = null;
+            for (int i = domainParts.length - 1; i >= 0; i--) {
+                domain = domainParts[i] + (domain == null ? "" : "." + domain);
+                if (checkScope(domainRules.get(domain), u)) {
+                    return true;
+                }
             }
-            for (String v : vals) {
-                if (v.equalsIgnoreCase(scope.getValue())) {
-                    FastURLFilter.LOG.debug(
-                            "Filtering {} matching metadata {}:{}",
-                            url,
-                            scope.getKey(),
-                            scope.getValue());
-                    if (checkScope(scope, u)) {
-                        return true;
+
+            // check on parent's URL metadata
+            for (MDScope scope : metadataRules) {
+                final String[] vals = metadata.getValues(scope.getKey());
+                if (vals == null) {
+                    continue;
+                }
+                for (String v : vals) {
+                    if (v.equalsIgnoreCase(scope.getValue())) {
+                        FastURLFilter.LOG.debug(
+                                "Filtering {} matching metadata {}:{}",
+                                url,
+                                scope.getKey(),
+                                scope.getValue());
+                        if (checkScope(scope, u)) {
+                            return true;
+                        }
                     }
                 }
             }
+
+            if (checkScope(globalRules, u)) {
+                return true;
+            }
+
+            return false;
         }
 
-        if (checkScope(globalRules, u)) {
-            return true;
-        }
-
-        return false;
-    }
-
-    private boolean checkScope(Scope s, URL u) {
-        if (s == null) return false;
-        for (Rule r : s.getRules()) {
-            String haystack = u.getPath();
-            // whether to include the query as well?
-            if (r.getType().toString().endsWith("QUERY")) {
-                if (u.getQuery() != null) {
-                    haystack += "?" + u.getQuery();
+        private boolean checkScope(Scope s, URL u) {
+            if (s == null) {
+                return false;
+            }
+            for (Rule r : s.getRules()) {
+                String haystack = u.getPath();
+                // whether to include the query as well?
+                if (r.getType().toString().endsWith("QUERY")) {
+                    if (u.getQuery() != null) {
+                        haystack += "?" + u.getQuery();
+                    }
+                }
+                if (r.getPattern().matcher(haystack).find()) {
+                    // matches! returns true for DENY, false for ALLOW
+                    return r.getType().toString().startsWith("DENY");
                 }
             }
-            if (r.getPattern().matcher(haystack).find()) {
-                // matches! returns true for DENY, false for ALLOW
-                return r.getType().toString().startsWith("DENY");
+            return false;
+        }
+    }
+
+    static class Scope {
+
+        public enum Type {
+            DOMAIN,
+            GLOBAL,
+            HOSTNAME,
+            METADATA
+        }
+
+        protected Rule[] rules;
+
+        public void setRules(List<Rule> rlist) {
+            this.rules = rlist.toArray(new Rule[0]);
+        }
+
+        public Rule[] getRules() {
+            return rules;
+        }
+    }
+
+    static class MDScope extends Scope {
+
+        private String key;
+        private String value;
+
+        MDScope(String constraint, Rule[] rules) {
+            this.rules = rules;
+            int eq = constraint.indexOf("=");
+            if (eq != -1) {
+                key = constraint.substring(0, eq);
+                value = constraint.substring(eq + 1);
+            } else {
+                key = constraint;
             }
         }
-        return false;
-    }
-}
 
-class Scope {
+        public String getKey() {
+            return key;
+        }
 
-    public enum Type {
-        DOMAIN,
-        GLOBAL,
-        HOSTNAME,
-        METADATA
-    };
-
-    protected Rule[] rules;
-
-    public void setRules(List<Rule> rlist) {
-        this.rules = rlist.toArray(new Rule[0]);
-    }
-
-    public Rule[] getRules() {
-        return rules;
-    }
-}
-
-class MDScope extends Scope {
-
-    private String key;
-    private String value;
-
-    MDScope(String constraint, Rule[] rules) {
-        this.rules = rules;
-        int eq = constraint.indexOf("=");
-        if (eq != -1) {
-            key = constraint.substring(0, eq);
-            value = constraint.substring(eq + 1);
-        } else {
-            key = constraint;
+        public String getValue() {
+            return value;
         }
     }
 
-    public String getKey() {
-        return key;
-    }
+    static class Rule {
 
-    public String getValue() {
-        return value;
-    }
-}
+        public enum Type {
+            DENYPATH,
+            DENYPATHQUERY,
+            ALLOWPATH,
+            ALLOWPATHQUERY
+        }
 
-class Rule {
+        private Type type;
+        private Pattern pattern;
 
-    public enum Type {
-        DENYPATH,
-        DENYPATHQUERY,
-        ALLOWPATH,
-        ALLOWPATHQUERY
-    };
-
-    private Type type;
-    private Pattern pattern;
-
-    public Rule(String line) {
-        int offset = 0;
-        String lcline = line.toLowerCase(Locale.ROOT);
-        // separate the type from the pattern
-        for (Type t : Type.values()) {
-            String start = t.toString().toLowerCase(Locale.ROOT) + " ";
-            if (lcline.startsWith(start)) {
-                type = t;
-                offset = start.length();
-                break;
+        public Rule(String line) {
+            int offset = 0;
+            String lcline = line.toLowerCase(Locale.ROOT);
+            // separate the type from the pattern
+            for (Type t : Type.values()) {
+                String start = t.toString().toLowerCase(Locale.ROOT) + " ";
+                if (lcline.startsWith(start)) {
+                    type = t;
+                    offset = start.length();
+                    break;
+                }
             }
+            // no match?
+            if (type == null) {
+                return;
+            }
+
+            String patternString = line.substring(offset).trim();
+            pattern = Pattern.compile(patternString);
         }
-        // no match?
-        if (type == null) return;
 
-        String patternString = line.substring(offset).trim();
-        pattern = Pattern.compile(patternString);
-    }
+        public Type getType() {
+            return type;
+        }
 
-    public Type getType() {
-        return type;
-    }
-
-    public Pattern getPattern() {
-        return pattern;
+        public Pattern getPattern() {
+            return pattern;
+        }
     }
 }

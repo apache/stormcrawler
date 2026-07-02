@@ -16,9 +16,9 @@
 # Default configuration for Apache StormCrawler
 # This is used to make the default values explicit and list the most common configurations.
 # Do not modify this file but instead provide a custom one with the parameter -conf
-# when launching your extension of ConfigurableTopology.  
+# when launching your extension of ConfigurableTopology.
 
-config: 
+config:
   fetcher.server.delay: 1.0
   # min. delay for multi-threaded queues
   fetcher.server.min.delay: 0.0
@@ -29,6 +29,9 @@ config:
   fetcher.max.urls.in.queues: -1
   fetcher.max.queue.size: -1
   fetcher.timeout.queue: -1
+  # hard timeout in seconds for a single protocol fetch at the bolt level;
+  # -1 disables (relies on protocol-level socket timeouts only)
+  fetcher.thread.timeout: -1
   # max. crawl-delay accepted in robots.txt (in seconds)
   fetcher.max.crawl.delay: 30
   # behavior of fetcher when the crawl-delay in the robots.txt
@@ -52,14 +55,17 @@ config:
   # time bucket to use for the metrics sent by the Fetcher
   fetcher.metrics.time.bucket.secs: 10
 
+  # metrics version: "v1" (legacy), "v2" (Storm V2 native), or "both"
+  stormcrawler.metrics.version: "v1"
+
   # SimpleFetcherBolt: if the delay required by the politeness
-  # is above this value, the tuple is sent back to the Storm queue 
+  # is above this value, the tuple is sent back to the Storm queue
   # for the bolt on the _throttle_ stream (in msec)
   fetcher.max.throttle.sleep: -1
-  
+
   # alternative values are "byIP" and "byDomain"
   partition.url.mode: "byHost"
-  
+
   urlbuffer.class: "org.apache.stormcrawler.persistence.urlbuffer.SimpleURLBuffer"
 
   # Lists the metadata to transfer to outlinks
@@ -78,16 +84,16 @@ config:
    - error.source
    - isSitemap
    - isFeed
-   
+
   metadata.track.path: true
   metadata.track.depth: true
 
-  # Agent name info - given here as an example. Do not be an anonynmous coward, use your real information!
+  # Agent name info - given here as an example. Do not be an anonymous coward, use your real information!
   # The full user agent value sent as part of the HTTP requests
   # is built from the elements below. Only the agent.name is mandatory,
-  # it is also used to parse the robots.txt directives. 
+  # it is also used to parse the robots.txt directives.
 
-  # The agent name must be compliant with RFC 9309 (section 2.2.1) 
+  # The agent name must be compliant with RFC 9309 (section 2.2.1)
   # i.e. it MUST contain only uppercase and lowercase letters ("a-z" and "A-Z), underscores ("_"), and hyphens ("-")
   # http.agent.name: "AnonymousCoward"
   # version of your crawler
@@ -107,7 +113,7 @@ config:
   # http.robots.agents: agents as a comma separated string but can also take a list
 
   # (advanced) Specify the user agent to send to the HTTP requests
-  # note that this is not used for parsing the robots.txt and 
+  # note that this is not used for parsing the robots.txt and
   # therefore you need to have set _http.agent.name_.
   # http.agent: "Verbatim user agent"
 
@@ -138,18 +144,32 @@ config:
   # Follow redirect HTTP responses:
   http.allow.redirects: false
 
+  # IP address filtering (okhttp protocol only). Optionally limit or block
+  # connections to IP address ranges once the host name has been resolved. This
+  # prevents information leakage to a public index when a DNS entry points to a
+  # private or loopback address. Rules can be given as a comma-separated string
+  # or as a list and may be:
+  #   - a single IP address, e.g. "127.0.0.1" or "::1"
+  #   - a CIDR block, e.g. "192.168.0.0/16" or "fd00::/8"
+  #   - "localhost" / "loopback" (matches InetAddress.isLoopbackAddress())
+  #   - "sitelocal" (matches InetAddress.isSiteLocalAddress())
+  # Only addresses matching an include rule are fetched (empty means all are
+  # allowed), addresses matching an exclude rule are always blocked.
+  # http.filter.ipaddress.include:
+  # http.filter.ipaddress.exclude: "localhost,sitelocal"
+
   # Allow all if robots.txt cannot be parsed due to code 403 (Forbidden):
   http.robots.403.allow: true
 
   # Allow all if robots.txt cannot be parsed due to a server error (5xx):
   http.robots.5xx.allow: false
-  
+
   # ignore directives from robots.txt files?
   http.robots.file.skip: false
-  
+
   # ignore robots directives from the http headers?
   http.robots.headers.skip: false
-  
+
   # ignore robots directives from the html meta?
   http.robots.meta.skip: false
 
@@ -162,7 +182,7 @@ config:
   # http.robots.content.limit: 524288  # 512 kiB
   http.robots.content.limit: -1  # default same as http.content.limit
 
-  # Guava caches used for the robots.txt directives 
+  # Guava caches used for the robots.txt directives
   robots.cache.spec: "maximumSize=10000,expireAfterWrite=6h"
   robots.error.cache.spec: "maximumSize=10000,expireAfterWrite=1h"
 
@@ -269,7 +289,7 @@ config:
 
   # Guava cache use by AbstractStatusUpdaterBolt for DISCOVERED URLs
   status.updater.use.cache: true
-  status.updater.cache.spec: "maximumSize=10000,expireAfterAccess=1h"
+  status.updater.cache.spec: "expireAfterAccess=1h,softValues"
 
   # Can also take "MINUTE" or "HOUR"
   status.updater.unit.round.date: "SECOND"
@@ -282,12 +302,12 @@ config:
   indexer.text.maxlength: -1
   indexer.canonical.name: "canonical"
   # How to convert metadata key values into fields for indexing
-  # 
+  #
   # if no alias is specified with =alias, the key value is used
-  # for instance below, _domain_ and _format_ will be used 
+  # for instance below, _domain_ and _format_ will be used
   # as field names, whereas _title_ will be used for _parse.title_.
-  # You can specify the index of the value to store from the values array 
-  # by using the _key[index]_ format, e.g. _parse.title[0]_ would try to 
+  # You can specify the index of the value to store from the values array
+  # by using the _key[index]_ format, e.g. _parse.title[0]_ would try to
   # get the first value for the metadata _parse.title_ (which is the default anyway).
   # Finally, you can use a glob (*) to match all the keys, e.g. _parse.*_ would
   # index all the keys with _parse_ as a prefix. Note that in that case, you can't
@@ -296,4 +316,4 @@ config:
   - parse.title=title
   - parse.keywords=keywords
   - parse.description=description
-  
+

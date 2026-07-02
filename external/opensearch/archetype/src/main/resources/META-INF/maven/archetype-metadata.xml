@@ -20,53 +20,53 @@ under the License.
 -->
 
 <archetype-descriptor
-	xmlns="https://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="https://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0 http://maven.apache.org/xsd/archetype-descriptor-1.1.0.xsd"
-	name="stormcrawler-core">
+    xmlns="https://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0 http://maven.apache.org/xsd/archetype-descriptor-1.1.0.xsd"
+    name="stormcrawler-core">
 
-	<requiredProperties>
-		<requiredProperty key="http-agent-name">
-			<validationRegex>^[a-zA-Z_\-]+$</validationRegex>
-		</requiredProperty>
-		<requiredProperty key="http-agent-version" />
-		<requiredProperty key="http-agent-description" />
-		<requiredProperty key="http-agent-url" />
-		<requiredProperty key="http-agent-email">
-			<validationRegex>^\S+@\S+\.\S+$</validationRegex>
-		</requiredProperty>
-		<requiredProperty key="StormCrawlerVersion">
-			<defaultValue>${project.version}</defaultValue>
-		</requiredProperty>
-	</requiredProperties>
-	
-  <fileSets>
-    <fileSet filtered="true" encoding="UTF-8">
-      <directory>src/main/resources</directory>
-      <includes>
-        <include>**/*.xml</include>
-        <include>**/*.txt</include>
-        <include>**/*.yaml</include>
-        <include>**/*.json</include>
-        <include>**/*.mapping</include>
-      </includes>
-    </fileSet>
-    <fileSet filtered="true" encoding="UTF-8">
-      <directory></directory>
-      <includes>
-        <include>README.md</include>
-        <include>*.flux</include>
-        <include>*.yaml</include>
-        <include>*.sh</include>
-      </includes>
-    </fileSet>
-    <fileSet filtered="true" encoding="UTF-8">
-      <directory>dashboards</directory>
-      <includes>
-        <include>*.sh</include>
-        <include>*.ndjson</include>
-      </includes>
-    </fileSet>
-  </fileSets>
+    <requiredProperties>
+        <requiredProperty key="http-agent-name">
+            <validationRegex>^[a-zA-Z_\-]+$</validationRegex>
+        </requiredProperty>
+        <requiredProperty key="http-agent-version" />
+        <requiredProperty key="http-agent-description" />
+        <requiredProperty key="http-agent-url" />
+        <requiredProperty key="http-agent-email">
+            <validationRegex>^\S+@\S+\.\S+$</validationRegex>
+        </requiredProperty>
+        <requiredProperty key="StormCrawlerVersion">
+            <defaultValue>${project.version}</defaultValue>
+        </requiredProperty>
+    </requiredProperties>
+
+    <fileSets>
+        <fileSet filtered="true" encoding="UTF-8">
+            <directory>src/main/resources</directory>
+            <includes>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.yaml</include>
+                <include>**/*.json</include>
+                <include>**/*.mapping</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true" encoding="UTF-8">
+            <directory></directory>
+            <includes>
+                <include>README.md</include>
+                <include>*.flux</include>
+                <include>*.yaml</include>
+                <include>*.sh</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true" encoding="UTF-8">
+            <directory>dashboards</directory>
+            <includes>
+                <include>*.sh</include>
+                <include>*.ndjson</include>
+            </includes>
+        </fileSet>
+    </fileSets>
 
 </archetype-descriptor>

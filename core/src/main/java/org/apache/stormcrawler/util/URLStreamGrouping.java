@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import com.google.common.collect.ImmutableList;
@@ -21,9 +22,9 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.generated.GlobalStreamId;
 import org.apache.storm.grouping.CustomStreamGrouping;
-import org.apache.storm.shade.org.apache.commons.lang.StringUtils;
 import org.apache.storm.task.WorkerTopologyContext;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
@@ -58,7 +59,7 @@ public class URLStreamGrouping implements CustomStreamGrouping, Serializable {
 
     private String partitionMode;
 
-    /** Groups URLs based on the hostname * */
+    /** Groups URLs based on the hostname. */
     public URLStreamGrouping() {}
 
     public URLStreamGrouping(String mode) {

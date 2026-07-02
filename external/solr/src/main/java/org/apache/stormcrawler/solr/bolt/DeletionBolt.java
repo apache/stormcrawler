@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.solr.bolt;
 
 import java.io.IOException;
@@ -32,7 +33,7 @@ import org.slf4j.LoggerFactory;
  * Deletion bolt for Apache SOLR.
  * Must be connected to the 'deletion' stream of the status updater bolt.
  * <pre>
- * 		builder.setBolt("deleter", new DeletionBolt()).localOrShuffleGrouping("status", Constants.DELETION_STREAM_NAME);
+ *      builder.setBolt("deleter", new DeletionBolt()).localOrShuffleGrouping("status", Constants.DELETION_STREAM_NAME);
  * </pre>
  **/
 @SuppressWarnings("serial")
@@ -60,12 +61,13 @@ public class DeletionBolt extends BaseRichBolt {
 
     @Override
     public void cleanup() {
-        if (connection != null)
+        if (connection != null) {
             try {
                 connection.close();
             } catch (IOException | SolrServerException e) {
                 LOG.warn("Failed to close connection", e);
             }
+        }
     }
 
     @Override

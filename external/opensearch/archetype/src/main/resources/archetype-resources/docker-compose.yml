@@ -1,0 +1,81 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+services:
+  zookeeper:
+    image: zookeeper:3.9.3
+    container_name: zookeeper
+    restart: always
+
+  nimbus:
+    image: storm:latest
+    container_name: nimbus
+    hostname: nimbus
+    command: storm nimbus
+    depends_on:
+      - zookeeper
+    restart: always
+
+  supervisor:
+    image: storm:latest
+    container_name: supervisor
+    command: storm supervisor -c worker.childopts=-Xmx%HEAP-MEM%m
+    depends_on:
+      - nimbus
+      - zookeeper
+    restart: always
+
+  ui:
+    image: storm:latest
+    container_name: ui
+    command: storm ui
+    depends_on:
+      - nimbus
+    restart: always
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  opensearch-sc:
+    image: opensearchproject/opensearch:2.19.4
+    container_name: opensearch-sc
+    environment:
+      - cluster.name=opensearch-sc-cluster
+      - node.name=opensearch-sc
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true # along with the memlock settings below, disables swapping
+      - "OPENSEARCH_JAVA_OPTS=-Xms4G -Xmx4G"
+      - plugins.security.disabled=true
+      - "DISABLE_INSTALL_DEMO_CONFIG=true"
+    volumes:
+      - opensearch-sc-data:/usr/share/opensearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536 # maximum number of open files for the OpenSearch user, set to at least 65536 on modern systems
+        hard: 65536
+    ports:
+      - "127.0.0.1:9200:9200" # REST API
+
+  opensearch-dashboard:
+    image: opensearchproject/opensearch-dashboards:2.19.4
+    container_name: dashboard
+    ports:
+      - "127.0.0.1:5601:5601"
+    expose:
+      - "5601"
+    environment:
+      - 'OPENSEARCH_HOSTS=["http://opensearch-sc:9200"]'
+      - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=true" # disables security dashboards plugin in OpenSearch Dashboards

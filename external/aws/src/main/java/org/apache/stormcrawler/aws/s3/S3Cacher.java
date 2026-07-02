@@ -14,25 +14,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.aws.s3;
 
-import com.amazonaws.services.s3.model.AmazonS3Exception;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectResult;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Map;
-import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.StorageClass;
 
 /** Stores binary content into Amazon S3. The credentials must be stored in ~/.aws/credentials */
 public abstract class S3Cacher extends AbstractS3CacheBolt {
@@ -54,14 +53,14 @@ public abstract class S3Cacher extends AbstractS3CacheBolt {
 
         bucketName = ConfUtils.getString(conf, BUCKET);
 
-        boolean bucketExists = client.doesBucketExist(bucketName);
+        boolean bucketExists = doesBucketExist(bucketName);
         if (!bucketExists) {
             String message = "Bucket " + bucketName + " does not exist";
             throw new RuntimeException(message);
         }
         this.eventCounter =
-                context.registerMetric(
-                        getMetricPrefix() + "s3cache_counter", new MultiCountMetric(), 10);
+                CrawlerMetrics.registerCounter(
+                        context, conf, getMetricPrefix() + "s3cache_counter", 10);
     }
 
     @Override
@@ -93,12 +92,7 @@ public abstract class S3Cacher extends AbstractS3CacheBolt {
         }
 
         // normalises URL
-        String key = "";
-        try {
-            key = URLEncoder.encode(url, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            // ignore it - we know UTF-8 is valid
-        }
+        String key = URLEncoder.encode(url, java.nio.charset.StandardCharsets.UTF_8);
         // check size of the key
         if (key.length() >= 1024) {
             LOG.info("Key too large : {}", key);
@@ -109,25 +103,20 @@ public abstract class S3Cacher extends AbstractS3CacheBolt {
             return;
         }
 
-        ByteArrayInputStream input = new ByteArrayInputStream(contentToCache);
-
-        ObjectMetadata md = new ObjectMetadata();
-        md.setContentLength(contentToCache.length);
-        md.setHeader("x-amz-storage-class", "STANDARD_IA");
+        PutObjectRequest request =
+                PutObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(getKeyPrefix() + key)
+                        .storageClass(StorageClass.STANDARD_IA)
+                        .build();
 
         try {
-            PutObjectResult result = client.putObject(bucketName, getKeyPrefix() + key, input, md);
+            client.putObject(request, RequestBody.fromBytes(contentToCache));
             eventCounter.scope("cached").incr();
             // TODO check something with the result?
-        } catch (AmazonS3Exception exception) {
-            LOG.error("AmazonS3Exception while storing {}", url, exception);
+        } catch (S3Exception exception) {
+            LOG.error("S3Exception while storing {}", url, exception);
             eventCounter.scope("s3_exception").incr();
-        } finally {
-            try {
-                input.close();
-            } catch (IOException e) {
-                LOG.error("Error while closing ByteArrayInputStream", e);
-            }
         }
 
         _collector.emit(tuple, new Values(url, content, metadata));

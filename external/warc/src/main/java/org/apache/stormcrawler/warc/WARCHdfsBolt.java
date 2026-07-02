@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.warc;
 
 import java.io.IOException;
@@ -58,8 +59,8 @@ public class WARCHdfsBolt extends GzipHdfsBolt {
         withFsUrl("file:///");
     }
 
-    public WARCHdfsBolt withHeader(Map<String, String> header_fields) {
-        this.header_fields = header_fields;
+    public WARCHdfsBolt withHeader(Map<String, String> headerFields) {
+        this.header_fields = headerFields;
         return this;
     }
 

@@ -23,16 +23,16 @@ config:
    password: "mypassword"
    rewriteBatchedStatements: "true"
    useBatchMultiSend: "true"
-   
+
   sql.max.urls.per.bucket: 5
-  
+
   sql.status.table: "urls"
-  
+
   sql.spout.max.results: 100
-  
+
     # time in secs for which the URLs will be considered for fetching after a ack or fail
   spout.ttl.purgatory: 30
-  
+
   # Min time (in msecs) to allow between 2 successive queries to SQL
   spout.min.delay.queries: 2000
 
@@ -42,9 +42,9 @@ config:
   spout.reset.fetchdate.after: 120
 
   sql.metrics.table: "metrics"
-  
+
   sql.index.table: "content"
-  
+
     # Metrics consumers:
   topology.metrics.consumer.register:
      - class: "org.apache.stormcrawler.sql.metrics.MetricsConsumer"

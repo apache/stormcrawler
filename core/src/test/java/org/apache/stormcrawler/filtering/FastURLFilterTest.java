@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.filtering;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.regex.FastURLFilter;
+import org.apache.stormcrawler.util.URLUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -40,7 +42,7 @@ class FastURLFilterTest {
 
     @Test
     void testImagesFilter() throws MalformedURLException {
-        URL url = new URL("http://www.somedomain.com/image.jpg");
+        URL url = URLUtil.toURL("http://www.somedomain.com/image.jpg");
         Metadata metadata = new Metadata();
         String filterResult = createFilter().filter(url, metadata, url.toExternalForm());
         Assertions.assertNull(filterResult);
@@ -48,19 +50,19 @@ class FastURLFilterTest {
 
     @Test
     void testDomainNotAllowed() throws MalformedURLException {
-        URL url = new URL("http://stormcrawler.net/");
+        URL url = URLUtil.toURL("http://stormcrawler.net/");
         Metadata metadata = new Metadata();
         String filterResult = createFilter().filter(url, metadata, url.toExternalForm());
         Assertions.assertNull(filterResult);
         // allowed
-        url = new URL("http://stormcrawler.net/bla/");
+        url = URLUtil.toURL("http://stormcrawler.net/bla/");
         filterResult = createFilter().filter(url, metadata, url.toExternalForm());
         Assertions.assertEquals(url.toString(), filterResult);
     }
 
     @Test
     void testMD() throws MalformedURLException {
-        URL url = new URL("http://somedomain.net/");
+        URL url = URLUtil.toURL("http://somedomain.net/");
         Metadata metadata = new Metadata();
         metadata.addValue("key", "value");
         String filterResult = createFilter().filter(url, metadata, url.toExternalForm());

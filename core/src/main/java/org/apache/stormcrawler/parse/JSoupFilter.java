@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse;
 
 import org.apache.stormcrawler.util.Configurable;
@@ -25,7 +26,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public interface JSoupFilter extends Configurable {
     /**
-     * Called when parsing a specific page
+     * Called when parsing a specific page.
      *
      * @param url the URL of the page being parsed
      * @param content the content being parsed

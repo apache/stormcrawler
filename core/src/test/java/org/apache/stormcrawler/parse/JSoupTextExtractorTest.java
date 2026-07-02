@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -61,6 +62,35 @@ class JSoupTextExtractorTest {
         Document jsoupDoc = Parser.htmlParser().parseInput(content, "http://stormcrawler.net");
         String text = extractor.text(jsoupDoc.body());
         assertEquals("the content of the page", text);
+    }
+
+    @Test
+    void testBlockFollowedByInlineElement() {
+        Config conf = new Config();
+        JSoupTextExtractor extractor = new JSoupTextExtractor(conf);
+        // block element followed by an inline anchor — see #1925
+        String content =
+                "<html><body><div>"
+                        + "<h3>Contact</h3>"
+                        + "<a href=\"mailto:info@example.com\">info@example.com</a>"
+                        + "</div></body></html>";
+        Document jsoupDoc = Parser.htmlParser().parseInput(content, "http://example.com");
+        String text = extractor.text(jsoupDoc.body());
+        assertEquals("Contact info@example.com", text);
+    }
+
+    @Test
+    void testBlockFollowedByInlineSpan() {
+        Config conf = new Config();
+        JSoupTextExtractor extractor = new JSoupTextExtractor(conf);
+        String content =
+                "<html><body><div>"
+                        + "<div>Phone</div>"
+                        + "<span>555-0100</span>"
+                        + "</div></body></html>";
+        Document jsoupDoc = Parser.htmlParser().parseInput(content, "http://example.com");
+        String text = extractor.text(jsoupDoc.body());
+        assertEquals("Phone 555-0100", text);
     }
 
     @Test

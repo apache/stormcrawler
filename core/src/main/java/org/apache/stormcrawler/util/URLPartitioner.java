@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.util;
 
 import crawlercommons.domains.PaidLevelDomain;
@@ -21,7 +22,7 @@ import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.slf4j.Logger;
@@ -48,28 +49,28 @@ public class URLPartitioner {
 
         // IP in metadata?
         if (partitionMode.equalsIgnoreCase(Constants.PARTITION_MODE_IP)) {
-            String ip_provided = metadata.getFirstValue("ip");
-            if (StringUtils.isNotBlank(ip_provided)) {
-                partitionKey = ip_provided;
+            String ipProvided = metadata.getFirstValue("ip");
+            if (StringUtils.isNotBlank(ipProvided)) {
+                partitionKey = ipProvided;
             }
         }
 
         if (partitionKey == null) {
             URL u;
             try {
-                u = new URL(url);
+                u = URLUtil.toURL(url);
                 host = u.getHost();
-            } catch (MalformedURLException e1) {
+            } catch (MalformedURLException e) {
                 LOG.warn("Invalid URL: {}", url);
                 return null;
             }
         }
 
         // partition by hostname
-        if (partitionMode.equalsIgnoreCase(Constants.PARTITION_MODE_HOST)) partitionKey = host;
-
-        // partition by domain : needs fixing
-        else if (partitionMode.equalsIgnoreCase(Constants.PARTITION_MODE_DOMAIN)) {
+        if (partitionMode.equalsIgnoreCase(Constants.PARTITION_MODE_HOST)) {
+            partitionKey = host;
+        } else if (partitionMode.equalsIgnoreCase(Constants.PARTITION_MODE_DOMAIN)) {
+            // partition by domain : needs fixing
             partitionKey = PaidLevelDomain.getPLD(host);
         }
 

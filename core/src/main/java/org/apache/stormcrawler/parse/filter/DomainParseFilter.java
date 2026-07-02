@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -27,7 +28,7 @@ import org.apache.stormcrawler.util.URLPartitioner;
 import org.jetbrains.annotations.NotNull;
 import org.w3c.dom.DocumentFragment;
 
-/** Adds domain (or host) to metadata - can be used later on for indexing * */
+/** Adds domain (or host) to metadata - can be used later on for indexing. */
 public class DomainParseFilter extends ParseFilter {
 
     private URLPartitioner partitioner;
@@ -54,9 +55,9 @@ public class DomainParseFilter extends ParseFilter {
     }
 
     @Override
-    public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse) {
-        Metadata metadata = parse.get(URL).getMetadata();
-        String value = partitioner.getPartition(URL, metadata);
+    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+        Metadata metadata = parse.get(url).getMetadata();
+        String value = partitioner.getPartition(url, metadata);
         metadata.setValue(mdKey, value);
     }
 }

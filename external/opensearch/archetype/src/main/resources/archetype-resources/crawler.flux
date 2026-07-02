@@ -33,7 +33,7 @@ bolts:
     parallelism: 1
   - id: "shunt"
     className: "org.apache.stormcrawler.tika.RedirectionBolt"
-    parallelism: 1 
+    parallelism: 1
   - id: "tika"
     className: "org.apache.stormcrawler.tika.ParserBolt"
     parallelism: 1

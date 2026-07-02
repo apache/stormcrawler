@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.stormcrawler.persistence;
 
 public enum Status {
@@ -23,12 +24,17 @@ public enum Status {
     REDIRECTION,
     ERROR;
 
-    /** Maps the HTTP Code to FETCHED, FETCH_ERROR or REDIRECTION */
+    /** Maps the HTTP Code to FETCHED, FETCH_ERROR or REDIRECTION. */
     public static Status fromHTTPCode(int code) {
-        if (code == 200) return Status.FETCHED;
-        else if (code == 304) return Status.FETCHED;
+        if (code == 200) {
+            return Status.FETCHED;
+        } else if (code == 304) {
+            return Status.FETCHED;
+        }
         // REDIRS?
-        if (code >= 300 && code < 400) return Status.REDIRECTION;
+        if (code >= 300 && code < 400) {
+            return Status.REDIRECTION;
+        }
         // error otherwise
         return Status.FETCH_ERROR;
     }

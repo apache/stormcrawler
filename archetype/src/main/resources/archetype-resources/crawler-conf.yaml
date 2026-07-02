@@ -14,19 +14,19 @@
 # limitations under the License.
 
 # Custom configuration for StormCrawler
-# This is used to override the default values from crawler-default.xml and provide additional ones 
+# This is used to override the default values from crawler-default.xml and provide additional ones
 # for your custom components.
 # Use this file with the parameter -conf when launching your extension of ConfigurableTopology.
 # This file does not contain all the key values but only the most frequently used ones. See crawler-default.xml for an extensive list.
 
-config: 
+config:
   topology.workers: 1
   topology.message.timeout.secs: 300
   topology.max.spout.pending: 100
   topology.debug: false
 
   fetcher.threads.number: 50
-  
+
   # override the JVM parameters for the workers
   topology.worker.childopts: "-Xmx2g -Djava.net.preferIPv4Stack=true"
 
@@ -55,9 +55,9 @@ config:
   # Agent name info - given here as an example. Do not be an anonynmous coward, use your real information!
   # The full user agent value sent as part of the HTTP requests
   # is built from the elements below. Only the agent.name is mandatory,
-  # it is also used to parse the robots.txt directives. 
+  # it is also used to parse the robots.txt directives.
 
-  # The agent name must be compliant with RFC 9309 (section 2.2.1) 
+  # The agent name must be compliant with RFC 9309 (section 2.2.1)
   # i.e. it MUST contain only uppercase and lowercase letters ("a-z" and "A-Z), underscores ("_"), and hyphens ("-")
   http.agent.name: "${http-agent-name}"
   # version of your crawler
@@ -142,12 +142,12 @@ config:
   indexer.text.fieldname: "content"
   indexer.canonical.name: "canonical"
   # How to convert metadata key values into fields for indexing
-  # 
+  #
   # if no alias is specified with =alias, the key value is used
-  # for instance below, _domain_ and _format_ will be used 
+  # for instance below, _domain_ and _format_ will be used
   # as field names, whereas _title_ will be used for _parse.title_.
-  # You can specify the index of the value to store from the values array 
-  # by using the _key[index]_ format, e.g. _parse.title[0]_ would try to 
+  # You can specify the index of the value to store from the values array
+  # by using the _key[index]_ format, e.g. _parse.title[0]_ would try to
   # get the first value for the metadata _parse.title_ (which is the default anyway).
   # Finally, you can use a glob (*) to match all the keys, e.g. _parse.*_ would
   # index all the keys with _parse_ as a prefix. Note that in that case, you can't

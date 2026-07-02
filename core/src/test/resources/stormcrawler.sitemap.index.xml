@@ -22,20 +22,20 @@ under the License.
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
                       http://www.sitemaps.org/schemas/sitemap/0.9/siteindex.xsd">
-  <sitemap>
-    <loc>https://stormcrawler.apache.org/sitemap-001.xml.gz</loc>
-    <lastmod>2024-10-19T11:21:53Z</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>https://stormcrawler.apache.org/sitemap-002.xml.gz</loc>
-    <lastmod>2024-10-19T11:21:53Z</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>https://stormcrawler.apache.org/sitemap-003.xml.gz</loc>
-    <lastmod>2024-10-19T11:21:53Z</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>https://stormcrawler.apache.org/sitemap-004.xml.gz</loc>
-    <lastmod>2024-10-19T11:21:53Z</lastmod>
-  </sitemap>
+    <sitemap>
+        <loc>https://stormcrawler.apache.org/sitemap-001.xml.gz</loc>
+        <lastmod>2024-10-19T11:21:53Z</lastmod>
+    </sitemap>
+    <sitemap>
+        <loc>https://stormcrawler.apache.org/sitemap-002.xml.gz</loc>
+        <lastmod>2024-10-19T11:21:53Z</lastmod>
+    </sitemap>
+    <sitemap>
+        <loc>https://stormcrawler.apache.org/sitemap-003.xml.gz</loc>
+        <lastmod>2024-10-19T11:21:53Z</lastmod>
+    </sitemap>
+    <sitemap>
+        <loc>https://stormcrawler.apache.org/sitemap-004.xml.gz</loc>
+        <lastmod>2024-10-19T11:21:53Z</lastmod>
+    </sitemap>
 </sitemapindex>

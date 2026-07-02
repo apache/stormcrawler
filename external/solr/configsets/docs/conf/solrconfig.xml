@@ -18,24 +18,24 @@ specific language governing permissions and limitations
 under the License.
 -->
 <config>
-	<luceneMatchVersion>9.0.0</luceneMatchVersion>
-	<requestDispatcher handleSelect="false">
-		<httpCaching never304="true" />
-	</requestDispatcher>
-	<updateHandler class="solr.DirectUpdateHandler2">
-		<updateLog>
-			<str name="dir">${solr.ulog.dir:}</str>
-		</updateLog>
-		<autoCommit>
-			<maxDocs>10000</maxDocs>
-			<maxTime>10000</maxTime>
-			<openSearcher>false</openSearcher>
-		</autoCommit>
-		<autoSoftCommit>
-			<maxTime>1000</maxTime>
-		</autoSoftCommit>
-	</updateHandler>
-	<requestHandler name="/select"   class="solr.SearchHandler" />
-	<requestHandler name="/update" class="solr.UpdateRequestHandler" />
-	<requestHandler name="/analysis/field" class="solr.FieldAnalysisRequestHandler" startup="lazy" />
+    <luceneMatchVersion>10.3</luceneMatchVersion>
+    <requestDispatcher handleSelect="false">
+        <httpCaching never304="true" />
+    </requestDispatcher>
+    <updateHandler class="solr.DirectUpdateHandler2">
+        <updateLog>
+            <str name="dir">${solr.ulog.dir:}</str>
+        </updateLog>
+        <autoCommit>
+            <maxDocs>10000</maxDocs>
+            <maxTime>10000</maxTime>
+            <openSearcher>false</openSearcher>
+        </autoCommit>
+        <autoSoftCommit>
+            <maxTime>1000</maxTime>
+        </autoSoftCommit>
+    </updateHandler>
+    <requestHandler name="/select"   class="solr.SearchHandler" />
+    <requestHandler name="/update" class="solr.UpdateRequestHandler" />
+    <requestHandler name="/analysis/field" class="solr.FieldAnalysisRequestHandler" startup="lazy" />
 </config>

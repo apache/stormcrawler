@@ -36,10 +36,14 @@ public class LocalResourceHandler extends AbstractHandler {
             jakarta.servlet.http.HttpServletRequest httpServletRequest,
             jakarta.servlet.http.HttpServletResponse response)
             throws IOException {
-        if (response.isCommitted() || baseRequest.isHandled()) return;
+        if (response.isCommitted() || baseRequest.isHandled()) {
+            return;
+        }
 
         // does the URL have a file element?
-        if (s.length() < 2) return;
+        if (s.length() < 2) {
+            return;
+        }
 
         baseRequest.setHandled(true);
 
