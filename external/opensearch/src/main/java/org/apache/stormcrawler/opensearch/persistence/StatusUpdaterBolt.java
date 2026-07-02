@@ -240,7 +240,8 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt implements Bulk
         // send a tuple on the queue stream in case a bolt
         // wants to handle it
         super.collector.emit(
-                org.apache.stormcrawler.Constants.QUEUE_STREAM_NAME, new Values(partitionKey));
+                org.apache.stormcrawler.Constants.QUEUE_STREAM_NAME,
+                new Values(partitionKey, metadata));
 
         // store routing key in metadata?
         if (StringUtils.isNotBlank(fieldNameForRoutingKey) && routingFieldNameInMetadata) {
