@@ -29,8 +29,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Parses the value of a <a
- * href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a>
- * HTTP response header, as sent by servers alongside a 429 (Too Many Requests) or 503 (Service
+ * href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a> HTTP
+ * response header, as sent by servers alongside a 429 (Too Many Requests) or 503 (Service
  * Unavailable) response to request a back-off.
  */
 public final class RetryAfterParser {

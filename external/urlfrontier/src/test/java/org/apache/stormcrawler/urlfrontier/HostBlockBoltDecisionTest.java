@@ -60,11 +60,14 @@ class HostBlockBoltDecisionTest {
     @Test
     void ignoresOtherStatusCodesEvenWithHeader() {
         assertEquals(
-                -1L, HostBlockBolt.blockUntilFor(md("200", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
+                -1L,
+                HostBlockBolt.blockUntilFor(md("200", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
         assertEquals(
-                -1L, HostBlockBolt.blockUntilFor(md("301", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
+                -1L,
+                HostBlockBolt.blockUntilFor(md("301", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
         assertEquals(
-                -1L, HostBlockBolt.blockUntilFor(md("403", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
+                -1L,
+                HostBlockBolt.blockUntilFor(md("403", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
     }
 
     @Test
@@ -83,7 +86,8 @@ class HostBlockBoltDecisionTest {
     void ignoresMalformedHeaderAndZeroDelay() {
         assertEquals(
                 -1L,
-                HostBlockBolt.blockUntilFor(md("429", "not-a-date"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
+                HostBlockBolt.blockUntilFor(
+                        md("429", "not-a-date"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
         // a zero delay is not worth a frontier round-trip
         assertEquals(
                 -1L, HostBlockBolt.blockUntilFor(md("429", "0"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));

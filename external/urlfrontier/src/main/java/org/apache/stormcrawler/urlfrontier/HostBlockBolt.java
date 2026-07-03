@@ -38,18 +38,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Consumes the {@code queue} stream emitted by the status updater and blocks a queue in
- * URLFrontier via {@code blockQueueUntil} whenever the tuple's metadata reports a rate-limit
- * response (HTTP 429 or 503) carrying a <a
+ * Consumes the {@code queue} stream emitted by the status updater and blocks a queue in URLFrontier
+ * via {@code blockQueueUntil} whenever the tuple's metadata reports a rate-limit response (HTTP 429
+ * or 503) carrying a <a
  * href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a>
  * header. See issues #867 and #784.
  *
  * <p>Wire it with a fields grouping on {@code "key"} from the status updater's {@code queue}
  * stream. The {@code "key"} is the frontier queue key derived from {@code partition.url.mode} (the
  * same setting the frontier uses to assign queues), so the block targets the matching queue. The
- * honoured delay is capped by {@code urlfrontier.max.retry.after} (in seconds, default 86400, -1
- * to disable the cap). Connects via {@code urlfrontier.host} / {@code urlfrontier.port};
- * multi-node address resolution is not supported.
+ * honoured delay is capped by {@code urlfrontier.max.retry.after} (in seconds, default 86400, -1 to
+ * disable the cap). Connects via {@code urlfrontier.host} / {@code urlfrontier.port}; multi-node
+ * address resolution is not supported.
  *
  * <p>The block is fire-and-forget: a failed call is logged but the tuple is acked anyway. A missed
  * block means the host is fetched once more and the next 429 re-emits the signal.
@@ -147,7 +147,8 @@ public class HostBlockBolt extends BaseRichBolt {
      * @return the absolute time to block the queue until, in epoch seconds, or {@code -1} if the
      *     tuple does not call for a block
      */
-    static long blockUntilFor(Metadata metadata, String retryAfterKey, long maxRetryAfterMs, long nowMs) {
+    static long blockUntilFor(
+            Metadata metadata, String retryAfterKey, long maxRetryAfterMs, long nowMs) {
         if (metadata == null) {
             return -1L;
         }
