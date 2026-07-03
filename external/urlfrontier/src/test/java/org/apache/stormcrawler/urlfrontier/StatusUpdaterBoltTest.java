@@ -159,6 +159,27 @@ class StatusUpdaterBoltTest {
 
     @Test
     @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void emitsKeyAndMetadataOnQueueStream() {
+        final var url = "https://www.url.net/something";
+        final var meta = new Metadata();
+        meta.setValue(persistedKey, "somePersistedMetaInfo");
+        store(url, Status.DISCOVERED, meta);
+        Assertions.assertEquals(true, isAcked(url, 5));
+
+        // a (key, metadata) tuple goes out on the queue stream, as in the
+        // OpenSearch StatusUpdaterBolt (#1974)
+        var emitted = output.getEmitted(org.apache.stormcrawler.Constants.QUEUE_STREAM_NAME);
+        Assertions.assertEquals(1, emitted.size());
+        var values = emitted.get(0);
+        Assertions.assertEquals(2, values.size());
+        Assertions.assertEquals("www.url.net", values.get(0));
+        Assertions.assertTrue(values.get(1) instanceof Metadata);
+        Assertions.assertEquals(
+                "somePersistedMetaInfo", ((Metadata) values.get(1)).getFirstValue(persistedKey));
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
     void exceedingMaxMessagesInFlightAfterFrontierRestart()
             throws ExecutionException, InterruptedException, TimeoutException {
         // Stopping the frontier to simulate the following situation:
