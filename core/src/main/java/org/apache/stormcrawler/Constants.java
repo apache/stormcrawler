@@ -33,8 +33,6 @@ public class Constants {
 
     public static final String StatusStreamName = "status";
 
-    public static final String HOST_INFO_STREAM_NAME = "hostinfo";
-
     public static final String DELETION_STREAM_NAME = "deletion";
 
     public static final String AllowRedirParamName = "redirections.allowed";

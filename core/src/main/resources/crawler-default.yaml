@@ -52,15 +52,6 @@ config:
   #    use the delay specified in the robots.txt
   fetcher.server.delay.force: false
 
-  # max. delay in seconds honoured when a server requests a back-off via the
-  # Retry-After HTTP response header (e.g. on a 429 or 503). The parsed delay is
-  # emitted on the "hostinfo" stream (key, blockUntil-in-epoch-seconds) for a
-  # host-aware consumer to act on - the fetch itself is not delayed here.
-  #  (-1) honour the delay requested by the server as-is, with no upper bound
-  #  (>=0) cap the delay to this many seconds. The default of 24h bounds a
-  #        misbehaving or hostile server from pinning a host queue for too long.
-  fetcher.max.retry.after: 86400
-
   # time bucket to use for the metrics sent by the Fetcher
   fetcher.metrics.time.bucket.secs: 10
 
