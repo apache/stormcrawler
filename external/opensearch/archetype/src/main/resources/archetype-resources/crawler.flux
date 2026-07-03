@@ -49,6 +49,9 @@ bolts:
   - id: "status_metrics"
     className: "org.apache.stormcrawler.opensearch.metrics.StatusMetricsBolt"
     parallelism: 1
+  - id: "queues"
+    className: "org.apache.stormcrawler.opensearch.persistence.QueueBolt"
+    parallelism: 1
 
 streams:
   - from: "spout"
@@ -139,3 +142,10 @@ streams:
     grouping:
       type: LOCAL_OR_SHUFFLE
       streamId: "deletion"
+
+  - from: "status"
+    to: "queues"
+    grouping:
+      type: FIELDS
+      args: ["key"]
+      streamId: "queue"

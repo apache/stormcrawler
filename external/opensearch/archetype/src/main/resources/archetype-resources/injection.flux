@@ -31,6 +31,10 @@ bolts:
     className: "org.apache.stormcrawler.opensearch.persistence.StatusUpdaterBolt"
     parallelism: 1
 
+  - id: "queues"
+    className: "org.apache.stormcrawler.opensearch.persistence.QueueBolt"
+    parallelism: 1
+
 streams:
   - from: "filespout"
     to: "filter"
@@ -48,3 +52,10 @@ streams:
         className: "org.apache.stormcrawler.util.URLStreamGrouping"
         constructorArgs:
           - "byDomain"
+
+  - from: "status"
+    to: "queues"
+    grouping:
+      type: FIELDS
+      args: ["key"]
+      streamId: "queue"

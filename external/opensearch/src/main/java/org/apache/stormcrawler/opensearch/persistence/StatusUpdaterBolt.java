@@ -26,6 +26,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
+import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.metrics.ScopedCounter;
@@ -235,6 +236,12 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt implements Bulk
         if (partitionKey == null) {
             partitionKey = "_DEFAULT_";
         }
+
+        // send a tuple on the queue stream in case a bolt
+        // wants to handle it
+        super.collector.emit(
+                org.apache.stormcrawler.Constants.QUEUE_STREAM_NAME,
+                new Values(partitionKey, metadata));
 
         // store routing key in metadata?
         if (StringUtils.isNotBlank(fieldNameForRoutingKey) && routingFieldNameInMetadata) {

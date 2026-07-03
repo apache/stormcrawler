@@ -53,6 +53,14 @@ config:
   # Sets the response buffer to the specified value in MB.
   # opensearch.metrics.responseBufferSize: 100
 
+
+  # Queues index
+  opensearch.queues.addresses: "http://localhost:9200"
+  opensearch.queues.index.name: "queues"
+  opensearch.queues.sniff: true
+  # cache of known queues, see https://github.com/ben-manes/caffeine/wiki/Specification
+  # opensearch.queues.cache.spec: "maximumSize=10000"
+
   # Spout and persistence bolt
   opensearch.status.addresses: "http://localhost:9200"
   opensearch.status.index.name: "status"
