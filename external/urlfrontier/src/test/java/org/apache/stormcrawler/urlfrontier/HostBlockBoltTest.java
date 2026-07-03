@@ -40,6 +40,7 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.persistence.Status;
+import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -136,13 +137,18 @@ class HostBlockBoltTest {
 
         long nowSecs = System.currentTimeMillis() / 1000L;
 
-        // block the host for an hour via the bolt under test
+        // block the host for an hour via the bolt under test: a queue-stream
+        // tuple whose metadata reports a 429 with a Retry-After of one hour
         HostBlockBolt bolt = new HostBlockBolt();
-        bolt.prepare(
-                frontierConfig(), TestUtil.getMockedTopologyContext(), mock(OutputCollector.class));
+        Map<String, Object> conf = frontierConfig();
+        conf.put(ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "protocol.");
+        bolt.prepare(conf, TestUtil.getMockedTopologyContext(), mock(OutputCollector.class));
         Tuple t = mock(Tuple.class);
         when(t.getStringByField("key")).thenReturn(HOST);
-        when(t.getLongByField("blockUntil")).thenReturn(nowSecs + 3600);
+        Metadata md = new Metadata();
+        md.setValue("fetch.statusCode", "429");
+        md.setValue("protocol.retry-after", "3600");
+        when(t.getValueByField("metadata")).thenReturn(md);
         bolt.execute(t);
 
         // while blocked, getURLs must not return the host

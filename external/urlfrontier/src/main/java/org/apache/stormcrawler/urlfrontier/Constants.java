@@ -43,4 +43,12 @@ public final class Constants {
     public static final String URLFRONTIER_UPDATER_MAX_MESSAGES_KEY =
             "urlfrontier.updater.max.messages";
     public static final String URLFRONTIER_CRAWL_ID_KEY = "urlfrontier.crawlid";
+
+    /**
+     * Maximum delay in seconds honoured when a server requests a back-off via the Retry-After HTTP
+     * response header. {@code -1} disables the cap. Defaults to 86400 (24h).
+     */
+    public static final String URLFRONTIER_MAX_RETRY_AFTER_KEY = "urlfrontier.max.retry.after";
+
+    public static final int URLFRONTIER_MAX_RETRY_AFTER_DEFAULT = 86400;
 }
