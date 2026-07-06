@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -55,6 +56,31 @@ class RetryAfterParserTest {
     void parseRetryAfterPastDateReturnsMinusOne() {
         Instant past = Instant.now().minusSeconds(300);
         assertEquals(-1L, RetryAfterParser.parseDelay(HTTP_DATE.format(past)));
+    }
+
+    @Test
+    void httpDateFormatterMatchesSpecAndJdkForTwoDigitDays() {
+        // the local formatter mirrors the parser's pattern, so a round-trip
+        // alone cannot catch a wrong pattern: cross-check it against the
+        // IMF-fixdate example of RFC 7231 and against the JDK's RFC 1123
+        // formatter (identical output for two-digit days)
+        Instant fixed = Instant.parse("2015-10-21T07:28:00Z");
+        assertEquals("Wed, 21 Oct 2015 07:28:00 GMT", HTTP_DATE.format(fixed));
+        assertEquals(
+                DateTimeFormatter.RFC_1123_DATE_TIME.format(fixed.atOffset(ZoneOffset.UTC)),
+                HTTP_DATE.format(fixed));
+    }
+
+    @Test
+    void parseRetryAfterRejectsUnpaddedSingleDigitDay() {
+        // RFC 1123 allows a single-digit day (as produced by the JDK's
+        // RFC_1123_DATE_TIME) but IMF-fixdate requires two digits; the parser
+        // is deliberately strict and rejects the unpadded form, even for a
+        // date in the future
+        OffsetDateTime future = OffsetDateTime.now(ZoneOffset.UTC).plusYears(1).withDayOfMonth(3);
+        String unpadded = DateTimeFormatter.RFC_1123_DATE_TIME.format(future);
+        assertTrue(unpadded.matches("\\w{3}, 3 \\w{3}.*"), "unexpected format: " + unpadded);
+        assertEquals(-1L, RetryAfterParser.parseDelay(unpadded));
     }
 
     @Test

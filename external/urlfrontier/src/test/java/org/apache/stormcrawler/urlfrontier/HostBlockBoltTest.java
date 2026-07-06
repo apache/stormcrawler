@@ -18,6 +18,7 @@
 package org.apache.stormcrawler.urlfrontier;
 
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +29,7 @@ import crawlercommons.urlfrontier.Urlfrontier.BlockQueueParams;
 import crawlercommons.urlfrontier.Urlfrontier.GetParams;
 import crawlercommons.urlfrontier.Urlfrontier.URLInfo;
 import io.grpc.ManagedChannel;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -138,9 +140,15 @@ class HostBlockBoltTest {
         long nowSecs = System.currentTimeMillis() / 1000L;
 
         // block the host for an hour via the bolt under test: a queue-stream
-        // tuple whose metadata reports a 429 with a Retry-After of one hour
+        // tuple whose metadata reports a 429 with a Retry-After of one hour.
+        // The bolt is configured through urlfrontier.address to cover the
+        // address resolution as well
         HostBlockBolt bolt = new HostBlockBolt();
-        Map<String, Object> conf = frontierConfig();
+        var connection = container.getFrontierConnection();
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(
+                Constants.URLFRONTIER_ADDRESS_KEY,
+                connection.getHost() + ":" + connection.getPort());
         conf.put(ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "protocol.");
         bolt.prepare(conf, TestUtil.getMockedTopologyContext(), mock(OutputCollector.class));
         Tuple t = mock(Tuple.class);
@@ -151,10 +159,19 @@ class HostBlockBoltTest {
         when(t.getValueByField("metadata")).thenReturn(md);
         bolt.execute(t);
 
-        // while blocked, getURLs must not return the host
-        await().atMost(15, TimeUnit.SECONDS).until(() -> !keysFromGetURLs().contains(HOST));
+        // give the fire-and-forget RPC time to land before polling: getURLs
+        // must never hand the URL out, and URLFrontier exposes no read API
+        // for the block state. Polling getURLs() before the block is
+        // effective would put the URL in-flight and make the assertion below
+        // pass even without a block, so a blind delay is the only option
+        await().pollDelay(Duration.ofSeconds(2)).atMost(3, TimeUnit.SECONDS).until(() -> true);
+        assertTrue(
+                keysFromGetURLs().isEmpty(),
+                "the URL was handed out although the queue should be blocked");
 
-        // unblock (a past time releases the queue) and the host becomes available again
+        // unblock (a past time releases the queue) and the host becomes
+        // available again; the URL never went in-flight, so this cannot be
+        // satisfied by the in-flight timeout
         blocking.blockQueueUntil(
                 BlockQueueParams.newBuilder()
                         .setKey(HOST)
