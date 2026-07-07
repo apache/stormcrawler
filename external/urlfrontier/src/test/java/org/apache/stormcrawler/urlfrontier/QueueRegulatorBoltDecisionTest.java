@@ -28,12 +28,12 @@ import org.apache.stormcrawler.Metadata;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit coverage for {@link HostBlockBolt#blockUntilFor(String, Metadata, String, long, long)} - the
+ * Unit coverage for {@link QueueRegulatorBolt#blockUntilFor(String, Metadata, String, long, long)} - the
  * decision whether a queue-stream tuple carries a server-requested back-off worth enforcing - and
- * for {@link HostBlockBolt#missingQueueStreamKeys(Map, String)} - the startup check on {@code
+ * for {@link QueueRegulatorBolt#missingQueueStreamKeys(Map, String)} - the startup check on {@code
  * metadata.persist}.
  */
-class HostBlockBoltDecisionTest {
+class QueueRegulatorBoltDecisionTest {
 
     private static final String KEY = "example.com";
     private static final String RETRY_AFTER_KEY = "protocol.retry-after";
@@ -54,14 +54,14 @@ class HostBlockBoltDecisionTest {
     @Test
     void blocksOn429WithRetryAfterSeconds() {
         long blockUntil =
-                HostBlockBolt.blockUntilFor(KEY, md("429", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS);
+                QueueRegulatorBolt.blockUntilFor(KEY, md("429", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS);
         assertEquals((NOW_MS + 120_000L) / 1000L, blockUntil);
     }
 
     @Test
     void blocksOn503WithRetryAfterSeconds() {
         long blockUntil =
-                HostBlockBolt.blockUntilFor(KEY, md("503", "60"), RETRY_AFTER_KEY, NO_CAP, NOW_MS);
+                QueueRegulatorBolt.blockUntilFor(KEY, md("503", "60"), RETRY_AFTER_KEY, NO_CAP, NOW_MS);
         assertEquals((NOW_MS + 60_000L) / 1000L, blockUntil);
     }
 
@@ -69,15 +69,15 @@ class HostBlockBoltDecisionTest {
     void ignoresOtherStatusCodesEvenWithHeader() {
         assertEquals(
                 -1L,
-                HostBlockBolt.blockUntilFor(
+                QueueRegulatorBolt.blockUntilFor(
                         KEY, md("200", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
         assertEquals(
                 -1L,
-                HostBlockBolt.blockUntilFor(
+                QueueRegulatorBolt.blockUntilFor(
                         KEY, md("301", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
         assertEquals(
                 -1L,
-                HostBlockBolt.blockUntilFor(
+                QueueRegulatorBolt.blockUntilFor(
                         KEY, md("403", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
     }
 
@@ -85,33 +85,33 @@ class HostBlockBoltDecisionTest {
     void ignores429WithoutHeader() {
         assertEquals(
                 -1L,
-                HostBlockBolt.blockUntilFor(KEY, md("429", null), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
+                QueueRegulatorBolt.blockUntilFor(KEY, md("429", null), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
     }
 
     @Test
     void ignoresMissingStatusCode() {
         assertEquals(
                 -1L,
-                HostBlockBolt.blockUntilFor(KEY, md(null, "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
+                QueueRegulatorBolt.blockUntilFor(KEY, md(null, "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
     }
 
     @Test
     void ignoresMalformedHeaderAndZeroDelay() {
         assertEquals(
                 -1L,
-                HostBlockBolt.blockUntilFor(
+                QueueRegulatorBolt.blockUntilFor(
                         KEY, md("429", "not-a-date"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
         // a zero delay is not worth a frontier round-trip
         assertEquals(
                 -1L,
-                HostBlockBolt.blockUntilFor(KEY, md("429", "0"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
+                QueueRegulatorBolt.blockUntilFor(KEY, md("429", "0"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
     }
 
     @Test
     void capsDelayAtConfiguredMaximum() {
         long capMs = 3_600_000L; // one hour
         long blockUntil =
-                HostBlockBolt.blockUntilFor(
+                QueueRegulatorBolt.blockUntilFor(
                         KEY, md("429", "86400"), RETRY_AFTER_KEY, capMs, NOW_MS);
         assertEquals((NOW_MS + capMs) / 1000L, blockUntil);
     }
@@ -119,7 +119,7 @@ class HostBlockBoltDecisionTest {
     @Test
     void negativeCapMeansUncapped() {
         long blockUntil =
-                HostBlockBolt.blockUntilFor(
+                QueueRegulatorBolt.blockUntilFor(
                         KEY, md("429", "86400"), RETRY_AFTER_KEY, NO_CAP, NOW_MS);
         assertEquals((NOW_MS + 86_400_000L) / 1000L, blockUntil);
     }
@@ -130,7 +130,7 @@ class HostBlockBoltDecisionTest {
         // below Long.MAX_VALUE in ms); the addition of nowMs must clamp, not
         // wrap negative and silently skip the block (regression)
         long blockUntil =
-                HostBlockBolt.blockUntilFor(
+                QueueRegulatorBolt.blockUntilFor(
                         KEY, md("429", "9223372036854775"), RETRY_AFTER_KEY, NO_CAP, NOW_MS);
         assertEquals(Long.MAX_VALUE / 1000L, blockUntil);
         assertTrue(blockUntil > NOW_MS / 1000L);
@@ -142,20 +142,20 @@ class HostBlockBoltDecisionTest {
         // queue must not stall every unrelated URL in it
         assertEquals(
                 -1L,
-                HostBlockBolt.blockUntilFor(
+                QueueRegulatorBolt.blockUntilFor(
                         "_DEFAULT_", md("429", "120"), RETRY_AFTER_KEY, NO_CAP, NOW_MS));
     }
 
     @Test
     void nullMetadataIsIgnored() {
-        assertEquals(-1L, HostBlockBolt.blockUntilFor(KEY, null, RETRY_AFTER_KEY, NO_CAP, NOW_MS));
+        assertEquals(-1L, QueueRegulatorBolt.blockUntilFor(KEY, null, RETRY_AFTER_KEY, NO_CAP, NOW_MS));
     }
 
     @Test
     void missingQueueStreamKeysReportsBothWithDefaultConfig() {
         // with the default metadata.persist neither key survives the filter
         Set<String> missing =
-                HostBlockBolt.missingQueueStreamKeys(new HashMap<>(), RETRY_AFTER_KEY);
+                QueueRegulatorBolt.missingQueueStreamKeys(new HashMap<>(), RETRY_AFTER_KEY);
         assertEquals(Set.of("fetch.statusCode", RETRY_AFTER_KEY), missing);
     }
 
@@ -163,13 +163,13 @@ class HostBlockBoltDecisionTest {
     void missingQueueStreamKeysEmptyWhenBothPersisted() {
         Map<String, Object> conf = new HashMap<>();
         conf.put("metadata.persist", List.of("fetch.statusCode", RETRY_AFTER_KEY));
-        assertTrue(HostBlockBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY).isEmpty());
+        assertTrue(QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY).isEmpty());
     }
 
     @Test
     void missingQueueStreamKeysHonoursWildcards() {
         Map<String, Object> conf = new HashMap<>();
         conf.put("metadata.persist", List.of("fetch.*", "protocol.*"));
-        assertTrue(HostBlockBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY).isEmpty());
+        assertTrue(QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY).isEmpty());
     }
 }

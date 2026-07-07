@@ -50,7 +50,7 @@ import org.junit.jupiter.api.Timeout;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers(disabledWithoutDocker = true)
-class HostBlockBoltTest {
+class QueueRegulatorBoltTest {
 
     private static final String HOST = "example.com";
 
@@ -143,7 +143,7 @@ class HostBlockBoltTest {
         // tuple whose metadata reports a 429 with a Retry-After of one hour.
         // The bolt is configured through urlfrontier.address to cover the
         // address resolution as well
-        HostBlockBolt bolt = new HostBlockBolt();
+        QueueRegulatorBolt bolt = new QueueRegulatorBolt();
         var connection = container.getFrontierConnection();
         Map<String, Object> conf = new HashMap<>();
         conf.put(

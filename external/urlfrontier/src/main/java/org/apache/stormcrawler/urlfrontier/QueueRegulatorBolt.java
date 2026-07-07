@@ -77,9 +77,9 @@ import org.slf4j.LoggerFactory;
  * tuple is acked anyway. A missed block means the host is fetched once more and the next 429
  * re-emits the signal.
  */
-public class HostBlockBolt extends BaseRichBolt {
+public class QueueRegulatorBolt extends BaseRichBolt {
 
-    private static final Logger LOG = LoggerFactory.getLogger(HostBlockBolt.class);
+    private static final Logger LOG = LoggerFactory.getLogger(QueueRegulatorBolt.class);
 
     /** Metadata key set by the FetcherBolt with the HTTP status code of the fetch. */
     private static final String STATUS_CODE_KEY = "fetch.statusCode";
