@@ -182,4 +182,46 @@ class QueueRegulatorBoltTest {
 
         bolt.cleanup();
     }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void blocksHostQueueOnHeaderless429() {
+        seedOneUrl();
+
+        // a 429 without a Retry-After header: the adaptive back-off must
+        // block the host for the configured base duration. The bolt is
+        // configured through urlfrontier.host/port to cover that resolution
+        // path as well
+        QueueRegulatorBolt bolt = new QueueRegulatorBolt();
+        Map<String, Object> conf = frontierConfig();
+        conf.put(ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "protocol.");
+        conf.put(Constants.URLFRONTIER_BACKOFF_BASE_KEY, 3600);
+        bolt.prepare(conf, TestUtil.getMockedTopologyContext(), mock(OutputCollector.class));
+        Tuple t = mock(Tuple.class);
+        when(t.getStringByField("key")).thenReturn(HOST);
+        Metadata md = new Metadata();
+        md.setValue("fetch.statusCode", "429");
+        when(t.getValueByField("metadata")).thenReturn(md);
+        bolt.execute(t);
+
+        // same blind delay rationale as blocksHostQueueUntilTime: getURLs
+        // must never hand the URL out, and polling too early would put it
+        // in-flight and make the assertion pass even without a block
+        await().pollDelay(Duration.ofSeconds(2)).atMost(3, TimeUnit.SECONDS).until(() -> true);
+        assertTrue(
+                keysFromGetURLs().isEmpty(),
+                "the URL was handed out although the queue should be blocked");
+
+        // unblock (a past time releases the queue) and the host becomes
+        // available again
+        blocking.blockQueueUntil(
+                BlockQueueParams.newBuilder()
+                        .setKey(HOST)
+                        .setCrawlID(CrawlID.DEFAULT)
+                        .setTime(System.currentTimeMillis() / 1000L - 1)
+                        .build());
+        await().atMost(15, TimeUnit.SECONDS).until(() -> keysFromGetURLs().contains(HOST));
+
+        bolt.cleanup();
+    }
 }

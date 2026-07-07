@@ -36,25 +36,42 @@ import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
-import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.MetadataTransfer;
-import org.apache.stormcrawler.util.RetryAfterParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Consumes the {@code queue} stream emitted by the status updater and blocks a queue in URLFrontier
- * via {@code blockQueueUntil} whenever the tuple's metadata reports a rate-limit response (HTTP 429
- * or 503) carrying a <a
- * href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a>
- * header. See issues #867 and #784.
+ * Regulates a URLFrontier queue from the {@code queue} stream emitted by the status updater:
+ * blocks it via {@code blockQueueUntil} whenever the tuple's metadata reports a rate-limit
+ * response. See issues #867, #784 and #1106.
+ *
+ * <p>Two cases are handled, both gated on the status codes configured with {@code
+ * urlfrontier.backoff.status.codes} (default 429 and 503):
+ *
+ * <ul>
+ *   <li>the response carries a usable <a
+ *       href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After">Retry-After</a>
+ *       header: the requested delay is honoured, capped by {@code urlfrontier.max.retry.after} (in
+ *       seconds, default 86400, -1 to disable the cap);
+ *   <li>the response carries no usable header — the common case in the wild: the host is blocked
+ *       for a growing duration, starting at {@code urlfrontier.backoff.base.secs} (default 60) and
+ *       multiplied by {@code urlfrontier.backoff.factor} (default 2) on each new incident, capped
+ *       at {@code urlfrontier.backoff.max.secs} (default 86400). A host that stays quiet for {@code
+ *       urlfrontier.backoff.decay.secs} (default 1800) after its block has expired is forgiven and
+ *       restarts from the base. Failures of URLs already in flight when a block was raised count as
+ *       the same incident, not as new ones. With {@code urlfrontier.backoff.on.exceptions} (default
+ *       false) fetch exceptions also count as incidents.
+ * </ul>
+ *
+ * <p>A random fraction ({@code urlfrontier.backoff.jitter}, default 0.1) is added to every computed
+ * block so that hosts blocked on the same schedule do not all retry at once, and a block is only
+ * ever extended, never shrunk by a later, shorter signal.
  *
  * <p>Wire it with a fields grouping on {@code "key"} from the status updater's {@code queue}
- * stream. The {@code "key"} is the frontier queue key derived from {@code partition.url.mode} (the
- * same setting the frontier uses to assign queues), so the block targets the matching queue. The
- * honoured delay is capped by {@code urlfrontier.max.retry.after} (in seconds, default 86400, -1 to
- * disable the cap).
+ * stream: the per-host state lives in the bolt task, so all signals for a host must reach the same
+ * task. The {@code "key"} is the frontier queue key derived from {@code partition.url.mode} (the
+ * same setting the frontier uses to assign queues), so the block targets the matching queue.
  *
  * <p><b>The metadata on the queue stream is filtered by {@code metadata.persist}</b>: with the
  * default configuration neither {@code fetch.statusCode} nor the Retry-After header survive the
@@ -66,32 +83,26 @@ import org.slf4j.LoggerFactory;
  *    - protocol.retry-after
  * </pre>
  *
- * (the second entry depends on {@code protocol.md.prefix}). A warning is logged at startup when the
- * configuration would strip them.
+ * (the second entry depends on {@code protocol.md.prefix}), and {@code fetch.exception} as well
+ * when the back-off on exceptions is enabled. A warning is logged at startup when the configuration
+ * would strip them.
+ *
+ * <p>Blocking stops new hand-outs; it does not recall URLs of the host already prefetched by the
+ * spout into the topology, which still fail against the rate-limited server and reschedule via the
+ * status stream. Keep {@code urlfrontier.max.urls.per.bucket} and {@code
+ * topology.max.spout.pending} small for a block to bite quickly.
  *
  * <p>Connects via {@code urlfrontier.address}, falling back to {@code urlfrontier.host} / {@code
  * urlfrontier.port}. The block is issued with {@code local=false} and propagates to the whole
  * cluster, so with several frontier nodes a single connection to any one of them is enough.
  *
  * <p>The block is fire-and-forget with a short deadline: a failed or expired call is logged but the
- * tuple is acked anyway. A missed block means the host is fetched once more and the next 429
- * re-emits the signal.
+ * tuple is acked anyway. A missed block heals itself: every further rate-limit signal for the host
+ * re-asserts the stored block until the frontier stops serving it.
  */
 public class QueueRegulatorBolt extends BaseRichBolt {
 
     private static final Logger LOG = LoggerFactory.getLogger(QueueRegulatorBolt.class);
-
-    /** Metadata key set by the FetcherBolt with the HTTP status code of the fetch. */
-    private static final String STATUS_CODE_KEY = "fetch.statusCode";
-
-    /** Name of the Retry-After HTTP header, lower-cased as stored by the protocol layer. */
-    private static final String RETRY_AFTER_HEADER = "retry-after";
-
-    /**
-     * Queue key used by the status updaters when no partition key can be derived from a URL. The
-     * queue is shared by unrelated URLs, so it is never blocked.
-     */
-    private static final String DEFAULT_QUEUE_KEY = "_DEFAULT_";
 
     /**
      * Deadline for the fire-and-forget blockQueueUntil call, so a frontier outage cannot pile up
@@ -118,32 +129,20 @@ public class QueueRegulatorBolt extends BaseRichBolt {
     private URLFrontierStub frontier;
     private String globalCrawlID;
 
-    /** Metadata key holding the Retry-After header, including the protocol prefix. */
-    private String retryAfterKey;
-
-    /** Upper bound in ms for the honoured Retry-After delay; -1 means no cap. */
-    private long maxRetryAfterMs;
+    /** Per-host back-off state and decision logic. */
+    private HostBackoff backoff;
 
     @Override
     public void prepare(Map<String, Object> conf, TopologyContext context, OutputCollector c) {
         this.collector = c;
         this.globalCrawlID =
                 ConfUtils.getString(conf, Constants.URLFRONTIER_CRAWL_ID_KEY, CrawlID.DEFAULT);
-        // the protocol layer stores response headers in the metadata with this
-        // prefix; the FetcherBolt merges them into the status metadata
-        this.retryAfterKey =
-                ConfUtils.getString(conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "")
-                        + RETRY_AFTER_HEADER;
-        long maxRetryAfterSecs =
-                ConfUtils.getLong(
-                        conf,
-                        Constants.URLFRONTIER_MAX_RETRY_AFTER_KEY,
-                        Constants.URLFRONTIER_MAX_RETRY_AFTER_DEFAULT);
-        this.maxRetryAfterMs = maxRetryAfterSecs < 0 ? -1L : maxRetryAfterSecs * 1000L;
+        this.backoff = new HostBackoff(conf);
         // the status updater emits the queue stream after the metadata.persist
         // filter: warn upfront when the keys this bolt relies on would be
         // stripped, as the bolt would otherwise silently never block anything
-        Set<String> missing = missingQueueStreamKeys(conf, retryAfterKey);
+        Set<String> missing =
+                missingQueueStreamKeys(conf, backoff.retryAfterKey(), backoff.onExceptions());
         if (!missing.isEmpty()) {
             LOG.warn(
                     "{} do(es) not survive the metadata.persist filter: the queue stream will"
@@ -179,9 +178,7 @@ public class QueueRegulatorBolt extends BaseRichBolt {
     public void execute(Tuple t) {
         final String key = t.getStringByField("key");
         final Metadata metadata = (Metadata) t.getValueByField("metadata");
-        final long blockUntil =
-                blockUntilFor(
-                        key, metadata, retryAfterKey, maxRetryAfterMs, System.currentTimeMillis());
+        final long blockUntil = backoff.blockUntilFor(key, metadata, System.currentTimeMillis());
         if (blockUntil > 0) {
             LOG.debug("Blocking queue {} until {}", key, blockUntil);
             BlockQueueParams params =
@@ -198,58 +195,26 @@ public class QueueRegulatorBolt extends BaseRichBolt {
     }
 
     /**
-     * Decides whether a queue-stream tuple carries a server-requested back-off worth enforcing.
-     * Only a rate-limit (429) or unavailable (503) response with a valid Retry-After header
-     * qualifies; the requested delay is capped by {@code maxRetryAfterMs} unless negative. The
-     * shared {@code _DEFAULT_} queue is never blocked.
-     *
-     * @return the absolute time to block the queue until, in epoch seconds, or {@code -1} if the
-     *     tuple does not call for a block
-     */
-    static long blockUntilFor(
-            String key, Metadata metadata, String retryAfterKey, long maxRetryAfterMs, long nowMs) {
-        if (metadata == null || DEFAULT_QUEUE_KEY.equals(key)) {
-            return -1L;
-        }
-        final String statusCode = metadata.getFirstValue(STATUS_CODE_KEY);
-        // only on a rate-limit (429) or unavailable (503) response does
-        // Retry-After signal a host back-off worth acting on
-        if (!"429".equals(statusCode) && !"503".equals(statusCode)) {
-            return -1L;
-        }
-        long retryAfterMs = RetryAfterParser.parseDelay(metadata.getFirstValue(retryAfterKey));
-        if (retryAfterMs <= 0) {
-            return -1L;
-        }
-        if (maxRetryAfterMs >= 0 && retryAfterMs > maxRetryAfterMs) {
-            retryAfterMs = maxRetryAfterMs;
-        }
-        long blockUntilMs;
-        try {
-            blockUntilMs = Math.addExact(nowMs, retryAfterMs);
-        } catch (ArithmeticException e) {
-            // uncapped delay pushed the block time past Long.MAX_VALUE:
-            // clamp instead of wrapping negative and skipping the block
-            blockUntilMs = Long.MAX_VALUE;
-        }
-        return blockUntilMs / 1000L;
-    }
-
-    /**
      * Returns the queue-stream keys this bolt relies on that would not survive the {@code
-     * metadata.persist} filter applied by the status updater before emitting.
+     * metadata.persist} filter applied by the status updater before emitting. The {@code
+     * fetch.exception} key only matters when the back-off on exceptions is enabled.
      */
-    static Set<String> missingQueueStreamKeys(Map<String, Object> conf, String retryAfterKey) {
+    static Set<String> missingQueueStreamKeys(
+            Map<String, Object> conf, String retryAfterKey, boolean onExceptions) {
         Metadata probe = new Metadata();
-        probe.setValue(STATUS_CODE_KEY, "429");
+        probe.setValue(HostBackoff.STATUS_CODE_KEY, "429");
         probe.setValue(retryAfterKey, "1");
+        probe.setValue(HostBackoff.EXCEPTION_KEY, "probe");
         Metadata filtered = MetadataTransfer.getInstance(conf).filter(probe);
         Set<String> missing = new LinkedHashSet<>();
-        if (filtered.getFirstValue(STATUS_CODE_KEY) == null) {
-            missing.add(STATUS_CODE_KEY);
+        if (filtered.getFirstValue(HostBackoff.STATUS_CODE_KEY) == null) {
+            missing.add(HostBackoff.STATUS_CODE_KEY);
         }
         if (filtered.getFirstValue(retryAfterKey) == null) {
             missing.add(retryAfterKey);
+        }
+        if (onExceptions && filtered.getFirstValue(HostBackoff.EXCEPTION_KEY) == null) {
+            missing.add(HostBackoff.EXCEPTION_KEY);
         }
         return missing;
     }
