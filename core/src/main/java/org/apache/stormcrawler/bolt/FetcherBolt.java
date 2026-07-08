@@ -677,6 +677,11 @@ public class FetcherBolt extends StatusEmitterBolt {
                                     msg);
                             if (force) {
                                 fiq.crawlDelay = maxCrawlDelay;
+                                // report the delay the fetcher is not holding, so a frontier-side
+                                // consumer can enforce it at the source (#867)
+                                metadata.setValue(
+                                        Constants.ROBOTS_CRAWL_DELAY_KEY,
+                                        Long.toString(rules.getCrawlDelay() / 1000L));
                             } else {
                                 // pass the info about crawl delay
                                 metadata.setValue(Constants.STATUS_ERROR_CAUSE, "crawl_delay");

@@ -29,6 +29,13 @@ public class Constants {
     public static final String STATUS_ERROR_SOURCE = "error.source";
     public static final String STATUS_ERROR_CAUSE = "error.cause";
 
+    /**
+     * Metadata key holding the robots.txt Crawl-delay in seconds, set by the fetcher bolts when the
+     * delay exceeds {@code fetcher.max.crawl.delay} and {@code fetcher.max.crawl.delay.force} is
+     * true, so a frontier-side consumer can enforce it at the source. See #867.
+     */
+    public static final String ROBOTS_CRAWL_DELAY_KEY = "robots.crawl.delay";
+
     public static final String QUEUE_STREAM_NAME = "queue";
 
     public static final String StatusStreamName = "status";
