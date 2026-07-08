@@ -407,6 +407,11 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                         // as some sites specify ridiculous values
                         LOG.debug("Delay from robots capped at {} for {}", robotsDelay, url);
                         delay = maxCrawlDelay;
+                        // report the delay the fetcher is not holding, so a frontier-side
+                        // consumer can enforce it at the source (#867)
+                        metadata.setValue(
+                                Constants.ROBOTS_CRAWL_DELAY_KEY,
+                                Long.toString(robotsDelay / 1000L));
                     } else {
                         LOG.debug(
                                 "Skipped URL from queue with overlong crawl-delay ({}): {}",
