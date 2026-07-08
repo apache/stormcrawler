@@ -48,14 +48,16 @@ class QueueRegulatorBoltDecisionTest {
     void missingQueueStreamKeysEmptyWhenBothPersisted() {
         Map<String, Object> conf = new HashMap<>();
         conf.put("metadata.persist", List.of("fetch.statusCode", RETRY_AFTER_KEY));
-        assertTrue(QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY, false).isEmpty());
+        assertTrue(
+                QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY, false).isEmpty());
     }
 
     @Test
     void missingQueueStreamKeysHonoursWildcards() {
         Map<String, Object> conf = new HashMap<>();
         conf.put("metadata.persist", List.of("fetch.*", "protocol.*"));
-        assertTrue(QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY, false).isEmpty());
+        assertTrue(
+                QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY, false).isEmpty());
     }
 
     @Test
@@ -64,7 +66,8 @@ class QueueRegulatorBoltDecisionTest {
         conf.put("metadata.persist", List.of("fetch.statusCode", RETRY_AFTER_KEY));
         // the same configuration is complete without the exceptions gate and
         // incomplete with it
-        assertTrue(QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY, false).isEmpty());
+        assertTrue(
+                QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY, false).isEmpty());
         assertEquals(
                 Set.of("fetch.exception"),
                 QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY, true));

@@ -42,9 +42,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Regulates a URLFrontier queue from the {@code queue} stream emitted by the status updater:
- * blocks it via {@code blockQueueUntil} whenever the tuple's metadata reports a rate-limit
- * response. See issues #867, #784 and #1106.
+ * Regulates a URLFrontier queue from the {@code queue} stream emitted by the status updater: blocks
+ * it via {@code blockQueueUntil} whenever the tuple's metadata reports a rate-limit response. See
+ * issues #867, #784 and #1106.
  *
  * <p>Two cases are handled, both gated on the status codes configured with {@code
  * urlfrontier.backoff.status.codes} (default 429 and 503):

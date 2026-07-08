@@ -106,8 +106,8 @@ public final class Constants {
     public static final float URLFRONTIER_BACKOFF_JITTER_DEFAULT = 0.1f;
 
     /**
-     * HTTP status codes treated as a rate-limit signal by the {@link QueueRegulatorBolt}: with a usable
-     * Retry-After header the requested delay is honoured, without one the adaptive back-off
+     * HTTP status codes treated as a rate-limit signal by the {@link QueueRegulatorBolt}: with a
+     * usable Retry-After header the requested delay is honoured, without one the adaptive back-off
      * escalates. Defaults to 429 and 503.
      */
     public static final String URLFRONTIER_BACKOFF_STATUS_CODES_KEY =

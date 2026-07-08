@@ -33,8 +33,8 @@ import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.RetryAfterParser;
 
 /**
- * Per-host back-off state and decision logic for the {@link QueueRegulatorBolt}: given a queue-stream
- * tuple, decides whether and until when the host's frontier queue should be blocked.
+ * Per-host back-off state and decision logic for the {@link QueueRegulatorBolt}: given a
+ * queue-stream tuple, decides whether and until when the host's frontier queue should be blocked.
  *
  * <p>Two kinds of signal are recognised, both derived from the tuple's metadata:
  *
