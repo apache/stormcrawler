@@ -58,7 +58,7 @@ public abstract class AbstractHttpProtocol implements Protocol {
     private static final DateTimeFormatter ISO_INSTANT_FORMATTER =
             DateTimeFormatter.ISO_INSTANT.withZone(ZoneId.of(ZoneOffset.UTC.toString()));
 
-    private org.apache.stormcrawler.protocol.HttpRobotRulesParser robots;
+    private org.apache.stormcrawler.protocol.RobotRulesParser robots;
 
     protected boolean skipRobots = false;
 
@@ -121,7 +121,15 @@ public abstract class AbstractHttpProtocol implements Protocol {
             customHeaders.add(KeyValue.build(h));
         }
 
-        robots = new HttpRobotRulesParser(conf);
+        String robotsParserImplementation =
+                ConfUtils.getString(
+                        conf,
+                        "http.robots.parser.class",
+                        "org.apache.stormcrawler.protocol.HttpRobotRulesParser");
+        robots =
+                InitialisationUtil.initializeFromQualifiedName(
+                        robotsParserImplementation, RobotRulesParser.class);
+        robots.setConf(conf);
         protocolMetadataPrefix =
                 ConfUtils.getString(
                         conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, protocolMetadataPrefix);

@@ -35,6 +35,17 @@ public class RobotRules extends crawlercommons.robots.BaseRobotRules {
         this.base = base;
     }
 
+    /**
+     * Returns the {@link BaseRobotRules} wrapped by this instance. {@link HttpRobotRulesParser}
+     * always wraps the rules returned by {@link RobotRulesParser#parseRules} in a plain {@code
+     * RobotRules} for content-length tracking (see {@link #getContentLengthFetched()}), so a
+     * custom {@link RobotRulesParser} returning its own {@code BaseRobotRules} subclass (e.g. to
+     * expose additional robots.txt directives) needs this accessor to unwrap it again.
+     */
+    public BaseRobotRules getWrapped() {
+        return base;
+    }
+
     @Override
     public boolean isAllowed(String url) {
         return base.isAllowed(url);

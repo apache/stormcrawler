@@ -182,6 +182,13 @@ config:
   # http.robots.content.limit: 524288  # 512 kiB
   http.robots.content.limit: -1  # default same as http.content.limit
 
+  # Implementation of RobotRulesParser used by the HTTP protocol implementations
+  # to fetch and parse robots.txt. Override to plug in custom robots.txt
+  # directive handling (e.g. parsing extensions not supported by crawler-commons).
+  # The class must extend org.apache.stormcrawler.protocol.RobotRulesParser and
+  # have a public no-arg constructor.
+  http.robots.parser.class: "org.apache.stormcrawler.protocol.HttpRobotRulesParser"
+
   # Guava caches used for the robots.txt directives
   robots.cache.spec: "maximumSize=10000,expireAfterWrite=6h"
   robots.error.cache.spec: "maximumSize=10000,expireAfterWrite=1h"

@@ -48,7 +48,7 @@ public class HttpRobotRulesParser extends RobotRulesParser {
 
     private static final int MAX_NUM_REDIRECTS = 5;
 
-    HttpRobotRulesParser() {}
+    public HttpRobotRulesParser() {}
 
     public HttpRobotRulesParser(Config conf) {
         setConf(conf);
