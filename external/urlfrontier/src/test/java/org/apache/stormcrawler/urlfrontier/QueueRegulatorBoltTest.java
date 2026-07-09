@@ -18,6 +18,7 @@
 package org.apache.stormcrawler.urlfrontier;
 
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -90,6 +91,11 @@ class QueueRegulatorBoltTest {
 
     /** Seeds one DISCOVERED url for {@link #HOST} so the queue exists and is fetchable. */
     private void seedOneUrl() {
+        seedUrls("/");
+    }
+
+    /** Seeds one DISCOVERED url for {@link #HOST} per path so the queue exists and is fetchable. */
+    private void seedUrls(String... paths) {
         StatusUpdaterBolt seeder = new StatusUpdaterBolt();
         TestOutputCollector out = new TestOutputCollector();
         Map<String, Object> config = frontierConfig();
@@ -101,18 +107,30 @@ class QueueRegulatorBoltTest {
         config.put("urlfrontier.cache.expireafter.sec", 10);
         seeder.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(out));
 
-        String url = "http://" + HOST + "/";
-        Tuple tuple = mock(Tuple.class);
-        when(tuple.getValueByField("status")).thenReturn(Status.DISCOVERED);
-        when(tuple.getStringByField("url")).thenReturn(url);
-        when(tuple.getValueByField("metadata")).thenReturn(new Metadata());
-        seeder.execute(tuple);
+        Set<String> urls = new HashSet<>();
+        for (String path : paths) {
+            String url = "http://" + HOST + path;
+            urls.add(url);
+            Tuple tuple = mock(Tuple.class);
+            when(tuple.getValueByField("status")).thenReturn(Status.DISCOVERED);
+            when(tuple.getStringByField("url")).thenReturn(url);
+            when(tuple.getValueByField("metadata")).thenReturn(new Metadata());
+            seeder.execute(tuple);
+        }
 
         await().atMost(20, TimeUnit.SECONDS)
                 .until(
                         () ->
-                                out.getAckedTuples().stream()
-                                        .anyMatch(t -> url.equals(t.getStringByField("url"))));
+                                urls.stream()
+                                        .allMatch(
+                                                url ->
+                                                        out.getAckedTuples().stream()
+                                                                .anyMatch(
+                                                                        t ->
+                                                                                url.equals(
+                                                                                        t
+                                                                                                .getStringByField(
+                                                                                                        "url")))));
         seeder.cleanup();
     }
 
@@ -223,5 +241,57 @@ class QueueRegulatorBoltTest {
         await().atMost(15, TimeUnit.SECONDS).until(() -> keysFromGetURLs().contains(HOST));
 
         bolt.cleanup();
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void pacesHostQueueOnRobotsCrawlDelay() {
+        seedUrls("/1", "/2");
+
+        QueueRegulatorBolt bolt = new QueueRegulatorBolt();
+        Map<String, Object> conf = frontierConfig();
+        conf.put(ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "protocol.");
+        bolt.prepare(conf, TestUtil.getMockedTopologyContext(), mock(OutputCollector.class));
+        Tuple t = mock(Tuple.class);
+        when(t.getStringByField("key")).thenReturn(HOST);
+        Metadata md = new Metadata();
+        md.setValue(org.apache.stormcrawler.Constants.ROBOTS_CRAWL_DELAY_KEY, "300");
+        when(t.getValueByField("metadata")).thenReturn(md);
+        bolt.execute(t);
+
+        // blind delay for the fire-and-forget RPC to land, as in the sibling tests
+        await().pollDelay(Duration.ofSeconds(2)).atMost(3, TimeUnit.SECONDS).until(() -> true);
+
+        // the queue delay paces successive hand-outs, it does not shrink a
+        // batch: the first getURLs still serves the queue (never produced
+        // before), so take a single URL out of it
+        assertEquals(1, countServed(1), "the first hand-out should serve one URL");
+
+        // the queue is now not requestable again before 300s: a later call
+        // must come back empty although /2 is neither in-flight nor served.
+        // The pause also pins the unit of setDelayRequestable: were it
+        // milliseconds, the 300ms window would have expired and /2 would be
+        // handed out
+        await().pollDelay(Duration.ofSeconds(2)).atMost(3, TimeUnit.SECONDS).until(() -> true);
+        assertEquals(0, countServed(10), "the queue delay should pace the second URL");
+
+        bolt.cleanup();
+    }
+
+    /** Drains one getURLs call and returns how many URLs it handed out. */
+    private int countServed(int maxUrlsPerQueue) {
+        GetParams params =
+                GetParams.newBuilder()
+                        .setCrawlID(CrawlID.DEFAULT)
+                        .setMaxQueues(10)
+                        .setMaxUrlsPerQueue(maxUrlsPerQueue)
+                        .build();
+        int served = 0;
+        Iterator<URLInfo> it = blocking.getURLs(params);
+        while (it.hasNext()) {
+            it.next();
+            served++;
+        }
+        return served;
     }
 }
