@@ -22,6 +22,7 @@ import crawlercommons.urlfrontier.URLFrontierGrpc;
 import crawlercommons.urlfrontier.URLFrontierGrpc.URLFrontierStub;
 import crawlercommons.urlfrontier.Urlfrontier.BlockQueueParams;
 import crawlercommons.urlfrontier.Urlfrontier.Empty;
+import crawlercommons.urlfrontier.Urlfrontier.QueueDelayParams;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import java.util.Collections;
@@ -68,6 +69,17 @@ import org.slf4j.LoggerFactory;
  * block so that hosts blocked on the same schedule do not all retry at once, and a block is only
  * ever extended, never shrunk by a later, shorter signal.
  *
+ * <p>Independently of rate limits, when the tuple's metadata carries {@code robots.crawl.delay}
+ * (written by the fetcher bolts when a robots.txt {@code Crawl-delay} exceeds {@code
+ * fetcher.max.crawl.delay} and {@code fetcher.max.crawl.delay.force} is true), the bolt forwards it
+ * to the frontier via {@code setDelay}, capped by {@code urlfrontier.backoff.max.secs}: the queue
+ * is then served at the pace robots requested, restoring the compliance that the force setting
+ * alone would violate. The value is declarative — the last one seen wins, re-sent at most once per
+ * {@code urlfrontier.backoff.decay.secs} window. If a site later removes its Crawl-delay, no signal
+ * arrives and the frontier keeps the old pace: throughput loss on that host, never impoliteness;
+ * {@code setDelay(key, 0)} is deliberately never called as it would erase a server-side default for
+ * the queue.
+ *
  * <p>Wire it with a fields grouping on {@code "key"} from the status updater's {@code queue}
  * stream: the per-host state lives in the bolt task, so all signals for a host must reach the same
  * task. The {@code "key"} is the frontier queue key derived from {@code partition.url.mode} (the
@@ -81,6 +93,7 @@ import org.slf4j.LoggerFactory;
  *   metadata.persist:
  *    - fetch.statusCode
  *    - protocol.retry-after
+ *    - robots.crawl.delay
  * </pre>
  *
  * (the second entry depends on {@code protocol.md.prefix}), and {@code fetch.exception} as well
@@ -124,6 +137,20 @@ public class QueueRegulatorBolt extends BaseRichBolt {
                 public void onCompleted() {}
             };
 
+    private static final StreamObserver<Empty> SET_DELAY_NOOP_OBSERVER =
+            new StreamObserver<>() {
+                @Override
+                public void onNext(Empty value) {}
+
+                @Override
+                public void onError(Throwable t) {
+                    LOG.warn("setDelay failed", t);
+                }
+
+                @Override
+                public void onCompleted() {}
+            };
+
     private OutputCollector collector;
     private ManagedChannel channel;
     private URLFrontierStub frontier;
@@ -132,12 +159,16 @@ public class QueueRegulatorBolt extends BaseRichBolt {
     /** Per-host back-off state and decision logic. */
     private HostBackoff backoff;
 
+    /** Per-host robots crawl-delay forwarding decision. */
+    private CrawlDelayPolicy crawlDelayPolicy;
+
     @Override
     public void prepare(Map<String, Object> conf, TopologyContext context, OutputCollector c) {
         this.collector = c;
         this.globalCrawlID =
                 ConfUtils.getString(conf, Constants.URLFRONTIER_CRAWL_ID_KEY, CrawlID.DEFAULT);
         this.backoff = new HostBackoff(conf);
+        this.crawlDelayPolicy = new CrawlDelayPolicy(conf);
         // the status updater emits the queue stream after the metadata.persist
         // filter: warn upfront when the keys this bolt relies on would be
         // stripped, as the bolt would otherwise silently never block anything
@@ -191,6 +222,19 @@ public class QueueRegulatorBolt extends BaseRichBolt {
             frontier.withDeadlineAfter(BLOCK_RPC_DEADLINE_SECS, TimeUnit.SECONDS)
                     .blockQueueUntil(params, NOOP_OBSERVER);
         }
+        final int delaySecs = crawlDelayPolicy.delaySecsFor(key, metadata);
+        if (delaySecs > 0) {
+            LOG.debug("Setting delay of {}s on queue {}", delaySecs, key);
+            QueueDelayParams delayParams =
+                    QueueDelayParams.newBuilder()
+                            .setKey(key)
+                            .setCrawlID(globalCrawlID)
+                            .setDelayRequestable(delaySecs)
+                            .setLocal(false)
+                            .build();
+            frontier.withDeadlineAfter(BLOCK_RPC_DEADLINE_SECS, TimeUnit.SECONDS)
+                    .setDelay(delayParams, SET_DELAY_NOOP_OBSERVER);
+        }
         collector.ack(t);
     }
 
@@ -205,6 +249,7 @@ public class QueueRegulatorBolt extends BaseRichBolt {
         probe.setValue(HostBackoff.STATUS_CODE_KEY, "429");
         probe.setValue(retryAfterKey, "1");
         probe.setValue(HostBackoff.EXCEPTION_KEY, "probe");
+        probe.setValue(org.apache.stormcrawler.Constants.ROBOTS_CRAWL_DELAY_KEY, "1");
         Metadata filtered = MetadataTransfer.getInstance(conf).filter(probe);
         Set<String> missing = new LinkedHashSet<>();
         if (filtered.getFirstValue(HostBackoff.STATUS_CODE_KEY) == null) {
@@ -215,6 +260,10 @@ public class QueueRegulatorBolt extends BaseRichBolt {
         }
         if (onExceptions && filtered.getFirstValue(HostBackoff.EXCEPTION_KEY) == null) {
             missing.add(HostBackoff.EXCEPTION_KEY);
+        }
+        if (filtered.getFirstValue(org.apache.stormcrawler.Constants.ROBOTS_CRAWL_DELAY_KEY)
+                == null) {
+            missing.add(org.apache.stormcrawler.Constants.ROBOTS_CRAWL_DELAY_KEY);
         }
         return missing;
     }

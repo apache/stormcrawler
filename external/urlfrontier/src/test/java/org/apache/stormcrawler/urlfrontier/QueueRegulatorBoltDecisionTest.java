@@ -37,17 +37,19 @@ class QueueRegulatorBoltDecisionTest {
     private static final String RETRY_AFTER_KEY = "protocol.retry-after";
 
     @Test
-    void missingQueueStreamKeysReportsBothWithDefaultConfig() {
-        // with the default metadata.persist neither key survives the filter
+    void missingQueueStreamKeysReportsAllWithDefaultConfig() {
+        // with the default metadata.persist none of the keys survives the filter
         Set<String> missing =
                 QueueRegulatorBolt.missingQueueStreamKeys(new HashMap<>(), RETRY_AFTER_KEY, false);
-        assertEquals(Set.of("fetch.statusCode", RETRY_AFTER_KEY), missing);
+        assertEquals(Set.of("fetch.statusCode", RETRY_AFTER_KEY, "robots.crawl.delay"), missing);
     }
 
     @Test
-    void missingQueueStreamKeysEmptyWhenBothPersisted() {
+    void missingQueueStreamKeysEmptyWhenAllPersisted() {
         Map<String, Object> conf = new HashMap<>();
-        conf.put("metadata.persist", List.of("fetch.statusCode", RETRY_AFTER_KEY));
+        conf.put(
+                "metadata.persist",
+                List.of("fetch.statusCode", RETRY_AFTER_KEY, "robots.crawl.delay"));
         assertTrue(
                 QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY, false).isEmpty());
     }
@@ -55,7 +57,7 @@ class QueueRegulatorBoltDecisionTest {
     @Test
     void missingQueueStreamKeysHonoursWildcards() {
         Map<String, Object> conf = new HashMap<>();
-        conf.put("metadata.persist", List.of("fetch.*", "protocol.*"));
+        conf.put("metadata.persist", List.of("fetch.*", "protocol.*", "robots.*"));
         assertTrue(
                 QueueRegulatorBolt.missingQueueStreamKeys(conf, RETRY_AFTER_KEY, false).isEmpty());
     }
@@ -63,7 +65,9 @@ class QueueRegulatorBoltDecisionTest {
     @Test
     void exceptionKeyOnlyRequiredWhenBackoffOnExceptionsIsEnabled() {
         Map<String, Object> conf = new HashMap<>();
-        conf.put("metadata.persist", List.of("fetch.statusCode", RETRY_AFTER_KEY));
+        conf.put(
+                "metadata.persist",
+                List.of("fetch.statusCode", RETRY_AFTER_KEY, "robots.crawl.delay"));
         // the same configuration is complete without the exceptions gate and
         // incomplete with it
         assertTrue(
