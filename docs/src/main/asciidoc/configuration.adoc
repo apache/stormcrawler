@@ -245,6 +245,7 @@ implementation.
 | file.encoding | UTF-8 | Encoding for FileProtocol.
 | protocol.instances.num | 1 | Number of instances per protocol implementation.
 | http.protocol.versions | - | HTTP protocol versions in order of preference (h2, http/1.1, http/1.0, h2c). If empty, uses implementation defaults.
+| http.robots.parser.class | org.apache.stormcrawler.protocol.HttpRobotRulesParser | Implementation to use for parsing robots.txt files.
 | robots.cache.spec | maximumSize=10000,expireAfterWrite=6h | CacheBuilder configuration for robots cache.
 | robots.error.cache.spec | maximumSize=10000,expireAfterWrite=1h | CacheBuilder configuration for error cache.
 | okhttp.protocol.connection.pool.max.idle.connections | 5 | OkHttp maximum number of idle connections.
