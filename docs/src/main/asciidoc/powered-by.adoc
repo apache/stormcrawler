@@ -36,5 +36,6 @@ If your organization is also making use of Apache StormCrawler, we’d love to h
 * link:https://shc-info.zml.hs-heilbronn.de/[Heilbronn University]
 * link:https://www.contexity.com/[Contexity]
 * link:https://www.kodis.iao.fraunhofer.de/de/projekte/SPIDERWISE.html[Fraunhofer IAO - KODIS]
+* link:https://www.thegreenwebfoundation.org/[Green Web Foundation]
 
 Drop us a line at mailto:dev@stormcrawler.apache.org[dev@stormcrawler.apache.org] if you want to be added to this page.
