@@ -45,6 +45,7 @@ under the License.
         <jacoco.branchRatio>0.42</jacoco.branchRatio>
         <jacoco.lineRatio>0.45</jacoco.lineRatio>
         <jacoco.complexityRatio>0.33</jacoco.complexityRatio>
+        <caffeine.version>3.2.4</caffeine.version>
     </properties>
 
     <build>
@@ -74,6 +75,12 @@ under the License.
             <groupId>com.github.crawler-commons</groupId>
             <artifactId>urlfrontier-API</artifactId>
             <version>${urlfrontier.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>${caffeine.version}</version>
         </dependency>
 
         <dependency>

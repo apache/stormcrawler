@@ -21,12 +21,12 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Expiry;
 import com.github.benmanes.caffeine.cache.Ticker;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
@@ -142,13 +142,15 @@ final class HostBackoff {
         this.maxRetryAfterMs = maxRetryAfterSecs < 0 ? -1L : maxRetryAfterSecs * 1000L;
         this.statusCodes = statusCodesFromConf(conf);
         this.baseSecs =
-                ConfUtils.getLong(
-                        conf,
-                        Constants.URLFRONTIER_BACKOFF_BASE_KEY,
-                        Constants.URLFRONTIER_BACKOFF_BASE_DEFAULT);
+                Math.max(
+                        0L,
+                        ConfUtils.getLong(
+                                conf,
+                                Constants.URLFRONTIER_BACKOFF_BASE_KEY,
+                                Constants.URLFRONTIER_BACKOFF_BASE_DEFAULT));
         // a factor below 1 would de-escalate, negative jitter would shrink
         // blocks, a negative decay would evict a running block: clamp all
-        // three rather than let a typo break the invariants silently
+        // to avoid letting a typo break the invariants silently
         this.factor =
                 Math.max(
                         1f,
@@ -157,10 +159,12 @@ final class HostBackoff {
                                 Constants.URLFRONTIER_BACKOFF_FACTOR_KEY,
                                 Constants.URLFRONTIER_BACKOFF_FACTOR_DEFAULT));
         this.maxSecs =
-                ConfUtils.getLong(
-                        conf,
-                        Constants.URLFRONTIER_BACKOFF_MAX_KEY,
-                        Constants.URLFRONTIER_BACKOFF_MAX_DEFAULT);
+                Math.max(
+                        this.baseSecs,
+                        ConfUtils.getLong(
+                                conf,
+                                Constants.URLFRONTIER_BACKOFF_MAX_KEY,
+                                Constants.URLFRONTIER_BACKOFF_MAX_DEFAULT));
         this.decaySecs =
                 Math.max(
                         0L,
@@ -184,31 +188,8 @@ final class HostBackoff {
         this.hosts =
                 Caffeine.newBuilder()
                         .expireAfter(
-                                new Expiry<String, HostState>() {
-                                    @Override
-                                    public long expireAfterCreate(
-                                            String key, HostState state, long currentTime) {
-                                        return TimeUnit.SECONDS.toNanos(state.ttlSecs());
-                                    }
-
-                                    @Override
-                                    public long expireAfterUpdate(
-                                            String key,
-                                            HostState state,
-                                            long currentTime,
-                                            long currentDuration) {
-                                        return TimeUnit.SECONDS.toNanos(state.ttlSecs());
-                                    }
-
-                                    @Override
-                                    public long expireAfterRead(
-                                            String key,
-                                            HostState state,
-                                            long currentTime,
-                                            long currentDuration) {
-                                        return currentDuration;
-                                    }
-                                })
+                                Expiry.<String, HostState>writing(
+                                        (key, state) -> Duration.ofSeconds(state.ttlSecs())))
                         .ticker(ticker)
                         .build();
     }

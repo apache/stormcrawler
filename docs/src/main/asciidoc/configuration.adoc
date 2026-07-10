@@ -477,8 +477,23 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/urlfronti
 
 | urlfrontier.host | localhost | URLFrontier service hostname.
 | urlfrontier.port | 7071 | URLFrontier service port.
+| urlfrontier.address | - | URLFrontier service address (can be used instead of host and port).
 | urlfrontier.max.buckets | 10 | Number of buckets to request from the frontier.
 | urlfrontier.max.urls.per.bucket | 10 | Maximum URLs per bucket.
+| urlfrontier.delay.requestable | - | Time in seconds for which the URLs are locked in URLFrontier.
+| urlfrontier.cache.expireafter.sec | - | Time in seconds after which the cache expires.
+| urlfrontier.max.messages.in.flight | - | Maximum number of messages in flight for the StatusUpdater.
+| urlfrontier.throttling.time.msec | - | Time in ms to throttle the StatusUpdater.
+| urlfrontier.updater.max.messages | - | Maximum number of messages to process at once by the StatusUpdater.
+| urlfrontier.crawlid | - | Crawl ID.
+| urlfrontier.max.retry.after | 86400 | Maximum delay in seconds honoured when a server requests a back-off via the Retry-After HTTP response header. -1 disables the cap.
+| urlfrontier.backoff.base.secs | 60 | First block duration in seconds applied when a host rate-limits without a usable Retry-After header. 0 disables the adaptive back-off.
+| urlfrontier.backoff.factor | 2.0 | Multiplicative increase applied to the block duration on each new pressure event for the same host.
+| urlfrontier.backoff.max.secs | 86400 | Upper bound in seconds for the escalated block duration.
+| urlfrontier.backoff.decay.secs | 1800 | Quiet window in seconds after which its escalation is forgotten and the next pressure event starts again from the base duration.
+| urlfrontier.backoff.on.exceptions | false | Whether fetch exceptions count as pressure events and escalate the host's block.
+| urlfrontier.backoff.jitter | 0.1 | Random extra fraction added to every computed block duration.
+| urlfrontier.backoff.status.codes | 429, 503 | HTTP status codes treated as a rate-limit signal by the QueueRegulatorBolt.
 |===
 
 ==== Tika

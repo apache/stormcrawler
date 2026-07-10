@@ -167,6 +167,22 @@ class HostBackoffTest {
     }
 
     @Test
+    void maximumBelowBaseIsRaisedToBase() {
+        HostBackoff backoff = backoff(conf(Constants.URLFRONTIER_BACKOFF_MAX_KEY, 30));
+        assertEquals(expectedAt(BASE_SECS), signal(backoff, md("429", null)));
+        clock.advanceSecs(BASE_SECS + 1);
+        assertEquals(expectedAt(BASE_SECS), signal(backoff, md("429", null)));
+    }
+
+    @Test
+    void negativeMaximumIsRaisedToBase() {
+        HostBackoff backoff = backoff(conf(Constants.URLFRONTIER_BACKOFF_MAX_KEY, -1));
+        assertEquals(expectedAt(BASE_SECS), signal(backoff, md("429", null)));
+        clock.advanceSecs(BASE_SECS + 1);
+        assertEquals(expectedAt(BASE_SECS), signal(backoff, md("429", null)));
+    }
+
+    @Test
     void pressureDuringActiveBlockIsOneCongestionEvent() {
         HostBackoff backoff = backoff(conf());
         long block = signal(backoff, md("429", null));
