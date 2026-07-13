@@ -30,7 +30,7 @@ services:
   supervisor:
     image: storm:latest
     container_name: supervisor
-    command: storm supervisor -c worker.childopts=-Xmx%HEAP-MEM%m
+    command: storm supervisor -c worker.childopts=-Xmx%HEAP-MEM%m -c storm.local.hostname=localhost
     depends_on:
       - nimbus
       - zookeeper
@@ -45,6 +45,16 @@ services:
     restart: always
     ports:
       - "127.0.0.1:8080:8080"
+
+  logviewer:
+    image: storm:latest
+    container_name: logviewer
+    command: storm logviewer
+    depends_on:
+      - supervisor
+    restart: always
+    ports:
+      - "127.0.0.1:8000:8000"
 
   opensearch-sc:
     image: opensearchproject/opensearch:2.19.4
