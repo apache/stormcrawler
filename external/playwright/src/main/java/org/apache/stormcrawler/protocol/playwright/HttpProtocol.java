@@ -25,9 +25,12 @@ import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Playwright.CreateOptions;
+import com.microsoft.playwright.Request;
 import com.microsoft.playwright.Tracing;
+import com.microsoft.playwright.options.HttpHeader;
 import com.microsoft.playwright.options.Proxy;
 import com.microsoft.playwright.options.WaitUntilState;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -147,6 +150,14 @@ public class HttpProtocol extends AbstractHttpProtocol {
         NewContextOptions b_c_options =
                 new Browser.NewContextOptions().setIsMobile(false).setUserAgent(ua);
 
+        // set Accept-Language if configured, as done by the other protocol implementations;
+        // an explicitly empty value overrides the browser's default with an empty header,
+        // only an absent key leaves the browser's default untouched
+        final String acceptLanguage = ConfUtils.getString(conf, "http.accept.language");
+        if (acceptLanguage != null) {
+            b_c_options.setExtraHTTPHeaders(Map.of("Accept-Language", acceptLanguage));
+        }
+
         // global proxy
         String proxyServer = ConfUtils.getString(conf, "http.proxy");
         String proxyUser = ConfUtils.getString(conf, "http.proxy.username");
@@ -216,6 +227,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                                         (k, v) -> {
                                                             responseMetaData.addValue(k, v);
                                                         });
+                                        storeVerbatimHeaders(response, responseMetaData);
                                     }
                                 }
                             });
@@ -259,6 +271,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                         (k, v) -> {
                                             responseMetaData.addValue(k, v);
                                         });
+                        storeVerbatimHeaders(response, responseMetaData);
 
                         int httpStatus = response.status();
                         boolean fetched = Status.FETCHED == Status.fromHTTPCode(httpStatus);
@@ -315,6 +328,49 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 }
             }
         }
+    }
+
+    /**
+     * Reconstructs verbatim request and response header blocks and stores them in the metadata
+     * under the same keys as the other protocol implementations, so that downstream consumers
+     * (e.g. WARC or archiving bolts) work regardless of the protocol used. The HTTP protocol
+     * version is not exposed by the Playwright API - HTTP/1.1 is written as a placeholder.
+     */
+    private void storeVerbatimHeaders(
+            final com.microsoft.playwright.Response response, final Metadata metadata) {
+        if (!storeHttpHeaders) {
+            return;
+        }
+
+        final Request request = response.request();
+        final URI uri = URI.create(request.url());
+        String path = uri.getRawPath();
+        if (StringUtils.isEmpty(path)) {
+            path = "/";
+        }
+        if (uri.getRawQuery() != null) {
+            path += "?" + uri.getRawQuery();
+        }
+
+        final StringBuilder requestVerbatim = new StringBuilder();
+        requestVerbatim.append(request.method()).append(" ").append(path).append(" HTTP/1.1\r\n");
+        for (HttpHeader header : request.headersArray()) {
+            requestVerbatim.append(header.name).append(": ").append(header.value).append("\r\n");
+        }
+        requestVerbatim.append("\r\n");
+        metadata.setValue(ProtocolResponse.REQUEST_HEADERS_KEY, requestVerbatim.toString());
+
+        final StringBuilder responseVerbatim = new StringBuilder();
+        responseVerbatim.append("HTTP/1.1 ").append(response.status());
+        if (StringUtils.isNotBlank(response.statusText())) {
+            responseVerbatim.append(" ").append(response.statusText());
+        }
+        responseVerbatim.append("\r\n");
+        for (HttpHeader header : response.headersArray()) {
+            responseVerbatim.append(header.name).append(": ").append(header.value).append("\r\n");
+        }
+        responseVerbatim.append("\r\n");
+        metadata.setValue(ProtocolResponse.RESPONSE_HEADERS_KEY, responseVerbatim.toString());
     }
 
     /** Returns a proxy object if required * */
