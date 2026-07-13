@@ -332,9 +332,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     /**
      * Reconstructs verbatim request and response header blocks and stores them in the metadata
-     * under the same keys as the other protocol implementations, so that downstream consumers
-     * (e.g. WARC or archiving bolts) work regardless of the protocol used. The HTTP protocol
-     * version is not exposed by the Playwright API - HTTP/1.1 is written as a placeholder.
+     * under the same keys as the other protocol implementations, so that downstream consumers (e.g.
+     * WARC or archiving bolts) work regardless of the protocol used. The HTTP protocol version is
+     * not exposed by the Playwright API - HTTP/1.1 is written as a placeholder.
      */
     private void storeVerbatimHeaders(
             final com.microsoft.playwright.Response response, final Metadata metadata) {
