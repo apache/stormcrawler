@@ -162,7 +162,6 @@ List of third-party dependencies grouped by their license type.
         * Crawler-commons (com.github.crawler-commons:crawler-commons:1.6 - https://github.com/crawler-commons/crawler-commons)
         * Curator Client (org.apache.curator:curator-client:5.9.0 - https://curator.apache.org/curator-client)
         * Curator Framework (org.apache.curator:curator-framework:5.9.0 - https://curator.apache.org/curator-framework)
-        * error-prone annotations (com.google.errorprone:error_prone_annotations:2.36.0 - https://errorprone.info/error_prone_annotations)
         * error-prone annotations (com.google.errorprone:error_prone_annotations:2.45.0 - https://errorprone.info/error_prone_annotations)
         * error-prone annotations (com.google.errorprone:error_prone_annotations:2.47.0 - https://errorprone.info/error_prone_annotations)
         * error-prone annotations (com.google.errorprone:error_prone_annotations:2.48.0 - https://errorprone.info/error_prone_annotations)
