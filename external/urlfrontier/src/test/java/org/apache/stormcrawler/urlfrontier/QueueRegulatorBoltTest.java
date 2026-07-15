@@ -34,6 +34,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -248,9 +249,26 @@ class QueueRegulatorBoltTest {
     void pacesHostQueueOnRobotsCrawlDelay() {
         seedUrls("/1", "/2");
 
+        // Model one hand-out before the response carrying the robots delay reaches the queue
+        // stream. Production uses max.urls.per.bucket=1 to prevent a single request from draining
+        // a larger host batch; setDelay cannot recall earlier or concurrent hand-outs.
+        assertEquals(1, countServed(1), "the first hand-out should serve one URL");
+
         QueueRegulatorBolt bolt = new QueueRegulatorBolt();
         Map<String, Object> conf = frontierConfig();
         conf.put(ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "protocol.");
+        conf.put(Constants.URLFRONTIER_ROBOTS_CRAWL_DELAY_ENABLED_KEY, true);
+        conf.put("fetcher.max.crawl.delay.force", true);
+        conf.put(
+                org.apache.stormcrawler.Constants.PARTITION_MODEParamName,
+                org.apache.stormcrawler.Constants.PARTITION_MODE_HOST);
+        conf.put(Constants.URLFRONTIER_MAX_URLS_PER_BUCKET_KEY, 1);
+        conf.put(
+                "metadata.persist",
+                List.of(
+                        "fetch.statusCode",
+                        "protocol.retry-after",
+                        org.apache.stormcrawler.Constants.ROBOTS_CRAWL_DELAY_KEY));
         bolt.prepare(conf, TestUtil.getMockedTopologyContext(), mock(OutputCollector.class));
         Tuple t = mock(Tuple.class);
         when(t.getStringByField("key")).thenReturn(HOST);
@@ -262,13 +280,8 @@ class QueueRegulatorBoltTest {
         // blind delay for the fire-and-forget RPC to land, as in the sibling tests
         await().pollDelay(Duration.ofSeconds(2)).atMost(3, TimeUnit.SECONDS).until(() -> true);
 
-        // the queue delay paces successive hand-outs, it does not shrink a
-        // batch: the first getURLs still serves the queue (never produced
-        // before), so take a single URL out of it
-        assertEquals(1, countServed(1), "the first hand-out should serve one URL");
-
-        // the queue is now not requestable again before 300s: a later call
-        // must come back empty although /2 is neither in-flight nor served.
+        // The queue is now not requestable again before 300s: a later call must come back empty
+        // although /2 was not part of the earlier hand-out and remains queued.
         // The pause also pins the unit of setDelayRequestable: were it
         // milliseconds, the 300ms window would have expired and /2 would be
         // handed out

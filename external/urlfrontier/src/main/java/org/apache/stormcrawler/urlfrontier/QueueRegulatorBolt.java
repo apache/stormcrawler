@@ -44,8 +44,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Regulates a URLFrontier queue from the {@code queue} stream emitted by the status updater: blocks
- * it via {@code blockQueueUntil} whenever the tuple's metadata reports a rate-limit response. See
- * issues #867, #784 and #1106.
+ * it via {@code blockQueueUntil} when metadata reports a rate-limit response, and paces it via
+ * {@code setDelay} when the fetcher reports a long robots.txt Crawl-delay. See issues #867, #784,
+ * #1106 and #1979.
  *
  * <p>Two cases are handled, both gated on the status codes configured with {@code
  * urlfrontier.backoff.status.codes} (default 429 and 503):
@@ -69,13 +70,12 @@ import org.slf4j.LoggerFactory;
  * block so that hosts blocked on the same schedule do not all retry at once, and a block is only
  * ever extended, never shrunk by a later, shorter signal.
  *
- * <p>Independently of rate limits, when the tuple's metadata carries {@code robots.crawl.delay}
- * (written by the fetcher bolts when a robots.txt {@code Crawl-delay} exceeds {@code
- * fetcher.max.crawl.delay} and {@code fetcher.max.crawl.delay.force} is true), the bolt forwards it
- * to the frontier via {@code setDelay}, capped by {@code urlfrontier.backoff.max.secs}: the queue
- * is then served at the pace robots requested, restoring the compliance that the force setting
- * alone would violate. The value is declarative — the last one seen wins, re-sent at most once per
- * {@code urlfrontier.backoff.decay.secs} window. If a site later removes its Crawl-delay, no signal
+ * <p>Independently of rate limits, when robots pacing is explicitly enabled and the tuple's
+ * metadata carries {@code robots.crawl.delay} (written by the fetcher bolts when a robots.txt
+ * {@code Crawl-delay} exceeds {@code fetcher.max.crawl.delay}), the bolt forwards it to the
+ * frontier via {@code setDelay}, capped by {@code urlfrontier.backoff.max.secs}. The value is
+ * declarative: the last one seen wins, re-sent at most once per {@code
+ * urlfrontier.backoff.decay.secs} window. If a site later removes its Crawl-delay, no signal
  * arrives and the frontier keeps the old pace: throughput loss on that host, never impoliteness;
  * {@code setDelay(key, 0)} is deliberately never called as it would erase a server-side default for
  * the queue.
@@ -93,25 +93,36 @@ import org.slf4j.LoggerFactory;
  *   metadata.persist:
  *    - fetch.statusCode
  *    - protocol.retry-after
- *    - robots.crawl.delay
  * </pre>
  *
  * (the second entry depends on {@code protocol.md.prefix}), and {@code fetch.exception} as well
  * when the back-off on exceptions is enabled. A warning is logged at startup when the configuration
  * would strip them.
  *
- * <p>Blocking stops new hand-outs; it does not recall URLs of the host already prefetched by the
- * spout into the topology, which still fail against the rate-limited server and reschedule via the
- * status stream. Keep {@code urlfrontier.max.urls.per.bucket} and {@code
- * topology.max.spout.pending} small for a block to bite quickly.
+ * <p>Robots pacing is enabled by {@code urlfrontier.robots.crawl.delay.enabled=true} together with
+ * {@code fetcher.max.crawl.delay.force=true}. It is safe only with {@code
+ * partition.url.mode=byHost}, {@code urlfrontier.max.urls.per.bucket=1}, and {@code
+ * robots.crawl.delay} in {@code metadata.persist} but <b>not</b> in {@code metadata.transfer}
+ * (including wildcards such as {@code robots.*}). The bolt probes these conditions at startup and
+ * fails fast rather than silently pacing a shared queue, transferring a host's delay to an outlink,
+ * or handing out several URLs from that host in one request. A custom {@code
+ * metadata.transfer.class} remains responsible for satisfying the same persist-only contract for
+ * all URLs and values.
+ *
+ * <p>Neither blocking nor pacing recalls URLs already prefetched by the spout. For rate-limit
+ * blocks, keep {@code urlfrontier.max.urls.per.bucket} and {@code topology.max.spout.pending} small
+ * for the block to bite quickly. Robots pacing requires the stricter per-queue batch size of one;
+ * this bounds each frontier hand-out but cannot recall earlier hand-outs or eliminate concurrent
+ * requests during the transition to the new delay.
  *
  * <p>Connects via {@code urlfrontier.address}, falling back to {@code urlfrontier.host} / {@code
  * urlfrontier.port}. The block is issued with {@code local=false} and propagates to the whole
  * cluster, so with several frontier nodes a single connection to any one of them is enough.
  *
- * <p>The block is fire-and-forget with a short deadline: a failed or expired call is logged but the
- * tuple is acked anyway. A missed block heals itself: every further rate-limit signal for the host
- * re-asserts the stored block until the frontier stops serving it.
+ * <p>The RPCs have a short deadline: a failed or expired call is logged but the tuple is acked
+ * anyway. A missed block heals itself on further rate-limit signals. Robots delay calls are
+ * serialized per host and coalesce to the latest value; an unchanged delay is re-sent after the
+ * configured decay window.
  */
 public class QueueRegulatorBolt extends BaseRichBolt {
 
@@ -137,20 +148,6 @@ public class QueueRegulatorBolt extends BaseRichBolt {
                 public void onCompleted() {}
             };
 
-    private static final StreamObserver<Empty> SET_DELAY_NOOP_OBSERVER =
-            new StreamObserver<>() {
-                @Override
-                public void onNext(Empty value) {}
-
-                @Override
-                public void onError(Throwable t) {
-                    LOG.warn("setDelay failed", t);
-                }
-
-                @Override
-                public void onCompleted() {}
-            };
-
     private OutputCollector collector;
     private ManagedChannel channel;
     private URLFrontierStub frontier;
@@ -162,12 +159,17 @@ public class QueueRegulatorBolt extends BaseRichBolt {
     /** Per-host robots crawl-delay forwarding decision. */
     private CrawlDelayPolicy crawlDelayPolicy;
 
+    /** Prevents terminal callbacks from chaining another RPC after cleanup starts. */
+    private volatile boolean closed;
+
     @Override
     public void prepare(Map<String, Object> conf, TopologyContext context, OutputCollector c) {
+        this.closed = false;
         this.collector = c;
         this.globalCrawlID =
                 ConfUtils.getString(conf, Constants.URLFRONTIER_CRAWL_ID_KEY, CrawlID.DEFAULT);
         this.backoff = new HostBackoff(conf);
+        validateRobotsPacingConfiguration(conf);
         this.crawlDelayPolicy = new CrawlDelayPolicy(conf);
         // the status updater emits the queue stream after the metadata.persist
         // filter: warn upfront when the keys this bolt relies on would be
@@ -222,20 +224,51 @@ public class QueueRegulatorBolt extends BaseRichBolt {
             frontier.withDeadlineAfter(BLOCK_RPC_DEADLINE_SECS, TimeUnit.SECONDS)
                     .blockQueueUntil(params, NOOP_OBSERVER);
         }
-        final int delaySecs = crawlDelayPolicy.delaySecsFor(key, metadata);
-        if (delaySecs > 0) {
-            LOG.debug("Setting delay of {}s on queue {}", delaySecs, key);
-            QueueDelayParams delayParams =
-                    QueueDelayParams.newBuilder()
-                            .setKey(key)
-                            .setCrawlID(globalCrawlID)
-                            .setDelayRequestable(delaySecs)
-                            .setLocal(false)
-                            .build();
-            frontier.withDeadlineAfter(BLOCK_RPC_DEADLINE_SECS, TimeUnit.SECONDS)
-                    .setDelay(delayParams, SET_DELAY_NOOP_OBSERVER);
-        }
+        crawlDelayPolicy.requestFor(key, metadata).ifPresent(this::setDelay);
         collector.ack(t);
+    }
+
+    private void setDelay(CrawlDelayPolicy.DelayRequest request) {
+        if (closed) {
+            return;
+        }
+        LOG.debug("Setting delay of {}s on queue {}", request.delaySecs(), request.key());
+        QueueDelayParams delayParams =
+                QueueDelayParams.newBuilder()
+                        .setKey(request.key())
+                        .setCrawlID(globalCrawlID)
+                        .setDelayRequestable(request.delaySecs())
+                        .setLocal(false)
+                        .build();
+        try {
+            frontier.withDeadlineAfter(BLOCK_RPC_DEADLINE_SECS, TimeUnit.SECONDS)
+                    .setDelay(delayParams, setDelayObserver(request));
+        } catch (RuntimeException e) {
+            LOG.warn("setDelay failed", e);
+            crawlDelayPolicy.completed(request, false).ifPresent(this::setDelay);
+        }
+    }
+
+    private StreamObserver<Empty> setDelayObserver(CrawlDelayPolicy.DelayRequest request) {
+        return new StreamObserver<>() {
+            @Override
+            public void onNext(Empty value) {}
+
+            @Override
+            public void onError(Throwable t) {
+                LOG.warn("setDelay failed", t);
+                crawlDelayPolicy
+                        .completed(request, false)
+                        .ifPresent(QueueRegulatorBolt.this::setDelay);
+            }
+
+            @Override
+            public void onCompleted() {
+                crawlDelayPolicy
+                        .completed(request, true)
+                        .ifPresent(QueueRegulatorBolt.this::setDelay);
+            }
+        };
     }
 
     /**
@@ -249,7 +282,6 @@ public class QueueRegulatorBolt extends BaseRichBolt {
         probe.setValue(HostBackoff.STATUS_CODE_KEY, "429");
         probe.setValue(retryAfterKey, "1");
         probe.setValue(HostBackoff.EXCEPTION_KEY, "probe");
-        probe.setValue(org.apache.stormcrawler.Constants.ROBOTS_CRAWL_DELAY_KEY, "1");
         Metadata filtered = MetadataTransfer.getInstance(conf).filter(probe);
         Set<String> missing = new LinkedHashSet<>();
         if (filtered.getFirstValue(HostBackoff.STATUS_CODE_KEY) == null) {
@@ -261,11 +293,88 @@ public class QueueRegulatorBolt extends BaseRichBolt {
         if (onExceptions && filtered.getFirstValue(HostBackoff.EXCEPTION_KEY) == null) {
             missing.add(HostBackoff.EXCEPTION_KEY);
         }
-        if (filtered.getFirstValue(org.apache.stormcrawler.Constants.ROBOTS_CRAWL_DELAY_KEY)
-                == null) {
-            missing.add(org.apache.stormcrawler.Constants.ROBOTS_CRAWL_DELAY_KEY);
-        }
         return missing;
+    }
+
+    /**
+     * Fails fast when robots pacing is enabled but the queue key, hand-out size, delay cap or
+     * metadata routing could apply an unsafe pace or target the wrong host.
+     */
+    static void validateRobotsPacingConfiguration(Map<String, Object> conf) {
+        if (!ConfUtils.getBoolean(
+                conf,
+                Constants.URLFRONTIER_ROBOTS_CRAWL_DELAY_ENABLED_KEY,
+                Constants.URLFRONTIER_ROBOTS_CRAWL_DELAY_ENABLED_DEFAULT)) {
+            return;
+        }
+
+        if (!ConfUtils.getBoolean(conf, "fetcher.max.crawl.delay.force", false)) {
+            throw new IllegalArgumentException(
+                    "robots crawl-delay pacing requires fetcher.max.crawl.delay.force=true");
+        }
+
+        int maxCrawlDelay = ConfUtils.getInt(conf, "fetcher.max.crawl.delay", 30);
+        if (maxCrawlDelay < 0) {
+            throw new IllegalArgumentException(
+                    "robots crawl-delay pacing requires fetcher.max.crawl.delay >= 0");
+        }
+
+        String partitionMode =
+                ConfUtils.getString(
+                        conf,
+                        org.apache.stormcrawler.Constants.PARTITION_MODEParamName,
+                        org.apache.stormcrawler.Constants.PARTITION_MODE_HOST);
+        if (!org.apache.stormcrawler.Constants.PARTITION_MODE_HOST.equals(partitionMode)) {
+            throw new IllegalArgumentException(
+                    "robots crawl-delay pacing requires partition.url.mode="
+                            + org.apache.stormcrawler.Constants.PARTITION_MODE_HOST
+                            + "; found "
+                            + partitionMode);
+        }
+
+        int maxURLsPerBucket =
+                ConfUtils.getInt(
+                        conf,
+                        Constants.URLFRONTIER_MAX_URLS_PER_BUCKET_KEY,
+                        Constants.URLFRONTIER_MAX_URLS_PER_BUCKET_DEFAULT);
+        if (maxURLsPerBucket != 1) {
+            throw new IllegalArgumentException(
+                    "robots crawl-delay pacing requires "
+                            + Constants.URLFRONTIER_MAX_URLS_PER_BUCKET_KEY
+                            + "=1; found "
+                            + maxURLsPerBucket);
+        }
+
+        long maxDelaySecs =
+                ConfUtils.getLong(
+                        conf,
+                        Constants.URLFRONTIER_BACKOFF_MAX_KEY,
+                        Constants.URLFRONTIER_BACKOFF_MAX_DEFAULT);
+        if (maxDelaySecs <= 0) {
+            throw new IllegalArgumentException(
+                    "robots crawl-delay pacing requires "
+                            + Constants.URLFRONTIER_BACKOFF_MAX_KEY
+                            + " > 0");
+        }
+
+        final String robotsDelayKey = org.apache.stormcrawler.Constants.ROBOTS_CRAWL_DELAY_KEY;
+        MetadataTransfer transfer = MetadataTransfer.getInstance(conf);
+        Metadata probe = new Metadata();
+        probe.setValue(robotsDelayKey, "1");
+        Metadata persisted = transfer.filter(probe);
+        if (persisted == null || persisted.getFirstValue(robotsDelayKey) == null) {
+            throw new IllegalArgumentException(
+                    "robots.crawl.delay must be included in metadata.persist");
+        }
+
+        Metadata outlink =
+                transfer.getMetaForOutlink(
+                        "http://target.example/", "http://source.example/", probe);
+        if (outlink == null || outlink.getFirstValue(robotsDelayKey) != null) {
+            throw new IllegalArgumentException(
+                    "robots.crawl.delay must not appear in metadata.transfer, including via a"
+                            + " wildcard: it is a per-host control signal");
+        }
     }
 
     @Override
@@ -275,6 +384,10 @@ public class QueueRegulatorBolt extends BaseRichBolt {
 
     @Override
     public void cleanup() {
+        closed = true;
+        if (crawlDelayPolicy != null) {
+            crawlDelayPolicy.clear();
+        }
         if (channel != null) {
             channel.shutdown();
         }
