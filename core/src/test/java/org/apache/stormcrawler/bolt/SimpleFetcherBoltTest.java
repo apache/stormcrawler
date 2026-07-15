@@ -49,7 +49,13 @@ public class SimpleFetcherBoltTest extends AbstractFetcherBoltTest {
                                 aResponse()
                                         .withStatus(200)
                                         .withBody("User-agent: *\nCrawl-delay: 120\n")));
-        stubFor(get(urlEqualTo("/page")).willReturn(aResponse().withStatus(200).withBody("hello")));
+        stubFor(
+                get(urlEqualTo("/page"))
+                        .willReturn(
+                                aResponse()
+                                        .withStatus(200)
+                                        .withHeader("Robots.Crawl.Delay", "1")
+                                        .withBody("hello")));
 
         Map<String, Object> config = new HashMap<>();
         config.put("http.agent.name", "this_is_only_a_test");
@@ -61,6 +67,26 @@ public class SimpleFetcherBoltTest extends AbstractFetcherBoltTest {
     }
 
     @Test
+    void fractionalLongCrawlDelayIsRoundedUp(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(
+                get(urlEqualTo("/robots.txt"))
+                        .willReturn(
+                                aResponse()
+                                        .withStatus(200)
+                                        .withBody("User-agent: *\nCrawl-delay: 30.5\n")));
+        stubFor(get(urlEqualTo("/page")).willReturn(aResponse().withStatus(200).withBody("hello")));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("fetcher.max.crawl.delay", 30);
+        config.put("fetcher.max.crawl.delay.force", true);
+
+        Metadata md = fetchAndGetContentMetadata(wmRuntimeInfo, config, "/page");
+        assertEquals("31", md.getFirstValue(Constants.ROBOTS_CRAWL_DELAY_KEY));
+    }
+
+    @Test
     void shortCrawlDelayIsNotReported(WireMockRuntimeInfo wmRuntimeInfo)
             throws ReflectiveOperationException {
         stubFor(
@@ -69,11 +95,37 @@ public class SimpleFetcherBoltTest extends AbstractFetcherBoltTest {
                                 aResponse()
                                         .withStatus(200)
                                         .withBody("User-agent: *\nCrawl-delay: 5\n")));
-        stubFor(get(urlEqualTo("/page")).willReturn(aResponse().withStatus(200).withBody("hello")));
+        stubFor(
+                get(urlEqualTo("/page"))
+                        .willReturn(
+                                aResponse()
+                                        .withStatus(200)
+                                        .withHeader("Robots.Crawl.Delay", "120")
+                                        .withBody("hello")));
 
         Map<String, Object> config = new HashMap<>();
         config.put("http.agent.name", "this_is_only_a_test");
         config.put("fetcher.max.crawl.delay", 30);
+        config.put("fetcher.max.crawl.delay.force", true);
+
+        Metadata md = fetchAndGetContentMetadata(wmRuntimeInfo, config, "/page");
+        assertNull(md.getFirstValue(Constants.ROBOTS_CRAWL_DELAY_KEY));
+    }
+
+    @Test
+    void negativeMaximumDisablesTheCrawlDelayLimit(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(
+                get(urlEqualTo("/robots.txt"))
+                        .willReturn(
+                                aResponse()
+                                        .withStatus(200)
+                                        .withBody("User-agent: *\nCrawl-delay: 120\n")));
+        stubFor(get(urlEqualTo("/page")).willReturn(aResponse().withStatus(200).withBody("hello")));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("fetcher.max.crawl.delay", -1);
         config.put("fetcher.max.crawl.delay.force", true);
 
         Metadata md = fetchAndGetContentMetadata(wmRuntimeInfo, config, "/page");
