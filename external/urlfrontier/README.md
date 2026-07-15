@@ -24,6 +24,48 @@ urlfrontier.max.buckets: 10
 urlfrontier.max.urls.per.bucket:10
 ```
 
+## Robots crawl-delay pacing
+
+`QueueRegulatorBolt` can pace host queues when a robots.txt Crawl-delay exceeds the fetcher's local
+limit. Wire it to the `queue` stream emitted by `StatusUpdaterBolt`:
+
+```yaml
+bolts:
+  - id: "queue-regulator"
+    className: "org.apache.stormcrawler.urlfrontier.QueueRegulatorBolt"
+    parallelism: 1
+
+streams:
+  - from: "status"
+    to: "queue-regulator"
+    grouping:
+      type: FIELDS
+      args: ["key"]
+      streamId: "queue"
+```
+
+Robots pacing is opt-in. It requires host partitioning, one URL per frontier hand-out, a positive
+delay cap, and a persist-only control signal:
+
+```yaml
+partition.url.mode: byHost
+fetcher.max.crawl.delay.force: true
+urlfrontier.robots.crawl.delay.enabled: true
+urlfrontier.max.urls.per.bucket: 1
+urlfrontier.backoff.max.secs: 86400
+
+metadata.persist:
+  - robots.crawl.delay
+```
+
+Do not include `robots.crawl.delay` in `metadata.transfer`, directly or through a wildcard such as
+`robots.*`: an outlink must not inherit its parent's host delay. The bolt rejects an unsafe robots
+configuration at startup. A custom `metadata.transfer.class` must preserve this contract for every
+URL and value; the startup probe can only exercise representative metadata. `setDelay(key, 0)` is
+not sent if a site later removes its Crawl-delay, so that host can remain slower than necessary but
+is not made less polite. A batch size of one bounds each hand-out; it does not recall URLs already
+emitted or eliminate concurrent requests while the new delay is reaching the frontier.
+
 Your StormCrawler topology requires the following dependency in its pom.xml (just like with any other module)
 
 ```

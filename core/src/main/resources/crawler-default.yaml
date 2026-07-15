@@ -40,8 +40,11 @@ config:
   #    skip URLs from this queue to avoid that any overlong
   #    crawl-delay throttles the crawler
   #  (if true)
-  #    set the delay to fetcher.max.crawl.delay,
-  #    making fetcher more aggressive than requested
+  #    cap the local delay at fetcher.max.crawl.delay and emit the
+  #    requested value in whole seconds as robots.crawl.delay;
+  #    URLFrontier's QueueRegulatorBolt can forward a capped value when
+  #    its robots crawl-delay integration is explicitly enabled. Without
+  #    that consumer the fetcher remains more aggressive than requested.
   fetcher.max.crawl.delay.force: false
   # behavior of fetcher when the crawl-delay in the robots.txt
   # is smaller (ev. less than one second) than the default delay:
