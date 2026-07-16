@@ -21,6 +21,7 @@ import static org.apache.stormcrawler.protocol.ProtocolResponse.REQUEST_TIME_KEY
 import static org.apache.stormcrawler.protocol.ProtocolResponse.RESPONSE_HEADERS_KEY;
 import static org.apache.stormcrawler.protocol.ProtocolResponse.RESPONSE_IP_KEY;
 
+import com.google.common.net.InetAddresses;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,7 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.apache.commons.codec.binary.Base32;
@@ -317,6 +319,44 @@ public class WARCRecordFormat implements RecordFormat {
         return WARC_DF.format(capturedAt);
     }
 
+    /**
+     * Get the canonicalized IP address, if stored as protocol metadata.
+     *
+     * <ul>
+     *   <li>IPv4: dot-decimal notation (dotted quad)
+     *   <li>IPv6: the canonical format (short representation) defined by <a
+     *       href="https://datatracker.ietf.org/doc/html/rfc5952">RFC 5952</a>
+     * </ul>
+     *
+     * See also
+     *
+     * <ul>
+     *   <li><a
+     *       href="https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1-annotated/#warc-ip-address">WARC-IP-Address,
+     *       WARC specification 1.1</a>
+     *   <li><a href="https://en.wikipedia.org/wiki/Dot-decimal_notation">IPv4 address, dot-decimal
+     *       notation</a>
+     *   <li><a href="https://en.wikipedia.org/wiki/IPv6_address#Representation">IPv6 address
+     *       representation, Wikipedia</a>
+     * </ul>
+     *
+     * @param metadata
+     * @param protocolMDprefix
+     * @return The canonical IP address string, or empty if the IP address was not recorded in
+     *     metadata.
+     */
+    protected static Optional<String> getIPAddress(Metadata metadata, String protocolMDprefix) {
+        String ip = metadata.getFirstValue(RESPONSE_IP_KEY, protocolMDprefix);
+        if (StringUtils.isBlank(ip)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(InetAddresses.toAddrString(InetAddresses.forString(ip)));
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+
     @Override
     public byte[] format(Tuple tuple) {
 
@@ -383,9 +423,9 @@ public class WARCRecordFormat implements RecordFormat {
         buffer.append("WARC-Type").append(": ").append(WARCTypeValue).append(CRLF);
 
         // "WARC-IP-Address" if present
-        String IP = metadata.getFirstValue(RESPONSE_IP_KEY, this.protocolMDprefix);
-        if (StringUtils.isNotBlank(IP)) {
-            buffer.append("WARC-IP-Address").append(": ").append(IP).append(CRLF);
+        Optional<String> ip = getIPAddress(metadata, this.protocolMDprefix);
+        if (ip.isPresent()) {
+            buffer.append("WARC-IP-Address").append(": ").append(ip.get()).append(CRLF);
         }
 
         // must be a valid URI

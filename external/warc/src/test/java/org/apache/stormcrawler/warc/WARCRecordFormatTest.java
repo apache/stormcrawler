@@ -27,6 +27,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 import org.apache.http.HttpHeaders;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
@@ -38,7 +39,42 @@ import org.netpreserve.jwarc.WarcRecord;
 
 class WARCRecordFormatTest {
 
-    private String protocolMDprefix = "http.";
+    private static String protocolMDprefix = "http.";
+
+    private static String[][] ipAddressTestData = {
+        // { expected, input }
+        // IPv4
+        {"127.0.0.1", "127.0.0.1"},
+        // IPv6
+        {
+            // IPv4-mapped IPv6 addresses
+            "192.0.2.128", "::ffff:192.0.2.128"
+        },
+        {
+            // IPv4-mapped IPv6 addresses (hex)
+            "192.0.2.128", "::ffff:C000:0280"
+        },
+        // Tests below are from jwarc's InetAddressesTest
+        {"2001:db8::1", "2001:db8:0:0:0:0:0:1"},
+        {"2001:db8::1", "2001:0DB8:0:0:0:0:0:1"},
+        {"::", "0:0:0:0:0:0:0:0"},
+        {"::1", "0:0:0:0:0:0:0:1"},
+        {"2001:db8:1:1:1:1:1:1", "2001:db8:1:1:1:1:1:1"},
+        {"2001:0:0:1::1", "2001:0:0:1:0:0:0:1"},
+        {"2001:db8:f::1", "2001:db8:000f:0:0:0:0:1"},
+        {"2001:db8::1:0:0:1", "2001:0db8:0000:0000:0001:0000:0000:0001"},
+        {"ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"},
+        {"2001:200f::1", "2001:200f:0:0:0:0:0:1"},
+        {
+            // https://datatracker.ietf.org/doc/html/rfc5952#section-4.2.2
+            // "The symbol "::" MUST NOT be used to shorten just one 16-bit 0 field."
+            "2001:0:3:4:5:6:7:8", "2001:0:3:4:5:6:7:8"
+        },
+        {
+            // shorten first of same-length consecutive 0 fields, also in initial position
+            "::4:0:0:0:ffff", "0:0:0:4:0:0:0:ffff"
+        },
+    };
 
     @Test
     void testGetDigestSha1() {
@@ -73,6 +109,21 @@ class WARCRecordFormatTest {
     }
 
     @Test
+    void testCanonicalizeIpAddress() {
+        Metadata metadata = new Metadata();
+        for (String[] p : ipAddressTestData) {
+            metadata.setValue(protocolMDprefix + ProtocolResponse.RESPONSE_IP_KEY, p[1]);
+            Optional<String> ip = WARCRecordFormat.getIPAddress(metadata, protocolMDprefix);
+            if (p[0] == null) {
+                assertTrue(ip.isEmpty());
+            } else {
+                assertTrue(ip.isPresent(), "No canonical form for " + p[1]);
+                assertEquals(p[0], ip.get());
+            }
+        }
+    }
+
+    @Test
     void testWarcRecord() {
         // test validity of WARC record
         String txt = "abcdef";
@@ -82,6 +133,8 @@ class WARCRecordFormatTest {
         metadata.addValue(
                 protocolMDprefix + ProtocolResponse.RESPONSE_HEADERS_KEY,
                 "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
+        metadata.addValue(
+                protocolMDprefix + ProtocolResponse.RESPONSE_IP_KEY, "2001:0DB8:0:0:0:0:0:1");
         Tuple tuple = mock(Tuple.class);
         when(tuple.getBinaryByField("content")).thenReturn(content);
         when(tuple.getStringByField("url")).thenReturn("https://www.example.org/");
@@ -111,6 +164,9 @@ class WARCRecordFormatTest {
         assertTrue(
                 warcString.contains("\r\nWARC-Payload-Digest: " + sha1str + "\r\n"),
                 "WARC record: no or incorrect payload digest");
+        assertTrue(
+                warcString.contains("\r\nWARC-IP-Address: 2001:db8::1\r\n"),
+                "WARC record: WARC-IP-Address not found (canonical form expected)");
     }
 
     @Test

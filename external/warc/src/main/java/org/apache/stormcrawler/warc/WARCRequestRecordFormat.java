@@ -18,10 +18,10 @@
 package org.apache.stormcrawler.warc;
 
 import static org.apache.stormcrawler.protocol.ProtocolResponse.REQUEST_HEADERS_KEY;
-import static org.apache.stormcrawler.protocol.ProtocolResponse.RESPONSE_IP_KEY;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.tuple.Tuple;
@@ -65,9 +65,9 @@ public class WARCRequestRecordFormat extends WARCRecordFormat {
         buffer.append("WARC-Type: ").append(WARC_TYPE_REQUEST).append(CRLF);
 
         // "WARC-IP-Address" if present
-        String IP = metadata.getFirstValue(RESPONSE_IP_KEY, this.protocolMDprefix);
-        if (StringUtils.isNotBlank(IP)) {
-            buffer.append("WARC-IP-Address: ").append(IP).append(CRLF);
+        Optional<String> ip = getIPAddress(metadata, this.protocolMDprefix);
+        if (ip.isPresent()) {
+            buffer.append("WARC-IP-Address").append(": ").append(ip.get()).append(CRLF);
         }
 
         addRecordID(buffer);

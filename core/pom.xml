@@ -50,7 +50,6 @@ under the License.
         <okhttp.version>5.4.0</okhttp.version>
         <caffeine.version>3.2.4</caffeine.version>
 
-        <guava.version>33.6.0-jre</guava.version>
         <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
         <jacoco.classRatio>0.72</jacoco.classRatio>
         <jacoco.instructionRatio>0.54</jacoco.instructionRatio>
