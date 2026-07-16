@@ -56,9 +56,17 @@ scheduler.adaptive.fetchInterval.min: 60
 scheduler.adaptive.fetchInterval.max: 20160
 scheduler.adaptive.fetchInterval.rate.incr: .5
 scheduler.adaptive.fetchInterval.rate.decr: .5
+
+metadata.persist:
+  - signature
+  - fetch.statusCode
+  - fetchInterval
+  - signatureChangeDate
+  - last-modified
+  - protocol.etag
 ----
 
-The `AdaptiveScheduler` requires the `MD5SignatureParseFilter` to be configured so that the `signature` metadata field is populated.
+The `AdaptiveScheduler` requires the `MD5SignatureParseFilter` to be configured so that the `signature` metadata field is populated. The scheduler also persists its current `fetchInterval` and the metadata used to detect content changes. The `last-modified` and `protocol.etag` fields allow conditional requests when `scheduler.adaptive.setLastModified` is enabled.
 
 
 === Bolts
