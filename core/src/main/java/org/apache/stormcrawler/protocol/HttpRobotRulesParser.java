@@ -180,7 +180,7 @@ public class HttpRobotRulesParser extends RobotRulesParser {
                                 redir);
                     }
 
-                    response = http.getProtocolOutput(redir.toString(), Metadata.empty);
+                    response = http.getProtocolOutput(redir.toString(), fetchRobotsMd);
                     code = response.getStatusCode();
                     bytesFetched.add(
                             response.getContent() != null ? response.getContent().length : 0);
