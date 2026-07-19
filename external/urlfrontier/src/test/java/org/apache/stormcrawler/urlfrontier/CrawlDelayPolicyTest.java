@@ -84,7 +84,7 @@ class CrawlDelayPolicyTest {
     }
 
     @Test
-    void changedValuesAreSerializedAndOnlyTheLatestPendingValueIsSent() {
+    void changedValuesAreSerializedAndOnlyTheMaximumPendingValueIsSent() {
         CrawlDelayPolicy policy = policy();
         CrawlDelayPolicy.DelayRequest first = request(policy, "120");
         assertFalse(policy.requestFor(KEY, md("60")).isPresent());
@@ -101,13 +101,24 @@ class CrawlDelayPolicyTest {
         CrawlDelayPolicy policy = policy();
         CrawlDelayPolicy.DelayRequest first = request(policy, "120");
         assertFalse(policy.completed(first, true).isPresent());
-        ticker.advanceSecs(Constants.URLFRONTIER_BACKOFF_DECAY_DEFAULT + 1);
+        ticker.advanceSecs(Constants.URLFRONTIER_ROBOTS_DELAY_DECAY_DEFAULT + 1);
         assertEquals(120, request(policy, "120").delaySecs());
     }
 
     @Test
-    void valueIsCappedAtBackoffMax() {
-        CrawlDelayPolicy policy = policy(Constants.URLFRONTIER_BACKOFF_MAX_KEY, 3600);
+    void lowerValueIsAppliedOnlyAfterTheMaximumExpiresFromTheWindow() {
+        CrawlDelayPolicy policy = policy();
+        CrawlDelayPolicy.DelayRequest first = request(policy, "120");
+        assertFalse(policy.completed(first, true).isPresent());
+        assertFalse(policy.requestFor(KEY, md("60")).isPresent());
+
+        ticker.advanceSecs(Constants.URLFRONTIER_ROBOTS_DELAY_DECAY_DEFAULT + 1);
+        assertEquals(60, request(policy, "60").delaySecs());
+    }
+
+    @Test
+    void valueIsCappedAtRobotsDelayMax() {
+        CrawlDelayPolicy policy = policy(Constants.URLFRONTIER_ROBOTS_DELAY_MAX_KEY, 3600);
         assertEquals(3600, request(policy, "86400").delaySecs());
     }
 
@@ -125,54 +136,82 @@ class CrawlDelayPolicyTest {
     }
 
     @Test
-    void failedRpcRetriesTheLatestPendingValue() {
+    void failedRpcDoesNotRetryALowerObservedValue() {
         CrawlDelayPolicy policy = policy();
         CrawlDelayPolicy.DelayRequest first = request(policy, "120");
         assertFalse(policy.requestFor(KEY, md("60")).isPresent());
 
-        CrawlDelayPolicy.DelayRequest second = policy.completed(first, false).orElseThrow();
-        assertEquals(60, second.delaySecs());
-        assertFalse(policy.completed(second, false).isPresent());
-        assertEquals(60, request(policy, "60").delaySecs());
-    }
-
-    @Test
-    void failedChangedRpcInvalidatesThePreviouslyAppliedValue() {
-        CrawlDelayPolicy policy = policy();
-        CrawlDelayPolicy.DelayRequest initial = request(policy, "120");
-        assertFalse(policy.completed(initial, true).isPresent());
-
-        CrawlDelayPolicy.DelayRequest changed = request(policy, "60");
-        assertFalse(policy.completed(changed, false).isPresent());
-
-        // The server may have applied 60 before the response was lost. Do not deduplicate the
-        // previous 120: reasserting it is the only way to converge safely.
+        // the lower value was dropped at observation time: nothing pends, no self-retry
+        assertFalse(policy.completed(first, false).isPresent());
+        // the failure invalidated the dedupe entry: the next signal reasserts the value
         assertEquals(120, request(policy, "120").delaySecs());
     }
 
     @Test
-    void repeatedInFlightValueRetriesOnFailureButNotOnSuccess() {
+    void failedRpcRetriesAHigherPendingValue() {
+        CrawlDelayPolicy policy = policy();
+        CrawlDelayPolicy.DelayRequest first = request(policy, "120");
+        assertFalse(policy.requestFor(KEY, md("180")).isPresent());
+
+        CrawlDelayPolicy.DelayRequest second = policy.completed(first, false).orElseThrow();
+        assertEquals(180, second.delaySecs());
+        assertFalse(policy.completed(second, false).isPresent());
+    }
+
+    @Test
+    void failedChangedRpcBecomesTheFloorForTheNextSignal() {
+        CrawlDelayPolicy policy = policy();
+        CrawlDelayPolicy.DelayRequest initial = request(policy, "120");
+        assertFalse(policy.completed(initial, true).isPresent());
+
+        CrawlDelayPolicy.DelayRequest changed = request(policy, "180");
+        assertFalse(policy.completed(changed, false).isPresent());
+
+        // The server may have applied 180 before the response was lost. The next signal is not
+        // deduplicated, and it must reassert the ambiguous maximum, not its own lower value.
+        assertEquals(180, request(policy, "120").delaySecs());
+    }
+
+    @Test
+    void theAmbiguousFloorExpiresWithTheDecayWindow() {
+        CrawlDelayPolicy policy = policy();
+        CrawlDelayPolicy.DelayRequest changed = request(policy, "180");
+        assertFalse(policy.completed(changed, false).isPresent());
+
+        ticker.advanceSecs(Constants.URLFRONTIER_ROBOTS_DELAY_DECAY_DEFAULT + 1);
+        assertEquals(120, request(policy, "120").delaySecs());
+    }
+
+    @Test
+    void repeatedInFlightValueNeverRetriesAndFailureReassertsOnTheNextSignal() {
         CrawlDelayPolicy failed = policy();
         CrawlDelayPolicy.DelayRequest failedRequest = request(failed, "120");
         assertFalse(failed.requestFor(KEY, md("120")).isPresent());
-        assertEquals(120, failed.completed(failedRequest, false).orElseThrow().delaySecs());
+        assertFalse(failed.completed(failedRequest, false).isPresent());
+        // the failure invalidated the dedupe entry: the next signal reasserts the value
+        assertEquals(120, request(failed, "120").delaySecs());
 
         CrawlDelayPolicy succeeded = policy();
         CrawlDelayPolicy.DelayRequest succeededRequest = request(succeeded, "120");
         assertFalse(succeeded.requestFor(KEY, md("120")).isPresent());
         assertFalse(succeeded.completed(succeededRequest, true).isPresent());
+        // the success recorded the value: an unchanged signal is deduplicated
+        assertFalse(succeeded.requestFor(KEY, md("120")).isPresent());
     }
 
     @Test
-    void staleCallbackCannotCompleteANewerRequestWithTheSameValue() {
+    void staleCallbackCannotCompleteANewerRequest() {
         CrawlDelayPolicy policy = policy();
         CrawlDelayPolicy.DelayRequest first = request(policy, "120");
-        assertFalse(policy.requestFor(KEY, md("120")).isPresent());
+        assertFalse(policy.requestFor(KEY, md("180")).isPresent());
         CrawlDelayPolicy.DelayRequest retry = policy.completed(first, false).orElseThrow();
+        assertEquals(180, retry.delaySecs());
 
+        // the retry replaced the failed request: a late duplicate callback for it is ignored
         assertFalse(policy.completed(first, true).isPresent());
-        assertFalse(policy.requestFor(KEY, md("60")).isPresent());
-        assertEquals(60, policy.completed(retry, true).orElseThrow().delaySecs());
+        assertFalse(policy.completed(retry, true).isPresent());
+        // the retry recorded 180: an unchanged signal is deduplicated
+        assertFalse(policy.requestFor(KEY, md("180")).isPresent());
     }
 
     @Test

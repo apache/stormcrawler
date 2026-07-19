@@ -73,12 +73,12 @@ import org.slf4j.LoggerFactory;
  * <p>Independently of rate limits, when robots pacing is explicitly enabled and the tuple's
  * metadata carries {@code robots.crawl.delay} (written by the fetcher bolts when a robots.txt
  * {@code Crawl-delay} exceeds {@code fetcher.max.crawl.delay}), the bolt forwards it to the
- * frontier via {@code setDelay}, capped by {@code urlfrontier.backoff.max.secs}. The value is
- * declarative: the last one seen wins, re-sent at most once per {@code
- * urlfrontier.backoff.decay.secs} window. If a site later removes its Crawl-delay, no signal
- * arrives and the frontier keeps the old pace: throughput loss on that host, never impoliteness;
- * {@code setDelay(key, 0)} is deliberately never called as it would erase a server-side default for
- * the queue.
+ * frontier via {@code setDelay}, capped by {@code urlfrontier.robots.delay.max.secs}. The value is
+ * conservative: the maximum observed value wins, re-sent at most once per {@code
+ * urlfrontier.robots.delay.decay.secs} window. If a site later removes its Crawl-delay or lowers it
+ * below {@code fetcher.max.crawl.delay}, no signal arrives and the frontier keeps the old pace:
+ * throughput loss on that host, never impoliteness; {@code setDelay(key, 0)} is deliberately never
+ * called as it would erase a server-side default for the queue.
  *
  * <p>Wire it with a fields grouping on {@code "key"} from the status updater's {@code queue}
  * stream: the per-host state lives in the bolt task, so all signals for a host must reach the same
@@ -100,7 +100,11 @@ import org.slf4j.LoggerFactory;
  * would strip them.
  *
  * <p>Robots pacing is enabled by {@code urlfrontier.robots.crawl.delay.enabled=true} together with
- * {@code fetcher.max.crawl.delay.force=true}. It is safe only with {@code
+ * {@code fetcher.max.crawl.delay.force=true}. It requires a single URLFrontier endpoint — at most
+ * one {@code urlfrontier.address} entry; the {@code urlfrontier.host}/{@code urlfrontier.port}
+ * fallback is fine: with several addresses a keyed {@code setDelay} silently does nothing on the
+ * nodes that do not own the queue (crawler-commons/url-frontier#146), and a cluster behind one
+ * load-balanced address cannot be detected and has the same problem. It also requires {@code
  * partition.url.mode=byHost}, {@code urlfrontier.max.urls.per.bucket=1}, and {@code
  * robots.crawl.delay} in {@code metadata.persist} but <b>not</b> in {@code metadata.transfer}
  * (including wildcards such as {@code robots.*}). The bolt probes these conditions at startup and
@@ -112,17 +116,25 @@ import org.slf4j.LoggerFactory;
  * <p>Neither blocking nor pacing recalls URLs already prefetched by the spout. For rate-limit
  * blocks, keep {@code urlfrontier.max.urls.per.bucket} and {@code topology.max.spout.pending} small
  * for the block to bite quickly. Robots pacing requires the stricter per-queue batch size of one;
- * this bounds each frontier hand-out but cannot recall earlier hand-outs or eliminate concurrent
- * requests during the transition to the new delay.
+ * this bounds each frontier hand-out but cannot recall earlier hand-outs.
+ *
+ * <p>With several concurrent {@code getURLs} clients — multiple Spout tasks, or several topologies
+ * on the same frontier — the frontier's per-queue politeness gate is not atomic
+ * (crawler-commons/url-frontier#147): concurrent requests can each be served a URL from the same
+ * queue inside the delay window. This is not limited to the transition to a new delay; it can recur
+ * on every concurrently aligned refill. Prefer a single Spout task per frontier when pacing must be
+ * strict.
  *
  * <p>Connects via {@code urlfrontier.address}, falling back to {@code urlfrontier.host} / {@code
- * urlfrontier.port}. The block is issued with {@code local=false} and propagates to the whole
- * cluster, so with several frontier nodes a single connection to any one of them is enough.
+ * urlfrontier.port}. Keyed {@code blockQueueUntil} and {@code setDelay} calls only take effect on
+ * the frontier node that owns the queue: in url-frontier 2.5 the {@code local=false} flag is not
+ * propagated by the distributed service (crawler-commons/url-frontier#146). With several configured
+ * addresses, blocks apply best-effort on the connected node only; a warning is logged at startup.
  *
  * <p>The RPCs have a short deadline: a failed or expired call is logged but the tuple is acked
  * anyway. A missed block heals itself on further rate-limit signals. Robots delay calls are
- * serialized per host and coalesce to the latest value; an unchanged delay is re-sent after the
- * configured decay window.
+ * serialized per host and coalesce to the maximum observed value; an unchanged delay is re-sent
+ * after the configured robots delay decay window.
  */
 public class QueueRegulatorBolt extends BaseRichBolt {
 
@@ -183,10 +195,18 @@ public class QueueRegulatorBolt extends BaseRichBolt {
                             + " missing entries to metadata.persist.",
                     missing);
         }
-        // a single connection is enough even with several frontier nodes, as
-        // the block is issued with local=false and propagates cluster-wide
+        // keyed blockQueueUntil/setDelay do not propagate across nodes in
+        // url-frontier 2.5 (local=false is ignored by the distributed service,
+        // crawler-commons/url-frontier#146): with several addresses each task
+        // only regulates the queues owned by the node it connects to
         List<String> addresses =
                 ConfUtils.loadListFromConf(Constants.URLFRONTIER_ADDRESS_KEY, conf);
+        if (addresses.size() > 1) {
+            LOG.warn(
+                    "Multiple configured URLFrontier addresses: blocks and delays only take effect"
+                            + " on the queues owned by the connected node"
+                            + " (crawler-commons/url-frontier#146)");
+        }
         String address;
         if (addresses.isEmpty()) {
             address =
@@ -297,8 +317,8 @@ public class QueueRegulatorBolt extends BaseRichBolt {
     }
 
     /**
-     * Fails fast when robots pacing is enabled but the queue key, hand-out size, delay cap or
-     * metadata routing could apply an unsafe pace or target the wrong host.
+     * Fails fast when robots pacing is enabled but the queue key, hand-out size, delay cap,
+     * frontier addressing, or metadata routing could apply an unsafe pace or target the wrong host.
      */
     static void validateRobotsPacingConfiguration(Map<String, Object> conf) {
         if (!ConfUtils.getBoolean(
@@ -306,6 +326,16 @@ public class QueueRegulatorBolt extends BaseRichBolt {
                 Constants.URLFRONTIER_ROBOTS_CRAWL_DELAY_ENABLED_KEY,
                 Constants.URLFRONTIER_ROBOTS_CRAWL_DELAY_ENABLED_DEFAULT)) {
             return;
+        }
+
+        List<String> addresses =
+                ConfUtils.loadListFromConf(Constants.URLFRONTIER_ADDRESS_KEY, conf);
+        if (addresses.size() > 1) {
+            throw new IllegalArgumentException(
+                    "robots crawl-delay pacing requires a single URLFrontier endpoint (at most one"
+                            + " urlfrontier.address entry): keyed setDelay calls are not propagated"
+                            + " across nodes and would silently not pace queues owned by other"
+                            + " nodes (crawler-commons/url-frontier#146)");
         }
 
         if (!ConfUtils.getBoolean(conf, "fetcher.max.crawl.delay.force", false)) {
@@ -348,12 +378,12 @@ public class QueueRegulatorBolt extends BaseRichBolt {
         long maxDelaySecs =
                 ConfUtils.getLong(
                         conf,
-                        Constants.URLFRONTIER_BACKOFF_MAX_KEY,
-                        Constants.URLFRONTIER_BACKOFF_MAX_DEFAULT);
+                        Constants.URLFRONTIER_ROBOTS_DELAY_MAX_KEY,
+                        Constants.URLFRONTIER_ROBOTS_DELAY_MAX_DEFAULT);
         if (maxDelaySecs <= 0) {
             throw new IllegalArgumentException(
                     "robots crawl-delay pacing requires "
-                            + Constants.URLFRONTIER_BACKOFF_MAX_KEY
+                            + Constants.URLFRONTIER_ROBOTS_DELAY_MAX_KEY
                             + " > 0");
         }
 

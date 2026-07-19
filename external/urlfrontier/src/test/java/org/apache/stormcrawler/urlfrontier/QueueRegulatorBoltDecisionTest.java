@@ -169,10 +169,32 @@ class QueueRegulatorBoltDecisionTest {
     @Test
     void robotsPacingRequiresAPositiveFrontierDelayCap() {
         Map<String, Object> conf = validRobotsConf();
-        conf.put(Constants.URLFRONTIER_BACKOFF_MAX_KEY, 0);
+        conf.put(Constants.URLFRONTIER_ROBOTS_DELAY_MAX_KEY, 0);
         assertThrows(
                 IllegalArgumentException.class,
                 () -> QueueRegulatorBolt.validateRobotsPacingConfiguration(conf));
+    }
+
+    @Test
+    void robotsPacingRequiresASingleFrontierAddress() {
+        // keyed setDelay is not propagated across nodes (crawler-commons/url-frontier#146)
+        Map<String, Object> conf = validRobotsConf();
+        conf.put(Constants.URLFRONTIER_ADDRESS_KEY, List.of("host1:7071", "host2:7071"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> QueueRegulatorBolt.validateRobotsPacingConfiguration(conf));
+
+        Map<String, Object> single = validRobotsConf();
+        single.put(Constants.URLFRONTIER_ADDRESS_KEY, List.of("host1:7071"));
+        assertDoesNotThrow(() -> QueueRegulatorBolt.validateRobotsPacingConfiguration(single));
+    }
+
+    @Test
+    void multipleFrontierAddressesAreAcceptedWhenRobotsPacingIsDisabled() {
+        // the #1984 rate-limit blocks stay best-effort on the connected node: warn, do not fail
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(Constants.URLFRONTIER_ADDRESS_KEY, List.of("host1:7071", "host2:7071"));
+        assertDoesNotThrow(() -> QueueRegulatorBolt.validateRobotsPacingConfiguration(conf));
     }
 
     private static Map<String, Object> validRobotsConf() {

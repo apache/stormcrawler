@@ -277,14 +277,12 @@ class QueueRegulatorBoltTest {
         when(t.getValueByField("metadata")).thenReturn(md);
         bolt.execute(t);
 
-        // blind delay for the fire-and-forget RPC to land, as in the sibling tests
-        await().pollDelay(Duration.ofSeconds(2)).atMost(3, TimeUnit.SECONDS).until(() -> true);
-
+        // blind delay for the fire-and-forget RPC to land, as in the sibling tests.
         // The queue is now not requestable again before 300s: a later call must come back empty
         // although /2 was not part of the earlier hand-out and remains queued.
         // The pause also pins the unit of setDelayRequestable: were it
         // milliseconds, the 300ms window would have expired and /2 would be
-        // handed out
+        // handed out.
         await().pollDelay(Duration.ofSeconds(2)).atMost(3, TimeUnit.SECONDS).until(() -> true);
         assertEquals(0, countServed(10), "the queue delay should pace the second URL");
 
