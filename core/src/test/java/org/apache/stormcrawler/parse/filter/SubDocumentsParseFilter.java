@@ -17,64 +17,61 @@
 
 package org.apache.stormcrawler.parse.filter;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathExpression;
-import javax.xml.xpath.XPathFactory;
-import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
-import org.slf4j.LoggerFactory;
-import org.w3c.dom.Document;
 import org.w3c.dom.DocumentFragment;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 public class SubDocumentsParseFilter extends ParseFilter {
-    private static final org.slf4j.Logger LOG =
-            LoggerFactory.getLogger(SubDocumentsParseFilter.class);
 
     @Override
     public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+        if (doc == null) {
+            return;
+        }
 
-        InputStream stream = new ByteArrayInputStream(content);
-
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            Document document = factory.newDocumentBuilder().parse(stream);
-            Element root = document.getDocumentElement();
-
-            XPath xPath = XPathFactory.newInstance().newXPath();
-            XPathExpression expression = xPath.compile("//url");
-
-            NodeList nodes = (NodeList) expression.evaluate(root, XPathConstants.NODESET);
-
-            for (int i = 0; i < nodes.getLength(); i++) {
-                Node node = nodes.item(i);
-
-                expression = xPath.compile("loc");
-                Node child = (Node) expression.evaluate(node, XPathConstants.NODE);
-
-                // create a subdocument for each url found in the sitemap
-                ParseData parseData = parse.get(child.getTextContent());
-
-                NodeList children = node.getChildNodes();
-                for (int j = 0; j < children.getLength(); j++) {
-                    Node n = children.item(j);
-                    parseData.put(n.getNodeName(), n.getTextContent());
+        NodeList links = findElements(doc, "a");
+        for (int i = 0; i < links.getLength(); i++) {
+            Node node = links.item(i);
+            if (node instanceof Element) {
+                String href = ((Element) node).getAttribute("href");
+                if (href != null && !href.isEmpty()) {
+                    parse.get(href);
                 }
             }
-        } catch (Exception e) {
-            LOG.error("Error processing sitemap from {}: {}", url, e);
         }
+    }
+
+    private NodeList findElements(Node node, String tagName) {
+        if (node instanceof org.w3c.dom.Document) {
+            return ((org.w3c.dom.Document) node).getElementsByTagName(tagName);
+        }
+        Node child = node.getFirstChild();
+        while (child != null) {
+            if (child instanceof Element) {
+                return ((Element) child).getElementsByTagName(tagName);
+            }
+            child = child.getNextSibling();
+        }
+        return new EmptyNodeList();
     }
 
     @Override
     public boolean needsDOM() {
         return true;
+    }
+
+    private static class EmptyNodeList implements NodeList {
+        @Override
+        public Node item(int index) {
+            return null;
+        }
+
+        @Override
+        public int getLength() {
+            return 0;
+        }
     }
 }

@@ -18,8 +18,6 @@
 package org.apache.stormcrawler.parse.filter;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.bolt.JSoupParserBolt;
 import org.apache.stormcrawler.parse.ParsingTester;
@@ -36,12 +34,10 @@ class SubDocumentsFilterTest extends ParsingTester {
     }
 
     @Test
-    void testSitemapSubdocuments() throws IOException {
-        Map<String, Object> config = new HashMap<>();
-        config.put("detect.mimetype", false);
-        prepareParserBolt("test.subdocfilter.json", config);
+    void testSubdocuments() throws IOException {
+        prepareParserBolt("test.subdocfilter.json");
         Metadata metadata = new Metadata();
-        parse("https://stormcrawler.apache.org/sitemap.xml", "stormcrawler.sitemap.xml", metadata);
+        parse("https://stormcrawler.apache.org/", "subdocuments.html", metadata);
         Assertions.assertEquals(7, output.getEmitted().size());
     }
 }
