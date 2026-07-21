@@ -304,4 +304,37 @@ class JSoupParserBoltTest extends ParsingTester {
         Assertions.assertEquals(
                 "http://www.javascriptlinks.com/mylink", statusTuples.get(0).get(0));
     }
+
+    /**
+     * Relative outlinks must be resolved against the document's {@code <base href>} element when
+     * one is present, matching browser behaviour, rather than against the document URL. Otherwise a
+     * page served from a sub-path with a base pointing at the domain root doubles the path segment.
+     */
+    @Test
+    void testBaseHrefOutlinkResolution() throws IOException {
+        bolt.prepare(stormConf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        String html =
+                "<html><head>"
+                        + "<base href=\"https://www.example.be/\">"
+                        + "</head><body>"
+                        + "<a href=\"fr/rayons/stockage-archivage-de-donnees/218725\">Stockage</a>"
+                        + "</body></html>";
+
+        Metadata metadata = new Metadata();
+        metadata.setValue("Content-Type", "text/html; charset=UTF-8");
+        parse(
+                "https://www.example.be/fr/rayons/actualites-reportages/216943",
+                html.getBytes(StandardCharsets.UTF_8),
+                metadata);
+
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(1, statusTuples.size());
+        Assertions.assertEquals(Status.DISCOVERED, statusTuples.get(0).get(2));
+        // resolved against the <base href> (domain root), NOT against the document path,
+        // which would have produced .../actualites-reportages/fr/rayons/stockage-...
+        Assertions.assertEquals(
+                "https://www.example.be/fr/rayons/stockage-archivage-de-donnees/218725",
+                statusTuples.get(0).get(0));
+    }
 }

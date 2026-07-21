@@ -338,7 +338,16 @@ public class JSoupParserBolt extends StatusEmitterBolt {
                 } else {
                     final Elements links = jsoupDoc.select("a[href]");
                     slinks = new HashMap<>(links.size());
-                    final URL baseUrl = URLUtil.toURL(url);
+                    // Resolve relative links against the document's base URI
+                    // rather than its URL: when the page contains a <base href>
+                    // element jsoup updates baseUri() accordingly, which is what
+                    // browsers use to resolve relative hrefs. Falls back to the
+                    // document URL when no (valid) <base> is present.
+                    String baseUri = jsoupDoc.baseUri();
+                    if (StringUtils.isBlank(baseUri)) {
+                        baseUri = url;
+                    }
+                    final URL baseUrl = URLUtil.toURL(baseUri);
                     for (Element link : links) {
                         // nofollow
                         String[] relkeywords = link.attr("rel").split(" ");
