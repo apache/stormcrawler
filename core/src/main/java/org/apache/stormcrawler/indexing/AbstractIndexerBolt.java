@@ -75,7 +75,18 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
     /** Indicates that empty field values should not be emitted at all. */
     public static final String ignoreEmptyFieldValueParamName = "indexer.ignore.empty.fields";
 
+    /**
+     * Metadata key whose value should be used as the document ID, if present. This can be used e.g.
+     * by a {@link org.apache.stormcrawler.parse.ParseFilter} generating a hash of the content so
+     * that duplicate content ends up under the same document ID regardless of the URL(s) it was
+     * found at. Falls back to the default (a SHA-256 digest of the URL) if not set or if the
+     * metadata does not contain a value for the configured key.
+     */
+    public static final String DOC_ID_METADATA_PARAM_NAME = "indexer.md.docid";
+
     private String[] filterKeyValue = null;
+
+    private String docIdMetadataKey = null;
 
     private final List<Key> metadata2field = new ArrayList<>();
 
@@ -156,6 +167,8 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
         fieldNameForUrl = ConfUtils.getString(conf, urlFieldParamName);
 
         canonicalMetadataName = ConfUtils.getString(conf, canonicalMetadataParamName);
+
+        docIdMetadataKey = ConfUtils.getString(conf, DOC_ID_METADATA_PARAM_NAME);
 
         final Pattern indexValuePattern = Pattern.compile("\\[(\\d+)\\]");
 
@@ -259,10 +272,30 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
      *
      * @param metadata The {@link Metadata}.
      * @param normalisedUrl The normalised url.
-     * @return Return the normalised url SHA-256 digest as String.
+     * @return The value found in the metadata for the key configured with {@link
+     *     #DOC_ID_METADATA_PARAM_NAME}, if any, otherwise the normalised url SHA-256 digest as
+     *     String.
      */
     protected String getDocumentID(Metadata metadata, String normalisedUrl) {
+        final String fromMetadata = getDocumentIDFromMetadata(metadata);
+        if (fromMetadata != null) {
+            return fromMetadata;
+        }
         return org.apache.commons.codec.digest.DigestUtils.sha256Hex(normalisedUrl);
+    }
+
+    /**
+     * Returns the value found in the metadata for the key configured with {@link
+     * #DOC_ID_METADATA_PARAM_NAME}, or null if the parameter is not set or has no matching value in
+     * the metadata. Subclasses which override {@link #getDocumentID} entirely (e.g. to hash or
+     * sanitize the ID for a specific backend) should call this first so that they still honor the
+     * configured metadata-based override.
+     */
+    protected final String getDocumentIDFromMetadata(Metadata metadata) {
+        if (docIdMetadataKey == null) {
+            return null;
+        }
+        return StringUtils.trimToNull(metadata.getFirstValue(docIdMetadataKey));
     }
 
     /**

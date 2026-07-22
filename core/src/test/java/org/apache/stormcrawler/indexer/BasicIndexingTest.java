@@ -198,6 +198,43 @@ class BasicIndexingTest extends IndexerTester {
     }
 
     @Test
+    void testDocumentIDFromMetadata() throws Exception {
+        Map<String, Object> config = new HashMap<>();
+        config.put(AbstractIndexerBolt.DOC_ID_METADATA_PARAM_NAME, "content.hash");
+        Metadata metadata = new Metadata();
+        metadata.setValue("content.hash", "abcdef123456");
+        prepareIndexerBolt(config);
+        String docId = ((DummyIndexer) bolt).docId(metadata, URL);
+        Assertions.assertEquals(
+                "abcdef123456",
+                docId,
+                "The value found in the metadata should be used as the document ID");
+    }
+
+    @Test
+    void testDocumentIDFromMetadataMissingValue() throws Exception {
+        Map<String, Object> config = new HashMap<>();
+        config.put(AbstractIndexerBolt.DOC_ID_METADATA_PARAM_NAME, "content.hash");
+        prepareIndexerBolt(config);
+        String docId = ((DummyIndexer) bolt).docId(new Metadata(), URL);
+        Assertions.assertEquals(
+                org.apache.commons.codec.digest.DigestUtils.sha256Hex(URL),
+                docId,
+                "Should fall back to the URL digest if the metadata key has no value");
+    }
+
+    @Test
+    void testDocumentIDDefault() throws Exception {
+        Map<String, Object> config = new HashMap<>();
+        prepareIndexerBolt(config);
+        String docId = ((DummyIndexer) bolt).docId(new Metadata(), URL);
+        Assertions.assertEquals(
+                org.apache.commons.codec.digest.DigestUtils.sha256Hex(URL),
+                docId,
+                "Should default to the URL digest if no metadata key is configured");
+    }
+
+    @Test
     void testGlobFilterMetadata() throws Exception {
         Map<String, Object> config = new HashMap<>();
         config.put(AbstractIndexerBolt.urlFieldParamName, "url");

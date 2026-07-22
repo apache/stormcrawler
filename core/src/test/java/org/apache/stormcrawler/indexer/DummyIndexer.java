@@ -86,4 +86,8 @@ public class DummyIndexer extends AbstractIndexerBolt {
     public Map<String, String> returnFields() {
         return fields;
     }
+
+    public String docId(Metadata metadata, String url) {
+        return getDocumentID(metadata, url);
+    }
 }
