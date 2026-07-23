@@ -28,6 +28,11 @@ import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.slf4j.LoggerFactory;
 
+/**
+ * @deprecated the Selenium module is deprecated and will be removed in the next major release of
+ *     StormCrawler.
+ */
+@Deprecated
 public abstract class SeleniumProtocol extends AbstractHttpProtocol {
 
     protected static final org.slf4j.Logger LOG = LoggerFactory.getLogger(SeleniumProtocol.class);

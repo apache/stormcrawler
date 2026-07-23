@@ -1,5 +1,7 @@
 # Selenium Protocol for Apache StormCrawler
 
+> **⚠️ Deprecated:** The Selenium module is deprecated and will be removed in the next major release of StormCrawler.
+
 This project provides a **[Selenium](https://www.selenium.dev/)-based protocol implementation** for Apache StormCrawler.
 
 ---
