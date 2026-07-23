@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  *
  * <pre>
  * protocol.delegator.config:
- * - className: "org.apache.stormcrawler.protocol.httpclient.HttpProtocol"
+ * - className: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
  *   filters:
  *     domain: "example.com"
  *     depth: "3"
@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  *   regex:
  *    - \.pdf
  *    - \.doc
- * - className: "org.apache.stormcrawler.protocol.selenium.SeleniumProtocol"
+ * - className: "org.apache.stormcrawler.protocol.playwright.HttpProtocol"
  * </pre>
  *
  * Typically, the last one in the list must not have filters as it is used as a default value. The

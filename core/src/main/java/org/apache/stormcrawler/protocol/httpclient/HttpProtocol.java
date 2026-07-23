@@ -68,7 +68,14 @@ import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.CookieConverter;
 import org.slf4j.LoggerFactory;
 
-/** Uses Apache httpclient to handle http and https. */
+/**
+ * Uses Apache httpclient to handle http and https.
+ *
+ * @deprecated The Apache HttpClient protocol implementation is deprecated and will be removed in
+ *     the next major release of StormCrawler. Use the OkHttp implementation ({@link
+ *     org.apache.stormcrawler.protocol.okhttp.HttpProtocol}) instead.
+ */
+@Deprecated
 public class HttpProtocol extends AbstractHttpProtocol
         implements ResponseHandler<ProtocolResponse> {
 

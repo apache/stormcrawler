@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
-import org.apache.stormcrawler.protocol.httpclient.HttpProtocol;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +47,7 @@ public class MultiProxyManager implements ProxyManager {
     private final AtomicInteger lastAccessedIndex = new AtomicInteger(0);
     private Map<SCProxy, SCProxy> proxyLookupMap;
 
-    private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(HttpProtocol.class);
+    private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(MultiProxyManager.class);
 
     /** Default constructor for setting up the proxy manager. */
     private void init(ProxyRotation rotation) {

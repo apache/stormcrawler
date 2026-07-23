@@ -26,6 +26,7 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.proxy.SingleProxyManager;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("deprecation")
 class HttpClientProtocolProxyManagerTest {
 
     @Test

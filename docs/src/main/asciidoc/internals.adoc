@@ -395,13 +395,13 @@ The following network protocols are implemented in StormCrawler:
 * link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/file/FileProtocol.java[FileProtocol]
 
 ===== DelegatorProtocol
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/DelegatorProtocol.java[DelegatorProtocol] enables selection from a collection of sub-protocols using filters based on metadata and URL patterns. The last protocol in the list acts as the default. This is useful when certain URLs need to be fetched with a browser-based protocol (e.g., Selenium) while the majority use a standard HTTP client.
+The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/DelegatorProtocol.java[DelegatorProtocol] enables selection from a collection of sub-protocols using filters based on metadata and URL patterns. The last protocol in the list acts as the default. This is useful when certain URLs need to be fetched with a browser-based protocol (e.g., Playwright) while the majority use a standard HTTP client.
 
 [source,yaml]
 ----
 http.protocol.implementation: "org.apache.stormcrawler.protocol.DelegatorProtocol"
 protocol.delegator.config:
-  - className: "org.apache.stormcrawler.protocol.httpclient.HttpProtocol"
+  - className: "org.apache.stormcrawler.protocol.playwright.HttpProtocol"
     filters:
       domain: "example.com"
   - className: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
@@ -421,7 +421,7 @@ http.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProto
 https.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
 ----
 
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/httpclient/HttpProtocol.java[HttpClient]
+* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/httpclient/HttpProtocol.java[HttpClient] (*deprecated* — will be removed in the next major release; use OKHttp instead)
 * link:https://github.com/apache/stormcrawler/blob/main/external/selenium/src/main/java/org/apache/stormcrawler/protocol/selenium/SeleniumProtocol.java[Selenium]
 * link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/okhttp/HttpProtocol.java[OKHttp]
 
