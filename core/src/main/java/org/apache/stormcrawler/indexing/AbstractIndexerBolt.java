@@ -82,6 +82,18 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
      * duplicate content ends up under the same document ID regardless of the URL(s) it was found
      * at. Falls back to the default (a SHA-256 digest of the URL) if not set or if the metadata
      * does not contain a value for the configured key.
+     *
+     * <p><strong>Deletion path caveat:</strong> a {@code DeletionBolt} handling a "gone" page does
+     * not reparse it, so it only sees this key if it was included in {@code metadata.persist} (see
+     * {@code MetadataTransfer#metadataPersistParamName}) and therefore round-tripped through the
+     * status store. If the key is missing from {@code metadata.persist}, the deletion falls back to
+     * {@code sha256(url)}, which will not match the ID the document was indexed under, silently
+     * orphaning it.
+     *
+     * <p><strong>Content-dedup caveat:</strong> when several URLs resolve to the same
+     * metadata-based ID (e.g. a content hash shared across duplicate pages), deleting any one of
+     * those URLs deletes the shared document, even though the content may still be live under the
+     * other URLs, until one of them is re-fetched and re-indexes it.
      */
     public static final String DOC_ID_METADATA_PARAM_NAME = "indexer.md.docid";
 
