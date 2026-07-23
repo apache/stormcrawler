@@ -326,6 +326,15 @@ The values below are used by sub-classes of `AbstractIndexerBolt`.
 | indexer.url.fieldname | url | Field name for indexed URL.
 |===
 
+Note: `indexer.md.docid` is never used raw: the matching value is passed through SHA-256
+(the same digest used for the default URL-based ID), except for CloudSearch, whose
+`CloudSearchIndexerBolt` re-digests it with SHA-512 via `CloudSearchUtils.getID` to satisfy
+CloudSearch's ID constraints. It is only honoured by backends whose bolts call
+`AbstractIndexerBolt#getDocumentID` under the hood: the OpenSearch and OpenSearch-Java
+`IndexerBolt`/`DeletionBolt` pairs, and the CloudSearch `CloudSearchIndexerBolt`. The Solr and
+SQL indexers build their document/row key directly from the URL and never call
+`getDocumentID()`, so this setting is silently ignored for those two backends.
+
 ==== Status Persistence
 
 This refers to persisting the status of a URL (e.g. ERROR, DISCOVERED etc.) along with something like a `nextFetchDate`
