@@ -24,6 +24,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
+/**
+ * @deprecated the Selenium module is deprecated and will be removed in the next major release of
+ *     StormCrawler.
+ */
+@Deprecated
 public abstract class NavigationFilter extends AbstractConfigurable {
     /** The end result comes from the first filter to return non-null * */
     public abstract @Nullable ProtocolResponse filter(

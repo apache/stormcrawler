@@ -38,7 +38,10 @@ import org.slf4j.LoggerFactory;
  *
  * @see org.apache.stormcrawler.util.Configurable#createConfiguredInstance(Class, Class, Map,
  *     JsonNode) for more information.
+ * @deprecated the Selenium module is deprecated and will be removed in the next major release of
+ *     StormCrawler.
  */
+@Deprecated
 public class NavigationFilters extends NavigationFilter {
 
     public static final NavigationFilters emptyNavigationFilters = new NavigationFilters();

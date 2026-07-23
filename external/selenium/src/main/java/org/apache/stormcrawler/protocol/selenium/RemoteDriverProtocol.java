@@ -33,7 +33,11 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 /**
  * Delegates the requests to one or more remote selenium servers. The processes must be started /
  * stopped separately. The URLs to connect to are specified with the config 'selenium.addresses'.
+ *
+ * @deprecated the Selenium module is deprecated and will be removed in the next major release of
+ *     StormCrawler.
  */
+@Deprecated
 public class RemoteDriverProtocol extends SeleniumProtocol {
 
     private void substituteUserAgent(Map<String, Object> keyvals, final String userAgentString) {
