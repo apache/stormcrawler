@@ -303,6 +303,7 @@ config:
 
   # configuration for the classes extending AbstractIndexerBolt
   # indexer.md.filter: "someKey=aValue"
+  indexer.md.docid: ""
   indexer.ignore.empty.fields: false
   indexer.url.fieldname: "url"
   indexer.text.fieldname: "content"
