@@ -17,6 +17,11 @@
 
 package org.apache.stormcrawler.aws.bolt;
 
+/**
+ * @deprecated AWS CloudSearch support is deprecated and will be removed in the next major release
+ *     of StormCrawler.
+ */
+@Deprecated
 public interface CloudSearchConstants {
     public static final String CLOUDSEARCH_PREFIX = "cloudsearch.";
     public static final String ENDPOINT = CLOUDSEARCH_PREFIX + "endpoint";

@@ -66,7 +66,13 @@ import software.amazon.awssdk.services.cloudsearchdomain.model.DocumentServiceWa
 import software.amazon.awssdk.services.cloudsearchdomain.model.UploadDocumentsRequest;
 import software.amazon.awssdk.services.cloudsearchdomain.model.UploadDocumentsResponse;
 
-/** Writes documents to CloudSearch. */
+/**
+ * Writes documents to CloudSearch.
+ *
+ * @deprecated AWS CloudSearch support is deprecated and will be removed in the next major release
+ *     of StormCrawler.
+ */
+@Deprecated
 public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
 
     public static final Logger LOG = LoggerFactory.getLogger(CloudSearchIndexerBolt.class);

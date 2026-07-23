@@ -22,6 +22,11 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 import org.apache.commons.codec.digest.DigestUtils;
 
+/**
+ * @deprecated AWS CloudSearch support is deprecated and will be removed in the next major release
+ *     of StormCrawler.
+ */
+@Deprecated
 public class CloudSearchUtils {
 
     private static final Pattern INVALID_XML_CHARS =

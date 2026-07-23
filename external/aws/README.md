@@ -1,7 +1,7 @@
 # stormcrawler-aws
 ================================
 
-AWS resources for StormCrawler, currently contains an indexer bolt for [CloudSearch](https://aws.amazon.com/cloudsearch/) and another bolt for storing and retrieving web pages to/from [S3](https://aws.amazon.com/s3/).
+AWS resources for StormCrawler, currently contains an indexer bolt for [CloudSearch](https://aws.amazon.com/cloudsearch/) (**deprecated**, see below) and another bolt for storing and retrieving web pages to/from [S3](https://aws.amazon.com/s3/).
 
 This module is built on the [AWS SDK for Java 2.x](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/home.html). Credentials are resolved through the SDK's [default credentials provider chain](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/credentials-chain.html) (environment variables, Java system properties, `~/.aws/credentials`, container/instance profiles, etc.).
 
@@ -20,6 +20,8 @@ Edit `~/.aws/credentials`, see [http://docs.aws.amazon.com/cli/latest/userguide/
 
 
 ## CloudSearch
+
+> **Deprecated:** AWS CloudSearch support is deprecated and will be removed in the next major release of StormCrawler.
 
 * How to use?
 
