@@ -17,6 +17,9 @@
 #  CloudSearch Configuration  #
 ###############################
 
+# NOTE: AWS CloudSearch support is deprecated and will be removed
+# in the next major release of StormCrawler.
+
 # max number of docs to keep in buffer
 # before sending to CS irrespective of size limits
 cloudsearch.batch.maxSize: 100

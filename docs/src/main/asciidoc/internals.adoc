@@ -103,7 +103,7 @@ The purpose of crawlers is often to index web pages to make them searchable. The
 
 * link:https://github.com/apache/stormcrawler/blob/main/external/solr/src/main/java/org/apache/stormcrawler/solr/bolt/IndexerBolt.java[Apache SOLR]
 * link:https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/bolt/IndexerBolt.java[OpenSearch]
-* link:https://github.com/apache/stormcrawler/blob/main/external/aws/src/main/java/org/apache/stormcrawler/aws/bolt/CloudSearchIndexerBolt.java[AWS CloudSearch]
+* link:https://github.com/apache/stormcrawler/blob/main/external/aws/src/main/java/org/apache/stormcrawler/aws/bolt/CloudSearchIndexerBolt.java[AWS CloudSearch] (deprecated, will be removed in the next major release)
 
 All of these extend the class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/indexing/AbstractIndexerBolt.java[AbstractIndexerBolt].
 
