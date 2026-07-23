@@ -71,11 +71,9 @@ public class ProtocolFactory {
             if (StringUtils.isBlank(protocolimplementation)) {
                 // set the default values
                 if (protocol.equalsIgnoreCase("http")) {
-                    protocolimplementation =
-                            "org.apache.stormcrawler.protocol.okhttp.HttpProtocol";
+                    protocolimplementation = "org.apache.stormcrawler.protocol.okhttp.HttpProtocol";
                 } else if (protocol.equalsIgnoreCase("https")) {
-                    protocolimplementation =
-                            "org.apache.stormcrawler.protocol.okhttp.HttpProtocol";
+                    protocolimplementation = "org.apache.stormcrawler.protocol.okhttp.HttpProtocol";
                 } else {
                     throw new RuntimeException(paramName + "should not have an empty value");
                 }

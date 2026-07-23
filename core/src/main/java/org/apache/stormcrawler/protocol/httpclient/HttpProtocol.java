@@ -71,8 +71,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Uses Apache httpclient to handle http and https.
  *
- * @deprecated The Apache HttpClient protocol implementation is deprecated and will be removed in the
- *     next major release of StormCrawler. Use the OkHttp implementation ({@link
+ * @deprecated The Apache HttpClient protocol implementation is deprecated and will be removed in
+ *     the next major release of StormCrawler. Use the OkHttp implementation ({@link
  *     org.apache.stormcrawler.protocol.okhttp.HttpProtocol}) instead.
  */
 @Deprecated
