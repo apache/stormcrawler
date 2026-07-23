@@ -10,7 +10,7 @@ These instructions should help you get Apache StormCrawler up and running in 5 t
 
 === Prerequisites
 
-To run StormCrawler, you will need Java SE 17 or later.
+To run StormCrawler, you will need Java SE 25 or later.
 
 Additionally, since we'll be running the required Apache Storm cluster using Docker Compose,
 make sure Docker is installed on your operating system.

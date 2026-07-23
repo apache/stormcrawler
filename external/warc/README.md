@@ -185,14 +185,14 @@ Please note that in order to access WARC files on AWS S3, you will need to add t
  <dependency>
    <groupId>org.apache.hadoop</groupId>
    <artifactId>hadoop-aws</artifactId>
-   <version>2.10.1</version>
+   <version>3.5.0</version>
  </dependency>
 ```
 
 where the version should match the one used by Apache Storm. In doubt, you can check with 
 
 ```
-mvn dependency:tree | grep "org.apache.hadoop:hadoop-hdfs:jar"
+mvn dependency:tree | grep "org.apache.hadoop:hadoop-client-api:jar"
 ```
 
 

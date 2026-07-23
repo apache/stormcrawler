@@ -28,6 +28,7 @@ List of third-party dependencies grouped by their license type.
         * Apache Commons CSV (org.apache.commons:commons-csv:1.14.1 - https://commons.apache.org/proper/commons-csv/)
         * Apache Commons Exec (org.apache.commons:commons-exec:1.6.0 - https://commons.apache.org/proper/commons-exec/)
         * Apache Commons IO (commons-io:commons-io:2.17.0 - https://commons.apache.org/proper/commons-io/)
+        * Apache Commons IO (commons-io:commons-io:2.20.0 - https://commons.apache.org/proper/commons-io/)
         * Apache Commons IO (commons-io:commons-io:2.22.0 - https://commons.apache.org/proper/commons-io/)
         * Apache Commons Lang (org.apache.commons:commons-lang3:3.20.0 - https://commons.apache.org/proper/commons-lang/)
         * Apache Commons Logging (commons-logging:commons-logging:1.2 - http://commons.apache.org/proper/commons-logging/)
@@ -303,14 +304,14 @@ List of third-party dependencies grouped by their license type.
         * rome (com.rometools:rome:2.1.0 - http://rometools.com/rome)
         * rome-utils (com.rometools:rome-utils:2.1.0 - http://rometools.com/rome-utils)
         * server (org.opensearch:opensearch:2.19.6 - https://github.com/opensearch-project/OpenSearch.git)
-        * Shaded Deps for Storm Client (org.apache.storm:storm-shaded-deps:2.8.9 - https://storm.apache.org/storm-shaded-deps)
         * SnakeYAML (org.yaml:snakeyaml:2.6 - https://bitbucket.org/snakeyaml/snakeyaml)
         * snappy-java (org.xerial.snappy:snappy-java:1.1.10.4 - https://github.com/xerial/snappy-java)
         * sniffer (org.opensearch.client:opensearch-rest-client-sniffer:2.19.6 - https://github.com/opensearch-project/OpenSearch.git)
         * SparseBitSet (com.zaxxer:SparseBitSet:1.3 - https://github.com/brettwooldridge/SparseBitSet)
-        * storm-autocreds (org.apache.storm:storm-autocreds:2.8.9 - https://storm.apache.org/external/storm-autocreds)
-        * Storm Client (org.apache.storm:storm-client:2.8.9 - https://storm.apache.org/storm-client)
-        * storm-hdfs (org.apache.storm:storm-hdfs:2.8.9 - https://storm.apache.org/external/storm-hdfs)
+        * Storm Autocreds (org.apache.storm:storm-autocreds:3.0.0 - https://storm.apache.org/storm-external/storm-autocreds)
+        * Storm Client (org.apache.storm:storm-client:3.0.0 - https://storm.apache.org/storm-client)
+        * Storm HDFS (org.apache.storm:storm-hdfs:3.0.0 - https://storm.apache.org/storm-external/storm-hdfs)
+        * Storm Shaded Deps (org.apache.storm:storm-shaded-deps:3.0.0 - https://storm.apache.org/storm-shaded-deps)
         * swagger-annotations-jakarta (io.swagger.core.v3:swagger-annotations-jakarta:2.2.22 - https://github.com/swagger-api/swagger-core/modules/swagger-annotations-jakarta)
         * T-Digest (com.tdunning:t-digest:3.2 - https://github.com/tdunning/t-digest)
         * urlfrontier-API (com.github.crawler-commons:urlfrontier-API:2.5 - https://github.com/crawler-commons/url-frontier/urlfrontier-API)
@@ -350,7 +351,7 @@ List of third-party dependencies grouped by their license type.
 
     BSD 2-Clause License
 
-        * zstd-jni (com.github.luben:zstd-jni:1.5.5-5 - https://github.com/luben/zstd-jni)
+        * zstd-jni (com.github.luben:zstd-jni:1.5.7-11 - https://github.com/luben/zstd-jni)
 
     BSD 3-Clause License
 

@@ -30,7 +30,6 @@ import org.apache.storm.hdfs.common.AbstractHDFSWriter;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
-import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.Logger;
@@ -102,7 +101,7 @@ public class WARCHdfsBolt extends GzipHdfsBolt {
 
         // write the header at the beginning of the file
         if (header != null && header.length > 0) {
-            super.out.write(Utils.gzip(header));
+            super.out.write(gzip(header));
         }
 
         return writer;

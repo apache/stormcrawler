@@ -15,9 +15,11 @@
 
 package org.apache.stormcrawler.warc;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.GZIPOutputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.storm.hdfs.bolt.HdfsBolt;
@@ -25,7 +27,6 @@ import org.apache.storm.hdfs.bolt.format.RecordFormat;
 import org.apache.storm.hdfs.common.AbstractHDFSWriter;
 import org.apache.storm.hdfs.common.HDFSWriter;
 import org.apache.storm.tuple.Tuple;
-import org.apache.storm.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +34,15 @@ import org.slf4j.LoggerFactory;
 public class GzipHdfsBolt extends HdfsBolt {
 
     private static final Logger LOG = LoggerFactory.getLogger(GzipHdfsBolt.class);
+
+    /** Compresses the given bytes into a standalone gzip container. */
+    protected static byte[] gzip(byte[] bytes) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(bytes.length / 2 + 64);
+        try (GZIPOutputStream gzos = new GZIPOutputStream(bos)) {
+            gzos.write(bytes);
+        }
+        return bos.toByteArray();
+    }
 
     protected transient FSDataOutputStream out = null;
 
@@ -59,7 +69,7 @@ public class GzipHdfsBolt extends HdfsBolt {
                 if (bytes.length == 0 && !compressEmpty) {
                     return new byte[0];
                 }
-                return Utils.gzip(bytes);
+                return gzip(bytes);
             } catch (Exception e) {
                 LOG.error("Exception caught when formatting - skipping the whole tuple");
                 return new byte[0];
