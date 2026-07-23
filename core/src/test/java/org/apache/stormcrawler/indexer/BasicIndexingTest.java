@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.indexing.AbstractIndexerBolt;
 import org.junit.jupiter.api.Assertions;
@@ -206,9 +207,10 @@ class BasicIndexingTest extends IndexerTester {
         prepareIndexerBolt(config);
         String docId = ((DummyIndexer) bolt).docId(metadata, URL);
         Assertions.assertEquals(
-                "abcdef123456",
+                DigestUtils.sha256Hex("abcdef123456"),
                 docId,
-                "The value found in the metadata should be used as the document ID");
+                "The SHA-256 digest of the value found in the metadata should be used as the"
+                        + " document ID");
     }
 
     @Test
@@ -218,7 +220,7 @@ class BasicIndexingTest extends IndexerTester {
         prepareIndexerBolt(config);
         String docId = ((DummyIndexer) bolt).docId(new Metadata(), URL);
         Assertions.assertEquals(
-                org.apache.commons.codec.digest.DigestUtils.sha256Hex(URL),
+                DigestUtils.sha256Hex(URL),
                 docId,
                 "Should fall back to the URL digest if the metadata key has no value");
     }
@@ -229,7 +231,7 @@ class BasicIndexingTest extends IndexerTester {
         prepareIndexerBolt(config);
         String docId = ((DummyIndexer) bolt).docId(new Metadata(), URL);
         Assertions.assertEquals(
-                org.apache.commons.codec.digest.DigestUtils.sha256Hex(URL),
+                DigestUtils.sha256Hex(URL),
                 docId,
                 "Should default to the URL digest if no metadata key is configured");
     }

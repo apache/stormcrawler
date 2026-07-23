@@ -76,11 +76,12 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
     public static final String ignoreEmptyFieldValueParamName = "indexer.ignore.empty.fields";
 
     /**
-     * Metadata key whose value should be used as the document ID, if present. This can be used e.g.
-     * by a {@link org.apache.stormcrawler.parse.ParseFilter} generating a hash of the content so
-     * that duplicate content ends up under the same document ID regardless of the URL(s) it was
-     * found at. Falls back to the default (a SHA-256 digest of the URL) if not set or if the
-     * metadata does not contain a value for the configured key.
+     * Metadata key whose value should be used to derive the document ID, if present. The value is
+     * passed through the same SHA-256 digest used for the URL-based ID, so this can be used e.g. by
+     * a {@link org.apache.stormcrawler.parse.ParseFilter} generating a hash of the content so that
+     * duplicate content ends up under the same document ID regardless of the URL(s) it was found
+     * at. Falls back to the default (a SHA-256 digest of the URL) if not set or if the metadata
+     * does not contain a value for the configured key.
      */
     public static final String DOC_ID_METADATA_PARAM_NAME = "indexer.md.docid";
 
@@ -272,16 +273,14 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
      *
      * @param metadata The {@link Metadata}.
      * @param normalisedUrl The normalised url.
-     * @return The value found in the metadata for the key configured with {@link
-     *     #DOC_ID_METADATA_PARAM_NAME}, if any, otherwise the normalised url SHA-256 digest as
-     *     String.
+     * @return The SHA-256 digest of the value found in the metadata for the key configured with
+     *     {@link #DOC_ID_METADATA_PARAM_NAME}, if any, otherwise the SHA-256 digest of the
+     *     normalised url.
      */
     protected String getDocumentID(Metadata metadata, String normalisedUrl) {
         final String fromMetadata = getDocumentIDFromMetadata(metadata);
-        if (fromMetadata != null) {
-            return fromMetadata;
-        }
-        return org.apache.commons.codec.digest.DigestUtils.sha256Hex(normalisedUrl);
+        final String source = fromMetadata != null ? fromMetadata : normalisedUrl;
+        return org.apache.commons.codec.digest.DigestUtils.sha256Hex(source);
     }
 
     /**
