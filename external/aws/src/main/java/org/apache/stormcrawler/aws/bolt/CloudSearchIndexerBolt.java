@@ -180,6 +180,10 @@ public class CloudSearchIndexerBolt extends AbstractIndexerBolt {
 
     @Override
     protected String getDocumentID(Metadata metadata, String normalisedUrl) {
+        final String fromMetadata = getDocumentIDFromMetadata(metadata);
+        if (fromMetadata != null) {
+            return CloudSearchUtils.getID(fromMetadata);
+        }
         return CloudSearchUtils.getID(normalisedUrl);
     }
 

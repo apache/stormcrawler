@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.indexing.AbstractIndexerBolt;
 import org.junit.jupiter.api.Assertions;
@@ -195,6 +196,44 @@ class BasicIndexingTest extends IndexerTester {
                 new String[] {"url"},
                 fields.keySet().toArray(),
                 "Index only the URL if no mapping is provided");
+    }
+
+    @Test
+    void testDocumentIDFromMetadata() throws Exception {
+        Map<String, Object> config = new HashMap<>();
+        config.put(AbstractIndexerBolt.DOC_ID_METADATA_PARAM_NAME, "content.hash");
+        Metadata metadata = new Metadata();
+        metadata.setValue("content.hash", "abcdef123456");
+        prepareIndexerBolt(config);
+        String docId = ((DummyIndexer) bolt).docId(metadata, URL);
+        Assertions.assertEquals(
+                DigestUtils.sha256Hex("abcdef123456"),
+                docId,
+                "The SHA-256 digest of the value found in the metadata should be used as the"
+                        + " document ID");
+    }
+
+    @Test
+    void testDocumentIDFromMetadataMissingValue() throws Exception {
+        Map<String, Object> config = new HashMap<>();
+        config.put(AbstractIndexerBolt.DOC_ID_METADATA_PARAM_NAME, "content.hash");
+        prepareIndexerBolt(config);
+        String docId = ((DummyIndexer) bolt).docId(new Metadata(), URL);
+        Assertions.assertEquals(
+                DigestUtils.sha256Hex(URL),
+                docId,
+                "Should fall back to the URL digest if the metadata key has no value");
+    }
+
+    @Test
+    void testDocumentIDDefault() throws Exception {
+        Map<String, Object> config = new HashMap<>();
+        prepareIndexerBolt(config);
+        String docId = ((DummyIndexer) bolt).docId(new Metadata(), URL);
+        Assertions.assertEquals(
+                DigestUtils.sha256Hex(URL),
+                docId,
+                "Should default to the URL digest if no metadata key is configured");
     }
 
     @Test

@@ -75,7 +75,31 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
     /** Indicates that empty field values should not be emitted at all. */
     public static final String ignoreEmptyFieldValueParamName = "indexer.ignore.empty.fields";
 
+    /**
+     * Metadata key whose value should be used to derive the document ID, if present. The value is
+     * passed through the same SHA-256 digest used for the URL-based ID, so this can be used e.g. by
+     * a {@link org.apache.stormcrawler.parse.ParseFilter} generating a hash of the content so that
+     * duplicate content ends up under the same document ID regardless of the URL(s) it was found
+     * at. Falls back to the default (a SHA-256 digest of the URL) if not set or if the metadata
+     * does not contain a value for the configured key.
+     *
+     * <p><strong>Deletion path caveat:</strong> a {@code DeletionBolt} handling a "gone" page does
+     * not reparse it, so it only sees this key if it was included in {@code metadata.persist} (see
+     * {@code MetadataTransfer#metadataPersistParamName}) and therefore round-tripped through the
+     * status store. If the key is missing from {@code metadata.persist}, the deletion falls back to
+     * {@code sha256(url)}, which will not match the ID the document was indexed under, silently
+     * orphaning it.
+     *
+     * <p><strong>Content-dedup caveat:</strong> when several URLs resolve to the same
+     * metadata-based ID (e.g. a content hash shared across duplicate pages), deleting any one of
+     * those URLs deletes the shared document, even though the content may still be live under the
+     * other URLs, until one of them is re-fetched and re-indexes it.
+     */
+    public static final String DOC_ID_METADATA_PARAM_NAME = "indexer.md.docid";
+
     private String[] filterKeyValue = null;
+
+    private String docIdMetadataKey = null;
 
     private final List<Key> metadata2field = new ArrayList<>();
 
@@ -156,6 +180,8 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
         fieldNameForUrl = ConfUtils.getString(conf, urlFieldParamName);
 
         canonicalMetadataName = ConfUtils.getString(conf, canonicalMetadataParamName);
+
+        docIdMetadataKey = ConfUtils.getString(conf, DOC_ID_METADATA_PARAM_NAME);
 
         final Pattern indexValuePattern = Pattern.compile("\\[(\\d+)\\]");
 
@@ -259,10 +285,28 @@ public abstract class AbstractIndexerBolt extends BaseRichBolt {
      *
      * @param metadata The {@link Metadata}.
      * @param normalisedUrl The normalised url.
-     * @return Return the normalised url SHA-256 digest as String.
+     * @return The SHA-256 digest of the value found in the metadata for the key configured with
+     *     {@link #DOC_ID_METADATA_PARAM_NAME}, if any, otherwise the SHA-256 digest of the
+     *     normalised url.
      */
     protected String getDocumentID(Metadata metadata, String normalisedUrl) {
-        return org.apache.commons.codec.digest.DigestUtils.sha256Hex(normalisedUrl);
+        final String fromMetadata = getDocumentIDFromMetadata(metadata);
+        final String source = fromMetadata != null ? fromMetadata : normalisedUrl;
+        return org.apache.commons.codec.digest.DigestUtils.sha256Hex(source);
+    }
+
+    /**
+     * Returns the value found in the metadata for the key configured with {@link
+     * #DOC_ID_METADATA_PARAM_NAME}, or null if the parameter is not set or has no matching value in
+     * the metadata. Subclasses which override {@link #getDocumentID} entirely (e.g. to hash or
+     * sanitize the ID for a specific backend) should call this first so that they still honor the
+     * configured metadata-based override.
+     */
+    protected final String getDocumentIDFromMetadata(Metadata metadata) {
+        if (docIdMetadataKey == null) {
+            return null;
+        }
+        return StringUtils.trimToNull(metadata.getFirstValue(docIdMetadataKey));
     }
 
     /**

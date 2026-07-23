@@ -318,12 +318,22 @@ The values below are used by sub-classes of `AbstractIndexerBolt`.
 
 | indexer.canonical.name | canonical | Metadata key for the canonical URL. Used to replace the URL with its canonical form before indexing.
 | indexer.ignore.empty.fields | false | If true, skip fields with empty values when indexing.
+| indexer.md.docid | - | Metadata key whose value, if present, is SHA-256 digested and used as the document ID instead of the default SHA-256 digest of the URL. Useful e.g. for content-based deduplication when a `ParseFilter` stores a content hash in the metadata.
 | indexer.md.filter | - | YAML list of key=value filters for metadata-based indexing.
 | indexer.md.mapping | - | YAML mapping from metadata fields to persistence layer fields.
 | indexer.text.fieldname | content | Field name for indexed HTML body text.
 | indexer.text.maxlength | -1 | Maximum length of text to index. -1 means no limit.
 | indexer.url.fieldname | url | Field name for indexed URL.
 |===
+
+Note: `indexer.md.docid` is never used raw: the matching value is passed through SHA-256
+(the same digest used for the default URL-based ID), except for CloudSearch, whose
+`CloudSearchIndexerBolt` re-digests it with SHA-512 via `CloudSearchUtils.getID` to satisfy
+CloudSearch's ID constraints. It is only honoured by backends whose bolts call
+`AbstractIndexerBolt#getDocumentID` under the hood: the OpenSearch and OpenSearch-Java
+`IndexerBolt`/`DeletionBolt` pairs, and the CloudSearch `CloudSearchIndexerBolt`. The Solr and
+SQL indexers build their document/row key directly from the URL and never call
+`getDocumentID()`, so this setting is silently ignored for those two backends.
 
 ==== Status Persistence
 
