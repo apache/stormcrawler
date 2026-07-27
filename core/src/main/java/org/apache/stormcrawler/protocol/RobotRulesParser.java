@@ -141,6 +141,8 @@ public abstract class RobotRulesParser {
                     agentName);
             this.agentNames.add(agentName.toLowerCase(Locale.ROOT));
         } else {
+            // our agent-string is always the first one we match against robots.txt
+            agentNames.add(agentName);
             int index = 0;
             if ((agents.get(0)).equalsIgnoreCase(agentName)) {
                 index++;
