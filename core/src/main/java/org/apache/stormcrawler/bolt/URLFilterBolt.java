@@ -79,7 +79,7 @@ public class URLFilterBolt extends BaseRichBolt {
         // not a status we want to filter
         if (discoveredOnly && !status.equals(Status.DISCOVERED)) {
             Values v = new Values(urlString, metadata, status);
-            collector.emit(stream, v);
+            collector.emit(stream, input, v);
             collector.ack(input);
             return;
         }
@@ -97,7 +97,7 @@ public class URLFilterBolt extends BaseRichBolt {
         }
 
         Values v = new Values(filtered, metadata, status);
-        collector.emit(stream, v);
+        collector.emit(stream, input, v);
         collector.ack(input);
     }
 
