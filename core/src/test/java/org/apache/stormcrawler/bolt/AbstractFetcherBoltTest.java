@@ -192,7 +192,59 @@ abstract class AbstractFetcherBoltTest {
         Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
     }
 
-    private void resetProtocolFactory() throws ReflectiveOperationException {
+    TestOutputCollector fetch(
+            WireMockRuntimeInfo wmRuntimeInfo, Map<String, Object> config, String path)
+            throws ReflectiveOperationException {
+        resetProtocolFactory();
+        TestOutputCollector output = new TestOutputCollector();
+        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.getSourceComponent()).thenReturn("source");
+        when(tuple.getStringByField("url"))
+                .thenReturn("http://localhost:" + wmRuntimeInfo.getHttpPort() + path);
+        when(tuple.getValueByField("metadata")).thenReturn(null);
+        bolt.execute(tuple);
+
+        await().atMost(30, TimeUnit.SECONDS)
+                .until(
+                        () ->
+                                output.getEmitted(Utils.DEFAULT_STREAM_ID).size() > 0
+                                        || output.getEmitted(Constants.StatusStreamName).size()
+                                                > 0);
+        return output;
+    }
+
+    /**
+     * Fetches a page that is expected to be retrieved successfully (HTTP 200, non-304): the fetcher
+     * emits it on the default stream (url, content, metadata) for downstream parsing.
+     */
+    Metadata fetchAndGetContentMetadata(
+            WireMockRuntimeInfo wmRuntimeInfo, Map<String, Object> config, String path)
+            throws ReflectiveOperationException {
+        TestOutputCollector output = fetch(wmRuntimeInfo, config, path);
+        List<List<Object>> contentTuples = output.getEmitted(Utils.DEFAULT_STREAM_ID);
+        Assertions.assertEquals(1, contentTuples.size());
+        Assertions.assertEquals(0, output.getEmitted(Constants.StatusStreamName).size());
+        return (Metadata) contentTuples.get(0).get(2);
+    }
+
+    /**
+     * Fetches a page that is expected to be rejected before any HTTP request is made (e.g. the
+     * crawl-delay-too-long guard): the fetcher emits directly on the status stream (url, metadata,
+     * status).
+     */
+    List<Object> fetchAndGetStatusTuple(
+            WireMockRuntimeInfo wmRuntimeInfo, Map<String, Object> config, String path)
+            throws ReflectiveOperationException {
+        TestOutputCollector output = fetch(wmRuntimeInfo, config, path);
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(1, statusTuples.size());
+        Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+        return statusTuples.get(0);
+    }
+
+    static void resetProtocolFactory() throws ReflectiveOperationException {
         Field instance = ProtocolFactory.class.getDeclaredField("single_instance");
         instance.setAccessible(true);
         instance.set(null, null);

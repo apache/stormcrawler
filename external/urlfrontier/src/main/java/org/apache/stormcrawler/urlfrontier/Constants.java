@@ -30,6 +30,7 @@ public final class Constants {
     // Spout
     public static final String URLFRONTIER_MAX_URLS_PER_BUCKET_KEY =
             "urlfrontier.max.urls.per.bucket";
+    public static final int URLFRONTIER_MAX_URLS_PER_BUCKET_DEFAULT = 10;
     public static final String URLFRONTIER_MAX_BUCKETS_KEY = "urlfrontier.max.buckets";
     public static final String URLFRONTIER_DELAY_REQUESTABLE_KEY = "urlfrontier.delay.requestable";
 
@@ -96,6 +97,27 @@ public final class Constants {
             "urlfrontier.backoff.on.exceptions";
 
     public static final boolean URLFRONTIER_BACKOFF_ON_EXCEPTIONS_DEFAULT = false;
+
+    /** Enables forwarding long robots.txt Crawl-delays to URLFrontier. Defaults to false. */
+    public static final String URLFRONTIER_ROBOTS_CRAWL_DELAY_ENABLED_KEY =
+            "urlfrontier.robots.crawl.delay.enabled";
+
+    public static final boolean URLFRONTIER_ROBOTS_CRAWL_DELAY_ENABLED_DEFAULT = false;
+
+    /** Upper bound in seconds for the forwarded robots crawl-delay. Defaults to 86400 (24h). */
+    public static final String URLFRONTIER_ROBOTS_DELAY_MAX_KEY =
+            "urlfrontier.robots.delay.max.secs";
+
+    public static final int URLFRONTIER_ROBOTS_DELAY_MAX_DEFAULT = 86400;
+
+    /**
+     * Deduplication window in seconds, after which an unchanged robots crawl-delay is reasserted to
+     * the frontier. Defaults to 1800 (30m).
+     */
+    public static final String URLFRONTIER_ROBOTS_DELAY_DECAY_KEY =
+            "urlfrontier.robots.delay.decay.secs";
+
+    public static final int URLFRONTIER_ROBOTS_DELAY_DECAY_DEFAULT = 1800;
 
     /**
      * Random extra fraction added to every computed block duration, so that hosts blocked on the

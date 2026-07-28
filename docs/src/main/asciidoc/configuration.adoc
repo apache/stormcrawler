@@ -177,7 +177,7 @@ features you are using in your Apache StormCrawler topology. Some external modul
 
 | fetcher.max.crawl.delay | 30 | Maximum accepted Crawl-delay from robots.txt (seconds). If the crawl-delay exceeds this value the behavior depends on the value of fetcher.max.crawl.delay.force.
 | fetcher.max.crawl.delay.force | false | Configures the behavior of fetcher if the robots.txt crawl-delay exceeds fetcher.max.crawl.delay. If false: the tuple is emitted to the StatusStream
-as an ERROR. If true: the queue delay is set to fetcher.max.crawl.delay.
+as an ERROR. If true: the fetcher caps its local delay and emits the requested delay in whole seconds as `robots.crawl.delay`; an explicitly enabled URLFrontier `QueueRegulatorBolt` can forward a capped value to the host queue.
 | fetcher.max.queue.size | -1 | The maximum length of the queue used to store items to be fetched by the FetcherBolt. A setting of -1 sets the length to Integer.MAX_VALUE.
 | fetcher.max.throttle.sleep | -1 | The maximum amount of time to wait between fetches; if exceeded, the item is sent to the back of the queue. Used in SimpleFetcherBolt. -1 disables it.
 | fetcher.max.urls.in.queues | -1 | Limits the number of URLs that can be stored in a fetch queue. -1 disables the limit.
@@ -486,6 +486,18 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/sql[sql m
 Integration with link:https://github.com/crawler-commons/url-frontier[URLFrontier], a language-agnostic API for URL management and scheduling.
 See the link:https://github.com/apache/stormcrawler/tree/main/external/urlfrontier[urlfrontier module] for full details.
 
+`QueueRegulatorBolt` consumes the `queue` stream from the URLFrontier status updater and applies
+rate-limit blocks or robots.txt pacing. Robots pacing is enabled when both
+`urlfrontier.robots.crawl.delay.enabled` and `fetcher.max.crawl.delay.force` are `true`. It requires `partition.url.mode: byHost`,
+`urlfrontier.max.urls.per.bucket: 1`, `robots.crawl.delay` in `metadata.persist`, and a single
+URLFrontier endpoint (at most one `urlfrontier.address` entry). The same key
+must not match `metadata.transfer`, including wildcards such as `robots.*`, because it is a
+per-host control signal. The bolt probes these requirements at startup. A batch size of one
+bounds each frontier hand-out but does not recall URLs already emitted or eliminate concurrent
+requests while the new delay is reaching the frontier. A custom `metadata.transfer.class` is
+responsible for preserving the same persist-only contract for all URLs and values; the startup
+probe exercises only representative metadata.
+
 [cols="1,1,3", options="header"]
 |===
 | key | default value | description
@@ -494,7 +506,10 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/urlfronti
 | urlfrontier.port | 7071 | URLFrontier service port.
 | urlfrontier.address | - | URLFrontier service address (can be used instead of host and port).
 | urlfrontier.max.buckets | 10 | Number of buckets to request from the frontier.
-| urlfrontier.max.urls.per.bucket | 10 | Maximum URLs per bucket.
+| urlfrontier.max.urls.per.bucket | 10 | Maximum URLs per bucket. Must be 1 when robots crawl-delay pacing is enabled so one request cannot hand out several URLs from the same host.
+| urlfrontier.robots.crawl.delay.enabled | false | Enables forwarding long robots.txt Crawl-delays from the queue stream to URLFrontier. Also requires `fetcher.max.crawl.delay.force: true` and the validated configuration described above.
+| urlfrontier.robots.delay.max.secs | 86400 | Upper bound in seconds for a robots crawl-delay forwarded to the frontier.
+| urlfrontier.robots.delay.decay.secs | 1800 | Deduplication window in seconds after which an unchanged robots crawl-delay is re-sent to the frontier.
 | urlfrontier.delay.requestable | - | Time in seconds for which the URLs are locked in URLFrontier.
 | urlfrontier.cache.expireafter.sec | - | Time in seconds after which the cache expires.
 | urlfrontier.max.messages.in.flight | - | Maximum number of messages in flight for the StatusUpdater.

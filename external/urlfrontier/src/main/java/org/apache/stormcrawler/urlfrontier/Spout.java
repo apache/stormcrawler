@@ -24,6 +24,7 @@ import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_DEFAULT_
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_DELAY_REQUESTABLE_KEY;
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_HOST_KEY;
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_MAX_BUCKETS_KEY;
+import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_MAX_URLS_PER_BUCKET_DEFAULT;
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_MAX_URLS_PER_BUCKET_KEY;
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_PORT_KEY;
 
@@ -70,7 +71,11 @@ public class Spout extends AbstractQueryingSpout {
             SpoutOutputCollector collector) {
         super.open(stormConf, context, collector);
 
-        maxURLsPerBucket = ConfUtils.getInt(stormConf, URLFRONTIER_MAX_URLS_PER_BUCKET_KEY, 10);
+        maxURLsPerBucket =
+                ConfUtils.getInt(
+                        stormConf,
+                        URLFRONTIER_MAX_URLS_PER_BUCKET_KEY,
+                        URLFRONTIER_MAX_URLS_PER_BUCKET_DEFAULT);
 
         maxBucketNum = ConfUtils.getInt(stormConf, URLFRONTIER_MAX_BUCKETS_KEY, 10);
 

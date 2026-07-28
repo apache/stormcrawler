@@ -583,6 +583,9 @@ public class FetcherBolt extends StatusEmitterBolt {
 
                 // https://github.com/apache/stormcrawler/issues/813
                 metadata.remove("fetch.exception");
+                metadata.remove(Constants.ROBOTS_CRAWL_DELAY_KEY);
+
+                String robotsCrawlDelaySecs = null;
 
                 boolean asap = false;
 
@@ -677,6 +680,12 @@ public class FetcherBolt extends StatusEmitterBolt {
                                     msg);
                             if (force) {
                                 fiq.crawlDelay = maxCrawlDelay;
+                                // report the delay the fetcher is not holding, so a frontier-side
+                                // consumer can enforce it at the source (#867)
+                                robotsCrawlDelaySecs =
+                                        Long.toString(1L + ((rules.getCrawlDelay() - 1L) / 1000L));
+                                metadata.setValue(
+                                        Constants.ROBOTS_CRAWL_DELAY_KEY, robotsCrawlDelaySecs);
                             } else {
                                 // pass the info about crawl delay
                                 metadata.setValue(Constants.STATUS_ERROR_CAUSE, "crawl_delay");
@@ -791,6 +800,14 @@ public class FetcherBolt extends StatusEmitterBolt {
                     // add a prefix to avoid confusion, preserve protocol
                     // metadata persisted or transferred from previous fetches
                     mergedMetadata.putAll(response.getMetadata(), protocolMetadataPrefix);
+
+                    // Only the locally parsed robots.txt value may populate this control signal.
+                    // A colliding protocol prefix/header must not pace an unrelated queue.
+                    mergedMetadata.remove(Constants.ROBOTS_CRAWL_DELAY_KEY);
+                    if (robotsCrawlDelaySecs != null) {
+                        mergedMetadata.setValue(
+                                Constants.ROBOTS_CRAWL_DELAY_KEY, robotsCrawlDelaySecs);
+                    }
 
                     mergedMetadata.setValue(
                             "fetch.statusCode", Integer.toString(response.getStatusCode()));

@@ -273,7 +273,7 @@ When `robots.txt` specifies a `Crawl-delay`:
 * If the delay is *smaller* than `fetcher.server.delay` and `fetcher.server.delay.force` is `true`, the larger default delay is used instead
 * If the delay is *larger* than `fetcher.max.crawl.delay`:
 ** `fetcher.max.crawl.delay.force: false` (default) — the queue is skipped and the URL gets an ERROR status
-** `fetcher.max.crawl.delay.force: true` — the delay is capped at `fetcher.max.crawl.delay`
+** `fetcher.max.crawl.delay.force: true` — the fetcher caps its local delay at `fetcher.max.crawl.delay` and reports the requested delay in whole seconds as `robots.crawl.delay`; when `QueueRegulatorBolt` is wired and `urlfrontier.robots.crawl.delay.enabled: true`, a value capped by `urlfrontier.robots.delay.max.secs` is forwarded to the host queue in the frontier
 
 ==== Robots.txt Compliance
 
