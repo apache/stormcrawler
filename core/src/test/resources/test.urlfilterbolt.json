@@ -1,0 +1,11 @@
+{
+  "org.apache.stormcrawler.filtering.URLFilters": [
+    {
+      "class": "org.apache.stormcrawler.filtering.regex.RegexURLFilter",
+      "name": "RegexURLFilter",
+      "params": {
+        "regexFilterFile": "default-regex-filters.txt"
+      }
+    }
+  ]
+}
