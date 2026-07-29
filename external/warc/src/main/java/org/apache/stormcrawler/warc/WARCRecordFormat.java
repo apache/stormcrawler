@@ -468,7 +468,14 @@ public class WARCRecordFormat implements RecordFormat {
                 metadata.getFirstValue(
                         ProtocolResponse.PROTOCOL_VERSIONS_KEY, this.protocolMDprefix);
         if (protocolVersions != null) {
-            buffer.append("WARC-Protocol: ").append(protocolVersions).append(CRLF);
+            for (String val : StringUtils.split(protocolVersions, ',')) {
+                buffer.append("WARC-Protocol: ").append(val).append(CRLF);
+            }
+        }
+        final String cipherSuites =
+                metadata.getFirstValue(ProtocolResponse.CIPHER_SUITES_KEY, this.protocolMDprefix);
+        if (cipherSuites != null) {
+            buffer.append("WARC-Cipher-Suite: ").append(cipherSuites).append(CRLF);
         }
 
         buffer.append("WARC-Payload-Digest").append(": ").append(payloadDigest).append(CRLF);

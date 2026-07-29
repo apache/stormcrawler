@@ -225,9 +225,9 @@ class WARCRecordFormatTest {
                         + "Content-Encoding: gzip\r\n"
                         + "Content-Length: 26\r\n"
                         + "Connection: close");
+        metadata.addValue(protocolMDprefix + ProtocolResponse.PROTOCOL_VERSIONS_KEY, "h2,TLS_1_3");
         metadata.addValue(
-                protocolMDprefix + ProtocolResponse.PROTOCOL_VERSIONS_KEY,
-                "h2,TLS_1_3,TLS_AES_256_GCM_SHA384");
+                protocolMDprefix + ProtocolResponse.CIPHER_SUITES_KEY, "TLS_AES_256_GCM_SHA384");
         metadata.addValue(protocolMDprefix + ProtocolResponse.RESPONSE_IP_KEY, "123.123.123.123");
         Tuple tuple = mock(Tuple.class);
         when(tuple.getBinaryByField("content")).thenReturn(content);
@@ -246,8 +246,14 @@ class WARCRecordFormatTest {
                 statusLine.matches("^HTTP/1\\.[01] .*"),
                 "WARC response record: HTTP status line must start with HTTP/1.1 or HTTP/1.0");
         assertTrue(
-                headersPayload[0].contains("\r\nWARC-Protocol: "),
-                "WARC response record is expected to include WARC header \"WARC-Protocol\"");
+                headersPayload[0].contains("\r\nWARC-Protocol: h2\r\n"),
+                "WARC response record is expected to include a WARC header \"WARC-Protocol: h2\"");
+        assertTrue(
+                headersPayload[0].contains("\r\nWARC-Protocol: TLS_1_3\r\n"),
+                "WARC response record is expected to include a WARC header \"WARC-Protocol: TLS_1_3\"");
+        assertTrue(
+                headersPayload[0].contains("\r\nWARC-Cipher-Suite: "),
+                "WARC response record is expected to include WARC header \"WARC-Cipher-Suite\"");
         assertTrue(
                 headersPayload[0].contains("\r\nWARC-IP-Address: "),
                 "WARC response record is expected to include WARC header \"WARC-IP-Address\"");

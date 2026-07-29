@@ -669,10 +669,11 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                             .getBytes(StandardCharsets.ISO_8859_1));
 
             final StringBuilder protocols = new StringBuilder(response.protocol().toString());
+            String cipherSuite = null;
             final Handshake handshake = connection.handshake();
             if (handshake != null) {
                 protocols.append(',').append(handshake.tlsVersion());
-                protocols.append(',').append(handshake.cipherSuite());
+                cipherSuite = handshake.cipherSuite().toString();
             }
 
             // returns a modified version of the response
@@ -686,6 +687,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     .header(ProtocolResponse.RESPONSE_IP_KEY, ipAddress)
                     .header(ProtocolResponse.REQUEST_TIME_KEY, Long.toString(startFetchTime))
                     .header(ProtocolResponse.PROTOCOL_VERSIONS_KEY, protocols.toString())
+                    .header(ProtocolResponse.CIPHER_SUITES_KEY, cipherSuite)
                     .build();
         }
     }
