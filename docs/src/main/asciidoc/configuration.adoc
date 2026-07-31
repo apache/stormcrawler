@@ -275,7 +275,6 @@ header.
 | topology.message.timeout.secs | -1 | OKHTTP message timeout.
 |===
 
-[[IP Address Filtering]]
 ===== IP Address Filtering
 
 The OkHttp protocol implementation (`org.apache.stormcrawler.protocol.okhttp.HttpProtocol`) can
