@@ -75,7 +75,7 @@ under the License.
         <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
         <commons.io.version>2.22.0</commons.io.version>
         <commons.compress.version>1.28.0</commons.compress.version>
-        <commons.codec.version>1.22.0</commons.codec.version>
+        <commons.codec.version>1.22.1</commons.codec.version>
         <guava.version>33.6.0-jre</guava.version>
         <git-code-format-maven-plugin.version>5.4</git-code-format-maven-plugin.version>
         <testcontainers.version>1.21.4</testcontainers.version>
@@ -91,7 +91,7 @@ under the License.
         <jacoco.branchRatio>1.00</jacoco.branchRatio>
         <jacoco.lineRatio>1.00</jacoco.lineRatio>
         <jacoco.complexityRatio>1.00</jacoco.complexityRatio>
-        <mysql-connector-j>9.7.0</mysql-connector-j>
+        <mysql-connector-j>26.7.0</mysql-connector-j>
 
         <skip.format.code>true</skip.format.code>
 
