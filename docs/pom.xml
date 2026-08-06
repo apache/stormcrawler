@@ -22,7 +22,7 @@ under the License.
     <parent>
         <groupId>org.apache.stormcrawler</groupId>
         <artifactId>stormcrawler</artifactId>
-        <version>3.7.1-SNAPSHOT</version>
+        <version>4.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>stormcrawler-docs</artifactId>

@@ -9,9 +9,9 @@ Apache StormCrawler is an open source collection of resources for building low-l
 
 ## Quickstart
 
-NOTE: These instructions assume that you have [Apache Maven](https://maven.apache.org/install.html) installed. You will need to install [Apache Storm 2.8.9](http://storm.apache.org/) to run the crawler.
+NOTE: These instructions assume that you have [Apache Maven](https://maven.apache.org/install.html) installed. You will need to install [Apache Storm 3.0.0](http://storm.apache.org/) to run the crawler.
 
-StormCrawler requires Java 17 or above. To execute tests, it requires you to have a locally installed and working Docker environment.
+StormCrawler requires Java 25 or above. To execute tests, it requires you to have a locally installed and working Docker environment.
 
 Once Storm is installed, the easiest way to get started is to generate a new StormCrawler project following the instructions below:
 
@@ -53,7 +53,7 @@ mvn clean install -Dskip.format.code=false
 
 The requirements for building from source are as follows
 
-- JDK 17+
+- JDK 25+
 - Apache Maven 3
 - Docker (if you want to run tests)
 
