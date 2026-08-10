@@ -220,8 +220,10 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             metadata.remove(Constants.STATUS_ERROR_CAUSE);
             metadata.remove(Constants.STATUS_ERROR_MESSAGE);
             metadata.remove(Constants.STATUS_ERROR_SOURCE);
-        } else if (status == Status.ERROR) {
-            // gone? notify any deleters. Doesn't need to be anchored
+        }
+
+        if (status == Status.ERROR || status == Status.REDIRECTION) {
+    // gone or redirected? notify any deleters. Doesn't need to be anchored
             collector.emit(Constants.DELETION_STREAM_NAME, new Values(url, metadata));
         }
 
