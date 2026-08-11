@@ -223,7 +223,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
         }
 
         if (status == Status.ERROR || status == Status.REDIRECTION) {
-    // gone or redirected? notify any deleters. Doesn't need to be anchored
+            // gone or redirected? notify any deleters. Doesn't need to be anchored
             collector.emit(Constants.DELETION_STREAM_NAME, new Values(url, metadata));
         }
 

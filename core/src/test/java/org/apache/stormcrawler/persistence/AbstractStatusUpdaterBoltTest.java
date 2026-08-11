@@ -39,14 +39,9 @@ class AbstractStatusUpdaterBoltTest {
 
         Map<String, Object> config = new HashMap<>();
         config.put(AbstractStatusUpdaterBolt.useCacheParamName, false);
-        config.put(
-                "scheduler.class",
-                "org.apache.stormcrawler.persistence.DefaultScheduler");
+        config.put("scheduler.class", "org.apache.stormcrawler.persistence.DefaultScheduler");
 
-        bolt.prepare(
-                config,
-                TestUtil.getMockedTopologyContext(),
-                new OutputCollector(output));
+        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
 
         String url = "http://example.com/old-page";
         Metadata metadata = new Metadata();
@@ -60,8 +55,7 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions =
-                output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(1, deletions.size());
         assertEquals(url, deletions.get(0).get(0));
