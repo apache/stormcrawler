@@ -33,33 +33,180 @@ import org.junit.jupiter.api.Test;
 class AbstractStatusUpdaterBoltTest {
 
     @Test
-    void testRedirectedUrlIsEmittedToDeletionStream() {
+    void testPermanentRedirect301IsEmittedToDeletionStream() {
         TestOutputCollector output = new TestOutputCollector();
         TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
 
-        Map<String, Object> config = new HashMap<>();
-        config.put(AbstractStatusUpdaterBolt.useCacheParamName, false);
-        config.put("scheduler.class", "org.apache.stormcrawler.persistence.DefaultScheduler");
-
-        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        bolt.prepare(
+                createConfig(),
+                TestUtil.getMockedTopologyContext(),
+                new OutputCollector(output));
 
         String url = "http://example.com/old-page";
         Metadata metadata = new Metadata();
+        metadata.setValue("fetch.statusCode", "301");
 
-        Map<String, Object> tupleValues = new HashMap<>();
-        tupleValues.put("url", url);
-        tupleValues.put("status", Status.REDIRECTION);
-        tupleValues.put("metadata", metadata);
-
-        Tuple tuple = TestUtil.getMockedTestTuple(tupleValues);
+        Tuple tuple = createTuple(url, Status.REDIRECTION, metadata);
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(1, deletions.size());
         assertEquals(url, deletions.get(0).get(0));
-        assertEquals(metadata, deletions.get(0).get(1));
+
+        Metadata emittedMetadata = (Metadata) deletions.get(0).get(1);
+        assertEquals("301", emittedMetadata.getFirstValue("fetch.statusCode"));
+    }
+
+    @Test
+    void testPermanentRedirect308IsEmittedToDeletionStream() {
+        TestOutputCollector output = new TestOutputCollector();
+        TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
+
+        bolt.prepare(
+                createConfig(),
+                TestUtil.getMockedTopologyContext(),
+                new OutputCollector(output));
+
+        String url = "http://example.com/old-page";
+        Metadata metadata = new Metadata();
+        metadata.setValue("fetch.statusCode", "308");
+
+        Tuple tuple = createTuple(url, Status.REDIRECTION, metadata);
+
+        bolt.execute(tuple);
+
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
+
+        assertEquals(1, deletions.size());
+        assertEquals(url, deletions.get(0).get(0));
+
+        Metadata emittedMetadata = (Metadata) deletions.get(0).get(1);
+        assertEquals("308", emittedMetadata.getFirstValue("fetch.statusCode"));
+    }
+
+    @Test
+    void testTemporaryRedirect302IsNotEmittedToDeletionStream() {
+        TestOutputCollector output = new TestOutputCollector();
+        TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
+
+        bolt.prepare(
+                createConfig(),
+                TestUtil.getMockedTopologyContext(),
+                new OutputCollector(output));
+
+        String url = "http://example.com/old-page";
+        Metadata metadata = new Metadata();
+        metadata.setValue("fetch.statusCode", "302");
+
+        Tuple tuple = createTuple(url, Status.REDIRECTION, metadata);
+
+        bolt.execute(tuple);
+
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
+
+        assertEquals(0, deletions.size());
+    }
+
+    @Test
+    void testMetaRefreshRedirectIsEmittedToDeletionStream() {
+        TestOutputCollector output = new TestOutputCollector();
+        TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
+
+        bolt.prepare(
+                createConfig(),
+                TestUtil.getMockedTopologyContext(),
+                new OutputCollector(output));
+
+        String url = "http://example.com/old-page";
+        Metadata metadata = new Metadata();
+        metadata.setValue("fetch.statusCode", "200");
+        metadata.setValue("_redirTo", "http://example.com/new-page");
+
+        Tuple tuple = createTuple(url, Status.REDIRECTION, metadata);
+
+        bolt.execute(tuple);
+
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
+
+        assertEquals(1, deletions.size());
+        assertEquals(url, deletions.get(0).get(0));
+
+        Metadata emittedMetadata = (Metadata) deletions.get(0).get(1);
+        assertEquals(
+                "http://example.com/new-page",
+                emittedMetadata.getFirstValue("_redirTo"));
+    }
+
+    @Test
+    void testFetchedUrlIsNotEmittedToDeletionStream() {
+        TestOutputCollector output = new TestOutputCollector();
+        TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
+
+        bolt.prepare(
+                createConfig(),
+                TestUtil.getMockedTopologyContext(),
+                new OutputCollector(output));
+
+        String url = "http://example.com/page";
+        Metadata metadata = new Metadata();
+        metadata.setValue("fetch.statusCode", "200");
+
+        Tuple tuple = createTuple(url, Status.FETCHED, metadata);
+
+        bolt.execute(tuple);
+
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
+
+        assertEquals(0, deletions.size());
+    }
+
+    @Test
+    void testErrorIsEmittedToDeletionStream() {
+        TestOutputCollector output = new TestOutputCollector();
+        TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
+
+        bolt.prepare(
+                createConfig(),
+                TestUtil.getMockedTopologyContext(),
+                new OutputCollector(output));
+
+        String url = "http://example.com/error";
+        Metadata metadata = new Metadata();
+
+        Tuple tuple = createTuple(url, Status.ERROR, metadata);
+
+        bolt.execute(tuple);
+
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
+
+        assertEquals(1, deletions.size());
+        assertEquals(url, deletions.get(0).get(0));
+    }
+
+    private static Map<String, Object> createConfig() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(AbstractStatusUpdaterBolt.useCacheParamName, false);
+        config.put(
+                "scheduler.class",
+                "org.apache.stormcrawler.persistence.DefaultScheduler");
+        return config;
+    }
+
+    private static Tuple createTuple(String url, Status status, Metadata metadata) {
+        Map<String, Object> tupleValues = new HashMap<>();
+        tupleValues.put("url", url);
+        tupleValues.put("status", status);
+        tupleValues.put("metadata", metadata);
+
+        return TestUtil.getMockedTestTuple(tupleValues);
     }
 
     private static class TestStatusUpdaterBolt extends AbstractStatusUpdaterBolt {

@@ -222,9 +222,22 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             metadata.remove(Constants.STATUS_ERROR_SOURCE);
         }
 
-        if (status == Status.ERROR || status == Status.REDIRECTION) {
-            // gone or redirected? notify any deleters. Doesn't need to be anchored
+        if (status == Status.ERROR) {
+            // gone? notify any deleters. Doesn't need to be anchored
             collector.emit(Constants.DELETION_STREAM_NAME, new Values(url, metadata));
+        } else if (status == Status.REDIRECTION) {
+            String statusCode = metadata.getFirstValue("fetch.statusCode");
+            String redirection = metadata.getFirstValue("_redirTo");
+
+            // Delete permanently redirected URLs (301/308) and meta-refresh redirects.
+            boolean permanentRedirect =
+                    "301".equals(statusCode) || "308".equals(statusCode);
+            boolean metaRefreshRedirect =
+                    "200".equals(statusCode) && redirection != null;
+
+            if (permanentRedirect || metaRefreshRedirect) {
+                collector.emit(Constants.DELETION_STREAM_NAME, new Values(url, metadata));
+            }
         }
 
         // determine the value of the next fetch based on the status
