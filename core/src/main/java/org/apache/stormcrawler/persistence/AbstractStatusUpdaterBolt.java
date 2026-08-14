@@ -230,10 +230,8 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             String redirection = metadata.getFirstValue("_redirTo");
 
             // Delete permanently redirected URLs (301/308) and meta-refresh redirects.
-            boolean permanentRedirect =
-                    "301".equals(statusCode) || "308".equals(statusCode);
-            boolean metaRefreshRedirect =
-                    "200".equals(statusCode) && redirection != null;
+            boolean permanentRedirect = "301".equals(statusCode) || "308".equals(statusCode);
+            boolean metaRefreshRedirect = "200".equals(statusCode) && redirection != null;
 
             if (permanentRedirect || metaRefreshRedirect) {
                 collector.emit(Constants.DELETION_STREAM_NAME, new Values(url, metadata));
