@@ -249,6 +249,38 @@ The JSON configuration allows loading several instances of the same filtering cl
 
 ===== Built-in URL Filters
 
+====== Adaptive
+The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/adaptive/AdaptiveURLNormalizer.java[AdaptiveURLNormalizer] learns which query parameters can be removed from the URLs of a site by comparing the URL of each page with the value of its canonical tag.
+
+When both point at the same resource - i.e. they have the same protocol, host, port and path - and differ only by their query string, the parameters dropped by the canonical are taken as evidence that they do not affect the content, whereas the ones kept by the canonical are evidence of the opposite. Once enough evidence has been gathered for a given parameter, it gets removed from the subsequent URLs of that site, which reduces the amount of duplicates fetched. The aim is similar to the _Clean-param_ extension of the robots protocol by Yandex, except that the rules are learnt instead of being declared by the site.
+
+This filter requires the canonical tag to have been extracted into the metadata, for instance with an XPathFilter configured with `"canonical": "//*[@rel=\"canonical\"]/@href"`, and must therefore be placed in a parsing bolt. The evidence is kept in memory only: it is lost when the topology is restarted and is not shared between the instances of the bolt.
+
+[source,json]
+----
+{
+    "class": "org.apache.stormcrawler.filtering.adaptive.AdaptiveURLNormalizer",
+    "name": "AdaptiveURLNormalizer",
+    "params": {
+        "canonicalMetadataKey": "canonical",
+        "scope": "host",
+        "minObservations": 5,
+        "confidenceThreshold": 0.9,
+        "maxScopes": 10000,
+        "maxParams": 100
+    }
+}
+----
+
+All the parameters are optional:
+
+* `canonicalMetadataKey` - metadata key holding the value of the canonical tag, _canonical_ by default.
+* `scope` - whether the rules are learnt per _host_ (default) or per _domain_.
+* `minObservations` - number of pages a parameter must have been seen on before a rule can be applied to it, 5 by default.
+* `confidenceThreshold` - proportion of the canonical tags which must have dropped the parameter, 0.9 by default.
+* `maxScopes` - maximum number of hosts or domains tracked, 10000 by default.
+* `maxParams` - maximum number of parameters tracked per host or domain, 100 by default.
+
 ====== Basic
 The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/basic/BasicURLFilter.java[BasicURLFilter] filters based on the length of the URL and the repetition of path elements.
 
