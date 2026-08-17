@@ -385,7 +385,7 @@ When handling HTTP redirects, StormCrawler offers three modes:
 
 2. **Redirects disabled** (`redirections.allowed: false`): Redirect target URLs are not sent to the status stream. Redirects are effectively ignored.
 
-3. **Immediate follow** (`http.allow.redirects: true`): Redirects are followed immediately in the HTTP client and the target URLs are not emitted to the status stream. This is the default behavior for browser-based protocols (Selenium and Playwright), but it is also supported by the OkHttp protocol. Note that with immediate follows, redirect targets bypass URL filtering, deduplication, and `robots.txt` checks.
+3. **Immediate follow** (`http.allow.redirects: true`): Redirects are followed immediately in the HTTP client and the target URLs are not emitted to the status stream. This is the default behavior for the browser-based Playwright protocol, but it is also supported by the OkHttp protocol. Note that with immediate follows, redirect targets bypass URL filtering, deduplication, and `robots.txt` checks.
 
 ==== Network Protocols
 
@@ -422,36 +422,38 @@ https.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProt
 ----
 
 * link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/httpclient/HttpProtocol.java[HttpClient] (*deprecated* — will be removed in the next major release; use OKHttp instead)
-* link:https://github.com/apache/stormcrawler/blob/main/external/selenium/src/main/java/org/apache/stormcrawler/protocol/selenium/SeleniumProtocol.java[Selenium]
 * link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/okhttp/HttpProtocol.java[OKHttp]
+* link:https://github.com/apache/stormcrawler/blob/main/external/playwright/src/main/java/org/apache/stormcrawler/protocol/playwright/HttpProtocol.java[Playwright] (browser-based, in the `playwright` external module)
 
 ==== Feature grid
 
-[cols="2,1,1,1", options="header"]
+[cols="2,1,1", options="header"]
 |===
-| Features | HTTPClient | OKHttp | Selenium
+| Features | HTTPClient | OKHttp
 
-| Basic authentication | link:https://github.com/apache/stormcrawler/pull/589[Y] | link:https://github.com/apache/stormcrawler/issues/792[Y] | N
-| Proxy (w. credentials?) | Y / Y | Y / link:https://github.com/apache/stormcrawler/issues/751[Y] | ?
-| Interruptible / trimmable link:https://github.com/apache/stormcrawler/issues/463[#463] | N / Y | Y / Y | Y / N
-| Cookies | Y | link:https://github.com/apache/stormcrawler/issues/632[Y] | N
-| Response headers | Y | Y | N
-| Trust all certificates | N | link:https://github.com/apache/stormcrawler/issues/615[Y] | N
-| HEAD method | link:https://github.com/apache/stormcrawler/issues/485[Y] | link:https://github.com/apache/stormcrawler/pull/923[Y] | N
-| POST method | N | link:https://github.com/apache/stormcrawler/issues/641[Y] | N
-| Verbatim response header | link:https://github.com/apache/stormcrawler/issues/317[Y] | link:https://github.com/apache/stormcrawler/issues/506[Y] | N
-| Verbatim request header | N | link:https://github.com/apache/stormcrawler/issues/506[Y] | N
-| IP address capture | N | link:https://github.com/apache/stormcrawler/pull/691[Y] | N
-| Navigation and javascript | N | N | Y
-| HTTP/2 | N | Y | (Y)
-| Configurable connection pool | N | link:https://github.com/apache/stormcrawler/issues/918[Y] | N
+| Basic authentication | link:https://github.com/apache/stormcrawler/pull/589[Y] | link:https://github.com/apache/stormcrawler/issues/792[Y]
+| Proxy (w. credentials?) | Y / Y | Y / link:https://github.com/apache/stormcrawler/issues/751[Y]
+| Interruptible / trimmable link:https://github.com/apache/stormcrawler/issues/463[#463] | N / Y | Y / Y
+| Cookies | Y | link:https://github.com/apache/stormcrawler/issues/632[Y]
+| Response headers | Y | Y
+| Trust all certificates | N | link:https://github.com/apache/stormcrawler/issues/615[Y]
+| HEAD method | link:https://github.com/apache/stormcrawler/issues/485[Y] | link:https://github.com/apache/stormcrawler/pull/923[Y]
+| POST method | N | link:https://github.com/apache/stormcrawler/issues/641[Y]
+| Verbatim response header | link:https://github.com/apache/stormcrawler/issues/317[Y] | link:https://github.com/apache/stormcrawler/issues/506[Y]
+| Verbatim request header | N | link:https://github.com/apache/stormcrawler/issues/506[Y]
+| IP address capture | N | link:https://github.com/apache/stormcrawler/pull/691[Y]
+| Navigation and javascript | N | N
+| HTTP/2 | N | Y
+| Configurable connection pool | N | link:https://github.com/apache/stormcrawler/issues/918[Y]
 |===
+
+Neither of the HTTP clients executes JavaScript: use the browser-based link:https://github.com/apache/stormcrawler/tree/main/external/playwright[Playwright] protocol for pages that require rendering or navigation.
 
 ==== HTTP/2
 
 * The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/okhttp/HttpProtocol.java[OKHttp] protocol supports link:https://en.wikipedia.org/wiki/HTTP/2[HTTP/2] if the JDK includes link:https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation[ALPN] (Java 9 and upwards or Java 8 builds starting early/mid 2020).
 * link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/httpclient/HttpProtocol.java[HttpClient] does not yet support HTTP/2.
-* link:https://github.com/apache/stormcrawler/blob/main/external/selenium/src/main/java/org/apache/stormcrawler/protocol/selenium/SeleniumProtocol.java[Selenium]: whether HTTP/2 is used or not depends on the used driver.
+* link:https://github.com/apache/stormcrawler/blob/main/external/playwright/src/main/java/org/apache/stormcrawler/protocol/playwright/HttpProtocol.java[Playwright]: whether HTTP/2 is used or not depends on the browser.
 
 Since link:https://github.com/apache/stormcrawler/pull/829[#829], the HTTP protocol version used is configurable via `http.protocol.versions` (see also comments in link:https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml[crawler-default.yaml]).
 

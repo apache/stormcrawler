@@ -263,15 +263,6 @@ header.
 | http.filter.ipaddress.include | - | (OkHttp only) Comma-separated list (or YAML list) of allowed IP ranges. If empty, all addresses are allowed unless excluded. See <<IP Address Filtering>>.
 | http.filter.ipaddress.exclude | - | (OkHttp only) Comma-separated list (or YAML list) of blocked IP ranges. See <<IP Address Filtering>>.
 | http.trust.everything | true | If true, trust all SSL/TLS connections.
-| navigationfilters.config.file | - | JSON config for NavigationFilter (used by the Selenium protocol module).
-| selenium.addresses | - | WebDriver server addresses.
-| selenium.capabilities | - | Desired WebDriver capabilities
-.
-| selenium.delegated.protocol | - | Delegated protocol for selective Selenium usage.
-| selenium.implicitlyWait | 0 | WebDriver element search timeout.
-| selenium.instances.num | 1 | Number of instances per WebDriver connection.
-| selenium.pageLoadTimeout | 0 | WebDriver page load timeout.
-| selenium.setScriptTimeout | 0 | WebDriver script execution timeout.
 | topology.message.timeout.secs | -1 | OKHTTP message timeout.
 |===
 

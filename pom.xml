@@ -724,7 +724,6 @@ under the License.
         <module>external/opensearch</module>
         <module>external/opensearch-java</module>
         <module>external/playwright</module>
-        <module>external/selenium</module>
         <module>external/solr</module>
         <module>external/sql</module>
         <module>external/tika</module>
