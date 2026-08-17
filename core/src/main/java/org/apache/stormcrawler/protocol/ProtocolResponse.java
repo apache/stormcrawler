@@ -17,6 +17,7 @@
 
 package org.apache.stormcrawler.protocol;
 
+import java.net.URL;
 import org.apache.stormcrawler.Metadata;
 
 public class ProtocolResponse {
@@ -81,11 +82,17 @@ public class ProtocolResponse {
     private final byte[] content;
     private final int statusCode;
     private final Metadata metadata;
+    private final URL url;
 
     public ProtocolResponse(byte[] c, int s, Metadata md) {
+        this(c, s, md, null);
+    }
+
+    public ProtocolResponse(byte[] c, int s, Metadata md, URL url) {
         content = c;
         statusCode = s;
         metadata = md == null ? new Metadata() : md;
+        this.url = url;
     }
 
     public byte[] getContent() {
@@ -98,5 +105,9 @@ public class ProtocolResponse {
 
     public Metadata getMetadata() {
         return metadata;
+    }
+
+    public URL getUrl() {
+        return url;
     }
 }

@@ -49,6 +49,7 @@ import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
 import org.apache.stormcrawler.protocol.Protocol;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 
 public class HttpProtocol extends AbstractHttpProtocol {
@@ -316,7 +317,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
                 responseMetaData.addValue(MD_KEY_END, Instant.now().toString());
 
-                return new ProtocolResponse(content, status.get(), responseMetaData);
+                return new ProtocolResponse(
+                        content, status.get(), responseMetaData, URLUtil.toURL(url));
 
             } finally {
                 if (isTracing && responseMetaData.getFirstValue(MD_TRACE) == null) {
