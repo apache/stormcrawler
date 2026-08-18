@@ -37,8 +37,11 @@ class AbstractStatusUpdaterBoltTest {
         TestOutputCollector output = new TestOutputCollector();
         TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
 
+        Map<String, Object> config = createConfig();
+        config.put(AbstractStatusUpdaterBolt.deleteRedirectionsParamName, true);
+
         bolt.prepare(
-                createConfig(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+                config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
 
         String url = "http://example.com/old-page";
         Metadata metadata = new Metadata();
@@ -48,7 +51,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(1, deletions.size());
         assertEquals(url, deletions.get(0).get(0));
@@ -62,8 +66,11 @@ class AbstractStatusUpdaterBoltTest {
         TestOutputCollector output = new TestOutputCollector();
         TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
 
+        Map<String, Object> config = createConfig();
+        config.put(AbstractStatusUpdaterBolt.deleteRedirectionsParamName, true);
+
         bolt.prepare(
-                createConfig(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+                config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
 
         String url = "http://example.com/old-page";
         Metadata metadata = new Metadata();
@@ -73,7 +80,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(1, deletions.size());
         assertEquals(url, deletions.get(0).get(0));
@@ -87,8 +95,11 @@ class AbstractStatusUpdaterBoltTest {
         TestOutputCollector output = new TestOutputCollector();
         TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
 
+        Map<String, Object> config = createConfig();
+        config.put(AbstractStatusUpdaterBolt.deleteRedirectionsParamName, true);
+
         bolt.prepare(
-                createConfig(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+                config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
 
         String url = "http://example.com/old-page";
         Metadata metadata = new Metadata();
@@ -98,18 +109,22 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(0, deletions.size());
     }
 
     @Test
-    void testMetaRefreshRedirectIsEmittedToDeletionStream() {
+    void testMetaRefreshRedirectIsNotEmittedToDeletionStream() {
         TestOutputCollector output = new TestOutputCollector();
         TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
 
+        Map<String, Object> config = createConfig();
+        config.put(AbstractStatusUpdaterBolt.deleteRedirectionsParamName, true);
+
         bolt.prepare(
-                createConfig(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+                config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
 
         String url = "http://example.com/old-page";
         Metadata metadata = new Metadata();
@@ -120,13 +135,82 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
-        assertEquals(1, deletions.size());
-        assertEquals(url, deletions.get(0).get(0));
+        assertEquals(0, deletions.size());
+    }
 
-        Metadata emittedMetadata = (Metadata) deletions.get(0).get(1);
-        assertEquals("http://example.com/new-page", emittedMetadata.getFirstValue("_redirTo"));
+    @Test
+    void testRedirectionWithoutStatusCodeIsNotEmittedToDeletionStream() {
+        TestOutputCollector output = new TestOutputCollector();
+        TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
+
+        Map<String, Object> config = createConfig();
+        config.put(AbstractStatusUpdaterBolt.deleteRedirectionsParamName, true);
+
+        bolt.prepare(
+                config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        String url = "http://example.com/old-page";
+        Metadata metadata = new Metadata();
+
+        Tuple tuple = createTuple(url, Status.REDIRECTION, metadata);
+
+        bolt.execute(tuple);
+
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
+
+        assertEquals(0, deletions.size());
+    }
+
+    @Test
+    void testPermanentRedirectIsNotDeletedWhenRedirectionsAreDisabled() {
+        TestOutputCollector output = new TestOutputCollector();
+        TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
+
+        Map<String, Object> config = createConfig();
+        config.put(AbstractStatusUpdaterBolt.deleteRedirectionsParamName, true);
+        config.put(Constants.AllowRedirParamName, false);
+
+        bolt.prepare(
+                config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        String url = "http://example.com/old-page";
+        Metadata metadata = new Metadata();
+        metadata.setValue("fetch.statusCode", "301");
+
+        Tuple tuple = createTuple(url, Status.REDIRECTION, metadata);
+
+        bolt.execute(tuple);
+
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
+
+        assertEquals(0, deletions.size());
+    }
+
+    @Test
+    void testPermanentRedirectIsNotDeletedByDefault() {
+        TestOutputCollector output = new TestOutputCollector();
+        TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
+
+        bolt.prepare(
+                createConfig(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        String url = "http://example.com/old-page";
+        Metadata metadata = new Metadata();
+        metadata.setValue("fetch.statusCode", "301");
+
+        Tuple tuple = createTuple(url, Status.REDIRECTION, metadata);
+
+        bolt.execute(tuple);
+
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
+
+        assertEquals(0, deletions.size());
     }
 
     @Test
@@ -145,7 +229,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(0, deletions.size());
     }
@@ -165,7 +250,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(1, deletions.size());
         assertEquals(url, deletions.get(0).get(0));
@@ -174,7 +260,9 @@ class AbstractStatusUpdaterBoltTest {
     private static Map<String, Object> createConfig() {
         Map<String, Object> config = new HashMap<>();
         config.put(AbstractStatusUpdaterBolt.useCacheParamName, false);
-        config.put("scheduler.class", "org.apache.stormcrawler.persistence.DefaultScheduler");
+        config.put(
+                "scheduler.class",
+                "org.apache.stormcrawler.persistence.DefaultScheduler");
         return config;
     }
 
