@@ -209,6 +209,7 @@ The archetype includes a default link:https://github.com/apache/stormcrawler/blo
 }
 ----
 
+* **CanonicalParamLearner** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/CanonicalParamLearner.java[CanonicalParamLearner] compares the URL of a page with the value of its canonical tag to work out which of its query parameters are irrelevant, for the xref:internals.adoc#adaptivenormalizer[AdaptiveURLNormalizer] to remove. It must be declared after the filter extracting the canonical tag and does not modify the parse result.
 * **CommaSeparatedToMultivaluedMetadata** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/CommaSeparatedToMultivaluedMetadata.java[CommaSeparatedToMultivaluedMetadata] rewrites single metadata values containing comma-separated entries into multiple values for the same key, useful for keyword tags.
 * **DebugParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/DebugParseFilter.java[DebugParseFilter] dumps an XML representation of the DOM structure to a temporary file.
 * **DomainParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/DomainParseFilter.java[DomainParseFilter] stores the domain or host name in the metadata for later indexing.
@@ -249,37 +250,60 @@ The JSON configuration allows loading several instances of the same filtering cl
 
 ===== Built-in URL Filters
 
+[[adaptivenormalizer]]
 ====== Adaptive
-The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/adaptive/AdaptiveURLNormalizer.java[AdaptiveURLNormalizer] learns which query parameters can be removed from the URLs of a site by comparing the URL of each page with the value of its canonical tag.
+The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/adaptive/AdaptiveURLNormalizer.java[AdaptiveURLNormalizer] removes from the URLs of a site the query parameters which its canonical tags have shown to be irrelevant.
 
-When both point at the same resource - i.e. they have the same protocol, host, port and path - and differ only by their query string, the parameters dropped by the canonical are taken as evidence that they do not affect the content, whereas the ones kept by the canonical are evidence of the opposite. Once enough evidence has been gathered for a given parameter, it gets removed from the subsequent URLs of that site, which reduces the amount of duplicates fetched. The aim is similar to the _Clean-param_ extension of the robots protocol by Yandex, except that the rules are learnt instead of being declared by the site.
+When the URL of a page and the value of its canonical tag point at the same resource - i.e. they have the same protocol, host, port and path - and differ only by their query string, the parameters dropped by the canonical are taken as evidence that they do not affect the content, whereas the ones kept by the canonical are evidence of the opposite. Once enough evidence has been gathered for a given parameter, it gets removed from the subsequent URLs of that site, which reduces the amount of duplicates fetched. The aim is similar to the _Clean-param_ extension of the robots protocol by Yandex, except that the rules are learnt instead of being declared by the site.
 
-This filter requires the canonical tag to have been extracted into the metadata, for instance with an XPathFilter configured with `"canonical": "//*[@rel=\"canonical\"]/@href"`, and must therefore be placed in a parsing bolt. The evidence is kept in memory only: it is lost when the topology is restarted and is not shared between the instances of the bolt.
+*This filter does nothing on its own.* The parsing bolts filter the outlinks of a page _before_ running the filters which extract its canonical tag, so the canonical is never in the metadata passed to the URL filters. The evidence is therefore gathered by a companion parse filter, link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/CanonicalParamLearner.java[CanonicalParamLearner], which runs after the canonical has been extracted and shares its findings with the URL filter through a store named in the configuration of both. Three things are needed:
 
+. a filter extracting the canonical tag into the metadata. The archetype does this with the JSoup `XPathFilter` in `jsoupfilters.json`, which is always run before the parse filters:
++
+[source,json]
+----
+{
+    "class": "org.apache.stormcrawler.jsoup.XPathFilter",
+    "name": "XPathFilter",
+    "params": {
+        "canonical": "//*[@rel=\"canonical\"]/@href"
+    }
+}
+----
+. the learner, in `parsefilters.json`. If the canonical is extracted by the ParseFilter flavour of `XPathFilter` instead, the learner must be declared *after* it in that same file:
++
+[source,json]
+----
+{
+    "class": "org.apache.stormcrawler.parse.filter.CanonicalParamLearner",
+    "name": "CanonicalParamLearner",
+    "params": {
+        "store": "default"
+    }
+}
+----
+. the URL filter itself, in `urlfilters.json`:
++
 [source,json]
 ----
 {
     "class": "org.apache.stormcrawler.filtering.adaptive.AdaptiveURLNormalizer",
     "name": "AdaptiveURLNormalizer",
     "params": {
-        "canonicalMetadataKey": "canonical",
-        "scope": "host",
-        "minObservations": 5,
-        "confidenceThreshold": 0.9,
-        "maxScopes": 10000,
-        "maxParams": 100
+        "store": "default"
     }
 }
 ----
 
-All the parameters are optional:
+The `store` parameter is optional and defaults to _default_. Everything else is configured with the xref:configuration.adoc[standard configuration mechanism] rather than in the JSON files, so that the two sides cannot disagree. See the `adaptive.normalizer.*` options in the configuration reference.
 
-* `canonicalMetadataKey` - metadata key holding the value of the canonical tag, _canonical_ by default.
-* `scope` - whether the rules are learnt per _host_ (default) or per _domain_.
-* `minObservations` - number of pages a parameter must have been seen on before a rule can be applied to it, 5 by default.
-* `confidenceThreshold` - proportion of the canonical tags which must have dropped the parameter, 0.9 by default.
-* `maxScopes` - maximum number of hosts or domains tracked, 10000 by default.
-* `maxParams` - maximum number of parameters tracked per host or domain, 100 by default.
+By default a parameter must have been dropped by the canonical of at least 5 distinct pages spread over at least 3 distinct paths, and kept by fewer than 10% of them, before it is removed. The requirement on distinct paths guards against self-referencing canonicals, a common misconfiguration where every page of a listing declares the bare listing as canonical: taken at face value, `page` would be found irrelevant and the whole of the paginated content would be normalised away and never fetched. For the same reason, a list of parameter names which are never removed - `page`, `offset`, `q`, `sort`, `id` and similar - is applied on top and can be replaced with `adaptive.normalizer.protected.params`.
+
+Limitations worth knowing before enabling it:
+
+* The evidence is held in memory and is lost when the topology is restarted. It is shared by all the components of a worker but not between workers, so two workers may briefly normalise the same URL differently. Rules are only ever added and never withdrawn, so the workers converge as the crawl progresses.
+* A URL discovered before a rule was established keeps the form it was stored with; the status store is not rewritten retrospectively.
+* Nothing is learnt from a page whose canonical tag is missing, points at another resource, or which has no query string of its own.
 
 ====== Basic
 The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/basic/BasicURLFilter.java[BasicURLFilter] filters based on the length of the URL and the repetition of path elements.
