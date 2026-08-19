@@ -353,6 +353,7 @@ that is being calculated by a link:https://github.com/apache/stormcrawler/blob/m
 | max.fetch.errors | 3 | Maximum number of successive fetch errors before changing status to ERROR.
 | scheduler.class | org.apache.stormcrawler.persistence.DefaultScheduler | Scheduler implementation for computing next fetch dates. Use AdaptiveScheduler for change-rate-based intervals.
 | status.updater.cache.spec | maximumSize=10000, expireAfterAccess=1h | Cache specification for the status updater.
+| status.updater.delete.redirections | false | Whether to emit permanently redirected URLs (HTTP 301/308) on the deletion stream. Requires redirections.allowed.
 | status.updater.unit.round.date | SECOND | Unit for rounding the next fetch date. Can also be MINUTE or HOUR.
 | status.updater.use.cache | true | Whether to use cache to avoid re-persisting URLs.
 |===

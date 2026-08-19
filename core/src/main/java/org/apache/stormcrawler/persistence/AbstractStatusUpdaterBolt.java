@@ -71,8 +71,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
     public static String roundDateParamName = "status.updater.unit.round.date";
 
     /** Parameter name to enable deletion of URLs with permanent redirects. */
-    public static String deleteRedirectionsParamName =
-            "status.updater.delete.redirections";
+    public static String deleteRedirectionsParamName = "status.updater.delete.redirections";
 
     /**
      * Key used to pass a preset Date to use as nextFetchDate. The value must represent a valid
@@ -110,12 +109,9 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
         mdTransfer = MetadataTransfer.getInstance(stormConf);
 
         useCache = ConfUtils.getBoolean(stormConf, useCacheParamName, true);
-        deleteRedirections =
-                ConfUtils.getBoolean(stormConf, deleteRedirectionsParamName, false);
+        deleteRedirections = ConfUtils.getBoolean(stormConf, deleteRedirectionsParamName, false);
 
-        allowRedirs =
-                ConfUtils.getBoolean(
-                        stormConf, Constants.AllowRedirParamName, true);
+        allowRedirs = ConfUtils.getBoolean(stormConf, Constants.AllowRedirParamName, true);
 
         if (useCache) {
             String spec = ConfUtils.getString(stormConf, cacheConfigParamName);
