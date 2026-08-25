@@ -421,38 +421,36 @@ http.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProto
 https.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
 ----
 
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/httpclient/HttpProtocol.java[HttpClient] (*deprecated* — will be removed in the next major release; use OKHttp instead)
 * link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/okhttp/HttpProtocol.java[OKHttp]
 * link:https://github.com/apache/stormcrawler/blob/main/external/playwright/src/main/java/org/apache/stormcrawler/protocol/playwright/HttpProtocol.java[Playwright] (browser-based, in the `playwright` external module)
 
 ==== Feature grid
 
-[cols="2,1,1", options="header"]
+[cols="2,1", options="header"]
 |===
-| Features | HTTPClient | OKHttp
+| Features | OKHttp
 
-| Basic authentication | link:https://github.com/apache/stormcrawler/pull/589[Y] | link:https://github.com/apache/stormcrawler/issues/792[Y]
-| Proxy (w. credentials?) | Y / Y | Y / link:https://github.com/apache/stormcrawler/issues/751[Y]
-| Interruptible / trimmable link:https://github.com/apache/stormcrawler/issues/463[#463] | N / Y | Y / Y
-| Cookies | Y | link:https://github.com/apache/stormcrawler/issues/632[Y]
-| Response headers | Y | Y
-| Trust all certificates | N | link:https://github.com/apache/stormcrawler/issues/615[Y]
-| HEAD method | link:https://github.com/apache/stormcrawler/issues/485[Y] | link:https://github.com/apache/stormcrawler/pull/923[Y]
-| POST method | N | link:https://github.com/apache/stormcrawler/issues/641[Y]
-| Verbatim response header | link:https://github.com/apache/stormcrawler/issues/317[Y] | link:https://github.com/apache/stormcrawler/issues/506[Y]
-| Verbatim request header | N | link:https://github.com/apache/stormcrawler/issues/506[Y]
-| IP address capture | N | link:https://github.com/apache/stormcrawler/pull/691[Y]
-| Navigation and javascript | N | N
-| HTTP/2 | N | Y
-| Configurable connection pool | N | link:https://github.com/apache/stormcrawler/issues/918[Y]
+| Basic authentication | link:https://github.com/apache/stormcrawler/issues/792[Y]
+| Proxy (w. credentials?) | Y / link:https://github.com/apache/stormcrawler/issues/751[Y]
+| Interruptible / trimmable link:https://github.com/apache/stormcrawler/issues/463[#463] | Y / Y
+| Cookies | link:https://github.com/apache/stormcrawler/issues/632[Y]
+| Response headers | Y
+| Trust all certificates | link:https://github.com/apache/stormcrawler/issues/615[Y]
+| HEAD method | link:https://github.com/apache/stormcrawler/pull/923[Y]
+| POST method | link:https://github.com/apache/stormcrawler/issues/641[Y]
+| Verbatim response header | link:https://github.com/apache/stormcrawler/issues/506[Y]
+| Verbatim request header | link:https://github.com/apache/stormcrawler/issues/506[Y]
+| IP address capture | link:https://github.com/apache/stormcrawler/pull/691[Y]
+| Navigation and javascript | N
+| HTTP/2 | Y
+| Configurable connection pool | link:https://github.com/apache/stormcrawler/issues/918[Y]
 |===
 
-Neither of the HTTP clients executes JavaScript: use the browser-based link:https://github.com/apache/stormcrawler/tree/main/external/playwright[Playwright] protocol for pages that require rendering or navigation.
+The OKHttp client does not execute JavaScript: use the browser-based link:https://github.com/apache/stormcrawler/tree/main/external/playwright[Playwright] protocol for pages that require rendering or navigation.
 
 ==== HTTP/2
 
 * The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/okhttp/HttpProtocol.java[OKHttp] protocol supports link:https://en.wikipedia.org/wiki/HTTP/2[HTTP/2] if the JDK includes link:https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation[ALPN] (Java 9 and upwards or Java 8 builds starting early/mid 2020).
-* link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/protocol/httpclient/HttpProtocol.java[HttpClient] does not yet support HTTP/2.
 * link:https://github.com/apache/stormcrawler/blob/main/external/playwright/src/main/java/org/apache/stormcrawler/protocol/playwright/HttpProtocol.java[Playwright]: whether HTTP/2 is used or not depends on the browser.
 
 Since link:https://github.com/apache/stormcrawler/pull/829[#829], the HTTP protocol version used is configurable via `http.protocol.versions` (see also comments in link:https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml[crawler-default.yaml]).
@@ -479,7 +477,7 @@ The `metadata` argument to link:https://github.com/apache/stormcrawler/blob/main
 
 * `protocol.set-cookie`: If this key is present in `metadata` and `http.use.cookies` is true, the protocol will send cookies stored from the response this page was linked to, given the cookie is applicable to the domain of the link.
 
-* `http.method.head`: If this key is present in `metadata`, the protocol sends a HEAD request. (Available in v1.12+ only for httpclient, see link:https://github.com/apache/stormcrawler/issues/485[#485])
+* `http.method.head`: If this key is present in `metadata`, the protocol sends a HEAD request. (see link:https://github.com/apache/stormcrawler/pull/923[#923])
 
 * `http.post.json`: If this key is present in `metadata`, the protocol sends a POST request. (Available in v1.12+ only for okhttp, see link:https://github.com/apache/stormcrawler/issues/641[#641])
 

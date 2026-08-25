@@ -27,10 +27,6 @@ import org.junit.jupiter.api.Test;
 
 class DelegationProtocolTest {
 
-    private static final String OKHTTP = "org.apache.stormcrawler.protocol.okhttp.HttpProtocol";
-
-    private static final String APACHE = "org.apache.stormcrawler.protocol.httpclient.HttpProtocol";
-
     @Test
     void getProtocolTest() throws FileNotFoundException {
         Config conf = new Config();
