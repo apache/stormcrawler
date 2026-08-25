@@ -197,9 +197,6 @@ config:
   robots.error.cache.spec: "maximumSize=10000,expireAfterWrite=1h"
 
   protocols: "http,https,file"
-  # NOTE: the Apache HttpClient protocol implementation
-  # (org.apache.stormcrawler.protocol.httpclient.HttpProtocol) is deprecated and will be removed in
-  # the next major release of StormCrawler. OkHttp is now the default.
   http.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
   https.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
   file.protocol.implementation: "org.apache.stormcrawler.protocol.file.FileProtocol"

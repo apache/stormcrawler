@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.protocol.httpclient;
+package org.apache.stormcrawler.protocol.okhttp;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -26,8 +26,7 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.proxy.SingleProxyManager;
 import org.junit.jupiter.api.Test;
 
-@SuppressWarnings("deprecation")
-class HttpClientProtocolProxyManagerTest {
+class HttpProtocolProxyManagerTest {
 
     @Test
     void omittedProxyManagerWithoutProxyHostDoesNotCreateDefaultManager() {
