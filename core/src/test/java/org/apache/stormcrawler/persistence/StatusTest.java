@@ -17,30 +17,26 @@
 
 package org.apache.stormcrawler.persistence;
 
-public enum Status {
-    DISCOVERED,
-    FETCHED,
-    FETCH_ERROR,
-    REDIRECTION,
-    ERROR;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-    /** Maps the HTTP Code to FETCHED, FETCH_ERROR or REDIRECTION. */
-    public static Status fromHTTPCode(int code) {
-        if (code == 200) {
-            return Status.FETCHED;
-        } else if (code == 304) {
-            return Status.FETCHED;
-        }
-        // REDIRS?
-        if (code >= 300 && code < 400) {
-            return Status.REDIRECTION;
-        }
-        // error otherwise
-        return Status.FETCH_ERROR;
+import org.junit.jupiter.api.Test;
+
+class StatusTest {
+
+    @Test
+    void testPermanentRedirects() {
+        assertTrue(Status.isPermanentRedirect(301));
+        assertTrue(Status.isPermanentRedirect(308));
     }
 
-    /** Returns true if the HTTP code indicates a permanent redirect. */
-    public static boolean isPermanentRedirect(int code) {
-        return code == 301 || code == 308;
+    @Test
+    void testNonPermanentRedirects() {
+        assertFalse(Status.isPermanentRedirect(300));
+        assertFalse(Status.isPermanentRedirect(302));
+        assertFalse(Status.isPermanentRedirect(303));
+        assertFalse(Status.isPermanentRedirect(307));
+        assertFalse(Status.isPermanentRedirect(200));
+        assertFalse(Status.isPermanentRedirect(404));
     }
 }

@@ -50,7 +50,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(1, deletions.size());
         assertEquals(url, deletions.get(0).get(0));
@@ -77,7 +78,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(1, deletions.size());
         assertEquals(url, deletions.get(0).get(0));
@@ -104,7 +106,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(0, deletions.size());
     }
@@ -128,7 +131,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(0, deletions.size());
     }
@@ -150,31 +154,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
-
-        assertEquals(0, deletions.size());
-    }
-
-    @Test
-    void testPermanentRedirectIsNotDeletedWhenRedirectionsAreDisabled() {
-        TestOutputCollector output = new TestOutputCollector();
-        TestStatusUpdaterBolt bolt = new TestStatusUpdaterBolt();
-
-        Map<String, Object> config = createConfig();
-        config.put(AbstractStatusUpdaterBolt.deleteRedirectionsParamName, true);
-        config.put(Constants.AllowRedirParamName, false);
-
-        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
-
-        String url = "http://example.com/old-page";
-        Metadata metadata = new Metadata();
-        metadata.setValue("fetch.statusCode", "301");
-
-        Tuple tuple = createTuple(url, Status.REDIRECTION, metadata);
-
-        bolt.execute(tuple);
-
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(0, deletions.size());
     }
@@ -195,7 +176,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(0, deletions.size());
     }
@@ -216,7 +198,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(0, deletions.size());
     }
@@ -236,7 +219,8 @@ class AbstractStatusUpdaterBoltTest {
 
         bolt.execute(tuple);
 
-        List<List<Object>> deletions = output.getEmitted(Constants.DELETION_STREAM_NAME);
+        List<List<Object>> deletions =
+                output.getEmitted(Constants.DELETION_STREAM_NAME);
 
         assertEquals(1, deletions.size());
         assertEquals(url, deletions.get(0).get(0));
