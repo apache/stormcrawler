@@ -20,6 +20,8 @@ package org.apache.stormcrawler.protocol;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.configureFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 
@@ -29,6 +31,7 @@ import com.github.tomakehurst.wiremock.core.Options;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import crawlercommons.robots.BaseRobotRules;
 import org.apache.storm.Config;
+import org.apache.stormcrawler.protocol.okhttp.HttpProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +47,7 @@ class HttpRobotRulesParserRedirectTest {
 
     private String body;
 
+    private String url0 = "http://localhost:" + ports[0];
     private String url1 = "http://localhost:" + ports[1];
     private String url7 = "http://localhost:" + ports[7];
     private String url8 = "http://localhost:" + ports[8];
@@ -106,6 +110,10 @@ class HttpRobotRulesParserRedirectTest {
 
     @Test
     void testRedirects() {
+        // the redirect chains tested here point at other ports of the same host
+        Config crossOriginConf = new Config();
+        crossOriginConf.putAll(conf);
+        crossOriginConf.put("http.robots.redirect.crossorigin.allow", true);
         // Test for 5 consecutive redirects
         configureFor(mockServer1.getClient());
         stubFor(
@@ -162,7 +170,7 @@ class HttpRobotRulesParserRedirectTest {
                 get(urlPathEqualTo("/robots.txt"))
                         .willReturn(aResponse().withBody(body).withStatus(200)));
         HttpRobotRulesParser httpRobotRulesParser = new HttpRobotRulesParser();
-        httpRobotRulesParser.setConf(conf);
+        httpRobotRulesParser.setConf(crossOriginConf);
         BaseRobotRules robotRules = httpRobotRulesParser.getRobotRulesSet(protocol, url1);
         Assertions.assertFalse(robotRules.isAllowAll());
         Assertions.assertFalse(robotRules.isAllowNone());
@@ -178,7 +186,7 @@ class HttpRobotRulesParserRedirectTest {
                                         .withBody(body)
                                         .withStatus(301)));
         httpRobotRulesParser = new HttpRobotRulesParser();
-        httpRobotRulesParser.setConf(conf);
+        httpRobotRulesParser.setConf(crossOriginConf);
         robotRules = httpRobotRulesParser.getRobotRulesSet(protocol, url1);
         Assertions.assertTrue(robotRules.isAllowAll());
         // Test relative redirects
@@ -212,7 +220,7 @@ class HttpRobotRulesParserRedirectTest {
                                         .withStatus(302)));
         // from here the redirect leads to the same robots.txt as in the first test block
         httpRobotRulesParser = new HttpRobotRulesParser();
-        httpRobotRulesParser.setConf(conf);
+        httpRobotRulesParser.setConf(crossOriginConf);
         robotRules = httpRobotRulesParser.getRobotRulesSet(protocol, url7);
         Assertions.assertFalse(robotRules.isAllowAll());
         Assertions.assertFalse(robotRules.isAllowNone());
@@ -231,6 +239,82 @@ class HttpRobotRulesParserRedirectTest {
         Assertions.assertFalse(robotRules.isAllowNone());
         Assertions.assertTrue(robotRules.isAllowed(url1 + "/index.html"));
         Assertions.assertFalse(robotRules.isAllowed(url1 + "/restricted/index.html"));
+    }
+
+    @Test
+    void testRedirectOnTheSameAuthorityIsFollowedByDefault() {
+        configureFor(mockServer0.getClient());
+        stubFor(
+                get(urlPathEqualTo("/robots.txt"))
+                        .willReturn(
+                                aResponse()
+                                        .withHeader("location", "/robots/rules.txt")
+                                        .withStatus(301)));
+        stubFor(
+                get(urlPathEqualTo("/robots/rules.txt"))
+                        .willReturn(aResponse().withBody(body).withStatus(200)));
+        HttpRobotRulesParser httpRobotRulesParser = new HttpRobotRulesParser();
+        httpRobotRulesParser.setConf(conf);
+        BaseRobotRules robotRules = httpRobotRulesParser.getRobotRulesSet(protocol, url0);
+        Assertions.assertFalse(robotRules.isAllowAll());
+        Assertions.assertFalse(robotRules.isAllowNone());
+        Assertions.assertTrue(robotRules.isAllowed(url0 + "/index.html"));
+        Assertions.assertFalse(robotRules.isAllowed(url0 + "/restricted/index.html"));
+    }
+
+    @Test
+    void testRedirectToAnotherAuthorityIsNotFollowedByDefault() {
+        configureFor(mockServer0.getClient());
+        stubFor(
+                get(urlPathEqualTo("/robots.txt"))
+                        .willReturn(
+                                aResponse()
+                                        .withHeader("location", url1 + "/robots.txt")
+                                        .withStatus(301)));
+        configureFor(mockServer1.getClient());
+        stubFor(
+                get(urlPathEqualTo("/robots.txt"))
+                        .willReturn(aResponse().withBody(body).withStatus(200)));
+        HttpRobotRulesParser httpRobotRulesParser = new HttpRobotRulesParser();
+        httpRobotRulesParser.setConf(conf);
+        BaseRobotRules robotRules = httpRobotRulesParser.getRobotRulesSet(protocol, url0);
+        mockServer1.verify(0, getRequestedFor(urlPathEqualTo("/robots.txt")));
+        Assertions.assertTrue(robotRules.isAllowNone());
+    }
+
+    @Test
+    void testHeadersNotSentToAnUnfollowedRedirectTarget() {
+        Config authConf = new Config();
+        authConf.putAll(conf);
+        authConf.put("http.basicauth.user", "this_is_only_a_test");
+        authConf.put("http.basicauth.password", "this_is_only_a_test");
+        HttpProtocol authProtocol = new HttpProtocol();
+        authProtocol.configure(authConf);
+        try {
+            configureFor(mockServer0.getClient());
+            stubFor(
+                    get(urlPathEqualTo("/robots.txt"))
+                            .willReturn(
+                                    aResponse()
+                                            .withHeader("location", url1 + "/robots.txt")
+                                            .withStatus(301)));
+            configureFor(mockServer1.getClient());
+            stubFor(
+                    get(urlPathEqualTo("/robots.txt"))
+                            .willReturn(aResponse().withBody(body).withStatus(200)));
+            HttpRobotRulesParser httpRobotRulesParser = new HttpRobotRulesParser();
+            httpRobotRulesParser.setConf(authConf);
+            httpRobotRulesParser.getRobotRulesSet(authProtocol, url0);
+            // the configured Authorization header is sent to the host the robots.txt belongs to
+            mockServer0.verify(
+                    1,
+                    getRequestedFor(urlPathEqualTo("/robots.txt"))
+                            .withHeader("Authorization", matching("Basic .+")));
+            // the target of the redirect is on another port and is not contacted at all
+            mockServer1.verify(0, getRequestedFor(urlPathEqualTo("/robots.txt")));
+        } finally {
+            authProtocol.cleanup();
+        }
     }
 
     private static class MockServer extends WireMockServer {

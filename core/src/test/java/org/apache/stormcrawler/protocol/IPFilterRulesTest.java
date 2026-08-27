@@ -64,6 +64,23 @@ class IPFilterRulesTest {
     }
 
     @Test
+    void excludeLinklocal() {
+        IPFilterRules r = rules(null, "linklocal");
+        assertFalse(r.isEmpty());
+        assertFalse(r.accept(ip("169.254.169.254")));
+        assertFalse(r.accept(ip("fe80::1")));
+        assertTrue(r.accept(ip("8.8.8.8")));
+    }
+
+    @Test
+    void linklocalIsCoveredByNeitherLoopbackNorSitelocal() {
+        IPFilterRules r = rules(null, "localhost,sitelocal");
+        assertTrue(
+                r.accept(ip("169.254.169.254")),
+                "a link-local address needs the linklocal rule of its own");
+    }
+
+    @Test
     void excludeAsYamlList() {
         IPFilterRules r = rules(null, Arrays.asList("loopback", "192.168.0.0/16"));
         assertFalse(r.accept(ip("127.0.0.1")));

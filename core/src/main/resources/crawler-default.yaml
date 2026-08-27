@@ -156,16 +156,33 @@ config:
   #   - a CIDR block, e.g. "192.168.0.0/16" or "fd00::/8"
   #   - "localhost" / "loopback" (matches InetAddress.isLoopbackAddress())
   #   - "sitelocal" (matches InetAddress.isSiteLocalAddress())
+  #   - "linklocal" (matches InetAddress.isLinkLocalAddress())
   # Only addresses matching an include rule are fetched (empty means all are
   # allowed), addresses matching an exclude rule are always blocked.
   # http.filter.ipaddress.include:
-  # http.filter.ipaddress.exclude: "localhost,sitelocal"
+  # http.filter.ipaddress.exclude: "localhost,sitelocal,linklocal"
 
   # Allow all if robots.txt cannot be parsed due to code 403 (Forbidden):
   http.robots.403.allow: true
 
   # Allow all if robots.txt cannot be parsed due to a server error (5xx):
   http.robots.5xx.allow: false
+
+  # Follow a robots.txt redirect whose target is on a different scheme, host or
+  # port than the URL it was reached from? Redirects to schemes other than http
+  # and https are never followed. A redirect which only replaces http with https
+  # while staying on the same host and port is always followed, whatever this is
+  # set to. When this is enabled, the robots.txt is re-fetched from the host
+  # named in the Location header, for up to 5 hops, and each of these requests
+  # carries the headers configured through http.basicauth.* and
+  # http.custom.headers as any other request does; http.filter.ipaddress.exclude
+  # can be used to restrict the addresses those fetches may reach.
+  http.robots.redirect.crossorigin.allow: false
+
+  # Allow all if a robots.txt redirect was not followed because of the setting
+  # above? If false, nothing is crawled on that host until the redirect is
+  # followed or this is set to true.
+  http.robots.redirect.refused.allow: false
 
   # ignore directives from robots.txt files?
   http.robots.file.skip: false
