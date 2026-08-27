@@ -155,13 +155,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
             return;
         }
 
-        final StringBuilder mdAsString = new StringBuilder();
-        for (String mdKey : metadata.keySet()) {
-            String[] vals = metadata.getValues(mdKey);
-            for (String v : vals) {
-                mdAsString.append("\t").append(mdKey).append("=").append(v);
-            }
-        }
+        final String mdAsString = MetadataColumn.encode(metadata);
 
         int partition = 0;
         String partitionKey = partitioner.getPartition(url, metadata);
@@ -213,7 +207,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
             final String url,
             final Status status,
             final Optional<Date> nextFetch,
-            final StringBuilder mdAsString,
+            final String mdAsString,
             final int partition,
             final String partitionKey,
             final PreparedStatement preparedStmt)
@@ -227,7 +221,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
             // a value so large it means it will never be refetched
             preparedStmt.setObject(3, NEVER);
         }
-        preparedStmt.setString(4, mdAsString.toString());
+        preparedStmt.setString(4, mdAsString);
         preparedStmt.setInt(5, partition);
         preparedStmt.setString(6, partitionKey);
     }

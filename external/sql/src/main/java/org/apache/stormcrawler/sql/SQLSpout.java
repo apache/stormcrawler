@@ -17,33 +17,26 @@
 
 package org.apache.stormcrawler.sql;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import org.apache.storm.spout.Scheme;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
-import org.apache.stormcrawler.Metadata;
+import org.apache.storm.tuple.Fields;
 import org.apache.stormcrawler.persistence.AbstractQueryingSpout;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.apache.stormcrawler.util.StringTabScheme;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SQLSpout extends AbstractQueryingSpout {
 
     public static final Logger LOG = LoggerFactory.getLogger(SQLSpout.class);
-
-    private static final Scheme SCHEME = new StringTabScheme();
 
     private static final String BASE_SQL =
             """
@@ -137,7 +130,7 @@ public class SQLSpout extends AbstractQueryingSpout {
 
     @Override
     public void declareOutputFields(OutputFieldsDeclarer declarer) {
-        declarer.declare(SCHEME.getOutputFields());
+        declarer.declare(new Fields("url", "metadata"));
     }
 
     @Override
@@ -235,14 +228,7 @@ public class SQLSpout extends AbstractQueryingSpout {
             return 1;
         }
 
-        final String normalisedMetadata =
-                (metadata == null || metadata.startsWith("\t")) ? metadata : "\t" + metadata;
-
-        final String urlWithMetadata = String.format(Locale.ROOT, "%s%s", url, normalisedMetadata);
-        final List<Object> v =
-                SCHEME.deserialize(
-                        ByteBuffer.wrap(urlWithMetadata.getBytes(StandardCharsets.UTF_8)));
-        buffer.add(url, (Metadata) v.get(1));
+        buffer.add(url, MetadataColumn.decode(metadata));
 
         return 0;
     }
