@@ -73,7 +73,9 @@ config:
 
   # Lists the metadata to transfer to outlinks
   # Used by Fetcher and SiteMapParser for redirections,
-  # discovered links, passing cookies to child pages, etc.
+  # discovered links, passing cookies to child pages
+  # (protocol.set-cookie and protocol.set-cookie-origin,
+  # which have to be transferred together), etc.
   # These are also persisted for the parent document (see below).
   # Allows wildcards, eg. "follow.*" transfers all metadata starting with "follow.".
   # metadata.transfer:

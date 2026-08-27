@@ -224,7 +224,7 @@ implementation.
 | robots.noFollow.strict | true | If true, remove all outlinks from pages marked as noFollow.
 | http.store.headers | false | Whether to store response headers.
 | http.timeout | 10000 | Connection timeout (ms).
-| http.use.cookies | false | Use cookies in subsequent requests.
+| http.use.cookies | false | Use cookies in subsequent requests. Requires `protocol.set-cookie` and `protocol.set-cookie-origin` in `metadata.transfer`.
 | https.protocol.implementation | org.apache.stormcrawler.protocol.okhttp.HttpProtocol | HTTPS Protocol
 implementation.
 | partition.url.mode | byHost | Defines how URLs are partitioned: byHost, byDomain, or byIP.

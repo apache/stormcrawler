@@ -55,6 +55,44 @@ class MetadataTransferTest {
     }
 
     @Test
+    void testCookieTransfer() throws MalformedURLException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(
+                MetadataTransfer.metadataTransferParamName,
+                List.of("protocol.set-cookie", "protocol.set-cookie-origin"));
+        Metadata parentMD = new Metadata();
+        parentMD.addValue("protocol.set-cookie", "sid=42; Path=/");
+        parentMD.addValue("protocol.set-cookie-origin", "http://www.example.com");
+        Metadata outlinkMD =
+                MetadataTransfer.getInstance(conf)
+                        .getMetaForOutlink(
+                                "http://www.example.com/outlink.html",
+                                "http://www.example.com",
+                                parentMD);
+        Assertions.assertEquals("sid=42; Path=/", outlinkMD.getFirstValue("protocol.set-cookie"));
+        Assertions.assertEquals(
+                "http://www.example.com", outlinkMD.getFirstValue("protocol.set-cookie-origin"));
+    }
+
+    @Test
+    void testCookieTransferWithWildcard() throws MalformedURLException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(MetadataTransfer.metadataTransferParamName, List.of("protocol.set-cookie*"));
+        Metadata parentMD = new Metadata();
+        parentMD.addValue("protocol.set-cookie", "sid=42; Path=/");
+        parentMD.addValue("protocol.set-cookie-origin", "http://www.example.com");
+        Metadata outlinkMD =
+                MetadataTransfer.getInstance(conf)
+                        .getMetaForOutlink(
+                                "http://www.example.com/outlink.html",
+                                "http://www.example.com",
+                                parentMD);
+        Assertions.assertEquals("sid=42; Path=/", outlinkMD.getFirstValue("protocol.set-cookie"));
+        Assertions.assertEquals(
+                "http://www.example.com", outlinkMD.getFirstValue("protocol.set-cookie-origin"));
+    }
+
+    @Test
     void testCustomTransferClass() throws MalformedURLException {
         Map<String, Object> conf = new HashMap<>();
         conf.put(MetadataTransfer.metadataTransferClassParamName, "thisclassnameWillNEVERexist");

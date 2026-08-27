@@ -70,6 +70,13 @@ public abstract class AbstractHttpProtocol implements Protocol {
 
     protected static final String RESPONSE_COOKIES_HEADER = "set-cookie";
 
+    /**
+     * Metadata key holding the url whose response carried the cookies stored under {@link
+     * #RESPONSE_COOKIES_HEADER}. It is written by the protocol and not taken from a response
+     * header, and is used to scope cookies without a domain attribute to the host which set them.
+     */
+    protected static final String RESPONSE_COOKIES_ORIGIN = "set-cookie-origin";
+
     protected static final String SET_HEADER_BY_REQUEST = "set-header";
 
     protected String protocolMetadataPrefix = "";

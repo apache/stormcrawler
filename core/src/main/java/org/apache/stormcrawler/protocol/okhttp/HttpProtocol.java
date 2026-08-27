@@ -23,6 +23,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.Proxy;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
@@ -102,6 +104,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     // track the time spent for each URL in DNS resolution
     private final Map<String, Long> DNStimes = new ConcurrentHashMap<>();
+
+    // makes sure that a missing cookie origin is reported once and not for every url
+    private final AtomicBoolean missingCookieOriginLogged = new AtomicBoolean();
 
     private OkHttpClient.Builder builder;
 
@@ -287,11 +292,48 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
         try {
             final List<Cookie> cookies =
-                    CookieConverter.getCookies(cookieStrings, URLUtil.toURL(url));
+                    CookieConverter.getCookies(
+                            cookieStrings, getCookieOrigin(md, url), URLUtil.toURL(url));
             for (Cookie c : cookies) {
                 rb.addHeader("Cookie", c.getName() + "=" + c.getValue());
             }
         } catch (MalformedURLException e) { // Bad url , nothing to do
+        }
+    }
+
+    /**
+     * Returns the url whose response set the cookies, or null when it was not recorded, in which
+     * case cookies without a domain attribute are not sent.
+     */
+    private URL getCookieOrigin(Metadata md, String url) {
+        final String origin = md.getFirstValue(RESPONSE_COOKIES_ORIGIN, protocolMetadataPrefix);
+        if (StringUtils.isBlank(origin)) {
+            if (missingCookieOriginLogged.compareAndSet(false, true)) {
+                LOG.warn(
+                        "No {}{} for {}, cookies without a domain attribute are not sent. Add {}{}"
+                                + " to metadata.transfer and metadata.persist next to {}{}.",
+                        protocolMetadataPrefix,
+                        RESPONSE_COOKIES_ORIGIN,
+                        url,
+                        protocolMetadataPrefix,
+                        RESPONSE_COOKIES_ORIGIN,
+                        protocolMetadataPrefix,
+                        RESPONSE_COOKIES_HEADER);
+            } else {
+                LOG.debug("No {}{} for {}", protocolMetadataPrefix, RESPONSE_COOKIES_ORIGIN, url);
+            }
+            return null;
+        }
+        try {
+            return URLUtil.toURL(origin);
+        } catch (MalformedURLException e) {
+            LOG.warn(
+                    "Invalid {}{} {} for {}",
+                    protocolMetadataPrefix,
+                    RESPONSE_COOKIES_ORIGIN,
+                    origin,
+                    url);
+            return null;
         }
     }
 
@@ -443,6 +485,16 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 }
 
                 responsemetadata.addValue(key.toLowerCase(Locale.ROOT), value);
+            }
+
+            // the Set-Cookie header does not say which host sent it: record the url of this
+            // response so that the cookies can be scoped to it when they are sent back. The
+            // key is dropped first so that a server sending a header of that name can not
+            // forge the origin of the cookies inherited from another page.
+            responsemetadata.remove(RESPONSE_COOKIES_ORIGIN);
+            if (responsemetadata.getFirstValue(RESPONSE_COOKIES_HEADER) != null) {
+                responsemetadata.setValue(
+                        RESPONSE_COOKIES_ORIGIN, response.request().url().toString());
             }
 
             final MutableObject<TrimmedContentReason> trimmed =
