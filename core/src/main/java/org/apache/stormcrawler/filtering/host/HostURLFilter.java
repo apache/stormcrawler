@@ -62,7 +62,7 @@ public class HostURLFilter extends URLFilter {
         // always the same
         if (!ignoreOutsideHost) {
             JsonNode filterByDomainNode = filterParams.get("ignoreOutsideDomain");
-            if (filterByHostNode == null) {
+            if (filterByDomainNode == null) {
                 ignoreOutsideDomain = false;
             } else {
                 ignoreOutsideDomain = filterByDomainNode.asBoolean(false);

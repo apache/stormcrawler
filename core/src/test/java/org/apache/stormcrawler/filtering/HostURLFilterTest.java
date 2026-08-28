@@ -36,10 +36,14 @@ import org.junit.jupiter.api.Test;
 class HostURLFilterTest {
 
     private HostURLFilter createFilter(boolean ignoreOutsideHost, boolean ignoreOutsideDomain) {
-        HostURLFilter filter = new HostURLFilter();
         ObjectNode filterParams = new ObjectNode(JsonNodeFactory.instance);
         filterParams.put("ignoreOutsideHost", Boolean.valueOf(ignoreOutsideHost));
         filterParams.put("ignoreOutsideDomain", Boolean.valueOf(ignoreOutsideDomain));
+        return createFilter(filterParams);
+    }
+
+    private HostURLFilter createFilter(ObjectNode filterParams) {
+        HostURLFilter filter = new HostURLFilter();
         Map<String, Object> conf = new HashMap<>();
         filter.configure(conf, filterParams);
         return filter;
@@ -107,5 +111,36 @@ class HostURLFilterTest {
         filterResult =
                 allAllowed.filter(sourceURL, metadata, "http://sub.sourcedomain.com/index.html");
         Assertions.assertEquals("http://sub.sourcedomain.com/index.html", filterResult);
+    }
+
+    /** The two modes are independent, so ignoreOutsideDomain must be honoured on its own. */
+    @Test
+    void testWithinDomainWithoutHostParameter() throws MalformedURLException {
+        ObjectNode filterParams = new ObjectNode(JsonNodeFactory.instance);
+        filterParams.put("ignoreOutsideDomain", Boolean.TRUE);
+        HostURLFilter withinDomain = createFilter(filterParams);
+        URL sourceURL = URLUtil.toURL("http://www.sourcedomain.com/index.html");
+        Metadata metadata = new Metadata();
+        String filterResult =
+                withinDomain.filter(sourceURL, metadata, "http://sub.sourcedomain.com/index.html");
+        Assertions.assertEquals("http://sub.sourcedomain.com/index.html", filterResult);
+        filterResult =
+                withinDomain.filter(sourceURL, metadata, "http://www.anotherDomain.com/index.html");
+        Assertions.assertNull(filterResult);
+    }
+
+    /**
+     * A configuration which sets ignoreOutsideHost only must not fail on the missing domain key.
+     */
+    @Test
+    void testHostParameterWithoutDomainParameter() throws MalformedURLException {
+        ObjectNode filterParams = new ObjectNode(JsonNodeFactory.instance);
+        filterParams.put("ignoreOutsideHost", Boolean.FALSE);
+        HostURLFilter allAllowed = createFilter(filterParams);
+        URL sourceURL = URLUtil.toURL("http://www.sourcedomain.com/index.html");
+        Metadata metadata = new Metadata();
+        String filterResult =
+                allAllowed.filter(sourceURL, metadata, "http://www.anotherDomain.com/index.html");
+        Assertions.assertEquals("http://www.anotherDomain.com/index.html", filterResult);
     }
 }
