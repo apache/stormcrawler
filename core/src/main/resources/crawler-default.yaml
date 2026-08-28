@@ -304,6 +304,10 @@ config:
   # Can also take "MINUTE" or "HOUR"
   status.updater.unit.round.date: "SECOND"
 
+  # Emit permanently redirected URLs (HTTP 301/308) on the deletion stream
+  # so that they can be removed from the index. Requires redirections.allowed.
+  status.updater.delete.redirections: false
+
   # configuration for the classes extending AbstractIndexerBolt
   # indexer.md.filter: "someKey=aValue"
   indexer.md.docid: ""

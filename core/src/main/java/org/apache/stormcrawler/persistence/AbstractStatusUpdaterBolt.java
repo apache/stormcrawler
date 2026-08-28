@@ -70,6 +70,10 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
      */
     public static String roundDateParamName = "status.updater.unit.round.date";
 
+    /** Parameter name to enable deletion of URLs with permanent redirects. */
+    public static String deleteRedirectionsParamName =
+            "status.updater.delete.redirections";
+
     /**
      * Key used to pass a preset Date to use as nextFetchDate. The value must represent a valid
      * instant in UTC and be parsable using {@link DateTimeFormatter#ISO_INSTANT}. This also
@@ -93,6 +97,8 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
 
     private int roundDateUnit = Calendar.SECOND;
 
+    private boolean deleteRedirections = false;
+
     @Override
     public void prepare(
             Map<String, Object> stormConf, TopologyContext context, OutputCollector collector) {
@@ -103,6 +109,8 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
         mdTransfer = MetadataTransfer.getInstance(stormConf);
 
         useCache = ConfUtils.getBoolean(stormConf, useCacheParamName, true);
+        deleteRedirections =
+                ConfUtils.getBoolean(stormConf, deleteRedirectionsParamName, false);
 
         if (useCache) {
             String spec = ConfUtils.getString(stormConf, cacheConfigParamName);
@@ -118,6 +126,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
                         return v;
                     },
                     30);
+
             CrawlerMetrics.registerGauge(
                     context,
                     stormConf,
@@ -128,6 +137,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
                         return v;
                     },
                     30);
+
             CrawlerMetrics.registerGauge(
                     context, stormConf, "cache.size", cache::estimatedSize, 30);
         }
@@ -156,7 +166,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
         // store it again
         if (potentiallyNew && useCache) {
             if (cache.getIfPresent(url) != null) {
-                // no need to add it to the queue
+                // no need to add the URL to the queue
                 LOG.debug("URL {} already in cache", url);
                 cacheHits++;
                 collector.ack(tuple);
@@ -175,7 +185,12 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
         if (dateInMetadata != null) {
             Date nextFetch = Date.from(Instant.parse(dateInMetadata));
             try {
-                store(url, status, mdTransfer.filter(metadata), Optional.of(nextFetch), tuple);
+                store(
+                        url,
+                        status,
+                        mdTransfer.filter(metadata),
+                        Optional.of(nextFetch),
+                        tuple);
                 return;
             } catch (Exception e) {
                 LOG.error("Exception caught when storing", e);
@@ -205,7 +220,8 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
                 status = Status.ERROR;
                 metadata.setValue(Constants.STATUS_ERROR_CAUSE, "maxFetchErrors");
             } else {
-                metadata.setValue(Constants.fetchErrorCountParamName, Integer.toString(count));
+                metadata.setValue(
+                        Constants.fetchErrorCountParamName, Integer.toString(count));
             }
         }
 
@@ -214,22 +230,39 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
         if (!status.equals(Status.FETCH_ERROR)) {
             metadata.remove(Constants.fetchErrorCountParamName);
         }
+
         // https://github.com/apache/stormcrawler/issues/415
         // remove error related key values in case of success
         if (status.equals(Status.FETCHED) || status.equals(Status.REDIRECTION)) {
             metadata.remove(Constants.STATUS_ERROR_CAUSE);
             metadata.remove(Constants.STATUS_ERROR_MESSAGE);
             metadata.remove(Constants.STATUS_ERROR_SOURCE);
-        } else if (status == Status.ERROR) {
+        }
+
+        if (status == Status.ERROR) {
             // gone? notify any deleters. Doesn't need to be anchored
             collector.emit(Constants.DELETION_STREAM_NAME, new Values(url, metadata));
+        } else if (status == Status.REDIRECTION && deleteRedirections) {
+            String statusCode = metadata.getFirstValue("fetch.statusCode");
+
+            if (statusCode != null) {
+                try {
+                    // Delete URLs that have been permanently redirected.
+                    if (Status.isPermanentRedirect(Integer.parseInt(statusCode))) {
+                        collector.emit(
+                                Constants.DELETION_STREAM_NAME, new Values(url, metadata));
+                    }
+                } catch (NumberFormatException e) {
+                    LOG.debug("Invalid HTTP status code: {}", statusCode);
+                }
+            }
         }
 
         // determine the value of the next fetch based on the status
         Optional<Date> nextFetch = scheduler.schedule(status, metadata);
 
-        // filter metadata just before storing it, so that non-persisted
-        // metadata is available to fetch schedulers
+        // filter metadata just before storing it, so that non-persisted metadata is available
+        // to fetch schedulers
         metadata = mdTransfer.filter(metadata);
 
         // round next fetch date - unless it is never
