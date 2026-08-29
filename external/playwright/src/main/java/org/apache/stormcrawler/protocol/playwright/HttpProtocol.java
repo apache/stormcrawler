@@ -227,6 +227,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                                         (k, v) -> {
                                                             responseMetaData.addValue(k, v);
                                                         });
+                                        recordCookieOrigin(responseMetaData, url);
                                         storeVerbatimHeaders(response, responseMetaData);
                                     }
                                 }
@@ -271,6 +272,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                         (k, v) -> {
                                             responseMetaData.addValue(k, v);
                                         });
+                        recordCookieOrigin(responseMetaData, url);
                         storeVerbatimHeaders(response, responseMetaData);
 
                         int httpStatus = response.status();
@@ -327,6 +329,22 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Records the url of the response which carried the cookies, as the Set-Cookie header does not
+     * say which host sent it and the cookies are scoped to that host when they are sent back. The
+     * key is always removed first, so that a response sending a header of that name can not choose
+     * the host its cookies are sent to.
+     *
+     * @param responseMetaData the metadata built from the response headers
+     * @param url the url of the response
+     */
+    private static void recordCookieOrigin(final Metadata responseMetaData, final String url) {
+        responseMetaData.remove(RESPONSE_COOKIES_ORIGIN);
+        if (responseMetaData.getFirstValue(RESPONSE_COOKIES_HEADER) != null) {
+            responseMetaData.setValue(RESPONSE_COOKIES_ORIGIN, url);
         }
     }
 

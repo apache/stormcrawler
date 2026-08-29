@@ -475,7 +475,9 @@ The `metadata` argument to link:https://github.com/apache/stormcrawler/blob/main
 
 * `http.accept.language`: If this key is present in `metadata`, the protocol will use the value to override the value for the `Accept-Language` header field of the HTTP request. If the key is not present, the `http.accept.language` global configuration value is used instead. (Available in v1.11+)
 
-* `protocol.set-cookie`: If this key is present in `metadata` and `http.use.cookies` is true, the protocol will send cookies stored from the response this page was linked to, given the cookie is applicable to the domain of the link.
+* `protocol.set-cookie`: If this key is present in `metadata` and `http.use.cookies` is true, the protocol sends the cookies stored from the response this page was linked to, given the cookie applies to the url being fetched. A cookie without a `Domain` attribute is only sent when the url has the same host as the response which set it, which requires `protocol.set-cookie-origin` to be present too.
+
+* `protocol.set-cookie-origin`: Written by the protocol next to `protocol.set-cookie` when a response carries a `Set-Cookie` header, and holds the url of that response. It must be transferred and persisted together with `protocol.set-cookie`, otherwise cookies without a `Domain` attribute are not sent. A value sent by a server as a header of that name is discarded.
 
 * `http.method.head`: If this key is present in `metadata`, the protocol sends a HEAD request. (see link:https://github.com/apache/stormcrawler/pull/923[#923])
 
@@ -510,13 +512,17 @@ metadata.persist:
   - last-modified
   - protocol.etag
   - protocol.set-cookie
+  - protocol.set-cookie-origin
   - ...
 ----
 
-* Cookies need to be transferred to outlinks by setting:
+* Cookies and the host which set them need to be transferred to outlinks by setting:
 
 [source,yaml]
 ----
 metadata.transfer:
-  - set-cookie
+  - protocol.set-cookie
+  - protocol.set-cookie-origin
 ----
+
+The wildcard `protocol.set-cookie*` covers both keys.
