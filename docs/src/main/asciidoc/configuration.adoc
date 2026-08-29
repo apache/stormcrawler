@@ -220,6 +220,8 @@ implementation.
 | http.robots.file.skip | false | Ignore robots.txt rules entirely.
 | http.robots.headers.skip | false | Ignore robots directives from HTTP headers.
 | http.robots.meta.skip | false | Ignore robots directives from HTML meta tags.
+| http.robots.redirect.crossorigin.allow | false | Follow a robots.txt redirect pointing at a different scheme, host or port than the URL it was reached from. Redirects to schemes other than http and https are never followed. A redirect which only replaces http with https while staying on the same host and port is always followed, whatever this is set to. When enabled, the robots.txt is re-fetched from the host named in the `Location` header, for up to 5 hops, and each of these requests carries the headers configured through `http.basicauth.*` and `http.custom.headers` as any other request does; see `http.filter.ipaddress.exclude` to restrict the addresses those fetches may reach.
+| http.robots.redirect.refused.allow | false | Allow crawling when a robots.txt redirect was not followed because of `http.robots.redirect.crossorigin.allow`. If false, nothing is crawled on that host until the redirect is followed or this is set to true.
 | http.skip.robots | false | Deprecated (replaced by http.robots.file.skip).
 | robots.noFollow.strict | true | If true, remove all outlinks from pages marked as noFollow.
 | http.store.headers | false | Whether to store response headers.
@@ -283,13 +285,19 @@ Each property accepts a comma-separated string or a YAML list of rules. A rule c
 * a CIDR block, e.g. `192.168.0.0/16` or `fd00::/8`
 * `localhost` or `loopback` — matches any loopback address (`InetAddress.isLoopbackAddress()`)
 * `sitelocal` — matches any site-local address (`InetAddress.isSiteLocalAddress()`)
+* `linklocal` — matches any link-local address (`InetAddress.isLinkLocalAddress()`), i.e. `169.254.0.0/16`
+and `fe80::/10`
 
 For example, to block crawling of localhost and private address spaces:
 
 [source,yaml]
 ----
-http.filter.ipaddress.exclude: "localhost,sitelocal"
+http.filter.ipaddress.exclude: "localhost,sitelocal,linklocal"
 ----
+
+`sitelocal` follows the JDK and covers `10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16` only. Carrier
+grade NAT (`100.64.0.0/10`) and IPv6 unique local addresses (`fd00::/8`) have no keyword and are added
+as CIDR blocks when they are also to be blocked.
 
 When a connection to a blocked address is attempted, the fetch fails with an `IOException` and a
 warning is logged. If neither property is set, no IP filtering is performed.

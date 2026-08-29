@@ -116,6 +116,9 @@ public class IPFilterRules {
                     case "sitelocal":
                         rules.add(InetAddress::isSiteLocalAddress);
                         break;
+                    case "linklocal":
+                        rules.add(InetAddress::isLinkLocalAddress);
+                        break;
                     default:
                         try {
                             CIDR cidr = new CIDR(ipRule);
