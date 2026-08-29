@@ -46,7 +46,7 @@ fetchTimeMs: 565
 
 public class MetadataRecordFormat extends WARCRecordFormat {
 
-    private static final Logger LOG = LoggerFactory.getLogger(WARCRequestRecordFormat.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MetadataRecordFormat.class);
 
     private List<String> metadataKeys;
 
@@ -73,6 +73,14 @@ public class MetadataRecordFormat extends WARCRecordFormat {
 
         // get the metadata key / values to save in the WARCs
         for (String key : metadataKeys) {
+            // the key becomes the name of a WARC field: drop it entirely if it is not a
+            // valid field name, otherwise the field line would be malformed
+            if (!isValidWarcFieldName(key)) {
+                LOG.warn(
+                        "Skipping invalid WARC field name configured in warc.metadata.keys: {}",
+                        key);
+                continue;
+            }
             final String[] values = metadata.getValues(key);
             if (values == null || values.length == 0) {
                 continue;
@@ -81,7 +89,9 @@ public class MetadataRecordFormat extends WARCRecordFormat {
                 if (StringUtils.isBlank(value)) {
                     continue;
                 }
-                payload.append(key).append(": ").append(value).append(CRLF);
+                // metadata values often originate from the parsed content: replace CR and
+                // LF so that the value cannot forge additional field lines
+                payload.append(key).append(": ").append(sanitizeWarcFieldValue(value)).append(CRLF);
             }
         }
 

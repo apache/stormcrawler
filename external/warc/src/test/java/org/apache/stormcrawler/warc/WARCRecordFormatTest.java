@@ -332,6 +332,47 @@ class WARCRecordFormatTest {
     }
 
     @Test
+    void testWarcResourceRecordContentTypeCRLFInjection() {
+        // test that a server-controlled Content-Type cannot forge additional WARC header
+        // lines in a resource record
+        String txt = "abcdef";
+        byte[] content = txt.getBytes(StandardCharsets.UTF_8);
+        Metadata metadata = new Metadata();
+        metadata.addValue(
+                protocolMDprefix + HttpHeaders.CONTENT_TYPE,
+                "text/html\r\nWARC-Truncated: length\r\n");
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.getBinaryByField("content")).thenReturn(content);
+        when(tuple.getStringByField("url")).thenReturn("https://www.example.org/");
+        when(tuple.getValueByField("metadata")).thenReturn(metadata);
+        WARCRecordFormat format = new WARCRecordFormat(protocolMDprefix);
+        byte[] warcBytes = format.format(tuple);
+        String warcString = new String(warcBytes, StandardCharsets.UTF_8);
+        assertFalse(
+                warcString.contains("\r\nWARC-Truncated: length"),
+                "WARC record: Content-Type must not forge additional WARC header lines");
+        // CR and LF are replaced by spaces, the content type remains on its header line
+        assertTrue(
+                warcString.contains("Content-Type: text/html  WARC-Truncated: length"),
+                "WARC record: sanitised Content-Type expected on a single header line");
+
+        // try to read it with Jwarc
+        try (WarcReader reader = new WarcReader(new ByteArrayInputStream(warcBytes))) {
+            for (WarcRecord record : reader) {
+                assertFalse(
+                        record.headers().contains("WARC-Truncated", "length"),
+                        "WARC record: WARC header block must not contain a forged header");
+                assertEquals(
+                        1,
+                        record.headers().all("Content-Type").size(),
+                        "WARC record: expected a single Content-Type header");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
     void testWarcMetadataRecord() {
         Metadata metadata = new Metadata();
         metadata.addValue("source", "a source");
