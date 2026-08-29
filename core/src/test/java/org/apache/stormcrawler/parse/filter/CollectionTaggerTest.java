@@ -33,16 +33,16 @@ class CollectionTaggerTest {
         ParseResult parse = new ParseResult();
         String URL = "http://stormcrawler.net/";
         tagger.filter(URL, null, null, parse);
-        String[] collections = parse.get(URL).getMetadata().getValues("collections");
+        String[] collections = parse.getOrCreate(URL).getMetadata().getValues("collections");
         Assertions.assertNotNull(collections);
         Assertions.assertEquals(2, collections.length);
         URL = "http://baby.com/tiny-crawler/";
         tagger.filter(URL, null, null, parse);
-        collections = parse.get(URL).getMetadata().getValues("collections");
+        collections = parse.getOrCreate(URL).getMetadata().getValues("collections");
         Assertions.assertNull(collections);
         URL = "http://nutch.apache.org/";
         tagger.filter(URL, null, null, parse);
-        collections = parse.get(URL).getMetadata().getValues("collections");
+        collections = parse.getOrCreate(URL).getMetadata().getValues("collections");
         Assertions.assertNotNull(collections);
         Assertions.assertEquals(1, collections.length);
     }

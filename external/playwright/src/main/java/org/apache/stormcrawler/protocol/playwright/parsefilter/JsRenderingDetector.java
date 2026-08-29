@@ -201,7 +201,7 @@ public class JsRenderingDetector extends ParseFilter {
             return;
         }
 
-        final Metadata md = parse.get(url).getMetadata();
+        final Metadata md = parse.getOrCreate(url).getMetadata();
         if (skipIfMetadataPresent != null
                 && !skipIfMetadataPresent.isEmpty()
                 && md.containsKey(skipIfMetadataPresent)) {
@@ -222,7 +222,7 @@ public class JsRenderingDetector extends ParseFilter {
     }
 
     private String detectReason(final String url, final byte[] content, final ParseResult parse) {
-        final Metadata md = parse.get(url).getMetadata();
+        final Metadata md = parse.getOrCreate(url).getMetadata();
         final String charsetName = CharsetIdentification.getCharsetFast(md, content, -1);
         java.nio.charset.Charset cs;
         try {
@@ -264,7 +264,7 @@ public class JsRenderingDetector extends ParseFilter {
             return null;
         }
 
-        final ParseData data = parse.get(url);
+        final ParseData data = parse.getOrCreate(url);
         final String text = data.getText();
         final int textLen = text == null ? 0 : text.trim().length();
         final int outlinks = parse.getOutlinks() == null ? 0 : parse.getOutlinks().size();

@@ -106,7 +106,7 @@ public class LanguageID extends ParseFilter {
 
         // check whether the metadata already contains a lang value
         // in which case we normalise its value and use it
-        Metadata m = parse.get(url).getMetadata();
+        Metadata m = parse.getOrCreate(url).getMetadata();
         String extractedValue = m.getFirstValue(extractedKeyName);
         if (StringUtils.isNotBlank(extractedValue) && extractedValue.length() > 1) {
             extractedValue = extractedValue.substring(0, 2).toLowerCase(Locale.ENGLISH);
@@ -115,7 +115,7 @@ public class LanguageID extends ParseFilter {
             return;
         }
 
-        String text = parse.get(url).getText();
+        String text = parse.getOrCreate(url).getText();
         if (StringUtils.isBlank(text)) {
             return;
         }
@@ -133,7 +133,7 @@ public class LanguageID extends ParseFilter {
             for (DetectedLanguage lang : probs) {
                 if (lang.getProbability() >= minProb) {
                     String code = lang.getLocale().getLanguage();
-                    parse.get(url).getMetadata().addValue(mdKey, code);
+                    parse.getOrCreate(url).getMetadata().addValue(mdKey, code);
                 }
             }
         }

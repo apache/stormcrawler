@@ -130,16 +130,18 @@ class JsRenderingDetectorTest {
         final JsRenderingDetector d = detector("{}");
         final ParseResult parse = new ParseResult();
         // simulate metadata coming from a Playwright fetch
-        parse.get("u").getMetadata().setValue(HttpProtocol.MD_KEY_END, "2026-05-04T00:00:00Z");
+        parse.getOrCreate("u")
+                .getMetadata()
+                .setValue(HttpProtocol.MD_KEY_END, "2026-05-04T00:00:00Z");
         d.filter("u", "<div data-reactroot></div>".getBytes(StandardCharsets.UTF_8), null, parse);
-        Assertions.assertNull(parse.get("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertNull(parse.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
     }
 
     @Test
     void skipsIfAlreadyFlagged() throws Exception {
         final JsRenderingDetector d = detector("{}");
         final ParseResult parse = new ParseResult();
-        parse.get("u").getMetadata().setValue("fetch.with", "playwright");
+        parse.getOrCreate("u").getMetadata().setValue("fetch.with", "playwright");
         d.filter(
                 "u",
                 "<html><body><p>some content</p></body></html>".getBytes(StandardCharsets.UTF_8),
@@ -147,8 +149,9 @@ class JsRenderingDetectorTest {
                 parse);
         // not overwritten, no reason added
         Assertions.assertEquals(
-                "playwright", parse.get("u").getMetadata().getFirstValue("fetch.with"));
-        Assertions.assertNull(parse.get("u").getMetadata().getFirstValue("fetch.with.reason"));
+                "playwright", parse.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertNull(
+                parse.getOrCreate("u").getMetadata().getFirstValue("fetch.with.reason"));
     }
 
     @Test

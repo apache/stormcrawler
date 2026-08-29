@@ -56,7 +56,7 @@ public class DomainParseFilter extends ParseFilter {
 
     @Override
     public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
-        Metadata metadata = parse.get(url).getMetadata();
+        Metadata metadata = parse.getOrCreate(url).getMetadata();
         String value = partitioner.getPartition(url, metadata);
         metadata.setValue(mdKey, value);
     }

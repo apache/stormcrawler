@@ -52,7 +52,7 @@ public class CommaSeparatedToMultivaluedMetadata extends ParseFilter {
 
     @Override
     public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
-        Metadata m = parse.get(url).getMetadata();
+        Metadata m = parse.getOrCreate(url).getMetadata();
         for (String key : keys) {
             String val = m.getFirstValue(key);
             if (val == null) {
