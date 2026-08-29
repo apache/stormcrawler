@@ -52,7 +52,11 @@ public class MetadataRecordFormat extends WARCRecordFormat {
     private final List<String> metadataKeys;
 
     public MetadataRecordFormat(List<String> metadataKeys) {
-        super("");
+        this(metadataKeys, WARCRecordFormat.DIGEST_ALGORITHM_SHA1);
+    }
+
+    public MetadataRecordFormat(List<String> metadataKeys, String digestAlgorithm) {
+        super("", digestAlgorithm);
         // the keys are fixed configuration: validate them once here instead of
         // for every record
         final List<String> validKeys = new ArrayList<>(metadataKeys.size());
@@ -118,7 +122,7 @@ public class MetadataRecordFormat extends WARCRecordFormat {
         int contentLength = metadata_representation.length;
         buffer.append("Content-Length: ").append(Integer.toString(contentLength)).append(CRLF);
 
-        String blockDigest = getDigestSha1(metadata_representation);
+        String blockDigest = getDigest(metadata_representation);
 
         String captureTime = getCaptureTime(metadata);
         buffer.append("WARC-Date: ").append(captureTime).append(CRLF);

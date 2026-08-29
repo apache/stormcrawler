@@ -74,14 +74,19 @@ public class WARCHdfsBolt extends GzipHdfsBolt {
             throws IOException {
         super.doPrepare(conf, topologyContext, collector);
         protocolMDprefix = ConfUtils.getString(conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "");
-        withRecordFormat(new WARCRecordFormat(protocolMDprefix));
+        String digestAlgorithm =
+                ConfUtils.getString(
+                        conf,
+                        WARCRecordFormat.DIGEST_ALGORITHM_PARAM,
+                        WARCRecordFormat.DIGEST_ALGORITHM_SHA1);
+        withRecordFormat(new WARCRecordFormat(protocolMDprefix, digestAlgorithm));
         if (withRequestRecords) {
-            addRecordFormat(new WARCRequestRecordFormat(protocolMDprefix), 0);
+            addRecordFormat(new WARCRequestRecordFormat(protocolMDprefix, digestAlgorithm), 0);
         }
         // detect if a list of keys was specified to be stored in the metadata
         List<String> metadataToWrite = ConfUtils.loadListFromConf(METADATA_KEYS_STORE, conf);
         if (!metadataToWrite.isEmpty()) {
-            addRecordFormat(new MetadataRecordFormat(metadataToWrite), 1);
+            addRecordFormat(new MetadataRecordFormat(metadataToWrite, digestAlgorithm), 1);
         }
     }
 

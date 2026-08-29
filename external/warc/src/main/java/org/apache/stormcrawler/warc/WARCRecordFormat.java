@@ -129,19 +129,108 @@ public class WARCRecordFormat implements RecordFormat {
             Pattern.compile("(?i)(?:Content-(?:Encoding|Length)|Transfer-Encoding)");
     protected static final String X_HIDE_HEADER = "X-Crawler-";
 
+    /**
+     * Configuration key setting the algorithm used to compute the WARC-Payload-Digest and
+     * WARC-Block-Digest fields. Supported values are {@value #DIGEST_ALGORITHM_SHA1} (the default)
+     * and {@value #DIGEST_ALGORITHM_SHA256}.
+     *
+     * <p>Note: SHA-1 is the convention across the WARC ecosystem and downstream tooling (CDX
+     * indexes, revisit record handling) may expect it. Change the default deliberately, not
+     * casually.
+     */
+    public static final String DIGEST_ALGORITHM_PARAM = "warc.digest.algorithm";
+
+    public static final String DIGEST_ALGORITHM_SHA1 = "sha1";
+
+    public static final String DIGEST_ALGORITHM_SHA256 = "sha256";
+
     private static final Base32 base32 = new Base32();
-    private static final String digestNoContent = getDigestSha1(new byte[0]);
 
     protected final String protocolMDprefix;
 
+    /** JCA name of the message digest algorithm, e.g. &quot;SHA-1&quot;. */
+    private final String digestJCAName;
+
+    /** Algorithm prefix of the WARC digest fields, e.g. &quot;sha1:&quot;. */
+    private final String digestPrefix;
+
+    private final String digestNoContent;
+
     public WARCRecordFormat(String protocolMDprefix) {
-        this.protocolMDprefix = protocolMDprefix;
+        this(protocolMDprefix, DIGEST_ALGORITHM_SHA1);
     }
 
+    public WARCRecordFormat(String protocolMDprefix, String digestAlgorithm) {
+        this.protocolMDprefix = protocolMDprefix;
+        this.digestJCAName = getDigestJCAName(digestAlgorithm);
+        this.digestPrefix = digestJCAName.toLowerCase(Locale.ROOT).replace("-", "") + ":";
+        this.digestNoContent = getDigest(new byte[0]);
+    }
+
+    /**
+     * Resolve the configured digest algorithm to the JCA name of the message digest. The value is
+     * matched case-insensitively and an optional hyphen is ignored, i.e. &quot;sha256&quot;,
+     * &quot;SHA-256&quot; etc. are all accepted.
+     *
+     * @throws IllegalArgumentException if the value is not a supported algorithm
+     */
+    private static String getDigestJCAName(String digestAlgorithm) {
+        if (digestAlgorithm == null) {
+            return "SHA-1";
+        }
+        return switch (digestAlgorithm.trim().toLowerCase(Locale.ROOT).replace("-", "")) {
+            case DIGEST_ALGORITHM_SHA1 -> "SHA-1";
+            case DIGEST_ALGORITHM_SHA256 -> "SHA-256";
+            default -> throw new IllegalArgumentException(
+                    "Unsupported value ["
+                            + digestAlgorithm
+                            + "] for "
+                            + DIGEST_ALGORITHM_PARAM
+                            + ", supported algorithms: "
+                            + DIGEST_ALGORITHM_SHA1
+                            + ", "
+                            + DIGEST_ALGORITHM_SHA256);
+        };
+    }
+
+    /**
+     * Compute the digest of the given bytes with the configured algorithm.
+     *
+     * @return digest in the form &quot;&lt;algorithm&gt;:&lt;base32&gt;&quot;, e.g.
+     *     &quot;sha1:...&quot;
+     */
+    public String getDigest(byte[] bytes) {
+        MessageDigest md = DigestUtils.getDigest(digestJCAName);
+        return digestPrefix + base32.encodeAsString(md.digest(bytes));
+    }
+
+    /**
+     * Compute the digest of the concatenation of the two given byte arrays with the configured
+     * algorithm.
+     *
+     * @return digest in the form &quot;&lt;algorithm&gt;:&lt;base32&gt;&quot;, e.g.
+     *     &quot;sha1:...&quot;
+     */
+    public String getDigest(byte[] bytes1, byte[] bytes2) {
+        MessageDigest md = DigestUtils.getDigest(digestJCAName);
+        md.update(bytes1);
+        return digestPrefix + base32.encodeAsString(md.digest(bytes2));
+    }
+
+    /**
+     * @deprecated use {@link #getDigest(byte[])} instead; the algorithm is set by {@link
+     *     #DIGEST_ALGORITHM_PARAM} and no longer fixed to SHA-1
+     */
+    @Deprecated
     public static String getDigestSha1(byte[] bytes) {
         return "sha1:" + base32.encodeAsString(DigestUtils.sha1(bytes));
     }
 
+    /**
+     * @deprecated use {@link #getDigest(byte[], byte[])} instead; the algorithm is set by {@link
+     *     #DIGEST_ALGORITHM_PARAM} and no longer fixed to SHA-1
+     */
+    @Deprecated
     public static String getDigestSha1(byte[] bytes1, byte[] bytes2) {
         MessageDigest sha1 = DigestUtils.getSha1Digest();
         sha1.update(bytes1);
@@ -435,14 +524,14 @@ public class WARCRecordFormat implements RecordFormat {
         String blockDigest = digestNoContent;
         if (content != null) {
             contentLength = content.length;
-            payloadDigest = getDigestSha1(content);
+            payloadDigest = getDigest(content);
             if (WARCTypeValue.equals(WARC_TYPE_RESPONSE)) {
-                blockDigest = getDigestSha1(httpheaders, content);
+                blockDigest = getDigest(httpheaders, content);
             } else {
                 blockDigest = payloadDigest;
             }
         } else if (WARCTypeValue.equals(WARC_TYPE_RESPONSE)) {
-            blockDigest = getDigestSha1(httpheaders);
+            blockDigest = getDigest(httpheaders);
         }
 
         // add the length of the http header

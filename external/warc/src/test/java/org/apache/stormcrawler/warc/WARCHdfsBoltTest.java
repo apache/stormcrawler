@@ -135,6 +135,37 @@ class WARCHdfsBoltTest {
                 "WARC response record is expected to include WARC header \"WARC-IP-Address\"");
     }
 
+    @Test
+    void testDigestAlgorithmConfig() throws IOException {
+        // instantiate a second bolt with warc.digest.algorithm: sha256
+        HdfsBolt sha256Bolt = makeBolt();
+        sha256Bolt.withConfigKey("warc");
+        Map<String, Object> sha256Conf = new HashMap<>(conf);
+        sha256Conf.put(
+                WARCRecordFormat.DIGEST_ALGORITHM_PARAM,
+                WARCRecordFormat.DIGEST_ALGORITHM_SHA256);
+        sha256Bolt.prepare(
+                sha256Conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        try {
+            sha256Bolt.execute(getPage());
+        } finally {
+            sha256Bolt.cleanup();
+        }
+        List<WarcRecord> records = readWARCs(warcDir).collect(Collectors.toList());
+        // expected 3 records (warcinfo, request, response)
+        assertEquals(3, records.size());
+        for (WarcRecord record : records) {
+            String payloadDigest = record.headers().first("WARC-Payload-Digest").orElse("");
+            String blockDigest = record.headers().first("WARC-Block-Digest").orElse("");
+            assertTrue(
+                    payloadDigest.isEmpty() || payloadDigest.startsWith("sha256:"),
+                    "WARC-Payload-Digest must use the configured algorithm sha256");
+            assertTrue(
+                    blockDigest.isEmpty() || blockDigest.startsWith("sha256:"),
+                    "WARC-Block-Digest must use the configured algorithm sha256");
+        }
+    }
+
     private static Stream<WarcRecord> readWARCs(Path warcDir) {
         try {
             return Files.walk(warcDir)

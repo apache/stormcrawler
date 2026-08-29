@@ -45,6 +45,10 @@ public class WARCRequestRecordFormat extends WARCRecordFormat {
         super(protocolMDprefix);
     }
 
+    public WARCRequestRecordFormat(String protocolMDprefix, String digestAlgorithm) {
+        super(protocolMDprefix, digestAlgorithm);
+    }
+
     @Override
     public byte[] format(Tuple tuple) {
 
@@ -82,7 +86,7 @@ public class WARCRequestRecordFormat extends WARCRecordFormat {
         int contentLength = httpheaders.length;
         buffer.append("Content-Length: ").append(Integer.toString(contentLength)).append(CRLF);
 
-        String blockDigest = getDigestSha1(httpheaders);
+        String blockDigest = getDigest(httpheaders);
 
         String captureTime = getCaptureTime(metadata);
         buffer.append("WARC-Date: ").append(captureTime).append(CRLF);

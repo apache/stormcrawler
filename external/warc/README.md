@@ -161,6 +161,14 @@ A note on the recording of HTTP requests and responses with StormCrawler and the
 
 You can specify in the configuration which metadata key/values to store as WARC metadata using `warc.metadata.keys`.
 
+The algorithm used to compute the `WARC-Payload-Digest` and `WARC-Block-Digest` fields is configurable with `warc.digest.algorithm`. It accepts `sha1` (the default) and `sha256`:
+
+```
+  warc.digest.algorithm: sha256
+```
+
+The value is matched case-insensitively and an optional hyphen is ignored, i.e. `SHA-256` is also accepted. SHA-1 is the convention across the WARC ecosystem and downstream tooling such as CDX indexers may expect `sha1` digests, so change the default only if your downstream tooling supports the alternative algorithm. Invalid values make the bolt fail when it is prepared.
+
 ## Consuming WARC files
 
 Web archives harvested in the [WARC format](https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/) can be used as input for StormCrawler – instead of fetching content from remote servers, the WARCSpout reads WARC files and emits the archive web page captures as tuples into the topology.
