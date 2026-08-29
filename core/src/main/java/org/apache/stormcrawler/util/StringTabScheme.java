@@ -25,7 +25,14 @@ import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Metadata;
 
-/** Converts a byte array into URL + metadata. */
+/**
+ * Converts a byte array into URL + metadata.
+ *
+ * <p>The format has no escaping: the keys and values are separated by tabulations and a key ends at
+ * the first equal sign. A value containing a tabulation is therefore read back as several key /
+ * value pairs, so this scheme suits seed files and other input produced with that limitation in
+ * mind.
+ */
 public class StringTabScheme implements Scheme {
 
     @Override

@@ -21,6 +21,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Map;
@@ -173,14 +174,26 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
         // changing the status or scheduling.
         String dateInMetadata = metadata.getFirstValue(AS_IS_NEXTFETCHDATE_METADATA);
         if (dateInMetadata != null) {
-            Date nextFetch = Date.from(Instant.parse(dateInMetadata));
+            Date nextFetch = null;
             try {
-                store(url, status, mdTransfer.filter(metadata), Optional.of(nextFetch), tuple);
-                return;
-            } catch (Exception e) {
-                LOG.error("Exception caught when storing", e);
-                collector.fail(tuple);
-                return;
+                nextFetch = Date.from(Instant.parse(dateInMetadata));
+            } catch (DateTimeParseException | IllegalArgumentException e) {
+                // not a date we can use: schedule the URL normally
+                LOG.error(
+                        "Invalid value {} for {} on {}",
+                        dateInMetadata,
+                        AS_IS_NEXTFETCHDATE_METADATA,
+                        url);
+            }
+            if (nextFetch != null) {
+                try {
+                    store(url, status, mdTransfer.filter(metadata), Optional.of(nextFetch), tuple);
+                    return;
+                } catch (Exception e) {
+                    LOG.error("Exception caught when storing", e);
+                    collector.fail(tuple);
+                    return;
+                }
             }
         }
 
