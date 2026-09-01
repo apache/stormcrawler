@@ -89,6 +89,42 @@ public class WARCRecordFormat implements RecordFormat {
     protected static final Pattern HTTP_STATUS_CODE_PATTERN = Pattern.compile("^[0-9]{3}$");
     protected static final String HTTP_VERSION_FALLBACK = "HTTP/1.1";
 
+    /*
+     * Named fields (WARC header fields and the fields of an application/warc-fields payload) are
+     * terminated by CRLF: their names are limited to printable ASCII characters excluding the
+     * colon, cf. RFC 5322 section 2.2, and their values must not contain CR or LF, otherwise the
+     * remainder of the value would be read as additional field lines.
+     */
+    private static final Pattern WARC_FIELD_NAME_PATTERN = Pattern.compile("[!-9;-~]+");
+
+    /**
+     * Check whether a string is a valid WARC field name, i.e. consists of printable ASCII
+     * characters without a colon, cf. RFC 5322 section 2.2.
+     *
+     * @param name field name candidate
+     * @return true if the name can safely be written as the name of a WARC field
+     */
+    static boolean isValidWarcFieldName(String name) {
+        if (name == null) {
+            return false;
+        }
+        return WARC_FIELD_NAME_PATTERN.matcher(name).matches();
+    }
+
+    /**
+     * Replace CR and LF characters in a field value by spaces so that the value cannot forge
+     * additional field lines in a WARC header block or in an application/warc-fields payload.
+     *
+     * @param value field value to sanitise
+     * @return the value without CR and LF characters
+     */
+    static String sanitizeWarcFieldValue(String value) {
+        if (value == null || (value.indexOf('\r') < 0 && value.indexOf('\n') < 0)) {
+            return value;
+        }
+        return value.replace('\r', ' ').replace('\n', ' ');
+    }
+
     protected static final Pattern PROBLEMATIC_HEADERS =
             Pattern.compile("(?i)(?:Content-(?:Encoding|Length)|Transfer-Encoding)");
     protected static final String X_HIDE_HEADER = "X-Crawler-";
@@ -445,7 +481,9 @@ public class WARCRecordFormat implements RecordFormat {
             if (StringUtils.isBlank(ct)) {
                 ct = "application/octet-stream";
             }
-            buffer.append("Content-Type: ").append(ct).append(CRLF);
+            // the content type is under the control of the remote server: replace CR and LF
+            // so that it cannot forge additional header lines in the WARC header block
+            buffer.append("Content-Type: ").append(sanitizeWarcFieldValue(ct)).append(CRLF);
         }
 
         String truncated =

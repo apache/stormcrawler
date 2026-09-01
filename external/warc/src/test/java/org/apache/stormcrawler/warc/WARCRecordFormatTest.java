@@ -19,6 +19,7 @@ package org.apache.stormcrawler.warc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -121,6 +122,30 @@ class WARCRecordFormatTest {
                 assertEquals(p[0], ip.get());
             }
         }
+    }
+
+    @Test
+    void testWarcFieldNameValidation() {
+        assertFalse(WARCRecordFormat.isValidWarcFieldName(null), "null is not a field name");
+        assertFalse(WARCRecordFormat.isValidWarcFieldName(""), "empty string is not a field name");
+        assertFalse(
+                WARCRecordFormat.isValidWarcFieldName("hops FromSeed"),
+                "a space is not allowed in a field name");
+        assertFalse(
+                WARCRecordFormat.isValidWarcFieldName("hopsFromSeed: 1"),
+                "a colon is not allowed in a field name");
+        assertTrue(WARCRecordFormat.isValidWarcFieldName("via"));
+        assertTrue(WARCRecordFormat.isValidWarcFieldName("feed.description"));
+        assertTrue(WARCRecordFormat.isValidWarcFieldName("WARC-Truncated"));
+    }
+
+    @Test
+    void testSanitizeWarcFieldValue() {
+        assertNull(WARCRecordFormat.sanitizeWarcFieldValue(null));
+        assertEquals("unchanged", WARCRecordFormat.sanitizeWarcFieldValue("unchanged"));
+        assertEquals("a  b", WARCRecordFormat.sanitizeWarcFieldValue("a\r\nb"));
+        assertEquals("a b", WARCRecordFormat.sanitizeWarcFieldValue("a\rb"));
+        assertEquals("a b", WARCRecordFormat.sanitizeWarcFieldValue("a\nb"));
     }
 
     @Test
@@ -329,6 +354,47 @@ class WARCRecordFormatTest {
         assertTrue(
                 warcString.contains("\r\nWARC-Block-Digest: " + sha1str + "\r\n"),
                 "WARC record: no or incorrect block, digest");
+    }
+
+    @Test
+    void testWarcResourceRecordContentTypeCRLFInjection() {
+        // test that a server-controlled Content-Type cannot forge additional WARC header
+        // lines in a resource record
+        String txt = "abcdef";
+        byte[] content = txt.getBytes(StandardCharsets.UTF_8);
+        Metadata metadata = new Metadata();
+        metadata.addValue(
+                protocolMDprefix + HttpHeaders.CONTENT_TYPE,
+                "text/html\r\nWARC-Truncated: length\r\n");
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.getBinaryByField("content")).thenReturn(content);
+        when(tuple.getStringByField("url")).thenReturn("https://www.example.org/");
+        when(tuple.getValueByField("metadata")).thenReturn(metadata);
+        WARCRecordFormat format = new WARCRecordFormat(protocolMDprefix);
+        byte[] warcBytes = format.format(tuple);
+        String warcString = new String(warcBytes, StandardCharsets.UTF_8);
+        assertFalse(
+                warcString.contains("\r\nWARC-Truncated: length"),
+                "WARC record: Content-Type must not forge additional WARC header lines");
+        // CR and LF are replaced by spaces, the content type remains on its header line
+        assertTrue(
+                warcString.contains("Content-Type: text/html  WARC-Truncated: length"),
+                "WARC record: sanitised Content-Type expected on a single header line");
+
+        // try to read it with Jwarc
+        try (WarcReader reader = new WarcReader(new ByteArrayInputStream(warcBytes))) {
+            for (WarcRecord record : reader) {
+                assertFalse(
+                        record.headers().contains("WARC-Truncated", "length"),
+                        "WARC record: WARC header block must not contain a forged header");
+                assertEquals(
+                        1,
+                        record.headers().all("Content-Type").size(),
+                        "WARC record: expected a single Content-Type header");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test

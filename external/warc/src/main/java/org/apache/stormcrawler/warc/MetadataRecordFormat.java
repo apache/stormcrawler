@@ -17,6 +17,7 @@ package org.apache.stormcrawler.warc;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.tuple.Tuple;
@@ -46,14 +47,26 @@ fetchTimeMs: 565
 
 public class MetadataRecordFormat extends WARCRecordFormat {
 
-    private static final Logger LOG = LoggerFactory.getLogger(WARCRequestRecordFormat.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MetadataRecordFormat.class);
 
-    private List<String> metadataKeys;
+    private final List<String> metadataKeys;
 
     public MetadataRecordFormat(List<String> metadataKeys) {
         super("");
-        this.metadataKeys = metadataKeys;
-        LOG.info("MetadataRecordFormat instantiated with {}", String.join(",", metadataKeys));
+        // the keys are fixed configuration: validate them once here instead of
+        // for every record
+        final List<String> validKeys = new ArrayList<>(metadataKeys.size());
+        for (String key : metadataKeys) {
+            if (isValidWarcFieldName(key)) {
+                validKeys.add(key);
+            } else {
+                LOG.warn(
+                        "Skipping invalid WARC field name configured in warc.metadata.keys: {}",
+                        key);
+            }
+        }
+        this.metadataKeys = List.copyOf(validKeys);
+        LOG.info("MetadataRecordFormat instantiated with {}", String.join(",", this.metadataKeys));
     }
 
     @Override
@@ -81,7 +94,9 @@ public class MetadataRecordFormat extends WARCRecordFormat {
                 if (StringUtils.isBlank(value)) {
                     continue;
                 }
-                payload.append(key).append(": ").append(value).append(CRLF);
+                // metadata values often originate from the parsed content: replace CR and
+                // LF so that the value cannot forge additional field lines
+                payload.append(key).append(": ").append(sanitizeWarcFieldValue(value)).append(CRLF);
             }
         }
 
