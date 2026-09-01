@@ -18,6 +18,7 @@
 package org.apache.stormcrawler.warc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -28,6 +29,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import org.apache.commons.codec.binary.Base32;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
@@ -46,11 +48,15 @@ class WARCDigestAlgorithmTest {
 
     private static final String SHA1_ABCDEF = "sha1:D6FMCDZDYW23YELHXWUEXAZ6LQCXU56S";
 
+    /*
+     * The Base32 padding is omitted: the WARC digest fields define the digest value as a token,
+     * which does not allow the padding character "=" (cf. ISO 28500 WARC 1.1).
+     */
     private static final String SHA256_ABCDEF =
-            "sha256:X32X5R7VHJWUBPVWICTYBJRZZA54FGWIVGAW6H6GYXDNZWJ4I4QQ====";
+            "sha256:X32X5R7VHJWUBPVWICTYBJRZZA54FGWIVGAW6H6GYXDNZWJ4I4QQ";
 
     private static final String SHA256_EMPTY =
-            "sha256:4OYMIQUY7QOBJGX36TEJS35ZEQT24QPEMSNZGTFESWMRW6CSXBKQ====";
+            "sha256:4OYMIQUY7QOBJGX36TEJS35ZEQT24QPEMSNZGTFESWMRW6CSXBKQ";
 
     /** Compute the expected digest independently of the code under test. */
     private static String expectedDigest(String jcaAlgorithm, String prefix, byte[]... byteArrays) {
@@ -59,7 +65,8 @@ class WARCDigestAlgorithmTest {
             for (byte[] bytes : byteArrays) {
                 md.update(bytes);
             }
-            return prefix + new Base32().encodeAsString(md.digest());
+            return prefix
+                    + StringUtils.stripEnd(new Base32().encodeAsString(md.digest()), "=");
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
@@ -100,6 +107,16 @@ class WARCDigestAlgorithmTest {
                 new WARCRecordFormat("", WARCRecordFormat.DIGEST_ALGORITHM_SHA256);
         assertEquals(SHA256_ABCDEF, format.getDigest(CONTENT), "Wrong sha256 digest");
         assertEquals(SHA256_EMPTY, format.getDigest(new byte[0]), "Wrong sha256 digest");
+    }
+
+    @Test
+    void testDigestValueContainsNoBase32Padding() {
+        // the digest value is a token per the WARC 1.1 grammar and must not contain "="
+        String sha256 = new WARCRecordFormat("", WARCRecordFormat.DIGEST_ALGORITHM_SHA256)
+                .getDigest(CONTENT);
+        assertFalse(sha256.contains("="), "digest value must not contain Base32 padding");
+        String sha1 = new WARCRecordFormat("").getDigest(CONTENT);
+        assertFalse(sha1.contains("="), "digest value must not contain Base32 padding");
     }
 
     @Test

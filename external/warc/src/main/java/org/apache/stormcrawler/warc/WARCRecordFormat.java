@@ -201,7 +201,7 @@ public class WARCRecordFormat implements RecordFormat {
      */
     public String getDigest(byte[] bytes) {
         MessageDigest md = DigestUtils.getDigest(digestJCAName);
-        return digestPrefix + base32.encodeAsString(md.digest(bytes));
+        return digestPrefix + base32Unpadded(md.digest(bytes));
     }
 
     /**
@@ -214,7 +214,18 @@ public class WARCRecordFormat implements RecordFormat {
     public String getDigest(byte[] bytes1, byte[] bytes2) {
         MessageDigest md = DigestUtils.getDigest(digestJCAName);
         md.update(bytes1);
-        return digestPrefix + base32.encodeAsString(md.digest(bytes2));
+        return digestPrefix + base32Unpadded(md.digest(bytes2));
+    }
+
+    /**
+     * Base32-encode a digest value without the trailing &quot;=&quot; padding characters: the
+     * WARC digest fields define the digest value as a token, which does not allow the padding
+     * character (cf. ISO 28500 WARC 1.1, WARC-Block-Digest / WARC-Payload-Digest). SHA-1 digests
+     * are unaffected (32 characters without padding), while e.g. SHA-256 digests would end in
+     * &quot;====&quot;.
+     */
+    private static String base32Unpadded(byte[] digest) {
+        return StringUtils.stripEnd(base32.encodeAsString(digest), "=");
     }
 
     /**

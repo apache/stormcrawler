@@ -169,6 +169,8 @@ The algorithm used to compute the `WARC-Payload-Digest` and `WARC-Block-Digest` 
 
 The value is matched case-insensitively and an optional hyphen is ignored, i.e. `SHA-256` is also accepted. SHA-1 is the convention across the WARC ecosystem and downstream tooling such as CDX indexers may expect `sha1` digests, so change the default only if your downstream tooling supports the alternative algorithm. Invalid values make the bolt fail when it is prepared.
 
+The digest values are written as Base32 without the trailing `=` padding, as required by the grammar of the WARC digest fields (the digest value is a token, which does not allow the padding character).
+
 ## Consuming WARC files
 
 Web archives harvested in the [WARC format](https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/) can be used as input for StormCrawler – instead of fetching content from remote servers, the WARCSpout reads WARC files and emits the archive web page captures as tuples into the topology.
