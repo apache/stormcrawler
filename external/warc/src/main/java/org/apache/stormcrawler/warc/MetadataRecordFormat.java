@@ -17,6 +17,7 @@ package org.apache.stormcrawler.warc;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.tuple.Tuple;
@@ -48,12 +49,24 @@ public class MetadataRecordFormat extends WARCRecordFormat {
 
     private static final Logger LOG = LoggerFactory.getLogger(MetadataRecordFormat.class);
 
-    private List<String> metadataKeys;
+    private final List<String> metadataKeys;
 
     public MetadataRecordFormat(List<String> metadataKeys) {
         super("");
-        this.metadataKeys = metadataKeys;
-        LOG.info("MetadataRecordFormat instantiated with {}", String.join(",", metadataKeys));
+        // the keys are fixed configuration: validate them once here instead of
+        // for every record
+        final List<String> validKeys = new ArrayList<>(metadataKeys.size());
+        for (String key : metadataKeys) {
+            if (isValidWarcFieldName(key)) {
+                validKeys.add(key);
+            } else {
+                LOG.warn(
+                        "Skipping invalid WARC field name configured in warc.metadata.keys: {}",
+                        key);
+            }
+        }
+        this.metadataKeys = List.copyOf(validKeys);
+        LOG.info("MetadataRecordFormat instantiated with {}", String.join(",", this.metadataKeys));
     }
 
     @Override
@@ -73,14 +86,6 @@ public class MetadataRecordFormat extends WARCRecordFormat {
 
         // get the metadata key / values to save in the WARCs
         for (String key : metadataKeys) {
-            // the key becomes the name of a WARC field: drop it entirely if it is not a
-            // valid field name, otherwise the field line would be malformed
-            if (!isValidWarcFieldName(key)) {
-                LOG.warn(
-                        "Skipping invalid WARC field name configured in warc.metadata.keys: {}",
-                        key);
-                continue;
-            }
             final String[] values = metadata.getValues(key);
             if (values == null || values.length == 0) {
                 continue;
