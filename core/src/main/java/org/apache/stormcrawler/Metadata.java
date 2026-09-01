@@ -213,13 +213,16 @@ public class Metadata {
             return;
         }
         String normalizedKey = normalizeKey(key);
-        if (!md.containsKey(normalizedKey)) {
+        String[] existingvals = md.get(normalizedKey);
+        if (existingvals == null || existingvals.length == 0) {
             md.put(normalizedKey, values);
             return;
         }
-        for (String value : values) {
-            addValue(normalizedKey, value);
-        }
+        // append in one go: adding one value at a time copies the whole array for every value
+        String[] newvals = new String[existingvals.length + values.length];
+        System.arraycopy(existingvals, 0, newvals, 0, existingvals.length);
+        System.arraycopy(values, 0, newvals, existingvals.length, values.length);
+        md.put(normalizedKey, newvals);
     }
 
     public void addValues(String key, Collection<String> values) {
