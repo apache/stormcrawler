@@ -1,0 +1,8 @@
+{
+  "org.apache.stormcrawler.parse.ParseFilters": [
+    {
+      "class": "org.apache.stormcrawler.parse.filter.EmptyParentParseFilter",
+      "name": "EmptyParent"
+    }
+  ]
+}

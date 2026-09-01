@@ -52,4 +52,15 @@ class SubDocumentsFilterTest extends ParsingTester {
         Assertions.assertEquals(1, emitted.size());
         Assertions.assertEquals("https://stormcrawler.apache.org/", emitted.get(0).get(0));
     }
+
+    @Test
+    void testEmptiedParentDocumentIsStillEmitted() throws IOException {
+        prepareParserBolt("test.emptyparentfilter.json");
+        parse("https://stormcrawler.apache.org/", "subdocuments.html", new Metadata());
+        List<List<Object>> emitted = output.getEmitted();
+        // the entry for the URL being parsed is always emitted, even when a
+        // filter emptied it, so that its status keeps being updated downstream
+        Assertions.assertEquals(1, emitted.size());
+        Assertions.assertEquals("https://stormcrawler.apache.org/", emitted.get(0).get(0));
+    }
 }

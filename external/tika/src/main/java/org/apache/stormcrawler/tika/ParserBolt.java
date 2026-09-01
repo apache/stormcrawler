@@ -296,13 +296,18 @@ public class ParserBolt extends BaseRichBolt {
         }
 
         // emit each document/subdocument in the ParseResult object
-        // there should be at least one ParseData item for the "parent" URL
-        // but skip the ones which carry no content, no text and no metadata,
-        // as they have nothing useful for downstream consumers and generally
-        // stem from a lookup on a URL which was never parsed
+        // there should be at least one ParseData item for the "parent" URL.
+        // Entries other than the one for the URL being parsed which carry no
+        // content, no text and no metadata are skipped: they have nothing
+        // useful for downstream consumers and generally stem from a lookup on
+        // a URL which was never parsed. The entry for the URL itself is always
+        // emitted, even when a filter emptied it, so that its status keeps
+        // being updated downstream.
         for (Map.Entry<String, ParseData> doc : parse) {
             ParseData parseDoc = doc.getValue();
-            if (isEmptyDocument(parseDoc)) {
+            if (!doc.getKey().equals(url) && isEmptyDocument(parseDoc)) {
+                LOG.debug("Skipping empty ParseData for {}", doc.getKey());
+                eventCounter.scope("skipped_empty_documents").incrBy(1);
                 continue;
             }
 
