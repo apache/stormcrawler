@@ -105,7 +105,10 @@ public class WARCRecordFormat implements RecordFormat {
      * @return true if the name can safely be written as the name of a WARC field
      */
     static boolean isValidWarcFieldName(String name) {
-        return name != null && WARC_FIELD_NAME_PATTERN.matcher(name).matches();
+        if (name == null) {
+            return false;
+        }
+        return WARC_FIELD_NAME_PATTERN.matcher(name).matches();
     }
 
     /**

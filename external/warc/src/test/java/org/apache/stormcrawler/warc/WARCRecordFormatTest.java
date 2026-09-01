@@ -19,6 +19,7 @@ package org.apache.stormcrawler.warc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -121,6 +122,30 @@ class WARCRecordFormatTest {
                 assertEquals(p[0], ip.get());
             }
         }
+    }
+
+    @Test
+    void testWarcFieldNameValidation() {
+        assertFalse(WARCRecordFormat.isValidWarcFieldName(null), "null is not a field name");
+        assertFalse(WARCRecordFormat.isValidWarcFieldName(""), "empty string is not a field name");
+        assertFalse(
+                WARCRecordFormat.isValidWarcFieldName("hops FromSeed"),
+                "a space is not allowed in a field name");
+        assertFalse(
+                WARCRecordFormat.isValidWarcFieldName("hopsFromSeed: 1"),
+                "a colon is not allowed in a field name");
+        assertTrue(WARCRecordFormat.isValidWarcFieldName("via"));
+        assertTrue(WARCRecordFormat.isValidWarcFieldName("feed.description"));
+        assertTrue(WARCRecordFormat.isValidWarcFieldName("WARC-Truncated"));
+    }
+
+    @Test
+    void testSanitizeWarcFieldValue() {
+        assertNull(WARCRecordFormat.sanitizeWarcFieldValue(null));
+        assertEquals("unchanged", WARCRecordFormat.sanitizeWarcFieldValue("unchanged"));
+        assertEquals("a  b", WARCRecordFormat.sanitizeWarcFieldValue("a\r\nb"));
+        assertEquals("a b", WARCRecordFormat.sanitizeWarcFieldValue("a\rb"));
+        assertEquals("a b", WARCRecordFormat.sanitizeWarcFieldValue("a\nb"));
     }
 
     @Test
