@@ -162,11 +162,34 @@ public class ParserBolt extends BaseRichBolt {
         // check that the mimetype is in the whitelist
         if (!mimeTypeWhiteList.isEmpty()) {
             boolean mt_match = false;
-            // see if a mimetype was guessed in JSOUPBolt
+            // see if a mimetype was detected already (e.g. by JSoupParserBolt)
             String mimeType = metadata.getFirstValue("parse.Content-Type");
-            // otherwise rely on what could have been obtained from HTTP
             if (mimeType == null) {
-                mimeType = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, this.protocolMDprefix);
+                // parse.Content-Type is absent: detect from content bytes so that
+                // the whitelist is evaluated against the same type Tika will use
+                // to select a parser, not the server-declared HTTP header which is
+                // untrusted and may differ from what the bytes actually are.
+                String httpCTHint =
+                        metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, this.protocolMDprefix);
+                org.apache.tika.metadata.Metadata detectionMd =
+                        new org.apache.tika.metadata.Metadata();
+                if (StringUtils.isNotBlank(httpCTHint)) {
+                    // pass the header as a hint only — detect() weighs it but
+                    // content bytes take precedence
+                    detectionMd.set(
+                            org.apache.tika.metadata.Metadata.CONTENT_TYPE, httpCTHint);
+                }
+                try {
+                    mimeType =
+                            tika.detect(new ByteArrayInputStream(content), detectionMd);
+                } catch (IOException e) {
+                    LOG.warn("Failed to detect MIME type for {}: {}", url, e.getMessage());
+                }
+                if (mimeType != null) {
+                    // write back so downstream code and metadata consumers see
+                    // the same value (avoids a second detection pass)
+                    metadata.setValue("parse.Content-Type", mimeType);
+                }
             }
             if (mimeType != null) {
                 for (Pattern mt : mimeTypeWhiteList) {
