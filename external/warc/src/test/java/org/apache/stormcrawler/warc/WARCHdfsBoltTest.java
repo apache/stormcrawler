@@ -142,8 +142,7 @@ class WARCHdfsBoltTest {
         sha256Bolt.withConfigKey("warc");
         Map<String, Object> sha256Conf = new HashMap<>(conf);
         sha256Conf.put(
-                WARCRecordFormat.DIGEST_ALGORITHM_PARAM,
-                WARCRecordFormat.DIGEST_ALGORITHM_SHA256);
+                WARCRecordFormat.DIGEST_ALGORITHM_PARAM, WARCRecordFormat.DIGEST_ALGORITHM_SHA256);
         sha256Bolt.prepare(
                 sha256Conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
         try {

@@ -181,15 +181,16 @@ public class WARCRecordFormat implements RecordFormat {
         return switch (digestAlgorithm.trim().toLowerCase(Locale.ROOT).replace("-", "")) {
             case DIGEST_ALGORITHM_SHA1 -> "SHA-1";
             case DIGEST_ALGORITHM_SHA256 -> "SHA-256";
-            default -> throw new IllegalArgumentException(
-                    "Unsupported value ["
-                            + digestAlgorithm
-                            + "] for "
-                            + DIGEST_ALGORITHM_PARAM
-                            + ", supported algorithms: "
-                            + DIGEST_ALGORITHM_SHA1
-                            + ", "
-                            + DIGEST_ALGORITHM_SHA256);
+            default ->
+                    throw new IllegalArgumentException(
+                            "Unsupported value ["
+                                    + digestAlgorithm
+                                    + "] for "
+                                    + DIGEST_ALGORITHM_PARAM
+                                    + ", supported algorithms: "
+                                    + DIGEST_ALGORITHM_SHA1
+                                    + ", "
+                                    + DIGEST_ALGORITHM_SHA256);
         };
     }
 
@@ -218,10 +219,10 @@ public class WARCRecordFormat implements RecordFormat {
     }
 
     /**
-     * Base32-encode a digest value without the trailing &quot;=&quot; padding characters: the
-     * WARC digest fields define the digest value as a token, which does not allow the padding
-     * character (cf. ISO 28500 WARC 1.1, WARC-Block-Digest / WARC-Payload-Digest). SHA-1 digests
-     * are unaffected (32 characters without padding), while e.g. SHA-256 digests would end in
+     * Base32-encode a digest value without the trailing &quot;=&quot; padding characters: the WARC
+     * digest fields define the digest value as a token, which does not allow the padding character
+     * (cf. ISO 28500 WARC 1.1, WARC-Block-Digest / WARC-Payload-Digest). SHA-1 digests are
+     * unaffected (32 characters without padding), while e.g. SHA-256 digests would end in
      * &quot;====&quot;.
      */
     private static String base32Unpadded(byte[] digest) {

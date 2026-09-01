@@ -65,16 +65,15 @@ class WARCDigestAlgorithmTest {
             for (byte[] bytes : byteArrays) {
                 md.update(bytes);
             }
-            return prefix
-                    + StringUtils.stripEnd(new Base32().encodeAsString(md.digest()), "=");
+            return prefix + StringUtils.stripEnd(new Base32().encodeAsString(md.digest()), "=");
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
     }
 
     /**
-     * The bytes covered by the WARC-Block-Digest: everything between the end of the WARC header
-     * and the final CRLF CRLF.
+     * The bytes covered by the WARC-Block-Digest: everything between the end of the WARC header and
+     * the final CRLF CRLF.
      */
     private static byte[] recordBlock(String warcString) {
         int start = warcString.indexOf("\r\n\r\n") + 4;
@@ -112,8 +111,9 @@ class WARCDigestAlgorithmTest {
     @Test
     void testDigestValueContainsNoBase32Padding() {
         // the digest value is a token per the WARC 1.1 grammar and must not contain "="
-        String sha256 = new WARCRecordFormat("", WARCRecordFormat.DIGEST_ALGORITHM_SHA256)
-                .getDigest(CONTENT);
+        String sha256 =
+                new WARCRecordFormat("", WARCRecordFormat.DIGEST_ALGORITHM_SHA256)
+                        .getDigest(CONTENT);
         assertFalse(sha256.contains("="), "digest value must not contain Base32 padding");
         String sha1 = new WARCRecordFormat("").getDigest(CONTENT);
         assertFalse(sha1.contains("="), "digest value must not contain Base32 padding");
@@ -176,7 +176,8 @@ class WARCDigestAlgorithmTest {
         // no verbatim HTTP headers stored -> resource record, block digest equals payload digest
         Metadata metadata = new Metadata();
         Tuple tuple = tupleWithContent(metadata);
-        WARCRecordFormat format = new WARCRecordFormat("", WARCRecordFormat.DIGEST_ALGORITHM_SHA256);
+        WARCRecordFormat format =
+                new WARCRecordFormat("", WARCRecordFormat.DIGEST_ALGORITHM_SHA256);
         String warcString = new String(format.format(tuple), StandardCharsets.UTF_8);
         assertTrue(warcString.contains("\r\nWARC-Type: resource\r\n"));
         assertTrue(
@@ -214,7 +215,8 @@ class WARCDigestAlgorithmTest {
         when(tuple.getStringByField("url")).thenReturn(URL);
         when(tuple.getValueByField("metadata")).thenReturn(metadata);
         MetadataRecordFormat format =
-                new MetadataRecordFormat(List.of("source"), WARCRecordFormat.DIGEST_ALGORITHM_SHA256);
+                new MetadataRecordFormat(
+                        List.of("source"), WARCRecordFormat.DIGEST_ALGORITHM_SHA256);
         String warcString = new String(format.format(tuple), StandardCharsets.UTF_8);
 
         // the payload of the metadata record are the metadata fields themselves
