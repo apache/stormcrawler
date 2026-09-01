@@ -19,7 +19,6 @@ package org.apache.stormcrawler.parse.filter;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +34,8 @@ import org.w3c.dom.DocumentFragment;
 
 /**
  * Rewrites single metadata containing comma separated values into multiple values for the same key,
- * useful for instance for keyword tags.
+ * useful for instance for keyword tags. The number of values produced from a single entry is
+ * bounded by the optional {@code maxTokens} parameter, 128 by default.
  */
 public class CommaSeparatedToMultivaluedMetadata extends ParseFilter {
 
@@ -43,11 +43,10 @@ public class CommaSeparatedToMultivaluedMetadata extends ParseFilter {
             LoggerFactory.getLogger(CommaSeparatedToMultivaluedMetadata.class);
 
     /**
-     * Default upper bound on the number of tokens a single value is split into. It is above what a
-     * page fetched with the archetype's default 65536 byte http.content.limit can produce, yet
-     * bounds the metadata a page can generate when the content limit is raised.
+     * Default upper bound on the number of values a single comma separated entry can produce, so
+     * that a page cannot generate an unbounded amount of metadata.
      */
-    private static final int MAX_TOKENS_DEFAULT = 65536;
+    private static final int MAX_TOKENS_DEFAULT = 128;
 
     private final Set<String> keys = new HashSet<>();
 
@@ -83,21 +82,21 @@ public class CommaSeparatedToMultivaluedMetadata extends ParseFilter {
             }
             m.remove(key);
             String[] tokens = val.split(" *, *");
-            if (tokens.length > maxTokens) {
-                LOG.warn(
-                        "Value of key [{}] split into [{}] tokens, keeping only the first [{}]",
-                        key,
-                        tokens.length,
-                        maxTokens);
-                tokens = Arrays.copyOf(tokens, maxTokens);
-            }
-            // store all tokens in one call: appending one token at a time copies the whole array
-            // for every token; blank tokens are dropped, as Metadata.addValue used to
+            // drop blank tokens, as Metadata.addValue used to, then store everything in one call:
+            // appending one token at a time copies the whole array for every token
             List<String> values = new ArrayList<>(tokens.length);
             for (String t : tokens) {
                 if (StringUtils.isNotBlank(t)) {
                     values.add(t);
                 }
+            }
+            if (values.size() > maxTokens) {
+                LOG.warn(
+                        "Key [{}] has [{}] comma separated values, keeping only the first [{}]",
+                        key,
+                        values.size(),
+                        maxTokens);
+                values.subList(maxTokens, values.size()).clear();
             }
             m.setValues(key, values.toArray(new String[0]));
         }

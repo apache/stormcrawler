@@ -209,7 +209,7 @@ The archetype includes a default link:https://github.com/apache/stormcrawler/blo
 }
 ----
 
-* **CommaSeparatedToMultivaluedMetadata** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/CommaSeparatedToMultivaluedMetadata.java[CommaSeparatedToMultivaluedMetadata] rewrites single metadata values containing comma-separated entries into multiple values for the same key, useful for keyword tags.
+* **CommaSeparatedToMultivaluedMetadata** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/CommaSeparatedToMultivaluedMetadata.java[CommaSeparatedToMultivaluedMetadata] rewrites single metadata values containing comma-separated entries into multiple values for the same key, useful for keyword tags. The number of values produced from a single entry is bounded by the optional `maxTokens` parameter (128 by default), so that a page cannot generate an unbounded amount of metadata.
 * **DebugParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/DebugParseFilter.java[DebugParseFilter] dumps an XML representation of the DOM structure to a temporary file.
 * **DomainParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/DomainParseFilter.java[DomainParseFilter] stores the domain or host name in the metadata for later indexing.
 * **LDJsonParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/LDJsonParseFilter.java[LDJsonParseFilter] extracts data from JSON-LD representations.

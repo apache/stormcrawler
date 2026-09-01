@@ -38,9 +38,10 @@ class CommaSeparatedToMultivaluedMetadataTest {
         }
     }
 
-    private static CommaSeparatedToMultivaluedMetadata newFilter() throws Exception {
+    private static CommaSeparatedToMultivaluedMetadata newFilter(String jsonParams)
+            throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        JsonNode params = mapper.readTree("{\"keys\": [\"parse.keywords\"]}");
+        JsonNode params = mapper.readTree(jsonParams);
         CommaSeparatedToMultivaluedMetadata filter = new CommaSeparatedToMultivaluedMetadata();
         filter.configure(Map.of(), params);
         return filter;
@@ -66,7 +67,9 @@ class CommaSeparatedToMultivaluedMetadataTest {
         ParseResult parse = new ParseResult();
         parse.set(url, md);
 
-        newFilter().filter(url, new byte[0], null, parse);
+        // the default cap is deliberately small; the bulk write path is what is under test here
+        newFilter("{\"keys\": [\"parse.keywords\"], \"maxTokens\": 1000}")
+                .filter(url, new byte[0], null, parse);
 
         Assertions.assertEquals(1000, md.getValues("parse.keywords").length);
         Assertions.assertTrue(
@@ -77,9 +80,9 @@ class CommaSeparatedToMultivaluedMetadataTest {
     }
 
     @Test
-    void timeAtArchetypeContentLimit() throws Exception {
+    void timeLargeValue() throws Exception {
         final String url = "https://example.com/";
-        // 65536 chars, the http.content.limit used by the archetype configuration
+        // 32768 tokens / 65535 chars, far beyond any realistic tag list
         String value = commaList(32768);
         Assertions.assertEquals(65535, value.length());
 
@@ -89,7 +92,9 @@ class CommaSeparatedToMultivaluedMetadataTest {
         parse.set(url, md);
 
         long start = System.nanoTime();
-        newFilter().filter(url, new byte[0], null, parse);
+        // the default cap is deliberately small; the bulk write path is what is under test here
+        newFilter("{\"keys\": [\"parse.keywords\"], \"maxTokens\": 65536}")
+                .filter(url, new byte[0], null, parse);
         long msec = (System.nanoTime() - start) / 1_000_000;
 
         System.out.println("32768 tokens took " + msec + " ms");
@@ -97,7 +102,7 @@ class CommaSeparatedToMultivaluedMetadataTest {
     }
 
     @Test
-    void splittingHandlesBlankTokensAndCap() throws Exception {
+    void splittingHandlesBlankTokens() throws Exception {
         final String url = "https://example.com/";
 
         // empty tokens between consecutive commas are dropped, as Metadata.addValue used to
@@ -105,7 +110,7 @@ class CommaSeparatedToMultivaluedMetadataTest {
         md.setValue("parse.keywords", "a,,b");
         ParseResult parse = new ParseResult();
         parse.set(url, md);
-        newFilter().filter(url, new byte[0], null, parse);
+        newFilter("{\"keys\": [\"parse.keywords\"]}").filter(url, new byte[0], null, parse);
         Assertions.assertArrayEquals(new String[] {"a", "b"}, md.getValues("parse.keywords"));
 
         // a value made only of empty tokens leaves no entry behind
@@ -113,19 +118,33 @@ class CommaSeparatedToMultivaluedMetadataTest {
         md.setValue("parse.keywords", " , ,");
         parse = new ParseResult();
         parse.set(url, md);
-        newFilter().filter(url, new byte[0], null, parse);
+        newFilter("{\"keys\": [\"parse.keywords\"]}").filter(url, new byte[0], null, parse);
         Assertions.assertNull(md.getValues("parse.keywords"));
+    }
 
-        // values with more tokens than maxTokens are trimmed
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode params = mapper.readTree("{\"keys\": [\"parse.keywords\"], \"maxTokens\": 2}");
-        CommaSeparatedToMultivaluedMetadata filter = new CommaSeparatedToMultivaluedMetadata();
-        filter.configure(Map.of(), params);
-        md = new Metadata();
-        md.setValue("parse.keywords", "a,b,c,d");
-        parse = new ParseResult();
+    @Test
+    void capAppliesAfterBlankTokensAreDropped() throws Exception {
+        final String url = "https://example.com/";
+
+        // the cap counts real values: blank tokens must not eat into it
+        Metadata md = new Metadata();
+        md.setValue("parse.keywords", ",,,a,b,c");
+        ParseResult parse = new ParseResult();
         parse.set(url, md);
-        filter.filter(url, new byte[0], null, parse);
+        newFilter("{\"keys\": [\"parse.keywords\"], \"maxTokens\": 2}")
+                .filter(url, new byte[0], null, parse);
         Assertions.assertArrayEquals(new String[] {"a", "b"}, md.getValues("parse.keywords"));
+    }
+
+    @Test
+    void defaultCapTrimsLongValues() throws Exception {
+        final String url = "https://example.com/";
+
+        Metadata md = new Metadata();
+        md.setValue("parse.keywords", commaList(200));
+        ParseResult parse = new ParseResult();
+        parse.set(url, md);
+        newFilter("{\"keys\": [\"parse.keywords\"]}").filter(url, new byte[0], null, parse);
+        Assertions.assertEquals(128, md.getValues("parse.keywords").length);
     }
 }
