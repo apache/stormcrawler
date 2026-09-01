@@ -162,7 +162,9 @@ public class ParserBolt extends BaseRichBolt {
         // check that the mimetype is in the whitelist
         if (!mimeTypeWhiteList.isEmpty()) {
             boolean mt_match = false;
-            // see if a mimetype was detected already (e.g. by JSoupParserBolt)
+            // parse.Content-Type is assumed byte-detected (JSoupParserBolt uses Tika detection,
+            // not the raw server header). A custom upstream writing a header-copied value bypasses
+            // this check — that is a caller responsibility.
             String mimeType = metadata.getFirstValue("parse.Content-Type");
             if (mimeType == null) {
                 // parse.Content-Type is absent: detect from content bytes so that
@@ -177,6 +179,15 @@ public class ParserBolt extends BaseRichBolt {
                     // pass the header as a hint only — detect() weighs it but
                     // content bytes take precedence
                     detectionMd.set(org.apache.tika.metadata.Metadata.CONTENT_TYPE, httpCTHint);
+                }
+                // pass the filename so detection matches what the parser dispatches on;
+                // without it, an ambiguous byte sequence (e.g. plain text with a .html
+                // extension) can resolve differently here than at parse time
+                try {
+                    URL _url = URLUtil.toURL(url);
+                    detectionMd.set(TikaCoreProperties.RESOURCE_NAME_KEY, _url.getFile());
+                } catch (MalformedURLException e1) {
+                    throw new IllegalStateException("Malformed URL", e1);
                 }
                 try {
                     mimeType = tika.detect(new ByteArrayInputStream(content), detectionMd);

@@ -111,4 +111,35 @@ class ParserBoltWhitelistDetectionTest extends ParsingTester {
                 status != null && status.stream().anyMatch(row -> Status.ERROR.equals(row.get(2)));
         Assertions.assertFalse(hasError, "whitelisted HTML document should not be rejected");
     }
+
+    /**
+     * Plain-text bytes with a .html URL extension. Without the filename hint, Tika resolves the
+     * ambiguous bytes as text/plain; with it, the extension pushes detection to text/html. The
+     * whitelist is set to text/html.*, so the document must be accepted — verifying that the same
+     * RESOURCE_NAME_KEY hint is passed to both the whitelist check and the parser dispatch.
+     */
+    @Test
+    void filenameHintInfluencesDetection() throws IOException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put("parser.mimetype.whitelist", "text/html.*");
+        conf.put(ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "http.");
+        bolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        // no parse.Content-Type, no Content-Type header — detection relies on bytes + filename
+        Metadata metadata = new Metadata();
+
+        // plain text bytes: no HTML magic, ambiguous without the filename hint
+        byte[] content = "just some plain text, no html tags".getBytes(StandardCharsets.UTF_8);
+
+        // .html extension should push detection to text/html
+        parse("https://example.org/page.html", content, metadata);
+
+        System.out.println("detected type: " + metadata.getFirstValue("parse.Content-Type"));
+
+        List<List<Object>> status = output.getEmitted(Constants.StatusStreamName);
+        boolean hasError =
+                status != null && status.stream().anyMatch(row -> Status.ERROR.equals(row.get(2)));
+        Assertions.assertFalse(
+                hasError, "document with .html URL should be accepted by text/html.* whitelist");
+    }
 }
