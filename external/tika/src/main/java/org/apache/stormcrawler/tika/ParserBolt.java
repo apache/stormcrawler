@@ -176,12 +176,10 @@ public class ParserBolt extends BaseRichBolt {
                 if (StringUtils.isNotBlank(httpCTHint)) {
                     // pass the header as a hint only — detect() weighs it but
                     // content bytes take precedence
-                    detectionMd.set(
-                            org.apache.tika.metadata.Metadata.CONTENT_TYPE, httpCTHint);
+                    detectionMd.set(org.apache.tika.metadata.Metadata.CONTENT_TYPE, httpCTHint);
                 }
                 try {
-                    mimeType =
-                            tika.detect(new ByteArrayInputStream(content), detectionMd);
+                    mimeType = tika.detect(new ByteArrayInputStream(content), detectionMd);
                 } catch (IOException e) {
                     LOG.warn("Failed to detect MIME type for {}: {}", url, e.getMessage());
                 }

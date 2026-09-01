@@ -50,9 +50,9 @@ class ParserBoltWhitelistDetectionTest extends ParsingTester {
     }
 
     /**
-     * The whitelist allows Word documents (application/.+word.*). The server header claims
-     * Word, but the body bytes are plain HTML. After the fix, detection on bytes yields
-     * text/html which does NOT match the whitelist, so the document must be rejected with ERROR.
+     * The whitelist allows Word documents (application/.+word.*). The server header claims Word,
+     * but the body bytes are plain HTML. After the fix, detection on bytes yields text/html which
+     * does NOT match the whitelist, so the document must be rejected with ERROR.
      */
     @Test
     void whitelistAppliesToTheDetectedType() throws IOException {
@@ -87,8 +87,8 @@ class ParserBoltWhitelistDetectionTest extends ParsingTester {
     }
 
     /**
-     * Sanity check: when parse.Content-Type IS already present (e.g. set by JSoupParserBolt),
-     * the whitelist check must still use it directly and not re-detect.
+     * Sanity check: when parse.Content-Type IS already present (e.g. set by JSoupParserBolt), the
+     * whitelist check must still use it directly and not re-detect.
      */
     @Test
     void whitelistUsesPreexistingParsedContentType() throws IOException {
@@ -102,16 +102,13 @@ class ParserBoltWhitelistDetectionTest extends ParsingTester {
         metadata.addValue("parse.Content-Type", "text/html; charset=UTF-8");
         metadata.addValue("http." + HttpHeaders.CONTENT_TYPE, "text/html; charset=UTF-8");
 
-        byte[] content =
-                "<html><body><p>hello</p></body></html>".getBytes(StandardCharsets.UTF_8);
+        byte[] content = "<html><body><p>hello</p></body></html>".getBytes(StandardCharsets.UTF_8);
         parse("https://example.org/index.html", content, metadata);
 
         // document should pass the whitelist and be emitted (no ERROR on status stream)
         List<List<Object>> status = output.getEmitted(Constants.StatusStreamName);
         boolean hasError =
-                status != null
-                        && status.stream()
-                                .anyMatch(row -> Status.ERROR.equals(row.get(2)));
+                status != null && status.stream().anyMatch(row -> Status.ERROR.equals(row.get(2)));
         Assertions.assertFalse(hasError, "whitelisted HTML document should not be rejected");
     }
 }
