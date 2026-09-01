@@ -306,6 +306,28 @@ NOTE: When a proxy is configured, the connection is established to the proxy and
 proxy's IP address rather than the target host's resolved address. IP filtering is therefore
 effectively disabled for proxied fetches.
 
+==== Adaptive URL normalization
+
+The values below are shared by the xref:internals.adoc#adaptivenormalizer[AdaptiveURLNormalizer] and
+its companion `CanonicalParamLearner`. They are read from the Storm configuration rather than from
+the JSON filter definitions so that the learning and the filtering sides cannot be configured
+differently. They have no effect unless both components are declared.
+
+[cols="1,1,3", options="header"]
+|===
+| key | default value | description
+
+| adaptive.normalizer.canonical.key | canonical | Metadata key holding the value of the canonical tag, as extracted by the `XPathFilter`.
+| adaptive.normalizer.scope | host | Whether the rules are learnt per `host` or per `domain`.
+| adaptive.normalizer.min.observations | 5 | Number of distinct pages a parameter must have been seen on before it can be removed.
+| adaptive.normalizer.min.distinct.paths | 3 | Number of distinct paths whose canonical must have dropped the parameter. Guards against self-referencing canonicals on paginated listings, which are confined to a single path.
+| adaptive.normalizer.confidence | 0.9 | Proportion of the canonical tags which must have dropped the parameter.
+| adaptive.normalizer.max.scopes | 10000 | Maximum number of hosts or domains tracked.
+| adaptive.normalizer.max.params | 100 | Maximum number of parameters tracked per host or domain. When full, the parameter with the least evidence is discarded.
+| adaptive.normalizer.max.cached.sources | 50000 | Maximum number of source URLs remembered, so that a page counts as a single observation however many outlinks it has and however many times it is refetched.
+| adaptive.normalizer.protected.params | see description | Parameters which are never removed, however consistently the canonical tags drop them. Defaults to `page`, `p`, `pg`, `paged`, `offset`, `start`, `from`, `limit`, `per_page`, `q`, `query`, `s`, `search`, `keyword`, `keywords`, `sort`, `order`, `dir`, `lang`, `language`, `hl`, `locale`, `id`, `category`, `cat`, `tag`, `year`, `month`, `day`, `view`, `format` and `type`. Set to an empty list to disable.
+|===
+
 ==== Indexing
 
 The values below are used by sub-classes of `AbstractIndexerBolt`.

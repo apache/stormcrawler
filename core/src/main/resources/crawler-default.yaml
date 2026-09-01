@@ -93,6 +93,22 @@ config:
   metadata.track.path: true
   metadata.track.depth: true
 
+  # Shared by the AdaptiveURLNormalizer and its companion CanonicalParamLearner. Both are
+  # optional and must be declared in urlfilters.json / parsefilters.json to have any effect.
+  adaptive.normalizer.canonical.key: "canonical"
+  adaptive.normalizer.scope: "host"
+  adaptive.normalizer.min.observations: 5
+  # distinct paths required: guards against self-referencing canonicals on paginated listings
+  adaptive.normalizer.min.distinct.paths: 3
+  adaptive.normalizer.confidence: 0.9
+  adaptive.normalizer.max.scopes: 10000
+  adaptive.normalizer.max.params: 100
+  adaptive.normalizer.max.cached.sources: 50000
+  # overrides the built-in list of parameters which are never removed (page, offset, q, id, ...)
+  # adaptive.normalizer.protected.params:
+  #  - page
+  #  - q
+
   # Agent name info - given here as an example. Do not be an anonymous coward, use your real information!
   # The full user agent value sent as part of the HTTP requests
   # is built from the elements below. Only the agent.name is mandatory,
