@@ -51,10 +51,22 @@ public class MetadataRecordFormat extends WARCRecordFormat {
 
     private final List<String> metadataKeys;
 
+    /**
+     * Creates a metadata record format computing the digests with the default algorithm (SHA-1).
+     */
     public MetadataRecordFormat(List<String> metadataKeys) {
         this(metadataKeys, WARCRecordFormat.DIGEST_ALGORITHM_SHA1);
     }
 
+    /**
+     * Creates a metadata record format computing the WARC-Block-Digest field with the given
+     * algorithm.
+     *
+     * @param metadataKeys metadata keys to include as fields of the metadata record
+     * @param digestAlgorithm algorithm for the digest fields; see {@link
+     *     WARCRecordFormat#WARCRecordFormat(String, String)}
+     * @throws IllegalArgumentException if the value is not a supported algorithm
+     */
     public MetadataRecordFormat(List<String> metadataKeys, String digestAlgorithm) {
         super("", digestAlgorithm);
         // the keys are fixed configuration: validate them once here instead of

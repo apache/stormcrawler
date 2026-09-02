@@ -98,6 +98,26 @@ class WARCDigestAlgorithmTest {
                 "digest algorithm must default to SHA-1");
         // a null algorithm must be treated as the default
         assertEquals(SHA1_ABCDEF, new WARCRecordFormat("", null).getDigest(CONTENT));
+        // a blank algorithm must be treated as the default as well
+        assertEquals(SHA1_ABCDEF, new WARCRecordFormat("", "").getDigest(CONTENT));
+        assertEquals(SHA1_ABCDEF, new WARCRecordFormat("", "   ").getDigest(CONTENT));
+    }
+
+    @Test
+    void testGetDigestRejectsNullBytes() {
+        WARCRecordFormat format = new WARCRecordFormat("");
+        assertThrows(
+                NullPointerException.class,
+                () -> format.getDigest(null),
+                "getDigest(byte[]) must reject null input");
+        assertThrows(
+                NullPointerException.class,
+                () -> format.getDigest(CONTENT, null),
+                "getDigest(byte[], byte[]) must reject null input");
+        assertThrows(
+                NullPointerException.class,
+                () -> format.getDigest(null, CONTENT),
+                "getDigest(byte[], byte[]) must reject null input");
     }
 
     @Test

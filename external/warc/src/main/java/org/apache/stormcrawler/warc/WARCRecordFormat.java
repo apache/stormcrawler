@@ -33,6 +33,7 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -156,10 +157,28 @@ public class WARCRecordFormat implements RecordFormat {
 
     private final String digestNoContent;
 
+    /**
+     * Creates a record format computing the digests with the default algorithm (SHA-1).
+     *
+     * @param protocolMDprefix prefix of the metadata keys holding the protocol response, as set by
+     *     {@code protocol.md.prefix}; may be empty
+     */
     public WARCRecordFormat(String protocolMDprefix) {
         this(protocolMDprefix, DIGEST_ALGORITHM_SHA1);
     }
 
+    /**
+     * Creates a record format computing the WARC-Payload-Digest and WARC-Block-Digest fields with
+     * the given algorithm.
+     *
+     * @param protocolMDprefix prefix of the metadata keys holding the protocol response, as set by
+     *     {@code protocol.md.prefix}; may be empty
+     * @param digestAlgorithm algorithm for the digest fields, {@value #DIGEST_ALGORITHM_SHA1} (the
+     *     default) or {@value #DIGEST_ALGORITHM_SHA256}; matched case-insensitively with an
+     *     optional hyphen, surrounding whitespace is trimmed. A {@code null} or blank value selects
+     *     the default SHA-1.
+     * @throws IllegalArgumentException if the value is not a supported algorithm
+     */
     public WARCRecordFormat(String protocolMDprefix, String digestAlgorithm) {
         this.protocolMDprefix = protocolMDprefix;
         this.digestJCAName = getDigestJCAName(digestAlgorithm);
@@ -172,10 +191,12 @@ public class WARCRecordFormat implements RecordFormat {
      * matched case-insensitively and an optional hyphen is ignored, i.e. &quot;sha256&quot;,
      * &quot;SHA-256&quot; etc. are all accepted.
      *
+     * @param digestAlgorithm algorithm to resolve; {@code null} or blank selects the default SHA-1
+     * @return the JCA name of the message digest, e.g. &quot;SHA-1&quot;
      * @throws IllegalArgumentException if the value is not a supported algorithm
      */
     private static String getDigestJCAName(String digestAlgorithm) {
-        if (digestAlgorithm == null) {
+        if (StringUtils.isBlank(digestAlgorithm)) {
             return "SHA-1";
         }
         return switch (digestAlgorithm.trim().toLowerCase(Locale.ROOT).replace("-", "")) {
@@ -197,10 +218,13 @@ public class WARCRecordFormat implements RecordFormat {
     /**
      * Compute the digest of the given bytes with the configured algorithm.
      *
+     * @param bytes bytes to digest, must not be null
      * @return digest in the form &quot;&lt;algorithm&gt;:&lt;base32&gt;&quot;, e.g.
      *     &quot;sha1:...&quot;
+     * @throws NullPointerException if the input is null
      */
     public String getDigest(byte[] bytes) {
+        Objects.requireNonNull(bytes, "bytes to digest must not be null");
         MessageDigest md = DigestUtils.getDigest(digestJCAName);
         return digestPrefix + base32Unpadded(md.digest(bytes));
     }
@@ -209,10 +233,15 @@ public class WARCRecordFormat implements RecordFormat {
      * Compute the digest of the concatenation of the two given byte arrays with the configured
      * algorithm.
      *
+     * @param bytes1 first bytes to digest, must not be null
+     * @param bytes2 second bytes to digest, must not be null
      * @return digest in the form &quot;&lt;algorithm&gt;:&lt;base32&gt;&quot;, e.g.
      *     &quot;sha1:...&quot;
+     * @throws NullPointerException if one of the inputs is null
      */
     public String getDigest(byte[] bytes1, byte[] bytes2) {
+        Objects.requireNonNull(bytes1, "first bytes to digest must not be null");
+        Objects.requireNonNull(bytes2, "second bytes to digest must not be null");
         MessageDigest md = DigestUtils.getDigest(digestJCAName);
         md.update(bytes1);
         return digestPrefix + base32Unpadded(md.digest(bytes2));
@@ -227,26 +256,6 @@ public class WARCRecordFormat implements RecordFormat {
      */
     private static String base32Unpadded(byte[] digest) {
         return StringUtils.stripEnd(base32.encodeAsString(digest), "=");
-    }
-
-    /**
-     * @deprecated use {@link #getDigest(byte[])} instead; the algorithm is set by {@link
-     *     #DIGEST_ALGORITHM_PARAM} and no longer fixed to SHA-1
-     */
-    @Deprecated
-    public static String getDigestSha1(byte[] bytes) {
-        return "sha1:" + base32.encodeAsString(DigestUtils.sha1(bytes));
-    }
-
-    /**
-     * @deprecated use {@link #getDigest(byte[], byte[])} instead; the algorithm is set by {@link
-     *     #DIGEST_ALGORITHM_PARAM} and no longer fixed to SHA-1
-     */
-    @Deprecated
-    public static String getDigestSha1(byte[] bytes1, byte[] bytes2) {
-        MessageDigest sha1 = DigestUtils.getSha1Digest();
-        sha1.update(bytes1);
-        return "sha1:" + base32.encodeAsString(sha1.digest(bytes2));
     }
 
     /** Generates a WARC info entry which can be stored at the beginning of each WARC file. */
