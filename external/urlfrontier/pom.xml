@@ -37,7 +37,7 @@ under the License.
     <description>URL Frontier resources for StormCrawler</description>
 
     <properties>
-        <urlfrontier.version>2.5</urlfrontier.version>
+        <urlfrontier.version>2.6</urlfrontier.version>
         <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
         <jacoco.classRatio>0.50</jacoco.classRatio>
         <jacoco.instructionRatio>0.49</jacoco.instructionRatio>

@@ -24,6 +24,23 @@ urlfrontier.max.buckets: 10
 urlfrontier.max.urls.per.bucket:10
 ```
 
+## Sending discovered URLs in batches
+
+`StatusUpdaterBolt` sends known URLs (fetched, redirections, errors...) to the frontier's
+`PutURLs` endpoint one message at a time, and discovered URLs, which are the bulk of what a
+crawl writes, through the batched `PutDiscovered` endpoint introduced in
+[URLFrontier 2.6](https://github.com/crawler-commons/url-frontier/releases/tag/2.6). Up to
+
+```
+urlfrontier.batch.size: 100
+```
+
+discovered URLs are grouped into one message, which amortises the per-message cost that limits
+the ingestion rate. A partially filled batch is sent after a second at the latest, so that acks
+are not delayed when the crawl tails off. Set `urlfrontier.batch.size` to 0 to send every URL
+individually. If the frontier predates 2.6 and does not implement `PutDiscovered`, the bolt
+detects it and falls back to sending discovered URLs individually on the streaming endpoint.
+
 ## Robots crawl-delay pacing
 
 `QueueRegulatorBolt` can pace host queues when a robots.txt Crawl-delay exceeds the fetcher's local

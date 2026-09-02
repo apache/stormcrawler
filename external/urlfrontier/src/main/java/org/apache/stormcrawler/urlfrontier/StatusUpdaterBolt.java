@@ -18,6 +18,8 @@
 package org.apache.stormcrawler.urlfrontier;
 
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_ADDRESS_KEY;
+import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_BATCH_SIZE_DEFAULT;
+import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_BATCH_SIZE_KEY;
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_CACHE_EXPIREAFTER_SEC_KEY;
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_CRAWL_ID_KEY;
 import static org.apache.stormcrawler.urlfrontier.Constants.URLFRONTIER_DEFAULT_HOST;
@@ -37,6 +39,8 @@ import crawlercommons.urlfrontier.CrawlID;
 import crawlercommons.urlfrontier.URLFrontierGrpc;
 import crawlercommons.urlfrontier.URLFrontierGrpc.URLFrontierStub;
 import crawlercommons.urlfrontier.Urlfrontier.AckMessage;
+import crawlercommons.urlfrontier.Urlfrontier.BatchAck;
+import crawlercommons.urlfrontier.Urlfrontier.DiscoveredBatch;
 import crawlercommons.urlfrontier.Urlfrontier.DiscoveredURLItem;
 import crawlercommons.urlfrontier.Urlfrontier.KnownURLItem;
 import crawlercommons.urlfrontier.Urlfrontier.StringList;
@@ -45,7 +49,12 @@ import crawlercommons.urlfrontier.Urlfrontier.URLInfo;
 import crawlercommons.urlfrontier.Urlfrontier.URLItem;
 import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
+import io.grpc.StatusRuntimeException;
+import io.grpc.stub.ClientCallStreamObserver;
+import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -53,8 +62,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -73,15 +85,39 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Persists the status of URLs in a URLFrontier service.
+ *
+ * <p>Known URLs (fetched, redirections, errors...) are sent one message at a time on the streaming
+ * {@code PutURLs} endpoint. Discovered URLs, which are the bulk of what a crawl writes, are grouped
+ * into batches and pushed on the batched {@code PutDiscovered} endpoint introduced in URLFrontier
+ * 2.6, which amortises the per-message cost that limits the ingestion rate. A partially filled
+ * batch is sent after a second at the latest, so that acks are not delayed when the crawl tails
+ * off. If the frontier does not implement {@code PutDiscovered}, the bolt detects it and falls back
+ * to sending discovered URLs individually on the streaming endpoint.
+ *
+ * <p>Flow control follows the client implementation shipped with URLFrontier
+ * (crawlercommons.urlfrontier.client.PutURLs): the sends wait on a monitor woken by the acks and by
+ * the transport's on-ready notifications, instead of polling.
+ */
 public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         implements RemovalListener<String, List<Tuple>>,
                 StreamObserver<crawlercommons.urlfrontier.Urlfrontier.AckMessage> {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatusUpdaterBolt.class);
 
+    /** how long a partially filled batch is held back before it is sent anyway */
+    private static final long BATCH_FLUSH_DELAY_MS = 1000;
+
+    /** how often the flusher checks whether a batch is due */
+    private static final long FLUSH_CHECK_INTERVAL_MS = 100;
+
     private ManagedChannel channel;
     private URLPartitioner partitioner;
-    private StreamObserver<URLItem> requestObserver;
+    private volatile URLFrontierStub frontier;
+    private volatile StreamObserver<URLItem> requestObserver;
+    private volatile StreamObserver<DiscoveredBatch> batchRequestObserver;
+    private volatile ClientCallStreamObserver<DiscoveredBatch> batchTransport;
 
     private Cache<String, List<Tuple>> waitAck;
 
@@ -99,6 +135,43 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
 
     /** Globally set crawlID * */
     private String globalCrawlID;
+
+    /** max number of discovered URLs per batch message; 0 sends them individually */
+    private volatile int batchSize = URLFRONTIER_BATCH_SIZE_DEFAULT;
+
+    /** when the oldest item currently buffered was added, 0 when the buffer is empty */
+    private long oldestBufferedAt;
+
+    /** true as long as the frontier is expected to implement the PutDiscovered endpoint */
+    private volatile boolean batching;
+
+    /** discovered URLs waiting to be sent as one batch */
+    private final ArrayDeque<URLItem> batchBuffer = new ArrayDeque<>();
+
+    /** batches sent but not acked yet, keyed by the ID echoed back in the BatchAck */
+    private final Map<String, List<URLItem>> pendingBatches = new HashMap<>();
+
+    /** guards the batch buffer, the pending batches and the batch stream reference */
+    private final Object batchLock = new Object();
+
+    /**
+     * guards the onNext calls on both gRPC streams: they come from the Storm executor thread and
+     * from the gRPC callback threads
+     */
+    private final Object sendLock = new Object();
+
+    private final AtomicInteger batchSequences = new AtomicInteger();
+
+    private ScheduledExecutorService batchFlusher;
+
+    /**
+     * notified when permits are released and when a transport becomes ready, so that throttled
+     * sends wake up as soon as they can proceed instead of polling
+     */
+    private final Object flow = new Object();
+
+    /** set once the bolt is shutting down; the callbacks must not act on it anymore */
+    private volatile boolean closed;
 
     @Override
     public void prepare(
@@ -128,7 +201,15 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
                 ConfUtils.getInt(
                         stormConf, URLFRONTIER_UPDATER_MAX_MESSAGES_KEY, maxMessagesInFlight);
 
+        batchSize = ConfUtils.getInt(stormConf, URLFRONTIER_BATCH_SIZE_KEY, batchSize);
+        batching = batchSize > 0;
+
         LOG.info("Allowing up to {} message(s) in flight", maxMessagesInFlight);
+        if (batching) {
+            LOG.info("Sending up to {} discovered URL(s) per batch", batchSize);
+        } else {
+            LOG.info("Discovered URLs sent individually - batching disabled");
+        }
 
         // Fairness not necessary, we are not in a hurry, as long as we may be processed at some
         // point.
@@ -195,16 +276,98 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         channel = ManagedChannelUtil.createChannel(address);
         channel.notifyWhenStateChanged(
                 ConnectivityState.SHUTDOWN, () -> onChannelStateChange(ConnectivityState.SHUTDOWN));
-        URLFrontierStub frontier = URLFrontierGrpc.newStub(channel).withWaitForReady();
-        requestObserver = frontier.putURLs(this);
+
+        frontier = URLFrontierGrpc.newStub(channel).withWaitForReady();
+        requestObserver = newPutURLsStream();
+
+        if (batching) {
+            batchRequestObserver = newPutDiscoveredStream();
+            batchFlusher = Executors.newSingleThreadScheduledExecutor(
+                    runnable -> {
+                        Thread thread = new Thread(runnable, "URLFrontier-batch-flusher");
+                        thread.setDaemon(true);
+                        return thread;
+                    });
+            batchFlusher.scheduleWithFixedDelay(
+                    this::flushBatchIfDue,
+                    FLUSH_CHECK_INTERVAL_MS,
+                    FLUSH_CHECK_INTERVAL_MS,
+                    TimeUnit.MILLISECONDS);
+        }
+    }
+
+    /** Opens a streaming PutURLs call whose acks are handled by this bolt. */
+    private StreamObserver<URLItem> newPutURLsStream() {
+        return frontier.putURLs(
+                new ClientResponseObserver<URLItem, AckMessage>() {
+
+                    @Override
+                    public void beforeStart(ClientCallStreamObserver<URLItem> stream) {
+                        stream.setOnReadyHandler(
+                                () -> {
+                                    synchronized (flow) {
+                                        flow.notifyAll();
+                                    }
+                                });
+                    }
+
+                    @Override
+                    public void onNext(AckMessage value) {
+                        StatusUpdaterBolt.this.onNext(value);
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        StatusUpdaterBolt.this.onError(t);
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        StatusUpdaterBolt.this.onCompleted();
+                    }
+                });
+    }
+
+    /** Opens a batched PutDiscovered call; the server acks a whole batch with one BatchAck. */
+    private StreamObserver<DiscoveredBatch> newPutDiscoveredStream() {
+        return frontier.putDiscovered(
+                new ClientResponseObserver<DiscoveredBatch, BatchAck>() {
+
+                    @Override
+                    public void beforeStart(ClientCallStreamObserver<DiscoveredBatch> stream) {
+                        batchTransport = stream;
+                        stream.setOnReadyHandler(
+                                () -> {
+                                    synchronized (flow) {
+                                        flow.notifyAll();
+                                    }
+                                });
+                    }
+
+                    @Override
+                    public void onNext(BatchAck value) {
+                        StatusUpdaterBolt.this.onNext(value);
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        StatusUpdaterBolt.this.onBatchError(t);
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        // end of stream - nothing special to do?
+                    }
+                });
     }
 
     private void onChannelStateChange(ConnectivityState state) {
         ConnectivityState newState = channel.getState(true);
         LOG.debug("Channel state changed from {} to {}", state, newState);
         if (state == ConnectivityState.TRANSIENT_FAILURE) {
-            URLFrontierStub frontier = URLFrontierGrpc.newStub(channel).withWaitForReady();
-            requestObserver = frontier.putURLs(this);
+            requestObserver = newPutURLsStream();
+            // the PutDiscovered stream is not recreated here: with waitForReady it survives
+            // connection blips, and abandoning it would orphan the batches already sent on it
         }
         channel.notifyWhenStateChanged(newState, () -> onChannelStateChange(newState));
     }
@@ -214,20 +377,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         // use the URL as ID
         final String url = confirmation.getID();
 
-        List<Tuple> values;
-
-        waitAckLock.lock();
-        try {
-            values = waitAck.getIfPresent(url);
-            if (values != null) {
-                // Invalidate before releasing permits to protect from new entries for this URL
-                // until permits are handed out. Invalidate removes the key url from waitAck,
-                // therefore it is safe to use values without lock at this point.
-                waitAck.invalidate(url);
-            }
-        } finally {
-            waitAckLock.unlock();
-        }
+        final List<Tuple> values = detachWaitAck(url);
 
         if (values == null) {
             // This should not happen, but breach of URLFrontier-protocol can.
@@ -253,10 +403,168 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             return;
         }
 
-        // We release all permits in one go before handling the ACK-status.
-        inFlightSemaphore.release(values.size());
+        completeTuples(url, values, confirmation.getStatus());
+    }
 
-        final boolean hasFailed = confirmation.getStatus().equals(AckMessage.Status.FAIL);
+    /**
+     * Acknowledges a whole batch: one status per URL, in the order the batch was sent.
+     *
+     * @param confirmation the BatchAck received from the PutDiscovered endpoint
+     */
+    private void onNext(final BatchAck confirmation) {
+        if (closed) {
+            return;
+        }
+
+        final List<URLItem> items;
+        synchronized (batchLock) {
+            items = pendingBatches.remove(confirmation.getID());
+        }
+
+        if (items == null) {
+            LOG.debug("Could not find batch with ID `{}`.", confirmation.getID());
+            return;
+        }
+
+        final List<AckMessage.Status> statuses = confirmation.getStatusesList();
+        if (statuses.size() != items.size()) {
+            LOG.warn(
+                    "BatchAck {} carries {} status(es) for {} URL(s).",
+                    confirmation.getID(),
+                    statuses.size(),
+                    items.size());
+        }
+
+        // URLs without a status, e.g. on a protocol breach, are left to the waitAck eviction
+        int numStatuses = Math.min(statuses.size(), items.size());
+        for (int i = 0; i < numStatuses; i++) {
+            final String url = items.get(i).getID();
+            final List<Tuple> values = detachWaitAck(url);
+            if (values == null) {
+                LOG.debug("Could not find unacked tuple for id `{}`.", url);
+                continue;
+            }
+            completeTuples(url, values, statuses.get(i));
+        }
+    }
+
+    private void onBatchError(final Throwable t) {
+        if (closed) {
+            return;
+        }
+
+        // a frontier older than 2.6 does not know the PutDiscovered endpoint; instead of
+        // dropping the discovered URLs, send them individually on the streaming endpoint
+        // and keep doing so for the rest of the bolt's life
+        if (t instanceof StatusRuntimeException
+                && ((StatusRuntimeException) t).getStatus().getCode()
+                        == io.grpc.Status.Code.UNIMPLEMENTED) {
+            LOG.warn(
+                    "The frontier does not implement PutDiscovered (URLFrontier < 2.6) - sending discovered URLs individually on the streaming endpoint.");
+            disableBatchingAndResend();
+            return;
+        }
+
+        LOG.error("Error received on the batch stream: {}", t.getMessage());
+        LOG.debug("Error received on the batch stream", t);
+
+        // the stream is dead: forget the batches it carried, their tuples are failed by the
+        // waitAck cache eviction and replayed by Storm. A new stream is opened on the next flush.
+        synchronized (batchLock) {
+            pendingBatches.clear();
+            batchRequestObserver = null;
+            batchTransport = null;
+        }
+        synchronized (flow) {
+            flow.notifyAll();
+        }
+    }
+
+    /** Stops batching and pushes everything buffered or in flight through the streaming endpoint. */
+    private void disableBatchingAndResend() {
+        final List<URLItem> toResend = new ArrayList<>();
+        synchronized (batchLock) {
+            batching = false;
+            for (List<URLItem> items : pendingBatches.values()) {
+                toResend.addAll(items);
+            }
+            pendingBatches.clear();
+            toResend.addAll(batchBuffer);
+            batchBuffer.clear();
+            oldestBufferedAt = 0;
+            batchRequestObserver = null;
+        }
+        if (batchFlusher != null) {
+            batchFlusher.shutdownNow();
+        }
+        if (toResend.isEmpty()) {
+            return;
+        }
+        LOG.info("Re-sending {} discovered URL(s) individually.", toResend.size());
+        for (URLItem item : toResend) {
+            sendOnStreamingEndpoint(item);
+        }
+    }
+
+    @Override
+    public void onError(Throwable t) {
+        if (closed) {
+            return;
+        }
+        LOG.error("Error received: {}", t.getMessage());
+        LOG.debug("Error received", t);
+        synchronized (flow) {
+            flow.notifyAll();
+        }
+    }
+
+    @Override
+    public void onCompleted() {
+        // end of stream - nothing special to do?
+    }
+
+    /**
+     * Sends a URL item on the streaming endpoint, failing its tuples locally if the stream got
+     * terminated while we were sending.
+     */
+    private void sendOnStreamingEndpoint(final URLItem item) {
+        try {
+            synchronized (sendLock) {
+                requestObserver.onNext(item);
+            }
+        } catch (IllegalStateException e) {
+            // the stream got terminated while we were sending
+            LOG.debug("Failed to send {} on the streaming endpoint.", item.getID(), e);
+            failTupleLocally(item.getID());
+        }
+    }
+
+    /** Detaches the tuples waiting for the given URL from the waitAck cache. */
+    @Nullable
+    private List<Tuple> detachWaitAck(final String url) {
+        List<Tuple> values;
+        waitAckLock.lock();
+        try {
+            values = waitAck.getIfPresent(url);
+            if (values != null) {
+                // Invalidate before releasing permits to protect from new entries for this URL
+                // until permits are handed out. Invalidate removes the key url from waitAck,
+                // therefore it is safe to use values without lock at this point.
+                waitAck.invalidate(url);
+            }
+        } finally {
+            waitAckLock.unlock();
+        }
+        return values;
+    }
+
+    /** Releases the permits and acks or fails the tuples of a completed URL. */
+    private void completeTuples(
+            final String url, @NotNull final List<Tuple> values, final AckMessage.Status status) {
+        // We release all permits in one go before handling the ACK-status.
+        releasePermits(values.size());
+
+        final boolean hasFailed = status.equals(AckMessage.Status.FAIL);
         if (!hasFailed) {
             LOG.debug("Acked {} tuple(s) for ID {}", values.size(), url);
             for (Tuple t : values) {
@@ -272,15 +580,28 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         }
     }
 
-    @Override
-    public void onError(Throwable t) {
-        LOG.error("Error received: {}", t.getMessage());
-        LOG.debug("Error received", t);
+    /**
+     * Fails the tuples waiting for the given URL without waiting for an ack, e.g. because the
+     * stream they were sent on got terminated. Storm replays them.
+     */
+    private void failTupleLocally(final String url) {
+        final List<Tuple> values = detachWaitAck(url);
+        if (values == null) {
+            return;
+        }
+        releasePermits(values.size());
+        for (Tuple t : values) {
+            eventCounter.scope("failed").incrBy(1);
+            collector.fail(t);
+        }
     }
 
-    @Override
-    public void onCompleted() {
-        // end of stream - nothing special to do?
+    /** Releases permits and wakes up any send waiting for room. */
+    private void releasePermits(int numPermits) {
+        inFlightSemaphore.release(numPermits);
+        synchronized (flow) {
+            flow.notifyAll();
+        }
     }
 
     @Override
@@ -294,41 +615,53 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         // First get processing permit. Otherwise, starvation possible.
         var hasPermit = false;
         var timeSpent = 0L;
+        boolean throttled = false;
         while (!hasPermit) {
-            try {
-                hasPermit = inFlightSemaphore.tryAcquire(throttleTimeMS, TimeUnit.MILLISECONDS);
-                if (!hasPermit) {
-                    LOG.trace(
-                            "{} messages in flight, time spent throttling {}",
-                            inFlightSemaphore.getQueueLength(),
-                            timeSpent);
-                    eventCounter.scope("timeSpentThrottling").incrBy(throttleTimeMS);
-                    timeSpent += throttleTimeMS;
-                    if (timeSpent >= 30000L) {
-                        LOG.warn(
-                                "Waiting more than {} ms for processing. There are {} permits available for {} waiting threads.",
-                                timeSpent,
-                                inFlightSemaphore.availablePermits(),
-                                inFlightSemaphore.getQueueLength());
-                    }
-                    // To prevent a deadlock, it is necessary to periodically clean up the waitAck
-                    // cache. Otherwise, in case of a frontier-side or connection-wise error, all
-                    // incoming URLs will after some time be all caught up in this loop without
-                    // touching the cache, possibly leading to no eviction and thus leading to no
-                    // release of inFlightSemaphore permits.
-                    waitAckLock.lock();
+            hasPermit = inFlightSemaphore.tryAcquire();
+            if (!hasPermit) {
+                throttled = true;
+                LOG.trace(
+                        "{} messages in flight, time spent throttling {}",
+                        inFlightSemaphore.getQueueLength(),
+                        timeSpent);
+                // wait for room on the monitor: woken as soon as an ack releases permits or the
+                // transport becomes ready again. The timeout is a backstop, not a poll interval.
+                synchronized (flow) {
                     try {
-                        waitAck.cleanUp();
-                    } finally {
-                        waitAckLock.unlock();
+                        flow.wait(throttleTimeMS);
+                    } catch (InterruptedException e) {
+                        LOG.warn(
+                                "InterruptedException - (approx.) {} messages in flight.",
+                                inFlightSemaphore.getQueueLength());
+                        Thread.currentThread().interrupt();
                     }
                 }
-            } catch (InterruptedException e) {
-                LOG.warn(
-                        "InterruptedException - (approx.) {} messages in flight.",
-                        inFlightSemaphore.getQueueLength());
-                Thread.currentThread().interrupt();
+                eventCounter.scope("timeSpentThrottling").incrBy(throttleTimeMS);
+                timeSpent += throttleTimeMS;
+                if (timeSpent >= 30000L) {
+                    LOG.warn(
+                            "Waiting more than {} ms for processing. There are {} permits available for {} waiting threads.",
+                            timeSpent,
+                            inFlightSemaphore.availablePermits(),
+                            inFlightSemaphore.getQueueLength());
+                }
+                // To prevent a deadlock, it is necessary to periodically clean up the waitAck
+                // cache. Otherwise, in case of a frontier-side or connection-wise error, all
+                // incoming URLs will after some time be all caught up in this loop without
+                // touching the cache, possibly leading to no eviction and thus leading to no
+                // release of inFlightSemaphore permits.
+                waitAckLock.lock();
+                try {
+                    waitAck.cleanUp();
+                } finally {
+                    waitAckLock.unlock();
+                }
             }
+        }
+
+        if (throttled) {
+            // acks were slow: push out whatever is buffered so that permits free up again
+            flushBatch();
         }
 
         boolean urlIsNotBeingSentToTheFrontier;
@@ -364,7 +697,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         if (urlIsNotBeingSentToTheFrontier) {
             // Release permit, because we will ACK fast if this url is already known and in the ack
             // process.
-            inFlightSemaphore.release();
+            releasePermits(1);
             // if this object is discovered - adding another version of it
             // won't make any difference
             LOG.debug("Already being sent to urlfrontier {} with status {}", url, status);
@@ -418,7 +751,142 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
                     KnownURLItem.newBuilder().setInfo(info).setRefetchableFromDate(date).build());
         }
 
-        requestObserver.onNext(itemBuilder.setID(url).build());
+        final URLItem item = itemBuilder.setID(url).build();
+
+        // discovered URLs travel in batches on the PutDiscovered endpoint, known URLs keep
+        // using the streaming endpoint
+        if (status.equals(Status.DISCOVERED)) {
+            boolean shouldBatch;
+            boolean flushNow = false;
+            synchronized (batchLock) {
+                // re-read inside the lock: batching can be disabled concurrently by the
+                // fallback for frontiers without the PutDiscovered endpoint
+                shouldBatch = batching;
+                if (shouldBatch) {
+                    if (batchBuffer.isEmpty()) {
+                        oldestBufferedAt = System.currentTimeMillis();
+                    }
+                    batchBuffer.add(item);
+                    flushNow = batchBuffer.size() >= batchSize;
+                }
+            }
+            if (!shouldBatch) {
+                sendOnStreamingEndpoint(item);
+                return;
+            }
+            if (flushNow) {
+                flushBatch();
+            }
+            return;
+        }
+
+        if (batching) {
+            // the outlinks buffered so far belong to the page whose status is now updated:
+            // a natural boundary for the batch
+            flushBatch();
+        }
+
+        sendOnStreamingEndpoint(item);
+    }
+
+    /** Sends the buffered discovered URLs as one batch, if any. */
+    private void flushBatch() {
+        flushBatch(false);
+    }
+
+    /**
+     * Sends the buffered discovered URLs as one batch, if any.
+     *
+     * @param awaitTransport whether to wait briefly for the transport to become ready before
+     *     sending; only the flusher thread may do so, the Storm executor thread never stalls
+     */
+    private void flushBatch(boolean awaitTransport) {
+        final List<URLItem> items;
+        final StreamObserver<DiscoveredBatch> stream;
+        synchronized (batchLock) {
+            if (!batching || batchBuffer.isEmpty()) {
+                return;
+            }
+            if (batchRequestObserver == null) {
+                // the previous stream died: open a new one
+                batchRequestObserver = newPutDiscoveredStream();
+            }
+            stream = batchRequestObserver;
+            items = new ArrayList<>(batchBuffer);
+            batchBuffer.clear();
+            oldestBufferedAt = 0;
+        }
+
+        final String batchID = "batch-" + batchSequences.incrementAndGet();
+        final DiscoveredBatch.Builder batchBuilder = DiscoveredBatch.newBuilder().setID(batchID);
+        for (URLItem buffered : items) {
+            batchBuilder.addItems(buffered.getDiscovered().getInfo());
+        }
+        final DiscoveredBatch batch = batchBuilder.build();
+
+        // registered before the send so that a fast ack can never miss it
+        synchronized (batchLock) {
+            pendingBatches.put(batchID, items);
+        }
+
+        try {
+            if (awaitTransport) {
+                // follow the transport's lead: wait briefly for it to take the batch without
+                // buffering it, woken by the on-ready handler. The timeout is a backstop, not a
+                // poll interval.
+                final ClientCallStreamObserver<DiscoveredBatch> transport = batchTransport;
+                if (transport != null && !transport.isReady()) {
+                    synchronized (flow) {
+                        flow.wait(BATCH_FLUSH_DELAY_MS);
+                    }
+                }
+            }
+            synchronized (sendLock) {
+                stream.onNext(batch);
+            }
+            eventCounter.scope("batched").incrBy(items.size());
+            eventCounter.scope("batches").incrBy(1);
+            LOG.debug("Sent batch {} with {} discovered URL(s).", batchID, items.size());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (RuntimeException e) {
+            // the stream got terminated while we were sending
+            LOG.debug("Failed to send batch {}.", batchID, e);
+            synchronized (batchLock) {
+                pendingBatches.remove(batchID);
+                if (batchRequestObserver == stream) {
+                    batchRequestObserver = null;
+                    batchTransport = null;
+                }
+            }
+            for (URLItem failed : items) {
+                failTupleLocally(failed.getID());
+            }
+        }
+    }
+
+    /** Flushes the buffer when it reached the batch size or its oldest item is old enough. */
+    private void flushBatchIfDue() {
+        if (closed) {
+            return;
+        }
+        try {
+            boolean due;
+            synchronized (batchLock) {
+                due =
+                        batching
+                                && !batchBuffer.isEmpty()
+                                && (batchBuffer.size() >= batchSize
+                                        || System.currentTimeMillis() - oldestBufferedAt
+                                                >= BATCH_FLUSH_DELAY_MS);
+            }
+            if (due) {
+                flushBatch(true);
+            }
+        } catch (RuntimeException e) {
+            // must not kill the scheduled flusher
+            LOG.error("Error while flushing the batch of discovered URLs.", e);
+        }
     }
 
     @Override
@@ -439,7 +907,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
 
         if (values != null) {
             // If we have values, we release their permits, because they are evicted by policy.
-            inFlightSemaphore.release(values.size());
+            releasePermits(values.size());
             var permits = inFlightSemaphore.availablePermits();
             LOG.warn("Evicted {} from waitAck with {} values. [{}]", key, values.size(), cause);
 
@@ -460,9 +928,41 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         }
     }
 
+    /** number of batch messages handed to the transport so far; also used by the tests */
+    int batchesSent() {
+        return batchSequences.get();
+    }
+
+    /** whether the discovered URLs are currently grouped into batches; also used by the tests */
+    boolean isBatching() {
+        return batching;
+    }
+
     @Override
     public void cleanup() {
-        requestObserver.onCompleted();
+        closed = true;
+        if (batchFlusher != null) {
+            batchFlusher.shutdownNow();
+        }
+        // best effort: hand over whatever is still buffered
+        try {
+            flushBatch();
+        } catch (RuntimeException e) {
+            LOG.debug("Could not flush the remaining discovered URLs.", e);
+        }
+        try {
+            requestObserver.onCompleted();
+        } catch (RuntimeException e) {
+            // the stream got terminated in the meantime
+        }
+        final StreamObserver<DiscoveredBatch> batchStream = batchRequestObserver;
+        if (batchStream != null) {
+            try {
+                batchStream.onCompleted();
+            } catch (RuntimeException e) {
+                // the stream got terminated in the meantime
+            }
+        }
         if (!channel.isShutdown()) {
             LOG.info("Shutting down connection to URLFrontier service.");
             channel.shutdown();
