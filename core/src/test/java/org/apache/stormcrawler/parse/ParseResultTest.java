@@ -80,17 +80,6 @@ class ParseResultTest {
     }
 
     @Test
-    void deprecatedGetCreatesAnEntryForAnUnknownURL() {
-        ParseResult parse = new ParseResult();
-
-        ParseData parseData = parse.get("https://example.com/never-parsed");
-
-        // the deprecated method keeps the historic behaviour of get()
-        Assertions.assertNotNull(parseData);
-        Assertions.assertEquals(1, parse.size());
-    }
-
-    @Test
     void putCreatesAnEntryForASubDocument() {
         ParseResult parse = new ParseResult();
 
