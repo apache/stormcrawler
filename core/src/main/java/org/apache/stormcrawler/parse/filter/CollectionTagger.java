@@ -122,7 +122,7 @@ public class CollectionTagger extends ParseFilter implements JSONResource {
     public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
         String[] tags = collections.tag(url);
         if (tags.length > 0) {
-            parse.get(url).getMetadata().setValues(key, tags);
+            parse.getOrCreate(url).getMetadata().setValues(key, tags);
         }
     }
 

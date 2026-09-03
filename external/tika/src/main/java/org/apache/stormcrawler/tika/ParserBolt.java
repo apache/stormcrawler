@@ -272,7 +272,7 @@ public class ParserBolt extends BaseRichBolt {
         ParseResult parse = new ParseResult(outlinks);
 
         // parse data of the parent URL
-        ParseData parseData = parse.get(url);
+        ParseData parseData = parse.getOrCreate(url);
         parseData.setMetadata(metadata);
         parseData.setText(text);
         parseData.setContent(content);
@@ -295,11 +295,16 @@ public class ParserBolt extends BaseRichBolt {
             }
         }
 
-        // emit each document/subdocument in the ParseResult object
-        // there should be at least one ParseData item for the "parent" URL
-
+        // emit each document/subdocument in the ParseResult object;
+        // skip empty entries for other URLs, which generally stem from a
+        // lookup on a URL which was never parsed
         for (Map.Entry<String, ParseData> doc : parse) {
             ParseData parseDoc = doc.getValue();
+            if (!doc.getKey().equals(url) && isEmptyDocument(parseDoc)) {
+                LOG.debug("Skipping empty ParseData for {}", doc.getKey());
+                eventCounter.scope("skipped_empty_documents").incrBy(1);
+                continue;
+            }
 
             collector.emit(
                     tuple,
@@ -312,6 +317,13 @@ public class ParserBolt extends BaseRichBolt {
 
         collector.ack(tuple);
         eventCounter.scope("tuple_success").incrBy(1);
+    }
+
+    private static boolean isEmptyDocument(ParseData parseDoc) {
+        byte[] content = parseDoc.getContent();
+        return (content == null || content.length == 0)
+                && StringUtils.isBlank(parseDoc.getText())
+                && (parseDoc.getMetadata() == null || parseDoc.getMetadata().size() == 0);
     }
 
     private Tika instantiateTika(Map<String, Object> conf) {

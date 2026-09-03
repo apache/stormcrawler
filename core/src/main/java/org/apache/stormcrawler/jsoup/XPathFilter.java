@@ -199,7 +199,7 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
     public void filter(
             String url, byte[] content, org.jsoup.nodes.Document doc, ParseResult parse) {
 
-        ParseData parseData = parse.get(url);
+        ParseData parseData = parse.getOrCreate(url);
         Metadata metadata = parseData.getMetadata();
 
         // applies the XPATH expression in the order in which they are produced

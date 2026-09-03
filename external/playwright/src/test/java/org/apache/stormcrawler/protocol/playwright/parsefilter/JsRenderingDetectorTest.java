@@ -46,9 +46,10 @@ class JsRenderingDetectorTest {
         final JsRenderingDetector d = detector("{}");
         final ParseResult p =
                 applyTo(d, "u", "<html><body><div data-reactroot></div></body></html>");
-        Assertions.assertEquals("playwright", p.get("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertEquals(
+                "playwright", p.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
         Assertions.assertTrue(
-                p.get("u")
+                p.getOrCreate("u")
                         .getMetadata()
                         .getFirstValue("fetch.with.reason")
                         .startsWith("fingerprint:"));
@@ -62,7 +63,8 @@ class JsRenderingDetectorTest {
                         d,
                         "u",
                         "<html><body><app-root ng-version=\"17.0.0\"></app-root></body></html>");
-        Assertions.assertEquals("playwright", p.get("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertEquals(
+                "playwright", p.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
     }
 
     @Test
@@ -73,7 +75,7 @@ class JsRenderingDetectorTest {
         final ParseResult p = applyTo(d, "u", html);
         Assertions.assertEquals(
                 "noscript-js-required",
-                p.get("u").getMetadata().getFirstValue("fetch.with.reason"));
+                p.getOrCreate("u").getMetadata().getFirstValue("fetch.with.reason"));
     }
 
     @Test
@@ -85,7 +87,7 @@ class JsRenderingDetectorTest {
                         "u",
                         "<html><body><div id=\"root\"></div><script src=\"/app.js\"></script></body></html>");
         Assertions.assertTrue(
-                p.get("u")
+                p.getOrCreate("u")
                         .getMetadata()
                         .getFirstValue("fetch.with.reason")
                         .startsWith("empty-root:"));
@@ -98,9 +100,9 @@ class JsRenderingDetectorTest {
         final String html =
                 "<html><body><p>Hi</p><script>console.log('app')</script></body></html>";
         final ParseResult p = applyTo(d, "u", html);
-        Assertions.assertNotNull(p.get("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertNotNull(p.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
         Assertions.assertTrue(
-                p.get("u")
+                p.getOrCreate("u")
                         .getMetadata()
                         .getFirstValue("fetch.with.reason")
                         .startsWith("thin-content:"));
@@ -114,7 +116,7 @@ class JsRenderingDetectorTest {
                         + "A".repeat(1000)
                         + "</p><a href='/x'>x</a><a href='/y'>y</a><a href='/z'>z</a></body></html>";
         final ParseResult p = applyTo(d, "u", html);
-        Assertions.assertNull(p.get("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertNull(p.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
     }
 
     @Test
@@ -122,7 +124,7 @@ class JsRenderingDetectorTest {
         // outcome-based fallback is gated on at least one <script>
         final JsRenderingDetector d = detector("{}");
         final ParseResult p = applyTo(d, "u", "<html><body><p>404 Not Found</p></body></html>");
-        Assertions.assertNull(p.get("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertNull(p.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
     }
 
     @Test
@@ -130,16 +132,18 @@ class JsRenderingDetectorTest {
         final JsRenderingDetector d = detector("{}");
         final ParseResult parse = new ParseResult();
         // simulate metadata coming from a Playwright fetch
-        parse.get("u").getMetadata().setValue(HttpProtocol.MD_KEY_END, "2026-05-04T00:00:00Z");
+        parse.getOrCreate("u")
+                .getMetadata()
+                .setValue(HttpProtocol.MD_KEY_END, "2026-05-04T00:00:00Z");
         d.filter("u", "<div data-reactroot></div>".getBytes(StandardCharsets.UTF_8), null, parse);
-        Assertions.assertNull(parse.get("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertNull(parse.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
     }
 
     @Test
     void skipsIfAlreadyFlagged() throws Exception {
         final JsRenderingDetector d = detector("{}");
         final ParseResult parse = new ParseResult();
-        parse.get("u").getMetadata().setValue("fetch.with", "playwright");
+        parse.getOrCreate("u").getMetadata().setValue("fetch.with", "playwright");
         d.filter(
                 "u",
                 "<html><body><p>some content</p></body></html>".getBytes(StandardCharsets.UTF_8),
@@ -147,8 +151,9 @@ class JsRenderingDetectorTest {
                 parse);
         // not overwritten, no reason added
         Assertions.assertEquals(
-                "playwright", parse.get("u").getMetadata().getFirstValue("fetch.with"));
-        Assertions.assertNull(parse.get("u").getMetadata().getFirstValue("fetch.with.reason"));
+                "playwright", parse.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertNull(
+                parse.getOrCreate("u").getMetadata().getFirstValue("fetch.with.reason"));
     }
 
     @Test
@@ -157,8 +162,8 @@ class JsRenderingDetectorTest {
                 detector("{\"metadataKey\":\"render\",\"metadataValue\":\"yes\"}");
         final ParseResult p =
                 applyTo(d, "u", "<html><body><div data-reactroot></div></body></html>");
-        Assertions.assertEquals("yes", p.get("u").getMetadata().getFirstValue("render"));
-        Assertions.assertNotNull(p.get("u").getMetadata().getFirstValue("render.reason"));
+        Assertions.assertEquals("yes", p.getOrCreate("u").getMetadata().getFirstValue("render"));
+        Assertions.assertNotNull(p.getOrCreate("u").getMetadata().getFirstValue("render.reason"));
     }
 
     @Test
@@ -173,10 +178,11 @@ class JsRenderingDetectorTest {
                         d,
                         "u",
                         "<html><body><div id=\"app\"><span>Loading...</span></div></body></html>");
-        Assertions.assertEquals("playwright", p.get("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertEquals(
+                "playwright", p.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
         Assertions.assertEquals(
                 "required-message:Loading...",
-                p.get("u").getMetadata().getFirstValue("fetch.with.reason"));
+                p.getOrCreate("u").getMetadata().getFirstValue("fetch.with.reason"));
     }
 
     @Test
@@ -189,6 +195,6 @@ class JsRenderingDetectorTest {
                         "<html><body><p>"
                                 + "A".repeat(1000)
                                 + "</p><a href='/x'>x</a><a href='/y'>y</a><a href='/z'>z</a></body></html>");
-        Assertions.assertNull(p.get("u").getMetadata().getFirstValue("fetch.with"));
+        Assertions.assertNull(p.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
     }
 }

@@ -56,7 +56,7 @@ public class MD5SignatureParseFilter extends ParseFilter {
 
     @Override
     public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
-        ParseData parseData = parse.get(url);
+        ParseData parseData = parse.getOrCreate(url);
         Metadata metadata = parseData.getMetadata();
         if (copyKeyName != null) {
             String signature = metadata.getFirstValue(keyName);

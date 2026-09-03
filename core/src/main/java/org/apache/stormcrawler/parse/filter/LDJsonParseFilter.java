@@ -61,7 +61,7 @@ public class LDJsonParseFilter extends ParseFilter {
                 return;
             }
 
-            ParseData parseData = parse.get(url);
+            ParseData parseData = parse.getOrCreate(url);
             Metadata metadata = parseData.getMetadata();
 
             // extract patterns and store as metadata

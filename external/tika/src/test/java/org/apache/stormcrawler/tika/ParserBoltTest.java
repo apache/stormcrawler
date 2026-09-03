@@ -106,4 +106,35 @@ class ParserBoltTest extends ParsingTester {
         outTuples = output.getEmitted();
         Assertions.assertEquals(1, outTuples.size());
     }
+
+    /**
+     * Checks that entries with no content, no text and no metadata are not emitted as documents.
+     *
+     * @see <a href="https://github.com/apache/stormcrawler/issues/2108">#2108</a>
+     */
+    @Test
+    void testEmptySubDocumentsAreNotEmitted() throws IOException {
+        prepareParserBolt("test.emptysubdocfilter.json");
+        parse(
+                "https://stormcrawler.apache.org/test_recursive_embedded.docx",
+                "test_recursive_embedded.docx");
+        List<List<Object>> outTuples = output.getEmitted();
+        Assertions.assertEquals(1, outTuples.size());
+    }
+
+    /**
+     * Checks that the document itself is still emitted when a filter emptied it, so that its status
+     * keeps being updated downstream.
+     *
+     * @see <a href="https://github.com/apache/stormcrawler/issues/2108">#2108</a>
+     */
+    @Test
+    void testEmptiedParentDocumentIsStillEmitted() throws IOException {
+        prepareParserBolt("test.emptyparentfilter.json");
+        parse(
+                "https://stormcrawler.apache.org/test_recursive_embedded.docx",
+                "test_recursive_embedded.docx");
+        List<List<Object>> outTuples = output.getEmitted();
+        Assertions.assertEquals(1, outTuples.size());
+    }
 }

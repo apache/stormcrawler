@@ -90,7 +90,7 @@ public class MyParseFilter extends ParseFilter {
     public void filter(String url, byte[] content, DocumentFragment doc,
                        ParseResult parse) {
         // Extract data and store in metadata
-        parse.get(url).getMetadata().setValue(metadataKey, "extracted-value");
+        parse.getOrCreate(url).getMetadata().setValue(metadataKey, "extracted-value");
     }
 }
 ----

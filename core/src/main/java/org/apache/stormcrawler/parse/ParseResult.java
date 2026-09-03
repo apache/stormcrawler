@@ -65,20 +65,25 @@ public class ParseResult implements Iterable<Map.Entry<String, ParseData>> {
         this.outlinks = outlinks;
     }
 
+    /** Returns the ParseData stored for the given URL or {@code null} if there is none. */
+    public ParseData getIfPresent(String url) {
+        return parseMap.get(url);
+    }
+
     /**
-     * @return An existent instance of Parse for the given URL or an empty one if none can be found,
-     *     useful to avoid unnecessary checks in the parse plugins
+     * Returns the ParseData for the given URL, creating an empty one if none exists yet, so that
+     * modifications made to the returned instance are stored.
      */
-    public ParseData get(String url) {
+    public ParseData getOrCreate(String url) {
         ParseData parse = parseMap.get(url);
         if (parse == null) {
             parse = new ParseData();
             parseMap.put(url, parse);
-            return parse;
         }
         return parse;
     }
 
+    /** Returns the values for the given key and URL or {@code null} if there is none. */
     public String[] getValues(String url, String key) {
         ParseData parseInfo = parseMap.get(url);
         if (parseInfo == null) {
@@ -89,12 +94,12 @@ public class ParseResult implements Iterable<Map.Entry<String, ParseData>> {
 
     /** Add the key value to the metadata object for a given URL. */
     public void put(String url, String key, String value) {
-        get(url).getMetadata().addValue(key, value);
+        getOrCreate(url).getMetadata().addValue(key, value);
     }
 
     /** Set the metadata for a given URL. */
     public void set(String url, Metadata metadata) {
-        get(url).setMetadata(metadata);
+        getOrCreate(url).setMetadata(metadata);
     }
 
     public Map<String, ParseData> getParseMap() {

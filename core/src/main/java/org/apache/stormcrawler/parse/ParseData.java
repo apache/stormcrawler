@@ -26,6 +26,7 @@ public class ParseData {
 
     public ParseData() {
         this.metadata = new Metadata();
+        this.content = new byte[0];
     }
 
     public ParseData(String text, Metadata metadata) {
@@ -36,6 +37,7 @@ public class ParseData {
 
     public ParseData(Metadata md) {
         this.metadata = md;
+        this.content = new byte[0];
     }
 
     public String getText() {

@@ -38,7 +38,9 @@ public class SubDocumentsParseFilter extends ParseFilter {
             if (node instanceof Element) {
                 String href = ((Element) node).getAttribute("href");
                 if (href != null && !href.isEmpty()) {
-                    parse.get(href);
+                    // create a sub-document for each link; the metadata entry
+                    // makes sure that it is not skipped as an empty document
+                    parse.put(href, "isSubDocument", "true");
                 }
             }
         }

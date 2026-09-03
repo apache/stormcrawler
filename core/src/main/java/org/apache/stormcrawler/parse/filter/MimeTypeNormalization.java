@@ -34,7 +34,7 @@ public class MimeTypeNormalization extends ParseFilter {
     @Override
     public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
 
-        Metadata m = parse.get(url).getMetadata();
+        Metadata m = parse.getOrCreate(url).getMetadata();
         String ct = m.getFirstValue("parse.Content-Type");
         if (StringUtils.isBlank(ct)) {
             ct = "unknown";
