@@ -44,6 +44,7 @@ import org.apache.storm.hdfs.bolt.format.RecordFormat;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
+import org.apache.stormcrawler.util.HttpHeaderResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -477,7 +478,9 @@ public class WARCRecordFormat implements RecordFormat {
             buffer.append("Content-Type: application/http; msgtype=response").append(CRLF);
         } else {
             // for resources just use the content type provided by the server if any
-            String ct = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, this.protocolMDprefix);
+            String ct =
+                    HttpHeaderResolver.getFirstValue(
+                            metadata, HttpHeaders.CONTENT_TYPE, this.protocolMDprefix);
             if (StringUtils.isBlank(ct)) {
                 ct = "application/octet-stream";
             }

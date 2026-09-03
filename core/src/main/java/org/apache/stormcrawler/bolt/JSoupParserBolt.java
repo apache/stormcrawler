@@ -59,6 +59,7 @@ import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.CharsetIdentification;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.HttpHeaderResolver;
 import org.apache.stormcrawler.util.RefreshTag;
 import org.apache.stormcrawler.util.RobotsTags;
 import org.apache.stormcrawler.util.URLUtil;
@@ -227,7 +228,8 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         boolean isPlainText = false;
 
         String mimeType =
-                metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, this.protocolMetadataPrefix);
+                HttpHeaderResolver.getFirstValue(
+                        metadata, HttpHeaders.CONTENT_TYPE, this.protocolMetadataPrefix);
 
         if (detectMimeType) {
             try {

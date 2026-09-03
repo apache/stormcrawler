@@ -32,6 +32,7 @@ import org.apache.http.HttpHeaders;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.HttpHeaderResolver;
 import org.apache.stormcrawler.util.URLUtil;
 
 /**
@@ -247,7 +248,9 @@ public class HttpRobotRulesParser extends RobotRulesParser {
             while ((code == 301 || code == 302 || code == 303 || code == 307 || code == 308)
                     && numRedirects < MAX_NUM_REDIRECTS) {
                 numRedirects++;
-                String redirection = response.getMetadata().getFirstValue(HttpHeaders.LOCATION);
+                String redirection =
+                        HttpHeaderResolver.getFirstValue(
+                                response.getMetadata(), HttpHeaders.LOCATION);
                 LOG.debug("Redirected from {} to {}", redir, redirection);
                 if (StringUtils.isNotBlank(redirection)) {
                     URL target = URLUtil.resolveUrl(redir, redirection);
@@ -312,7 +315,9 @@ public class HttpRobotRulesParser extends RobotRulesParser {
             // Parsing found rules according to RFC 9309
             if (code == 200) {
                 // Only if the status code 200 is returned, the rules are parsed
-                String ct = response.getMetadata().getFirstValue(HttpHeaders.CONTENT_TYPE);
+                String ct =
+                        HttpHeaderResolver.getFirstValue(
+                                response.getMetadata(), HttpHeaders.CONTENT_TYPE);
                 robotRules = parseRules(url.toString(), response.getContent(), ct, agentNames);
             } else if (code == 403 && !allowForbidden) {
                 // If the fetch of the robots.txt file is forbidden, then forbid also the fetch

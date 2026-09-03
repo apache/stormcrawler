@@ -57,6 +57,7 @@ import org.apache.stormcrawler.protocol.ProtocolFactory;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.RobotRules;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.HttpHeaderResolver;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 
@@ -546,7 +547,9 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
             } else if (status.equals(Status.REDIRECTION)) {
 
                 // find the URL it redirects to
-                String redirection = response.getMetadata().getFirstValue(HttpHeaders.LOCATION);
+                String redirection =
+                        HttpHeaderResolver.getFirstValue(
+                                response.getMetadata(), HttpHeaders.LOCATION);
 
                 // stores the URL it redirects to
                 // used for debugging mainly - do not resolve the target
