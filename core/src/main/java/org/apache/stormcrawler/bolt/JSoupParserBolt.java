@@ -19,9 +19,7 @@ package org.apache.stormcrawler.bolt;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -62,10 +60,12 @@ import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.RefreshTag;
 import org.apache.stormcrawler.util.RobotsTags;
 import org.apache.stormcrawler.util.URLUtil;
-import org.apache.tika.config.TikaConfig;
+import org.apache.tika.detect.DefaultDetector;
 import org.apache.tika.detect.Detector;
+import org.apache.tika.io.TikaInputStream;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.mime.MediaType;
+import org.apache.tika.parser.ParseContext;
 import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
 import org.jsoup.select.Elements;
@@ -89,7 +89,7 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
     private JSoupFilter jsoupFilters = null;
 
-    private final Detector detector = TikaConfig.getDefaultConfig().getDetector();
+    private final Detector detector = new DefaultDetector();
 
     private boolean detectMimeType = true;
 
@@ -547,17 +547,16 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
         if (StringUtils.isNotBlank(httpContentType)) {
             // pass content type from server as a clue
-            metadata.set(org.apache.tika.metadata.Metadata.CONTENT_TYPE, httpContentType);
+            metadata.set(HttpHeaders.CONTENT_TYPE, httpContentType);
         }
 
         // use full URL as a clue
         metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, url);
 
-        metadata.set(
-                org.apache.tika.metadata.Metadata.CONTENT_LENGTH, Integer.toString(content.length));
+        metadata.set(HttpHeaders.CONTENT_LENGTH, Integer.toString(content.length));
 
-        try (InputStream stream = new ByteArrayInputStream(content)) {
-            MediaType mt = detector.detect(stream, metadata);
+        try (TikaInputStream stream = TikaInputStream.get(content)) {
+            MediaType mt = detector.detect(stream, metadata, new ParseContext());
             return mt.toString();
         } catch (IOException e) {
             throw new IllegalStateException("Unexpected IOException", e);

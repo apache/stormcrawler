@@ -47,10 +47,27 @@ under the License.
     </properties>
 
     <dependencies>
+        <!-- Loads the JSON tika-config and instantiates the parsers and detectors -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-serialization</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+
+        <!-- In Tika 4 the standard parser package is a POM aggregating the
+             individual parser modules; depending on it with type=pom brings
+             them all in as transitive dependencies -->
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-parsers-standard-package</artifactId>
             <version>${tika.version}</version>
+            <type>pom</type>
             <exclusions>
                 <exclusion>
                     <artifactId>asm</artifactId>

@@ -123,7 +123,7 @@ config:
    - application/.*pdf.*
 
   # Tika parser configuration file
-  parse.tika.config.file: "tika-config.xml"
+  parse.tika.config.file: "tika-config.json"
 
   # custom fetch interval to be used when a document has the key/value in its metadata
   # and has been fetched successfully (value in minutes)
