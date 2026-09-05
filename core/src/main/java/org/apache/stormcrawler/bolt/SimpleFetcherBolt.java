@@ -628,7 +628,7 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                 key = u.getHost();
             }
         } else {
-            key = u.getHost();
+            key = URLUtil.getCanonicalHost(u);
             if (key == null) {
                 LOG.warn("Unknown host for url: {}, using URL string as key", u.toExternalForm());
                 key = u.toExternalForm();

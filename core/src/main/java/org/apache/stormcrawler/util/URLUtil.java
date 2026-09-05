@@ -22,6 +22,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -251,6 +252,31 @@ public class URLUtil {
         } catch (MalformedURLException e) {
             return null;
         }
+    }
+
+    /**
+     * Returns the host in the form the HTTP client will connect to it: percent-escapes decoded,
+     * lowercased and without a trailing dot. Host strings which only differ in escaping or case
+     * reach the same server, so politeness queues and robots.txt caches must key on the same
+     * value, otherwise one server is fetched under several queue ids and its robots.txt is
+     * downloaded once per spelling.
+     *
+     * @param url The url to check.
+     * @return String The canonical host for the url, or null if the url is not well formed or has
+     *     no host.
+     */
+    public static String getCanonicalHost(URL url) {
+        String host = url.getHost();
+        if (host == null) {
+            return null;
+        }
+        // okhttp percent-decodes the host when it parses the URL; do the same
+        // so keys derived from the URL string agree with what it connects to
+        String decoded = URLDecoder.decode(host, StandardCharsets.UTF_8);
+        if (decoded.endsWith(".")) {
+            decoded = decoded.substring(0, decoded.length() - 1);
+        }
+        return decoded.toLowerCase(Locale.ROOT);
     }
 
     /**
