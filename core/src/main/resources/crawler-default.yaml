@@ -159,10 +159,14 @@ config:
   #   - "localhost" / "loopback" (matches InetAddress.isLoopbackAddress())
   #   - "sitelocal" (matches InetAddress.isSiteLocalAddress())
   #   - "linklocal" (matches InetAddress.isLinkLocalAddress())
+  #   - "anylocal" (matches InetAddress.isAnyLocalAddress())
+  #   - "multicast" (matches InetAddress.isMulticastAddress())
+  # A value which is neither of these is a configuration error and stops the
+  # topology from starting.
   # Only addresses matching an include rule are fetched (empty means all are
   # allowed), addresses matching an exclude rule are always blocked.
   # http.filter.ipaddress.include:
-  # http.filter.ipaddress.exclude: "localhost,sitelocal,linklocal"
+  # http.filter.ipaddress.exclude: "localhost,sitelocal,linklocal,100.64.0.0/10,fd00::/8"
 
   # Allow all if robots.txt cannot be parsed due to code 403 (Forbidden):
   http.robots.403.allow: true
