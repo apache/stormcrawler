@@ -22,11 +22,14 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -88,6 +91,9 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
 
     protected ScopedCounter eventCounter;
 
+    /** Schemes which may be emitted from the store, from the {@code protocols} config key. */
+    protected Set<String> allowedSchemes;
+
     protected URLBuffer buffer;
 
     protected SpoutOutputCollector collector;
@@ -115,6 +121,21 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
         eventCounter = CrawlerMetrics.registerCounter(context, stormConf, "counters", 10);
 
         buffer = URLBuffer.createInstance(stormConf);
+
+        /*
+         * The store is the crawl instruction set: whatever ends up in it is
+         * fetched. Schemes which are not configured for the crawl must not
+         * re-enter the topology from there, so rows are checked before they
+         * are emitted - URL filtering only runs on the discovery path.
+         */
+        allowedSchemes =
+                ConfUtils.loadListFromConf("protocols", stormConf).stream()
+                        .map(String::trim)
+                        .map(String::toLowerCase)
+                        .collect(Collectors.toSet());
+        if (allowedSchemes.isEmpty()) {
+            allowedSchemes = Set.of("http", "https");
+        }
 
         CrawlerMetrics.registerGauge(context, stormConf, "buffer_size", buffer::size, 10);
         CrawlerMetrics.registerGauge(context, stormConf, "numQueues", buffer::numQueues, 10);
@@ -191,7 +212,7 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
             timeLastQuerySent = System.currentTimeMillis();
         }
 
-        if (buffer.hasNext()) {
+        while (buffer.hasNext()) {
             // track how long the buffer had been empty for
             if (timestampEmptyBuffer != -1) {
                 eventCounter
@@ -201,11 +222,21 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
             }
             List<Object> fields = buffer.next();
             String url = fields.get(0).toString();
+            if (!schemeAllowed(url)) {
+                LOG.warn(
+                        "Stored URL {} not fetched: its scheme is not in the configured list",
+                        url);
+                eventCounter.scope("skipped.scheme").incrBy(1);
+                // try the next entry the buffer holds; a rejected row stays in
+                // the store and is skipped again on every query
+                continue;
+            }
             this.collector.emit(fields, url);
             beingProcessed.put(url, null);
             eventCounter.scope("emitted").incrBy(1);
             return;
-        } else if (timestampEmptyBuffer == -1) {
+        }
+        if (timestampEmptyBuffer == -1 && !buffer.hasNext()) {
             timestampEmptyBuffer = System.currentTimeMillis();
         }
 
@@ -223,11 +254,19 @@ public abstract class AbstractQueryingSpout extends BaseRichSpout {
         timeLastQuerySent = System.currentTimeMillis();
     }
 
+    /** Checks the scheme of a stored URL against the configured {@code protocols} list. */
+    protected boolean schemeAllowed(String url) {
+        int colon = url.indexOf(':');
+        if (colon <= 0) {
+            return false;
+        }
+        return allowedSchemes.contains(url.substring(0, colon).toLowerCase(Locale.ROOT));
+    }
+
     /**
      * Returns the amount of time to wait if the backend was queried too recently and needs
      * throttling or -1 if the backend can be queried straight away.
-     */
-    private long throttleQueries() {
+     */    private long throttleQueries() {
         if (timeLastQuerySent != 0) {
             // check that we allowed some time between queries
             long difference = System.currentTimeMillis() - timeLastQuerySent;
