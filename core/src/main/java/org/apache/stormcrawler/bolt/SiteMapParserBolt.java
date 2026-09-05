@@ -86,6 +86,21 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
     private int maxOffsetGuess = 300;
 
+    /**
+     * Whether a document without the {@code isSitemap} key is classified as a sitemap by searching
+     * the first bytes for the sitemaps.org namespace. Any page that carries the namespace string
+     * early enough is reclassified as a sitemap and never reaches the parser bolt, so this defaults
+     * to false, like {@code feed.sniffContent} does for feeds.
+     */
+    private boolean sniffContent = false;
+
+    /**
+     * Whether the parser rejects documents which are not well formed sitemaps. Strict parsing keeps
+     * an ordinary HTML page that mentions the sitemap namespace from being parsed leniently into
+     * half a sitemap.
+     */
+    private boolean strict = true;
+
     private Consumer<Number> averagedMetrics;
 
     /** Delay in minutes used for scheduling sub-sitemaps. */
@@ -103,21 +118,18 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
         LOG.debug("Processing {}", url);
 
-        boolean looksLikeSitemap = sniff(content);
-        // can force the mimetype as we know it is XML
-        if (looksLikeSitemap) {
-            ct = "application/xml";
-        }
-
         String isSitemap = metadata.getFirstValue(isSitemapKey);
 
-        boolean treatAsSitemap = Boolean.parseBoolean(isSitemap);
-
-        // doesn't have the key and want to rely on the clue
-        if (isSitemap == null && looksLikeSitemap) {
-            LOG.info("{} detected as sitemap based on content", url);
-            treatAsSitemap = true;
+        // only sniff when the operator asked for it: a page deciding how the
+        // pipeline treats it must not depend on a string in its body, and a
+        // sniffed document also needs a sitemap compatible content type
+        if (isSitemap == null && sniffContent && sniffsAsSitemap(ct, content)) {
+            LOG.info("{} detected as sitemap based on content and content type", url);
+            ct = "application/xml";
+            isSitemap = "true";
         }
+
+        boolean treatAsSitemap = Boolean.parseBoolean(isSitemap);
 
         // decided that it is not a sitemap file
         if (!treatAsSitemap) {
@@ -140,12 +152,21 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
             // exception while parsing the sitemap
             String errorMessage = "Exception while parsing " + url + ": " + e;
             LOG.error(errorMessage);
-            // send to status stream in case another component wants to update
-            // its status
+            /*
+             * A document which does not parse as a sitemap is most likely an
+             * ordinary page whose persisted metadata carried isSitemap=true.
+             * Dropping the marking and emitting it as FETCH_ERROR keeps it
+             * schedulable: a terminal ERROR would remove it from the crawl for
+             * good when fetchInterval.error is negative, which lets whoever
+             * controls the content remove URLs from the corpus. The document
+             * goes on to the parser bolt on its next fetch, like any other
+             * page.
+             */
+            metadata.remove(isSitemapKey);
             metadata.setValue(Constants.STATUS_ERROR_SOURCE, "sitemap parsing");
             metadata.setValue(Constants.STATUS_ERROR_MESSAGE, errorMessage);
             collector.emit(
-                    Constants.StatusStreamName, tuple, new Values(url, metadata, Status.ERROR));
+                    Constants.StatusStreamName, tuple, new Values(url, metadata, Status.FETCH_ERROR));
             collector.ack(tuple);
             return;
         }
@@ -335,7 +356,9 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
     public void prepare(
             Map<String, Object> stormConf, TopologyContext context, OutputCollector collector) {
         super.prepare(stormConf, context, collector);
-        parser = new SiteMapParser(false);
+        strict = ConfUtils.getBoolean(stormConf, "sitemap.strict", true);
+        parser = new SiteMapParser(strict);
+        sniffContent = ConfUtils.getBoolean(stormConf, "sitemap.sniffContent", false);
         filterHoursSinceModified =
                 ConfUtils.getInt(stormConf, "sitemap.filter.hours.since.modified", -1);
         parseFilters = ParseFilters.fromConf(stormConf);
@@ -364,8 +387,23 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
     /**
      * Examines the first bytes of the content for a clue of whether this document is a sitemap,
-     * based on namespaces. Works for XML and non-compressed documents only.
+     * based on namespaces. Works for XML and non-compressed documents only. Used only when
+     * {@code sitemap.sniffContent} is enabled. A content type which rules a sitemap out (a page
+     * served as HTML) stops the sniffing; an absent or generic one lets it proceed, since the
+     * parser guesses the type of the document anyway.
      */
+    private boolean sniffsAsSitemap(String contentType, byte[] content) {
+        if (StringUtils.isNotBlank(contentType)) {
+            String ctLower = contentType.toLowerCase(Locale.ROOT);
+            if (!ctLower.contains("xml")
+                    && !ctLower.contains("text/plain")
+                    && !ctLower.contains("octet-stream")) {
+                return false;
+            }
+        }
+        return sniff(content);
+    }
+
     private boolean sniff(byte[] content) {
         byte[] beginning = content;
         if (content.length > maxOffsetGuess && maxOffsetGuess > 0) {
