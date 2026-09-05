@@ -260,7 +260,9 @@ header.
 | http.content.partial.as.trimmed | false | Accepts partially fetched content in OKHTTP.
 | http.filter.ipaddress.include | - | (OkHttp only) Comma-separated list (or YAML list) of allowed IP ranges. If empty, all addresses are allowed unless excluded. See <<IP Address Filtering>>.
 | http.filter.ipaddress.exclude | - | (OkHttp only) Comma-separated list (or YAML list) of blocked IP ranges. See <<IP Address Filtering>>.
-| http.trust.everything | true | If true, trust all SSL/TLS connections.
+| http.trust.everything | false | (OkHttp only) If true, accept any TLS certificate, including self-signed, expired or otherwise invalid ones. The servers are then not authenticated: anyone able to answer for the host name receives everything sent to them. Credentials (basic auth, credential headers, cookies) are withheld over such connections unless `http.credentials.allow.insecure` is set to true.
+| http.verify.hostnames | true | (OkHttp only) If true, check that the certificate presented by the server matches the host name contacted. Independent of `http.trust.everything`: a valid certificate for a different name is accepted when this is false.
+| http.credentials.allow.insecure | false | (OkHttp only) If true, send credentials (basic auth, credential headers, cookies) even over connections whose server certificate was not validated, i.e. when `http.trust.everything` is true.
 | topology.message.timeout.secs | -1 | OKHTTP message timeout.
 |===
 

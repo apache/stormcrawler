@@ -72,6 +72,12 @@ config:
   http.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
   https.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
 
+  # Accept any TLS certificate, e.g. self-signed ones? The servers are not
+  # authenticated then; credentials (basic auth, credential headers, cookies)
+  # are withheld over such connections unless
+  # http.credentials.allow.insecure is set to true.
+  http.trust.everything: false
+
   # The maximum number of bytes for returned HTTP response bodies.
   # The fetched page will be trimmed to 65KB in this case
   # Set -1 to disable the limit.
