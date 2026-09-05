@@ -201,8 +201,11 @@ config:
   # http.content.limit when fetching the robots.txt
   # (the robots.txt RFC draft requires to fetch and parse at least 500 kiB,
   #  see https://datatracker.ietf.org/doc/html/draft-rep-wg-topic-00#section-2.5)
+  # A value of -1 means "same as http.content.limit": the robots.txt fetch
+  # then uses whatever limit is configured for pages, including "no limit"
+  # when http.content.limit is -1 too.
   # http.robots.content.limit: 524288  # 512 kiB
-  http.robots.content.limit: -1  # default same as http.content.limit
+  http.robots.content.limit: 524288
 
   # Implementation of RobotRulesParser used by the HTTP protocol implementations
   # to fetch and parse robots.txt. Override to plug in custom robots.txt
