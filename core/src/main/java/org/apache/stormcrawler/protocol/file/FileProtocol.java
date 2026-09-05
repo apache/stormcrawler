@@ -18,6 +18,9 @@
 package org.apache.stormcrawler.protocol.file;
 
 import crawlercommons.robots.BaseRobotRules;
+import java.io.File;
+import java.io.IOException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.Protocol;
@@ -27,11 +30,37 @@ import org.apache.stormcrawler.util.ConfUtils;
 
 public class FileProtocol implements Protocol {
 
+    /**
+     * Directory reads are confined to when set. Null or empty means the file scheme serves nothing:
+     * a URL decides which path the worker opens, so reads must not be possible until an operator
+     * has chosen a root on purpose.
+     */
+    public static final String ROOT_KEY = "file.protocol.root";
+
     private String encoding;
+
+    private File root;
 
     @Override
     public void configure(Config conf) {
         encoding = ConfUtils.getString(conf, "file.encoding", "UTF-8");
+        String rootPath = ConfUtils.getString(conf, ROOT_KEY, null);
+        if (StringUtils.isNotBlank(rootPath)) {
+            root = new File(rootPath);
+            try {
+                root = root.getCanonicalFile();
+            } catch (IOException e) {
+                throw new RuntimeException("Cannot resolve " + ROOT_KEY + ": " + rootPath, e);
+            }
+            if (!root.isDirectory()) {
+                throw new RuntimeException(ROOT_KEY + " is not a directory: " + rootPath);
+            }
+        }
+    }
+
+    /** Returns the configured confinement root, or null when reads are disabled entirely. */
+    File getRoot() {
+        return root;
     }
 
     @Override

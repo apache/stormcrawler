@@ -61,6 +61,23 @@ public class FileResponse {
 
         File file = new File(URLDecoder.decode(path, fileProtocol.getEncoding()));
 
+        /*
+         * A URL decides which path the worker opens: without a configured root
+         * nothing is served, with one the resolved path must stay below it.
+         */
+        File root = fileProtocol.getRoot();
+        if (root == null) {
+            LOG.warn("Refusing to read {} because {} is not configured", url, FileProtocol.ROOT_KEY);
+            statusCode = HttpStatus.SC_FORBIDDEN;
+            return;
+        }
+
+        if (!file.getCanonicalFile().toPath().startsWith(root.toPath())) {
+            LOG.warn("Refusing to read {} because it is outside {}", url, root);
+            statusCode = HttpStatus.SC_FORBIDDEN;
+            return;
+        }
+
         if (!file.exists()) {
             statusCode = HttpStatus.SC_NOT_FOUND;
             return;
