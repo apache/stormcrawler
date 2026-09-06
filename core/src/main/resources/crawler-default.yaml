@@ -161,8 +161,12 @@ config:
   #   - "linklocal" (matches InetAddress.isLinkLocalAddress())
   # Only addresses matching an include rule are fetched (empty means all are
   # allowed), addresses matching an exclude rule are always blocked.
-  # http.filter.ipaddress.include:
-  # http.filter.ipaddress.exclude: "localhost,sitelocal,linklocal"
+  # The exclude list is enabled by default: a fetched page decides which hosts
+  # the fetcher connects to, and loopback, private and link-local ranges host
+  # unauthenticated services (e.g. cloud instance metadata) which a public
+  # index must not leak into. Set http.filter.ipaddress.include to any value
+  # (e.g. "0.0.0.0/0") and leave the exclude list empty to crawl an intranet.
+  http.filter.ipaddress.exclude: "localhost,sitelocal,linklocal,100.64.0.0/10,fd00::/8"
 
   # Allow all if robots.txt cannot be parsed due to code 403 (Forbidden):
   http.robots.403.allow: true
