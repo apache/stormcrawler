@@ -46,6 +46,12 @@ public class ProtocolResponse {
     public static final String PROTOCOL_VERSIONS_KEY = "_protocol_versions_";
 
     /**
+     * Key which holds the SSL/TLS cipher suites. For requests sent over http:// the value may be
+     * null.
+     */
+    public static final String CIPHER_SUITES_KEY = "_cipher_suites_";
+
+    /**
      * Metadata key which holds a boolean value in metadata whether the response content is trimmed
      * or not.
      */
