@@ -251,7 +251,12 @@ public class FetcherBolt extends StatusEmitterBolt {
             return nextFetchTime.get();
         }
 
-        /** Must be called with the monitor of this queue held. */
+        /**
+         * Must be called with the monitor of this queue held. The size is incremented before the
+         * bound is checked and decremented again on overflow, so {@link #getQueueSize()} can
+         * transiently over-report by one while an offer is being rejected. Harmless: the value is
+         * only used for metrics and the debug dump.
+         */
         boolean offer(FetchItem it) {
             if (removed) {
                 return false;
@@ -1184,6 +1189,12 @@ public class FetcherBolt extends StatusEmitterBolt {
         }
     }
 
+    /**
+     * Logs the content of the queues and the URLs being fetched. Not synchronized: the queues and
+     * their items are iterated with weakly consistent iterators while the fetcher threads keep
+     * working, so the dump is a smear over the time it takes to produce it rather than a
+     * point-in-time snapshot. Sizes and item lists may not add up exactly.
+     */
     private void logQueuesContent() {
         StringBuilder sb = new StringBuilder();
         sb.append("\nNum queues : ").append(fetchQueues.queues.size());
