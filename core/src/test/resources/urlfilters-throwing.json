@@ -1,0 +1,12 @@
+{
+	"org.apache.stormcrawler.filtering.URLFilters": [
+		{
+			"class": "org.apache.stormcrawler.filtering.URLFiltersExceptionTest$ThrowingURLFilter",
+			"name": "ThrowingURLFilter"
+		},
+		{
+			"class": "org.apache.stormcrawler.filtering.URLFiltersExceptionTest$RejectEverythingURLFilter",
+			"name": "RejectEverythingURLFilter"
+		}
+	]
+}
