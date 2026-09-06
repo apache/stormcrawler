@@ -215,10 +215,16 @@ config:
   robots.cache.spec: "maximumSize=10000,expireAfterWrite=6h"
   robots.error.cache.spec: "maximumSize=10000,expireAfterWrite=1h"
 
-  protocols: "http,https,file"
+  # The file scheme must be enabled deliberately: a fetched page can put a
+  # file:// URL into the frontier, and FileProtocol reads whatever path the
+  # worker user can read unless file.protocol.root confines it. When enabled,
+  # set file.protocol.root to the directory reads are confined to; without it
+  # the file scheme serves nothing.
+  protocols: "http,https"
   http.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
   https.protocol.implementation: "org.apache.stormcrawler.protocol.okhttp.HttpProtocol"
   file.protocol.implementation: "org.apache.stormcrawler.protocol.file.FileProtocol"
+  # file.protocol.root: "/data/corpus"
 
   # number of instances for each protocol implementation
   protocol.instances.num: 1
