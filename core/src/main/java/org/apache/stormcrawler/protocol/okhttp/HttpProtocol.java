@@ -97,6 +97,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     private int completionTimeout = -1;
 
+    /** Per-call deadline in seconds from fetcher.thread.timeout, -1 when disabled. */
+    private long fetchTimeout = -1;
+
     /** Accept partially fetched content as trimmed content */
     private boolean partialContentAsTrimmed = false;
 
@@ -154,6 +157,19 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         this.completionTimeout =
                 ConfUtils.getInt(conf, "topology.message.timeout.secs", completionTimeout);
+
+        this.fetchTimeout =
+                ConfUtils.getLong(conf, Constants.FETCH_TIMEOUT_PARAM_KEY, fetchTimeout);
+        if (fetchTimeout > 0 && completionTimeout > 0 && fetchTimeout > completionTimeout) {
+            // the per-call deadline replaces the client-level callTimeout derived from the
+            // message timeout: never loosen it, Storm would fail the tuple first anyway
+            LOG.warn(
+                    "{} ({}s) is larger than topology.message.timeout.secs ({}s): using the latter",
+                    Constants.FETCH_TIMEOUT_PARAM_KEY,
+                    fetchTimeout,
+                    completionTimeout);
+            fetchTimeout = completionTimeout;
+        }
 
         this.partialContentAsTrimmed =
                 ConfUtils.getBoolean(conf, "http.content.partial.as.trimmed", false);
@@ -349,6 +365,11 @@ public class HttpProtocol extends AbstractHttpProtocol {
     }
 
     @Override
+    public boolean supportsFetchTimeout() {
+        return fetchTimeout > 0;
+    }
+
+    @Override
     public ProtocolResponse getProtocolOutput(String url, final Metadata metadata)
             throws Exception {
         // create default local client
@@ -467,6 +488,12 @@ public class HttpProtocol extends AbstractHttpProtocol {
         final Request request = rb.build();
 
         final Call call = localClient.newCall(request);
+
+        if (fetchTimeout > 0) {
+            // hard deadline for the whole call, enforced by okio's watchdog: on expiry the call
+            // is cancelled, the socket closed and execute()/the body read throw immediately
+            call.timeout().timeout(fetchTimeout, TimeUnit.SECONDS);
+        }
 
         try (Response response = call.execute()) {
 
