@@ -385,7 +385,7 @@ When handling HTTP redirects, StormCrawler offers three modes:
 
 2. **Redirects disabled** (`redirections.allowed: false`): Redirect target URLs are not sent to the status stream. Redirects are effectively ignored.
 
-3. **Immediate follow** (`http.allow.redirects: true`): Redirects are followed immediately in the HTTP client and the target URLs are not emitted to the status stream. This is the default behavior for the browser-based Playwright protocol, but it is also supported by the OkHttp protocol. Note that with immediate follows, redirect targets bypass URL filtering, deduplication, and `robots.txt` checks.
+3. **Immediate follow** (`http.allow.redirects: true`): Redirects are followed immediately in the HTTP client and the target URLs are not emitted to the status stream. This is the default behavior for the browser-based Playwright protocol, but it is also supported by the OkHttp protocol. With immediate follows on OkHttp, every redirect target runs through the URL filter chain before the hop is taken and a rejected target ends the chain, so the filter rules configured for the crawl still apply to the hops. The chain is limited to 5 hops; a chain which does not end within that returns its last redirect response, which the caller handles like it does when immediate follows are off. The final URL is recorded in the response metadata under `_redirTo`. Deduplication and `robots.txt` checks do not apply to the followed hops.
 
 ==== Network Protocols
 
