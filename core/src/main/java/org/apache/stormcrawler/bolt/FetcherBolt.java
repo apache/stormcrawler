@@ -536,8 +536,12 @@ public class FetcherBolt extends StatusEmitterBolt {
                     return null;
                 }
                 if (!fiq.hasFreeSlot()) {
-                    // finishFetchItem will schedule it again
                     fiq.scheduled.set(false);
+                    // a fetch may have finished between the check and the clearing of the
+                    // flag, in which case its schedule() found the flag still set: re-check
+                    if (fiq.hasFreeSlot() && !fiq.queue.isEmpty()) {
+                        schedule(fiq, fiq.getNextFetchTime());
+                    }
                     continue;
                 }
                 final FetchItem it = fiq.poll();
