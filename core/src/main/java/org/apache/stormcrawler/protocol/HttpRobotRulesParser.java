@@ -103,7 +103,12 @@ public class HttpRobotRulesParser extends RobotRulesParser {
     /** Compose unique key to store and access robot rules in cache for given URL. */
     protected static String getCacheKey(URL url) {
         String protocol = url.getProtocol().toLowerCase(Locale.ROOT);
-        String host = url.getHost().toLowerCase(Locale.ROOT);
+        // canonicalise the host so aliases of one server (percent-escaping,
+        // case, trailing dot) share one cache entry and one robots.txt fetch
+        String host = URLUtil.getCanonicalHost(url);
+        if (host == null) {
+            host = "";
+        }
 
         int port = url.getPort();
         if (port == -1) {
