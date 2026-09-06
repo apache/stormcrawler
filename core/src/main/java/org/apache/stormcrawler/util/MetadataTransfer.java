@@ -17,7 +17,11 @@
 
 package org.apache.stormcrawler.util;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
@@ -123,7 +127,7 @@ public class MetadataTransfer {
      * the URL path.
      */
     public Metadata getMetaForOutlink(String targetUrl, String sourceUrl, Metadata parentMetadata) {
-        Metadata md = filter(parentMetadata, mdToTransfer);
+        Metadata md = filter(parentMetadata, transferFilter());
 
         // keep the path?
         if (trackPath) {
@@ -150,11 +154,11 @@ public class MetadataTransfer {
      * not necessarily transferred to the outlinks.
      */
     public Metadata filter(Metadata metadata) {
-        Metadata filteredMetadata = filter(metadata, mdToTransfer);
+        Metadata filteredMetadata = filter(metadata, transferFilter());
 
         // add the features that are only persisted but
         // not transferred like __redirTo_
-        filteredMetadata.putAll(filter(metadata, mdToPersistOnly));
+        filteredMetadata.putAll(filter(metadata, persistOnlyFilter()));
 
         return filteredMetadata;
     }
@@ -163,20 +167,92 @@ public class MetadataTransfer {
      * Filter the metadata based on a set of keys. If a key ends with a * then all the keys starting
      * with the prefix will be added.
      */
-    private Metadata filter(Metadata metadata, Set<String> filter) {
-        Metadata filteredMetadata = new Metadata();
+    private static Metadata filter(Metadata metadata, CompiledFilter compiled) {
+        final Map<String, String[]> source = metadata.asMap();
+        final Map<String, String[]> target = new HashMap<>();
 
-        for (String key : filter) {
-            if (key.endsWith("*")) {
-                String prefix = key.substring(0, key.length() - 1);
-                for (String k : metadata.keySet(prefix)) {
-                    metadata.copy(filteredMetadata, k);
-                }
-            } else {
-                metadata.copy(filteredMetadata, key);
+        // exact keys: direct lookups
+        for (String key : compiled.exactKeys) {
+            final String[] values = source.get(key);
+            if (values != null && values.length > 0) {
+                target.put(key, values);
             }
         }
 
-        return filteredMetadata;
+        // wildcards: a single pass over the metadata for all the prefixes,
+        // without allocating an intermediate key set per prefix
+        if (compiled.prefixes.length > 0) {
+            for (Map.Entry<String, String[]> entry : source.entrySet()) {
+                final String key = entry.getKey();
+                final String[] values = entry.getValue();
+                if (values == null || values.length == 0 || target.containsKey(key)) {
+                    continue;
+                }
+                for (String prefix : compiled.prefixes) {
+                    if (key.startsWith(prefix)) {
+                        target.put(key, values);
+                        break;
+                    }
+                }
+            }
+        }
+
+        return new Metadata(target);
+    }
+
+    /**
+     * Pre-computed, normalised form of a set of keys to transfer: exact keys and wildcard prefixes.
+     * Keeps a snapshot of the keys it was built from so that a stale instance can be detected.
+     */
+    private static final class CompiledFilter {
+        private final Set<String> snapshot;
+        private final Set<String> exactKeys;
+        private final String[] prefixes;
+
+        private CompiledFilter(Set<String> filter) {
+            this.snapshot = new HashSet<>(filter);
+            final Set<String> exact = new HashSet<>();
+            final List<String> prefixList = new ArrayList<>();
+            for (String key : snapshot) {
+                final String normalised = key.toLowerCase(Locale.ROOT);
+                if (normalised.endsWith("*")) {
+                    prefixList.add(normalised.substring(0, normalised.length() - 1));
+                } else {
+                    exact.add(normalised);
+                }
+            }
+            this.exactKeys = exact;
+            this.prefixes = prefixList.toArray(new String[0]);
+        }
+
+        /** True if this instance was built from exactly the given keys. */
+        private boolean isFor(Set<String> filter) {
+            return snapshot.equals(filter);
+        }
+    }
+
+    // Built lazily on first use and rebuilt whenever the underlying set no longer matches the
+    // snapshot, so subclasses may keep editing mdToTransfer / mdToPersistOnly at any time. The
+    // equality check is a handful of hash lookups with no allocation; the compile itself only
+    // runs when the keys actually changed.
+    private CompiledFilter compiledTransfer;
+    private CompiledFilter compiledPersistOnly;
+
+    private CompiledFilter transferFilter() {
+        CompiledFilter compiled = compiledTransfer;
+        if (compiled == null || !compiled.isFor(mdToTransfer)) {
+            compiled = new CompiledFilter(mdToTransfer);
+            compiledTransfer = compiled;
+        }
+        return compiled;
+    }
+
+    private CompiledFilter persistOnlyFilter() {
+        CompiledFilter compiled = compiledPersistOnly;
+        if (compiled == null || !compiled.isFor(mdToPersistOnly)) {
+            compiled = new CompiledFilter(mdToPersistOnly);
+            compiledPersistOnly = compiled;
+        }
+        return compiled;
     }
 }
