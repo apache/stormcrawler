@@ -17,27 +17,27 @@
 
 package org.apache.stormcrawler.protocol.okhttp;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.any;
+import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.ok;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpsConfigurator;
-import com.sun.net.httpserver.HttpsServer;
-import java.io.IOException;
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.common.ConsoleNotifier;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyStore;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Base64;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLPeerUnverifiedException;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
@@ -51,7 +51,7 @@ import org.junit.jupiter.api.Test;
  */
 class OkHttpTrustEverythingTest {
 
-    private static final char[] KEYSTORE_PASSWORD = "changeit".toCharArray();
+    private static final String KEYSTORE_PASSWORD = "changeit";
 
     /** Certificate issued for localhost: valid for the host the tests connect to. */
     private static final String LOCALHOST_KEYSTORE = "/ssl/localhost.p12";
@@ -59,16 +59,13 @@ class OkHttpTrustEverythingTest {
     /** Certificate issued for another host name: trusted under trust-all, wrong name. */
     private static final String OTHERHOST_KEYSTORE = "/ssl/otherhost.p12";
 
-    private HttpsServer server;
-
-    private RecordingHandler handler;
+    private WireMockServer server;
 
     @AfterEach
     void stopServer() {
         if (server != null) {
-            server.stop(0);
+            server.stop();
             server = null;
-            handler = null;
         }
     }
 
@@ -83,12 +80,11 @@ class OkHttpTrustEverythingTest {
     @Test
     void selfSignedCertificateRejectedByDefault() throws Exception {
         // http.trust.everything defaults to false: an unvalidatable certificate
-        // must not be accepted. Depending on the platform the handshake fails or
-        // the connection is dropped while it is retried.
+        // must not be accepted
         startServer(LOCALHOST_KEYSTORE);
         final HttpProtocol protocol = protocol(config());
         assertThrows(
-                Exception.class,
+                SSLHandshakeException.class,
                 () -> fetch(protocol, "/default"),
                 "self-signed certificates must be rejected by default");
     }
@@ -105,14 +101,12 @@ class OkHttpTrustEverythingTest {
     @Test
     void hostnameIsStillVerified() throws Exception {
         // the certificate is issued for another host name: trusting any
-        // certificate must not imply accepting any name. Depending on the
-        // platform the failed verification surfaces as an SSL exception or the
-        // connection is dropped while it is retried.
+        // certificate must not imply accepting any name
         final Config conf = config();
         conf.put("http.trust.everything", true);
         startServer(OTHERHOST_KEYSTORE);
         assertThrows(
-                Exception.class,
+                SSLPeerUnverifiedException.class,
                 () -> fetch(protocol(conf), "/hostname"),
                 "the hostname verifier should not accept any name unconditionally");
     }
@@ -134,11 +128,9 @@ class OkHttpTrustEverythingTest {
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
         startServer(LOCALHOST_KEYSTORE);
-        final ProtocolResponse response = fetch(protocol(conf), "/basicauth");
-        assertEquals(200, response.getStatusCode(), "the connection must succeed");
-        assertNull(
-                handler.lastHeaders.get("authorization"),
-                "credentials must not be sent to unauthenticated servers");
+        fetch(protocol(conf), "/basicauth");
+        server.verify(
+                1, getRequestedFor(urlPathEqualTo("/basicauth")).withoutHeader("Authorization"));
     }
 
     @Test
@@ -154,10 +146,10 @@ class OkHttpTrustEverythingTest {
                 "Basic "
                         + Base64.getEncoder()
                                 .encodeToString("user:secret".getBytes(StandardCharsets.UTF_8));
-        assertEquals(
-                expected,
-                handler.lastHeaders.get("authorization"),
-                "the opt-in sends credentials");
+        server.verify(
+                1,
+                getRequestedFor(urlPathEqualTo("/basicauth"))
+                        .withHeader("Authorization", equalTo(expected)));
     }
 
     @Test
@@ -166,11 +158,13 @@ class OkHttpTrustEverythingTest {
         conf.put("http.trust.everything", true);
         conf.put("http.custom.headers", List.of("X-Api-Key=s3cret", "X-Trace=public"));
         startServer(LOCALHOST_KEYSTORE);
-        final ProtocolResponse response = fetch(protocol(conf), "/customheaders");
-        assertEquals(200, response.getStatusCode(), "the connection must succeed");
-        assertNull(
-                handler.lastHeaders.get("x-api-key"), "credential headers must be withheld");
-        assertEquals("public", handler.lastHeaders.get("x-trace"), "other headers are sent");
+        fetch(protocol(conf), "/customheaders");
+        server.verify(
+                1, getRequestedFor(urlPathEqualTo("/customheaders")).withoutHeader("X-Api-Key"));
+        server.verify(
+                1,
+                getRequestedFor(urlPathEqualTo("/customheaders"))
+                        .withHeader("X-Trace", equalTo("public")));
     }
 
     @Test
@@ -181,8 +175,10 @@ class OkHttpTrustEverythingTest {
         conf.put("http.custom.headers", List.of("X-Api-Key=s3cret", "X-Trace=public"));
         startServer(LOCALHOST_KEYSTORE);
         fetch(protocol(conf), "/customheaders");
-        assertEquals("s3cret", handler.lastHeaders.get("x-api-key"), "the opt-in sends credentials");
-        assertEquals("public", handler.lastHeaders.get("x-trace"));
+        server.verify(
+                1,
+                getRequestedFor(urlPathEqualTo("/customheaders"))
+                        .withHeader("X-Api-Key", equalTo("s3cret")));
     }
 
     @Test
@@ -191,11 +187,8 @@ class OkHttpTrustEverythingTest {
         conf.put("http.trust.everything", true);
         conf.put("http.use.cookies", true);
         startServer(LOCALHOST_KEYSTORE);
-        final ProtocolResponse response = fetch(protocol(conf), "/cookies", metadata());
-        assertEquals(200, response.getStatusCode(), "the connection must succeed");
-        assertNull(
-                handler.lastHeaders.get("cookie"),
-                "cookies must not be sent to unauthenticated servers");
+        fetch(protocol(conf), "/cookies", metadata());
+        server.verify(1, getRequestedFor(urlPathEqualTo("/cookies")).withoutHeader("Cookie"));
     }
 
     @Test
@@ -206,16 +199,16 @@ class OkHttpTrustEverythingTest {
         conf.put("http.use.cookies", true);
         startServer(LOCALHOST_KEYSTORE);
         fetch(protocol(conf), "/cookies", metadata());
-        assertEquals("sid=x", handler.lastHeaders.get("cookie"), "the opt-in sends cookies");
+        server.verify(
+                1,
+                getRequestedFor(urlPathEqualTo("/cookies")).withHeader("Cookie", equalTo("sid=x")));
     }
 
     /** Metadata as an outlink would inherit it, with a cookie scoped to the server. */
     private Metadata metadata() {
         final Metadata md = new Metadata();
         md.setValue("protocol.set-cookie", "sid=x; Path=/");
-        md.setValue(
-                "protocol.set-cookie-origin",
-                "https://localhost:" + server.getAddress().getPort() + "/");
+        md.setValue("protocol.set-cookie-origin", "https://localhost:" + server.httpsPort() + "/");
         return md;
     }
 
@@ -242,48 +235,32 @@ class OkHttpTrustEverythingTest {
 
     private ProtocolResponse fetch(HttpProtocol protocol, String path, Metadata md)
             throws Exception {
-        return protocol.getProtocolOutput(
-                "https://localhost:" + server.getAddress().getPort() + path, md);
+        return protocol.getProtocolOutput("https://localhost:" + server.httpsPort() + path, md);
     }
 
-    /** Starts an HTTPS server on a random port presenting the certificate of the keystore. */
+    /**
+     * Starts an HTTPS server on a random port presenting the certificate of the keystore. The
+     * keystore is copied to a temporary file as WireMock reads it from the file system.
+     */
     private void startServer(String keystoreResource) throws Exception {
-        final KeyStore keyStore = KeyStore.getInstance("PKCS12");
-        try (InputStream in = OkHttpTrustEverythingTest.class.getResourceAsStream(keystoreResource)) {
-            keyStore.load(in, KEYSTORE_PASSWORD);
+        final Path keystoreFile = Files.createTempFile("wiremock-keystore", ".p12");
+        keystoreFile.toFile().deleteOnExit();
+        try (InputStream in =
+                OkHttpTrustEverythingTest.class.getResourceAsStream(keystoreResource)) {
+            Files.copy(in, keystoreFile, StandardCopyOption.REPLACE_EXISTING);
         }
-        final KeyManagerFactory keyManagerFactory =
-                KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        keyManagerFactory.init(keyStore, KEYSTORE_PASSWORD);
-        final SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
 
-        server = HttpsServer.create(new InetSocketAddress(java.net.InetAddress.getByName("127.0.0.1"), 0), 0);
-        server.setHttpsConfigurator(new HttpsConfigurator(sslContext));
-        handler = new RecordingHandler();
-        server.createContext("/", handler);
+        server =
+                new WireMockServer(
+                        WireMockConfiguration.options()
+                                .dynamicPort()
+                                .dynamicHttpsPort()
+                                .keystorePath(keystoreFile.toAbsolutePath().toString())
+                                .keystorePassword(KEYSTORE_PASSWORD)
+                                .keyManagerPassword(KEYSTORE_PASSWORD)
+                                .keystoreType("PKCS12")
+                                .notifier(new ConsoleNotifier(false)));
         server.start();
-    }
-
-    /** Records the request headers of the last request received. */
-    static class RecordingHandler implements HttpHandler {
-
-        final Map<String, String> lastHeaders = new ConcurrentHashMap<>();
-
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            for (Map.Entry<String, List<String>> header :
-                    exchange.getRequestHeaders().entrySet()) {
-                lastHeaders.put(
-                        header.getKey().toLowerCase(Locale.ROOT),
-                        String.join(",", header.getValue()));
-            }
-            final byte[] body = "Success!".getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "text/html");
-            exchange.sendResponseHeaders(200, body.length);
-            try (OutputStream out = exchange.getResponseBody()) {
-                out.write(body);
-            }
-        }
+        server.stubFor(any(anyUrl()).willReturn(ok("Success!")));
     }
 }
