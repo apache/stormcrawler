@@ -34,12 +34,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
@@ -108,6 +107,23 @@ public class HttpProtocol extends AbstractHttpProtocol {
     // makes sure that a missing cookie origin is reported once and not for every url
     private final AtomicBoolean missingCookieOriginLogged = new AtomicBoolean();
 
+    // makes sure that withheld cookies are reported once and not for every url
+    private final AtomicBoolean withheldCookiesLogged = new AtomicBoolean();
+
+    // whether credentials (basic auth, credential headers, cookies) may be sent:
+    // false when the servers are not authenticated and
+    // http.credentials.allow.insecure is not enabled
+    private boolean sendCredentials = true;
+
+    /** Header names carrying credentials, see {@link #isCredentialHeader(String)}. */
+    private static final Set<String> CREDENTIAL_HEADERS =
+            Set.of(
+                    HttpHeaders.AUTHORIZATION.toLowerCase(Locale.ROOT),
+                    HttpHeaders.PROXY_AUTHORIZATION.toLowerCase(Locale.ROOT),
+                    // the cookie header is not a constant in HttpHeaders
+                    "cookie",
+                    "x-api-key");
+
     private OkHttpClient.Builder builder;
 
     private static final TrustManager[] trustAllCerts =
@@ -130,11 +146,12 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 }
             };
 
-    private static final SSLContext trustAllSslContext;
+    // package-private so that the OkHttpTrustEverythingTest can check the protocol
+    static final SSLContext trustAllSslContext;
 
     static {
         try {
-            trustAllSslContext = SSLContext.getInstance("SSL");
+            trustAllSslContext = SSLContext.getInstance("TLS");
             trustAllSslContext.init(null, trustAllCerts, new java.security.SecureRandom());
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -157,6 +174,37 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         this.partialContentAsTrimmed =
                 ConfUtils.getBoolean(conf, "http.content.partial.as.trimmed", false);
+
+        /*
+         * certificate trust and hostname verification are separate decisions:
+         * accepting any certificate does not imply accepting any name
+         */
+        final boolean trustEverything = ConfUtils.getBoolean(conf, "http.trust.everything", false);
+        final boolean verifyHostnames = ConfUtils.getBoolean(conf, "http.verify.hostnames", true);
+        // credentials are withheld over connections whose server certificate
+        // was not validated, unless explicitly opted in
+        final boolean insecureCredentialsAllowed =
+                ConfUtils.getBoolean(conf, "http.credentials.allow.insecure", false);
+        this.sendCredentials = !trustEverything || insecureCredentialsAllowed;
+
+        if (trustEverything) {
+            LOG.warn(
+                    "http.trust.everything is enabled: TLS certificate chains are accepted without "
+                            + "validation, the identity of the servers is not authenticated. Anybody "
+                            + "able to answer for the host name receives everything sent to them.");
+        }
+        if (!verifyHostnames) {
+            LOG.warn(
+                    "http.verify.hostnames is disabled: the certificates are not checked against "
+                            + "the host name either, the identity of the servers is not authenticated.");
+        }
+        if (trustEverything && !sendCredentials) {
+            LOG.warn(
+                    "Credentials configured with http.basicauth.*, credential headers in "
+                            + "http.custom.headers and cookies are withheld because the servers "
+                            + "are not authenticated. Set http.credentials.allow.insecure to true "
+                            + "to send them anyway.");
+        }
 
         builder =
                 new OkHttpClient.Builder()
@@ -223,15 +271,33 @@ public class HttpProtocol extends AbstractHttpProtocol {
         // use a basic auth?
         if (StringUtils.isNotBlank(basicAuthUser)) {
             final String basicAuthPass = ConfUtils.getString(conf, "http.basicauth.password", "");
-            final String encoding =
-                    Base64.getEncoder()
-                            .encodeToString(
-                                    (basicAuthUser + ":" + basicAuthPass)
-                                            .getBytes(StandardCharsets.UTF_8));
-            customRequestHeaders.add(new KeyValue(HttpHeaders.AUTHORIZATION, "Basic " + encoding));
+            if (sendCredentials) {
+                final String encoding =
+                        Base64.getEncoder()
+                                .encodeToString(
+                                        (basicAuthUser + ":" + basicAuthPass)
+                                                .getBytes(StandardCharsets.UTF_8));
+                customRequestHeaders.add(
+                        new KeyValue(HttpHeaders.AUTHORIZATION, "Basic " + encoding));
+            } else {
+                LOG.warn(
+                        "Basic authentication configured with http.basicauth.user is withheld "
+                                + "because the servers are not authenticated (http.trust.everything). "
+                                + "Set http.credentials.allow.insecure to true to send it anyway.");
+            }
         }
 
-        customHeaders.forEach(customRequestHeaders::add);
+        for (KeyValue customHeader : customHeaders) {
+            if (!sendCredentials && isCredentialHeader(customHeader.getKey())) {
+                LOG.warn(
+                        "Custom header {} is withheld because the servers are not authenticated "
+                                + "(http.trust.everything). Set http.credentials.allow.insecure to "
+                                + "true to send it anyway.",
+                        customHeader.getKey());
+                continue;
+            }
+            customRequestHeaders.add(customHeader);
+        }
 
         // optionally block connections to forbidden IP address ranges
         // (e.g. localhost/loopback, private/site-local addresses), see
@@ -245,15 +311,11 @@ public class HttpProtocol extends AbstractHttpProtocol {
             builder.addNetworkInterceptor(new HTTPHeadersInterceptor());
         }
 
-        if (ConfUtils.getBoolean(conf, "http.trust.everything", true)) {
+        if (trustEverything) {
             builder.sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager) trustAllCerts[0]);
-            builder.hostnameVerifier(
-                    new HostnameVerifier() {
-                        @Override
-                        public boolean verify(String hostname, SSLSession session) {
-                            return true;
-                        }
-                    });
+        }
+        if (!verifyHostnames) {
+            builder.hostnameVerifier((hostname, session) -> true);
         }
 
         builder.eventListenerFactory(
@@ -285,6 +347,15 @@ public class HttpProtocol extends AbstractHttpProtocol {
     }
 
     private void addCookiesToRequest(Builder rb, String url, Metadata md) {
+        if (!sendCredentials) {
+            if (withheldCookiesLogged.compareAndSet(false, true)) {
+                LOG.warn(
+                        "Cookies are withheld because the servers are not authenticated "
+                                + "(http.trust.everything). Set http.credentials.allow.insecure to "
+                                + "true to send them anyway.");
+            }
+            return;
+        }
         final String[] cookieStrings =
                 md.getValues(RESPONSE_COOKIES_HEADER, protocolMetadataPrefix);
         if (cookieStrings == null || cookieStrings.length == 0) {
@@ -337,12 +408,33 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
     }
 
+    /**
+     * Returns true when the header carries credentials which must not be disclosed to servers that
+     * were not authenticated. Covers the standard credential headers plus any header commonly used
+     * for API keys; cookie headers are handled separately in {@link #addCookiesToRequest}.
+     */
+    private static boolean isCredentialHeader(String name) {
+        if (name == null) {
+            return false;
+        }
+        final String normalised = name.trim().toLowerCase(Locale.ROOT);
+        return CREDENTIAL_HEADERS.contains(normalised);
+    }
+
     protected void addHeadersToRequest(Builder rb, Metadata md) {
         final String[] headerStrings = md.getValues(SET_HEADER_BY_REQUEST, protocolMetadataPrefix);
 
         if (headerStrings != null && headerStrings.length > 0) {
             for (String hs : headerStrings) {
                 KeyValue h = KeyValue.build(hs);
+                if (!sendCredentials && isCredentialHeader(h.getKey())) {
+                    LOG.warn(
+                            "Header {} set by request is withheld because the servers are not "
+                                    + "authenticated (http.trust.everything). Set "
+                                    + "http.credentials.allow.insecure to true to send it anyway.",
+                            h.getKey());
+                    continue;
+                }
                 rb.addHeader(h.getKey(), h.getValue());
             }
         }

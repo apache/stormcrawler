@@ -392,7 +392,7 @@ Keep the pool size (idle + active) under 1000. For large crawls, increase `proto
 
 ==== SSL/TLS
 
-By default, StormCrawler's OkHttp protocol trusts all certificates (`http.trust.everything: true`). For production crawls over untrusted networks, consider setting this to `false` and configuring a proper trust store.
+By default, StormCrawler's OkHttp protocol validates the certificate chains of HTTPS servers and checks that the certificate matches the host name contacted (`http.trust.everything: false`, `http.verify.hostnames: true`). For crawls of hosts whose certificates cannot be validated, e.g. self-signed ones, set `http.trust.everything` to `true`: the servers are then not authenticated, so credentials (basic auth, credential headers in `http.custom.headers`, cookies) are withheld over such connections unless `http.credentials.allow.insecure` is set to `true`. Hostname checking is a separate decision and can be disabled with `http.verify.hostnames: false`.
 
 ==== Authentication
 
@@ -404,7 +404,7 @@ http.basicauth.user: "username"
 http.basicauth.password: "password"
 ----
 
-These credentials are sent as an `Authorization` header with every request. For per-site authentication, use metadata-driven headers instead (see <<Metadata-dependent Behavior For HTTP Protocols>> in the Internals section).
+These credentials are sent as an `Authorization` header with every request to servers authenticated by their TLS certificate; they are withheld when `http.trust.everything` is enabled, unless `http.credentials.allow.insecure` is set to `true`. For per-site authentication, use metadata-driven headers instead (see <<Metadata-dependent Behavior For HTTP Protocols>> in the Internals section).
 
 ==== Proxy Authentication
 
