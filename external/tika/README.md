@@ -31,4 +31,4 @@ The next step is to use a [RedirectionBolt](https://github.com/apache/stormcrawl
  
 ## Configure Tika
 
-The Tika parser bolt loads a Tika configuration file from the Java classpath. The default file name (path) is `tika-config.xml` and can be changed by the configuration `parser.tika.config.file`. See [configuring Tika](https://tika.apache.org/2.1.0/configuring.html) and the default configuration file [tika-config.xml](./src/main/resources/tika-config.xml).
+The Tika parser bolt loads a Tika configuration file from the Java classpath. The default file name (path) is `tika-config.json` and can be changed by the configuration `parser.tika.config.file`. Since Tika 4, configurations are written in JSON instead of XML - see [configuring Tika](https://tika.apache.org/4.0.0/config.html) and the default configuration file [tika-config.json](./src/main/resources/tika-config.json).

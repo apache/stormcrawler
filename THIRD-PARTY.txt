@@ -22,7 +22,7 @@ List of third-party dependencies grouped by their license type.
         * Apache Avro (org.apache.avro:avro:1.12.1 - https://avro.apache.org)
         * Apache Commons CLI (commons-cli:commons-cli:1.11.0 - https://commons.apache.org/proper/commons-cli/)
         * Apache Commons Codec (commons-codec:commons-codec:1.22.1 - https://commons.apache.org/proper/commons-codec/)
-        * Apache Commons Collections (org.apache.commons:commons-collections4:4.5.0 - https://commons.apache.org/proper/commons-collections/)
+        * Apache Commons Collections (org.apache.commons:commons-collections4:4.6.0 - https://commons.apache.org/proper/commons-collections/)
         * Apache Commons Compress (org.apache.commons:commons-compress:1.28.0 - https://commons.apache.org/proper/commons-compress/)
         * Apache Commons CSV (org.apache.commons:commons-csv:1.14.1 - https://commons.apache.org/proper/commons-csv/)
         * Apache Commons Exec (org.apache.commons:commons-exec:1.6.0 - https://commons.apache.org/proper/commons-exec/)
@@ -49,7 +49,6 @@ List of third-party dependencies grouped by their license type.
         * Apache HttpCore NIO (org.apache.httpcomponents:httpcore-nio:4.4.16 - http://hc.apache.org/httpcomponents-core-ga)
         * Apache James :: Mime4j :: Core (org.apache.james:apache-mime4j-core:0.8.14 - http://james.apache.org/mime4j/apache-mime4j-core)
         * Apache James :: Mime4j :: DOM (org.apache.james:apache-mime4j-dom:0.8.14 - http://james.apache.org/mime4j/apache-mime4j-dom)
-        * Apache JempBox (org.apache.pdfbox:jempbox:1.8.17 - http://www.apache.org/pdfbox-parent/jempbox/)
         * Apache Log4j API (org.apache.logging.log4j:log4j-api:2.26.0 - https://logging.apache.org/log4j/2.x/)
         * Apache Log4j Core (org.apache.logging.log4j:log4j-core:2.26.0 - https://logging.apache.org/log4j/2.x/)
         * Apache Log4j JUL Adapter (org.apache.logging.log4j:log4j-jul:2.25.4 - https://logging.apache.org/log4j/2.x/)
@@ -73,37 +72,40 @@ List of third-party dependencies grouped by their license type.
         * Apache POI (org.apache.poi:poi-scratchpad:5.5.1 - https://poi.apache.org/)
         * Apache POI - API based on OPC and OOXML schemas (org.apache.poi:poi-ooxml:5.5.1 - https://poi.apache.org/)
         * Apache POI - Common (org.apache.poi:poi:5.5.1 - https://poi.apache.org/)
-        * Apache POI - OOXML schemas (full) (org.apache.poi:poi-ooxml-full:5.5.1 - https://poi.apache.org/)
         * Apache Solr (module: api) (org.apache.solr:solr-api:10.0.0 - https://solr.apache.org/)
         * Apache Solr (module: solrj) (org.apache.solr:solr-solrj:10.0.0 - https://solr.apache.org/)
         * Apache Solr (module: solrj-jetty) (org.apache.solr:solr-solrj-jetty:10.0.0 - https://solr.apache.org/)
         * Apache Solr (module: solrj-zookeeper) (org.apache.solr:solr-solrj-zookeeper:10.0.0 - https://solr.apache.org/)
-        * Apache Tika Apple parser module (org.apache.tika:tika-parser-apple-module:3.3.2 - https://tika.apache.org/tika-parser-apple-module/)
-        * Apache Tika audiovideo parser module (org.apache.tika:tika-parser-audiovideo-module:3.3.2 - https://tika.apache.org/tika-parser-audiovideo-module/)
-        * Apache Tika cad parser module (org.apache.tika:tika-parser-cad-module:3.3.2 - https://tika.apache.org/tika-parser-cad-module/)
-        * Apache Tika code parser module (org.apache.tika:tika-parser-code-module:3.3.2 - https://tika.apache.org/tika-parser-code-module/)
-        * Apache Tika core (org.apache.tika:tika-core:3.3.2 - https://tika.apache.org/)
-        * Apache Tika crypto parser module (org.apache.tika:tika-parser-crypto-module:3.3.2 - https://tika.apache.org/tika-parser-crypto-module/)
-        * Apache Tika digest commons (org.apache.tika:tika-parser-digest-commons:3.3.2 - https://tika.apache.org/tika-parser-digest-commons/)
-        * Apache Tika font parser module (org.apache.tika:tika-parser-font-module:3.3.2 - https://tika.apache.org/tika-parser-font-module/)
-        * Apache Tika html parser module (org.apache.tika:tika-parser-html-module:3.3.2 - https://tika.apache.org/tika-parser-html-module/)
-        * Apache Tika image parser module (org.apache.tika:tika-parser-image-module:3.3.2 - https://tika.apache.org/tika-parser-image-module/)
-        * Apache Tika mail commons (org.apache.tika:tika-parser-mail-commons:3.3.2 - https://tika.apache.org/tika-parser-mail-commons/)
-        * Apache Tika mail parser module (org.apache.tika:tika-parser-mail-module:3.3.2 - https://tika.apache.org/tika-parser-mail-module/)
-        * Apache Tika Microsoft parser module (org.apache.tika:tika-parser-microsoft-module:3.3.2 - https://tika.apache.org/tika-parser-microsoft-module/)
-        * Apache Tika miscellaneous office format parser module (org.apache.tika:tika-parser-miscoffice-module:3.3.2 - https://tika.apache.org/tika-parser-miscoffice-module/)
-        * Apache Tika news parser module (org.apache.tika:tika-parser-news-module:3.3.2 - https://tika.apache.org/tika-parser-news-module/)
-        * Apache Tika OCR parser module (org.apache.tika:tika-parser-ocr-module:3.3.2 - https://tika.apache.org/tika-parser-ocr-module/)
-        * Apache Tika package parser module (org.apache.tika:tika-parser-pkg-module:3.3.2 - https://tika.apache.org/tika-parser-pkg-module/)
-        * Apache Tika PDF parser module (org.apache.tika:tika-parser-pdf-module:3.3.2 - https://tika.apache.org/tika-parser-pdf-module/)
-        * Apache Tika plugin for Ogg, Vorbis and FLAC (org.gagravarr:vorbis-java-tika:0.8 - https://github.com/Gagravarr/VorbisJava)
-        * Apache Tika standard parser package (org.apache.tika:tika-parsers-standard-package:3.3.2 - https://tika.apache.org/tika-parsers/tika-parsers-standard/tika-parsers-standard-package/)
-        * Apache Tika text parser module (org.apache.tika:tika-parser-text-module:3.3.2 - https://tika.apache.org/tika-parser-text-module/)
-        * Apache Tika WARC parser module (org.apache.tika:tika-parser-webarchive-module:3.3.2 - https://tika.apache.org/tika-parser-webarchive-module/)
-        * Apache Tika XML parser module (org.apache.tika:tika-parser-xml-module:3.3.2 - https://tika.apache.org/tika-parser-xml-module/)
-        * Apache Tika XMP commons (org.apache.tika:tika-parser-xmp-commons:3.3.2 - https://tika.apache.org/tika-parser-xmp-commons/)
-        * Apache Tika ZIP commons (org.apache.tika:tika-parser-zip-commons:3.3.2 - https://tika.apache.org/tika-parser-zip-commons/)
-        * Apache XmpBox (org.apache.pdfbox:xmpbox:3.0.8 - https://www.apache.org/pdfbox-parent/xmpbox/)
+        * Apache Tika Apple parser module (org.apache.tika:tika-parser-apple-module:4.0.0 - https://tika.apache.org/tika-parser-apple-module/)
+        * Apache Tika audiovideo parser module (org.apache.tika:tika-parser-audiovideo-module:4.0.0 - https://tika.apache.org/tika-parser-audiovideo-module/)
+        * Apache Tika cad parser module (org.apache.tika:tika-parser-cad-module:4.0.0 - https://tika.apache.org/tika-parser-cad-module/)
+        * Apache Tika code parser module (org.apache.tika:tika-parser-code-module:4.0.0 - https://tika.apache.org/tika-parser-code-module/)
+        * Apache Tika core (org.apache.tika:tika-core:4.0.0 - https://tika.apache.org/)
+        * Apache Tika crypto parser module (org.apache.tika:tika-parser-crypto-module:4.0.0 - https://tika.apache.org/tika-parser-crypto-module/)
+        * Apache Tika data URI commons (org.apache.tika:tika-parser-datauri-commons:4.0.0 - https://tika.apache.org/tika-parser-datauri-commons/)
+        * Apache Tika digest commons (org.apache.tika:tika-parser-digest-commons:4.0.0 - https://tika.apache.org/tika-parser-digest-commons/)
+        * Apache Tika font parser module (org.apache.tika:tika-parser-font-module:4.0.0 - https://tika.apache.org/tika-parser-font-module/)
+        * Apache Tika HTML encoding detector (org.apache.tika:tika-encoding-detector-html:4.0.0 - https://tika.apache.org/tika-encoding-detectors/tika-encoding-detector-html/)
+        * Apache Tika html parser module (org.apache.tika:tika-parser-html-module:4.0.0 - https://tika.apache.org/tika-parser-html-module/)
+        * Apache Tika image parser module (org.apache.tika:tika-parser-image-module:4.0.0 - https://tika.apache.org/tika-parser-image-module/)
+        * Apache Tika mail commons (org.apache.tika:tika-parser-mail-commons:4.0.0 - https://tika.apache.org/tika-parser-mail-commons/)
+        * Apache Tika mail parser module (org.apache.tika:tika-parser-mail-module:4.0.0 - https://tika.apache.org/tika-parser-mail-module/)
+        * Apache Tika Microsoft parser module (org.apache.tika:tika-parser-microsoft-module:4.0.0 - https://tika.apache.org/tika-parser-microsoft-module/)
+        * Apache Tika miscellaneous office format parser module (org.apache.tika:tika-parser-miscoffice-module:4.0.0 - https://tika.apache.org/tika-parser-miscoffice-module/)
+        * Apache Tika ML charset encoding detector (org.apache.tika:tika-encoding-detector-mojibuster:4.0.0 - https://tika.apache.org/tika-encoding-detectors/tika-encoding-detector-mojibuster/)
+        * Apache Tika ML core (no Tika dependencies) (org.apache.tika:tika-ml-core:4.0.0 - https://tika.apache.org/tika-ml-core/)
+        * Apache Tika ML junk detector — runtime and training tools (org.apache.tika:tika-ml-junkdetect:4.0.0 - https://tika.apache.org/tika-ml-junkdetect/)
+        * Apache Tika news parser module (org.apache.tika:tika-parser-news-module:4.0.0 - https://tika.apache.org/tika-parser-news-module/)
+        * Apache Tika OCR parser module (org.apache.tika:tika-parser-ocr-module:4.0.0 - https://tika.apache.org/tika-parser-ocr-module/)
+        * Apache Tika package parser module (org.apache.tika:tika-parser-pkg-module:4.0.0 - https://tika.apache.org/tika-parser-pkg-module/)
+        * Apache Tika PDF parser module (org.apache.tika:tika-parser-pdf-module:4.0.0 - https://tika.apache.org/tika-parser-pdf-module/)
+        * Apache Tika serialization (org.apache.tika:tika-serialization:4.0.0 - https://tika.apache.org)
+        * Apache Tika standard parser package (org.apache.tika:tika-parsers-standard-package:4.0.0 - https://tika.apache.org/tika-parsers/tika-parsers-standard/tika-parsers-standard-package/)
+        * Apache Tika text parser module (org.apache.tika:tika-parser-text-module:4.0.0 - https://tika.apache.org/tika-parser-text-module/)
+        * Apache Tika WARC parser module (org.apache.tika:tika-parser-webarchive-module:4.0.0 - https://tika.apache.org/tika-parser-webarchive-module/)
+        * Apache Tika XML parser module (org.apache.tika:tika-parser-xml-module:4.0.0 - https://tika.apache.org/tika-parser-xml-module/)
+        * Apache Tika XMP commons (org.apache.tika:tika-parser-xmp-commons:4.0.0 - https://tika.apache.org/tika-parser-xmp-commons/)
+        * Apache Tika ZIP commons (org.apache.tika:tika-parser-zip-commons:4.0.0 - https://tika.apache.org/tika-parser-zip-commons/)
         * Apache ZooKeeper - Jute (org.apache.zookeeper:zookeeper-jute:3.9.4 - http://zookeeper.apache.org/zookeeper-jute)
         * Apache ZooKeeper - Server (org.apache.zookeeper:zookeeper:3.9.4 - http://zookeeper.apache.org/zookeeper)
         * AWS Event Stream (software.amazon.eventstream:eventstream:1.0.1 - https://github.com/awslabs/aws-eventstream-java)
@@ -141,7 +143,7 @@ List of third-party dependencies grouped by their license type.
         * AWS Java SDK :: Utilities (software.amazon.awssdk:utils:2.54.6 - https://aws.amazon.com/sdkforjava/utils)
         * AWS Java SDK :: Utils Lite (software.amazon.awssdk:utils-lite:2.54.6 - https://aws.amazon.com/sdkforjava)
         * Caffeine cache (com.github.ben-manes.caffeine:caffeine:3.2.4 - https://github.com/ben-manes/caffeine)
-        * com.drewnoakes:metadata-extractor (com.drewnoakes:metadata-extractor:2.20.0 - https://drewnoakes.com/code/exif/)
+        * com.drewnoakes:metadata-extractor (com.drewnoakes:metadata-extractor:2.21.0 - https://drewnoakes.com/code/exif/)
         * compiler (com.github.spullara.mustache.java:compiler:0.9.14 - http://github.com/spullara/mustache.java)
         * Crawler-commons (com.github.crawler-commons:crawler-commons:1.6 - https://github.com/crawler-commons/crawler-commons)
         * Curator Client (org.apache.curator:curator-client:5.9.0 - https://curator.apache.org/curator-client)
@@ -305,7 +307,13 @@ List of third-party dependencies grouped by their license type.
         * Bouncy Castle JavaMail Jakarta S/MIME APIs (org.bouncycastle:bcjmail-jdk18on:1.85 - https://www.bouncycastle.org/download/bouncy-castle-java/)
         * Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs (org.bouncycastle:bcpkix-jdk18on:1.84 - https://www.bouncycastle.org/download/bouncy-castle-java/)
         * Bouncy Castle Provider (org.bouncycastle:bcprov-jdk18on:1.84 - https://www.bouncycastle.org/download/bouncy-castle-java/)
-        * Bouncy Castle Provider (org.bouncycastle:bcprov-jdk18on:1.85 - https://www.bouncycastle.org/download/bouncy-castle-java/)
+        * Bouncy Castle Provider (org.bouncycastle:bcprov-jdk18on:1.85.2 - https://www.bouncycastle.org/download/bouncy-castle-java/)
+
+    BSD-2-Clause
+
+        * commonmark-java core (org.commonmark:commonmark:0.30.0 - https://github.com/commonmark/commonmark-java/commonmark)
+        * commonmark-java extension for strikethrough (org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0 - https://github.com/commonmark/commonmark-java/commonmark-ext-gfm-strikethrough)
+        * commonmark-java extension for tables (org.commonmark:commonmark-ext-gfm-tables:0.30.0 - https://github.com/commonmark/commonmark-java/commonmark-ext-gfm-tables)
 
     BSD-2-Clause, Public Domain, per Creative Commons CC0
 
@@ -331,7 +339,7 @@ List of third-party dependencies grouped by their license type.
 
     CDDL, v1.0, LGPL, v2.1 or later
 
-        * JHighlight (org.codelibs:jhighlight:1.1.1 - https://github.com/codelibs/jhighlight)
+        * JHighlight (org.codelibs:jhighlight:2.0.0 - https://github.com/codelibs/jhighlight)
 
     CDDL/GPLv2+CE
 
@@ -375,10 +383,6 @@ List of third-party dependencies grouped by their license type.
         * JSON-B API (jakarta.json.bind:jakarta.json.bind-api:2.0.0 - https://eclipse-ee4j.github.io/jsonb-api)
         * JSON-P Default Provider (org.glassfish:jakarta.json:2.0.0 - https://github.com/eclipse-ee4j/jsonp)
 
-    GENERAL PUBLIC LICENSE, version 3 (GPL-3.0), GNU LESSER GENERAL PUBLIC LICENSE, version 3 (LGPL-3.0), Mozilla Public License Version 1.1
-
-        * juniversalchardet (com.github.albfernandez:juniversalchardet:2.5.0 - https://github.com/albfernandez/juniversalchardet)
-
     MIT-0
 
         * reactive-streams (org.reactivestreams:reactive-streams:1.0.4 - http://www.reactive-streams.org/)
@@ -386,7 +390,7 @@ List of third-party dependencies grouped by their license type.
     MIT License
 
         * Animal Sniffer Annotations (org.codehaus.mojo:animal-sniffer-annotations:1.24 - https://www.mojohaus.org/animal-sniffer/animal-sniffer-annotations)
-        * dd-plist (com.googlecode.plist:dd-plist:1.29 - http://www.github.com/3breadt/dd-plist)
+        * dd-plist (com.googlecode.plist:dd-plist:1.30 - http://www.github.com/3breadt/dd-plist)
         * JOpt Simple (net.sf.jopt-simple:jopt-simple:5.0.4 - http://jopt-simple.github.io/jopt-simple)
         * jsoup Java HTML Parser (org.jsoup:jsoup:1.23.2 - https://jsoup.org/)
         * JTokkit (com.knuddels:jtokkit:1.1.0 - https://github.com/knuddelsgmbh/jtokkit)
@@ -415,4 +419,4 @@ List of third-party dependencies grouped by their license type.
 
     UnRar License
 
-        * Java Unrar (com.github.junrar:junrar:7.6.0 - https://github.com/junrar/junrar)
+        * Java Unrar (com.github.junrar:junrar:8.1.0 - https://github.com/junrar/junrar)

@@ -1,0 +1,9 @@
+{
+  "parsers": [
+    {
+      "default-parser": {
+        "exclude": ["tesseract-ocr-parser"]
+      }
+    }
+  ]
+}
