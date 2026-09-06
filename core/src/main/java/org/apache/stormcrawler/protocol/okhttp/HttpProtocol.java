@@ -54,6 +54,7 @@ import okhttp3.EventListener.Factory;
 import okhttp3.Gzip;
 import okhttp3.Handshake;
 import okhttp3.Headers;
+import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -74,6 +75,7 @@ import org.apache.http.cookie.Cookie;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.filtering.URLFilters;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
 import org.apache.stormcrawler.protocol.IPFilterRules;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
@@ -89,6 +91,13 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(HttpProtocol.class);
 
+    /**
+     * Maximum number of redirect hops followed when {@code http.allow.redirects} is enabled. A
+     * chain which does not end within this many hops returns its last redirect response, which the
+     * caller handles like it does when redirect following is off.
+     */
+    private static final int MAX_REDIRECT_HOPS = 5;
+
     private final MediaType json = MediaType.parse("application/json; charset=utf-8");
 
     private OkHttpClient client;
@@ -99,6 +108,12 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     /** Accept partially fetched content as trimmed content */
     private boolean partialContentAsTrimmed = false;
+
+    /** Redirect targets run through the URL filters before a hop is taken. */
+    private URLFilters urlFilters = URLFilters.emptyURLFilters;
+
+    /** Whether redirect responses are followed, from {@code http.allow.redirects}. */
+    private boolean followRedirects = false;
 
     private final List<KeyValue> customRequestHeaders = new LinkedList<>();
 
@@ -158,12 +173,22 @@ public class HttpProtocol extends AbstractHttpProtocol {
         this.partialContentAsTrimmed =
                 ConfUtils.getBoolean(conf, "http.content.partial.as.trimmed", false);
 
+        /*
+         * Redirects are followed in getProtocolOutput and not by the client:
+         * every target has to pass through the URL filters first, so that the
+         * scheme exclusions, host confinement and depth rules configured for
+         * the crawl also apply to the hops a fetched page steers the fetcher
+         * to. The client must therefore never follow them on its own.
+         */
+        final boolean allowRedirects = ConfUtils.getBoolean(conf, "http.allow.redirects", false);
+        this.followRedirects = allowRedirects;
+        urlFilters = URLFilters.fromConf(conf);
         builder =
                 new OkHttpClient.Builder()
                         .retryOnConnectionFailure(
                                 ConfUtils.getBoolean(
                                         conf, "http.retry.on.connection.failure", true))
-                        .followRedirects(ConfUtils.getBoolean(conf, "http.allow.redirects", false))
+                        .followRedirects(false)
                         .connectTimeout(timeout, TimeUnit.MILLISECONDS)
                         .writeTimeout(timeout, TimeUnit.MILLISECONDS)
                         .readTimeout(timeout, TimeUnit.MILLISECONDS);
@@ -466,9 +491,85 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         final Request request = rb.build();
 
-        final Call call = localClient.newCall(request);
+        /*
+         * Follow redirect responses manually: every target runs through the
+         * URL filters before the hop is taken, and a target which is rejected
+         * ends the chain - the redirect response is then returned as is and
+         * the caller handles it like it does when http.allow.redirects is
+         * off. The final URL is recorded in the response metadata so that
+         * callers can tell that the content is not from the URL they asked
+         * for.
+         */
+        Response lastResponse = null;
+        Call call = null;
+        Request currentRequest = request;
+        String currentUrl = url;
 
-        try (Response response = call.execute()) {
+        try {
+            for (int hops = 0; hops <= MAX_REDIRECT_HOPS; hops++) {
+                if (lastResponse != null) {
+                    // release the connection before issuing the next request
+                    lastResponse.close();
+                    lastResponse = null;
+                }
+                call = client.newCall(currentRequest);
+                lastResponse = call.execute();
+
+                if (hops == MAX_REDIRECT_HOPS) {
+                    LOG.warn("More than {} redirect hops for {}", MAX_REDIRECT_HOPS, url);
+                    break;
+                }
+                if (!followRedirects || !isRedirect(lastResponse)) {
+                    break;
+                }
+
+                final String location = lastResponse.header(HttpHeaders.LOCATION);
+                if (StringUtils.isBlank(location)) {
+                    LOG.debug(
+                            "Got redirect response {} for {} without location",
+                            lastResponse.code(),
+                            url);
+                    break;
+                }
+
+                final HttpUrl target = currentRequest.url().resolve(location);
+                if (target == null) {
+                    LOG.warn(
+                            "Redirect target {} could not be resolved against {}",
+                            location,
+                            currentUrl);
+                    break;
+                }
+
+                final Metadata sourceMetadata = metadata != null ? metadata : new Metadata();
+                final String filtered =
+                        urlFilters.filter(
+                                currentRequest.url().url(), sourceMetadata, target.toString());
+                if (filtered == null) {
+                    LOG.info("Redirect target {} rejected by the URL filters", target);
+                    break;
+                }
+
+                final HttpUrl accepted = HttpUrl.parse(filtered);
+                if (accepted == null) {
+                    LOG.warn("Filtered redirect target {} is not a URL", filtered);
+                    break;
+                }
+
+                final Request.Builder followBuilder = currentRequest.newBuilder().url(accepted);
+                // for 303, and for 301 or 302 after a POST, the request is
+                // repeated as a GET, like the client would do
+                final int code = lastResponse.code();
+                if (code == 303
+                        || ((code == 301 || code == 302) && !"GET".equals(currentRequest.method()))) {
+                    followBuilder.method("GET", null);
+                }
+                currentRequest = followBuilder.build();
+                currentUrl = filtered;
+            }
+
+            final Response response = lastResponse;
+            final Call executedCall = call;
 
             final Metadata responsemetadata = new Metadata();
             final Headers headers = response.headers();
@@ -487,6 +588,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 responsemetadata.addValue(key.toLowerCase(Locale.ROOT), value);
             }
 
+            if (!currentUrl.equals(url)) {
+                responsemetadata.setValue("_redirTo", currentUrl);
+            }
+
             // the Set-Cookie header does not say which host sent it: record the url of this
             // response so that the cookies can be scoped to it when they are sent back. The
             // key is dropped first so that a server sending a header of that name can not
@@ -501,8 +606,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     new MutableObject<>(TrimmedContentReason.NOT_TRIMMED);
             final byte[] bytes = toByteArray(response.body(), pageMaxContent, trimmed);
             if (trimmed.get() != TrimmedContentReason.NOT_TRIMMED) {
-                if (!call.isCanceled()) {
-                    call.cancel();
+                if (!executedCall.isCanceled()) {
+                    executedCall.cancel();
                 }
                 responsemetadata.setValue(ProtocolResponse.TRIMMED_RESPONSE_KEY, "true");
                 responsemetadata.setValue(
@@ -511,13 +616,23 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 LOG.warn("HTTP content trimmed to {} (reason: {})", bytes.length, trimmed.get());
             }
 
-            final Long dnsResolution = DNStimes.remove(call.toString());
+            final Long dnsResolution = DNStimes.remove(executedCall.toString());
             if (dnsResolution != null) {
                 responsemetadata.setValue("metrics.dns.resolution.msec", dnsResolution.toString());
             }
 
             return new ProtocolResponse(bytes, response.code(), responsemetadata);
+        } finally {
+            if (lastResponse != null) {
+                lastResponse.close();
+            }
         }
+    }
+
+    /** Checks whether the response is a redirect whose Location must be resolved. */
+    private static boolean isRedirect(Response response) {
+        final int code = response.code();
+        return code == 301 || code == 302 || code == 303 || code == 307 || code == 308;
     }
 
     private byte[] toByteArray(

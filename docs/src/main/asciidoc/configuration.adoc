@@ -232,7 +232,7 @@ implementation.
 | partition.url.mode | byHost | Defines how URLs are partitioned: byHost, byDomain, or byIP.
 | protocols | http,https,file | Supported protocols.
 | redirections.allowed | true | If true, emit redirect target URLs as "outlinks" to the status stream. If false, do not follow redirects. See also `http.allow.redirects`.
-| http.allow.redirects | false | (OkHttp only) Follow HTTP redirects immediately in the HTTP protocol client. Note: if followed immediately, redirect target URLs are not emitted to the status stream, are not filtered, not deduplicated, and not checked against robots.txt.
+| http.allow.redirects | false | (OkHttp only) Follow HTTP redirects immediately in the HTTP protocol client. Note: if followed immediately, redirect target URLs are not emitted to the status stream, are not deduplicated and not checked against robots.txt, but each target runs through the URL filter chain before the hop is taken (up to 5 hops; the final URL is recorded in the response metadata as `_redirTo`).
 | sitemap.discovery | false | Enable automatic sitemap discovery.
 | urlbuffer.class | org.apache.stormcrawler.persistence.urlbuffer.SimpleURLBuffer | URL buffer implementation used by spouts.
 |===
