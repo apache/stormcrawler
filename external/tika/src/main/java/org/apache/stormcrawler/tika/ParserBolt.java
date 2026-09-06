@@ -52,6 +52,7 @@ import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.HttpHeaderResolver;
 import org.apache.stormcrawler.util.InitialisationUtil;
 import org.apache.stormcrawler.util.MetadataTransfer;
 import org.apache.stormcrawler.util.URLUtil;
@@ -166,7 +167,9 @@ public class ParserBolt extends BaseRichBolt {
             String mimeType = metadata.getFirstValue("parse.Content-Type");
             // otherwise rely on what could have been obtained from HTTP
             if (mimeType == null) {
-                mimeType = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, this.protocolMDprefix);
+                mimeType =
+                        HttpHeaderResolver.getFirstValue(
+                                metadata, HttpHeaders.CONTENT_TYPE, this.protocolMDprefix);
             }
             if (mimeType != null) {
                 for (Pattern mt : mimeTypeWhiteList) {
@@ -198,7 +201,9 @@ public class ParserBolt extends BaseRichBolt {
         org.apache.tika.metadata.Metadata md = new org.apache.tika.metadata.Metadata();
 
         // provide the mime-type as a clue for guessing
-        String httpCT = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, this.protocolMDprefix);
+        String httpCT =
+                HttpHeaderResolver.getFirstValue(
+                        metadata, HttpHeaders.CONTENT_TYPE, this.protocolMDprefix);
         if (StringUtils.isNotBlank(httpCT)) {
             // pass content type from server as a clue
             md.set(org.apache.tika.metadata.Metadata.CONTENT_TYPE, httpCT);

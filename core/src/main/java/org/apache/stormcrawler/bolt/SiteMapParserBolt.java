@@ -61,6 +61,7 @@ import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.persistence.DefaultScheduler;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.HttpHeaderResolver;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 
@@ -99,7 +100,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
         byte[] content = tuple.getBinaryByField("content");
         String url = tuple.getStringByField("url");
 
-        String ct = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE);
+        String ct = HttpHeaderResolver.getFirstValue(metadata, HttpHeaders.CONTENT_TYPE);
 
         LOG.debug("Processing {}", url);
 

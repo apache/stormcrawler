@@ -81,6 +81,7 @@ import org.apache.stormcrawler.protocol.ProtocolResponse.TrimmedContentReason;
 import org.apache.stormcrawler.proxy.SCProxy;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.CookieConverter;
+import org.apache.stormcrawler.util.HttpHeaderResolver;
 import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
@@ -418,13 +419,15 @@ public class HttpProtocol extends AbstractHttpProtocol {
         if (metadata != null) {
             addHeadersToRequest(rb, metadata);
 
-            final String lastModified = metadata.getFirstValue(HttpHeaders.LAST_MODIFIED);
+            final String lastModified =
+                    HttpHeaderResolver.getFirstValue(metadata, HttpHeaders.LAST_MODIFIED);
             if (StringUtils.isNotBlank(lastModified)) {
                 rb.header(HttpHeaders.IF_MODIFIED_SINCE, formatHttpDate(lastModified));
             }
 
             final String ifNoneMatch =
-                    metadata.getFirstValue(HttpHeaders.ETAG, protocolMetadataPrefix);
+                    HttpHeaderResolver.getFirstValue(
+                            metadata, HttpHeaders.ETAG, protocolMetadataPrefix);
             if (StringUtils.isNotBlank(ifNoneMatch)) {
                 rb.header(HttpHeaders.IF_NONE_MATCH, ifNoneMatch);
             }

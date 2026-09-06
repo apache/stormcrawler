@@ -128,7 +128,8 @@ public class CharsetIdentification {
 
     /** Returns the charset declared by the server if any. */
     private static String getCharsetFromHTTP(Metadata metadata) {
-        return getCharsetFromContentType(metadata.getFirstValue(HttpHeaders.CONTENT_TYPE));
+        return getCharsetFromContentType(
+                HttpHeaderResolver.getFirstValue(metadata, HttpHeaders.CONTENT_TYPE));
     }
 
     /** Detects any BOMs and returns the corresponding charset. */
