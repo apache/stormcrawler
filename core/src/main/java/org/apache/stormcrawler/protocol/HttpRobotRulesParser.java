@@ -64,9 +64,16 @@ public class HttpRobotRulesParser extends RobotRulesParser {
         super.setConf(conf);
         allowForbidden = ConfUtils.getBoolean(conf, "http.robots.403.allow", true);
         fetchRobotsMd = new Metadata();
-        /* http.content.limit for fetching the robots.txt */
+        /*
+         * http.content.limit for fetching the robots.txt. The default of -1
+         * means "same as http.content.limit": writing the key into the fetch
+         * metadata would override the global limit of the protocol with "no
+         * limit", so it is only set when a robots specific limit is configured.
+         */
         int robotsTxtContentLimit = ConfUtils.getInt(conf, "http.robots.content.limit", -1);
-        fetchRobotsMd.addValue("http.content.limit", Integer.toString(robotsTxtContentLimit));
+        if (robotsTxtContentLimit != -1) {
+            fetchRobotsMd.addValue("http.content.limit", Integer.toString(robotsTxtContentLimit));
+        }
         allow5xx = ConfUtils.getBoolean(conf, "http.robots.5xx.allow", false);
         allowCrossOriginRedirects =
                 ConfUtils.getBoolean(conf, "http.robots.redirect.crossorigin.allow", false);
