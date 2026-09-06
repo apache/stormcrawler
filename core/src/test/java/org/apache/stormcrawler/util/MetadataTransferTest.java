@@ -152,4 +152,105 @@ class MetadataTransferTest {
     }
 
     static class MyCustomTransferClass extends MetadataTransfer {}
+
+    @Test
+    void testWildcardPrefixIsCaseInsensitiveAndSelective() throws MalformedURLException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(MetadataTransfer.trackPathParamName, false);
+        conf.put(MetadataTransfer.trackDepthParamName, false);
+        conf.put(MetadataTransfer.metadataTransferParamName, List.of("Cookie.*", "exact"));
+        Metadata parentMD = new Metadata();
+        parentMD.addValue("cookie.id", "42");
+        parentMD.addValue("cookies", "not a prefix match");
+        parentMD.addValue("cook", "no");
+        parentMD.addValue("exact", "yes");
+        parentMD.addValue("exactly", "no");
+        Metadata outlinkMD =
+                MetadataTransfer.getInstance(conf)
+                        .getMetaForOutlink(
+                                "http://www.example.com/outlink.html",
+                                "http://www.example.com",
+                                parentMD);
+        Assertions.assertEquals(Set.of("cookie.id", "exact"), outlinkMD.keySet());
+        Assertions.assertEquals("42", outlinkMD.getFirstValue("cookie.id"));
+    }
+
+    /** Subclass that extends the transfer set after the base configuration, a supported pattern. */
+    static class ExtendingTransferClass extends MetadataTransfer {
+        @Override
+        protected void configure(Map<String, Object> conf) {
+            super.configure(conf);
+            mdToTransfer.add("added.*");
+        }
+    }
+
+    @Test
+    void testSubclassCanExtendTransferSetInConfigure() throws MalformedURLException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(MetadataTransfer.trackPathParamName, false);
+        conf.put(MetadataTransfer.trackDepthParamName, false);
+        conf.put(
+                MetadataTransfer.metadataTransferClassParamName,
+                ExtendingTransferClass.class.getName());
+        conf.put(MetadataTransfer.metadataTransferParamName, List.of("cookie.*"));
+        Metadata parentMD = new Metadata();
+        parentMD.addValue("cookie.id", "42");
+        parentMD.addValue("added.key", "yes");
+        parentMD.addValue("other", "no");
+        Metadata outlinkMD =
+                MetadataTransfer.getInstance(conf)
+                        .getMetaForOutlink(
+                                "http://www.example.com/outlink.html",
+                                "http://www.example.com",
+                                parentMD);
+        Assertions.assertEquals(Set.of("cookie.id", "added.key"), outlinkMD.keySet());
+    }
+
+    @Test
+    void testSameSizeMutationOfTransferSetIsHonoured() throws MalformedURLException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(MetadataTransfer.trackPathParamName, false);
+        conf.put(MetadataTransfer.trackDepthParamName, false);
+        conf.put(MetadataTransfer.metadataTransferParamName, List.of("cookie.*"));
+        MetadataTransfer mdt = MetadataTransfer.getInstance(conf);
+        Metadata parentMD = new Metadata();
+        parentMD.addValue("cookie.id", "42");
+        parentMD.addValue("other", "yes");
+        Assertions.assertEquals(
+                Set.of("cookie.id"),
+                mdt.getMetaForOutlink(
+                                "http://www.example.com/outlink.html",
+                                "http://www.example.com",
+                                parentMD)
+                        .keySet());
+        // same size, different content: the compiled filter must not be stale
+        mdt.mdToTransfer.remove("cookie.*");
+        mdt.mdToTransfer.add("other");
+        Assertions.assertEquals(
+                Set.of("other"),
+                mdt.getMetaForOutlink(
+                                "http://www.example.com/outlink.html",
+                                "http://www.example.com",
+                                parentMD)
+                        .keySet());
+    }
+
+    @Test
+    void testNullValueArrayIsSkipped() throws MalformedURLException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(MetadataTransfer.trackPathParamName, false);
+        conf.put(MetadataTransfer.trackDepthParamName, false);
+        conf.put(MetadataTransfer.metadataTransferParamName, List.of("cookie.*", "exact"));
+        Map<String, String[]> backing = new HashMap<>();
+        backing.put("cookie.id", new String[] {"42"});
+        backing.put("cookie.broken", null);
+        backing.put("exact", null);
+        Metadata outlinkMD =
+                MetadataTransfer.getInstance(conf)
+                        .getMetaForOutlink(
+                                "http://www.example.com/outlink.html",
+                                "http://www.example.com",
+                                new Metadata(backing));
+        Assertions.assertEquals(Set.of("cookie.id"), outlinkMD.keySet());
+    }
 }
