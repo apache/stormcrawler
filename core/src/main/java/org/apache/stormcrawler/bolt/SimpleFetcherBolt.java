@@ -28,13 +28,7 @@ import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
@@ -126,10 +120,8 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
     // by default remains as is-pre 1.17
     private String protocolMetadataPrefix = "";
 
-    /** Hard timeout in seconds for a single protocol fetch. -1 means disabled. */
-    private long fetchTimeout = -1;
-
-    private ExecutorService fetchExecutor;
+    /** Runs protocol calls under fetcher.thread.timeout, see {@link FetchTimeoutHelpers}. */
+    private FetchTimeoutHelpers fetchHelpers;
 
     private void checkConfiguration() {
 
@@ -222,17 +214,8 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                 ConfUtils.getString(
                         conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, protocolMetadataPrefix);
 
-        this.fetchTimeout =
-                ConfUtils.getLong(conf, FetcherBolt.FETCH_TIMEOUT_PARAM_KEY, fetchTimeout);
-        if (fetchTimeout > 0) {
-            fetchExecutor =
-                    Executors.newSingleThreadExecutor(
-                            r -> {
-                                Thread t = new Thread(r, "SimpleFetcherTimeout #" + taskId);
-                                t.setDaemon(true);
-                                return t;
-                            });
-        }
+        fetchHelpers = new FetchTimeoutHelpers(conf, 2, "SimpleFetcherTimeout-" + taskId + "-");
+        fetchHelpers.registerMetrics(context, conf, metricsTimeBucketSecs);
     }
 
     @Override
@@ -246,8 +229,8 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
     public void cleanup() {
         super.cleanup();
         protocolFactory.cleanup();
-        if (fetchExecutor != null) {
-            fetchExecutor.shutdownNow();
+        if (fetchHelpers != null) {
+            fetchHelpers.shutdown();
         }
     }
 
@@ -301,7 +284,8 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
             Protocol protocol = protocolFactory.getProtocol(url);
 
-            BaseRobotRules rules = protocol.getRobotRules(urlString);
+            BaseRobotRules rules =
+                    fetchHelpers.call(() -> protocol.getRobotRules(urlString), protocol, urlString);
             boolean fromCache = false;
             if (rules instanceof RobotRules
                     && ((RobotRules) rules).getContentLengthFetched().length == 0) {
@@ -446,28 +430,11 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
             final String fetchUrl = urlString;
             final Metadata fetchMetadata = metadata;
             ProtocolResponse response;
-            if (fetchExecutor != null) {
-                Future<ProtocolResponse> future =
-                        fetchExecutor.submit(
-                                () -> protocol.getProtocolOutput(fetchUrl, fetchMetadata));
-                try {
-                    response = future.get(fetchTimeout, TimeUnit.SECONDS);
-                } catch (TimeoutException e) {
-                    future.cancel(true);
-                    throw new Exception(
-                            "Fetch timed out after " + fetchTimeout + "s fetching " + urlString, e);
-                } catch (CancellationException e) {
-                    throw new Exception("Fetch cancelled for " + urlString);
-                } catch (ExecutionException e) {
-                    Throwable cause = e.getCause();
-                    if (cause instanceof Exception) {
-                        throw (Exception) cause;
-                    }
-                    throw new Exception(cause);
-                }
-            } else {
-                response = protocol.getProtocolOutput(urlString, metadata);
-            }
+            response =
+                    fetchHelpers.call(
+                            () -> protocol.getProtocolOutput(fetchUrl, fetchMetadata),
+                            protocol,
+                            urlString);
             long timeFetching = System.currentTimeMillis() - start;
 
             final int byteLength = response.getContent().length;
@@ -575,10 +542,16 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
             }
 
             // common exceptions for which we log only a short message
-            if (exece.getCause() instanceof java.util.concurrent.TimeoutException
+            if (exece instanceof FetchTimeoutHelpers.TimeoutException
+                    || exece instanceof java.io.InterruptedIOException
                     || message.contains(" timed out")) {
                 LOG.error("Socket timeout fetching {}", urlString);
                 message = "Socket timeout fetching";
+                eventCounter.scope("fetch.timeout").incrBy(1);
+            } else if (exece instanceof FetchTimeoutHelpers.SaturatedException) {
+                eventCounter.scope("fetch.helper.rejected").incrBy(1);
+                LOG.warn("{}: all fetch helpers are busy", message);
+                message = "No fetch helper available";
             } else if (exece.getCause() instanceof java.net.UnknownHostException
                     || exece instanceof java.net.UnknownHostException) {
                 LOG.error("Unknown host {}", urlString);

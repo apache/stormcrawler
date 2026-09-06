@@ -31,6 +31,7 @@ import java.util.Map;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.persistence.Status;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -137,5 +138,40 @@ public class FetcherBoltTest extends AbstractFetcherBoltTest {
         Metadata md = (Metadata) statusTuple.get(1);
         assertEquals("crawl_delay", md.getFirstValue(Constants.STATUS_ERROR_CAUSE));
         assertNull(md.getFirstValue(Constants.ROBOTS_CRAWL_DELAY_KEY));
+    }
+
+    @Test
+    void noHelperThreadsWithOkhttpAndFetchTimeout(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(get(urlEqualTo("/page")).willReturn(aResponse().withStatus(200).withBody("hello")));
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("fetcher.thread.timeout", 5L);
+        fetchAndGetContentMetadata(wmRuntimeInfo, config, "/page");
+        assertEquals(
+                0,
+                ((FetcherBolt) bolt).helperPoolSize(),
+                "okhttp cancels the call itself: no helper threads expected");
+    }
+
+    /** With okhttp the robots.txt fetch goes through the same call deadline as the page. */
+    @Test
+    void slowRobotsTxtIsBoundedByTheFetchTimeoutWithOkhttp(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(
+                get(urlEqualTo("/robots.txt"))
+                        .willReturn(aResponse().withStatus(200).withFixedDelay(10_000)));
+        stubFor(get(urlEqualTo("/page")).willReturn(aResponse().withStatus(200).withBody("hello")));
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("http.timeout", 30_000);
+        config.put("fetcher.thread.timeout", 1L);
+        long start = System.currentTimeMillis();
+        // the robots.txt lookup fails at the deadline; the parser then allows the fetch
+        Metadata md = fetchAndGetContentMetadata(wmRuntimeInfo, config, "/page");
+        Assertions.assertNotNull(md);
+        Assertions.assertTrue(
+                System.currentTimeMillis() - start < 6_000, "robots.txt lookup was not bounded");
+        assertEquals(0, ((FetcherBolt) bolt).helperPoolSize());
     }
 }

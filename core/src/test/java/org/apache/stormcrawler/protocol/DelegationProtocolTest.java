@@ -18,6 +18,10 @@
 package org.apache.stormcrawler.protocol;
 
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.DelegatorProtocol.FilteredProtocol;
@@ -72,5 +76,34 @@ class DelegationProtocolTest {
         Assertions.assertEquals("fourth", pf.id);
         pf = superProto.getProtocolFor("https://www.example-two.com/large.doc", meta);
         Assertions.assertEquals("fourth", pf.id);
+    }
+
+    private static DelegatorProtocol delegator(String... classNames) {
+        Config conf = new Config();
+        conf.put("http.agent.name", "this_is_only_a_test");
+        conf.put("fetcher.thread.timeout", 1L);
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (int i = 0; i < classNames.length; i++) {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("className", classNames[i]);
+            entry.put("id", "p" + i);
+            if (i < classNames.length - 1) {
+                entry.put("filters", Map.of("key" + i, "value"));
+            }
+            entries.add(entry);
+        }
+        conf.put("protocol.delegator.config", entries);
+        DelegatorProtocol delegator = new DelegatorProtocol();
+        delegator.configure(conf);
+        return delegator;
+    }
+
+    @Test
+    void supportsFetchTimeoutOnlyWhenEveryDelegateDoes() {
+        String okhttp = org.apache.stormcrawler.protocol.okhttp.HttpProtocol.class.getName();
+        String dummy = DummyProtocol.class.getName();
+        Assertions.assertTrue(delegator(okhttp, okhttp).supportsFetchTimeout());
+        Assertions.assertFalse(delegator(dummy, okhttp).supportsFetchTimeout());
+        Assertions.assertFalse(delegator(okhttp, dummy).supportsFetchTimeout());
     }
 }

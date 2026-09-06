@@ -60,4 +60,13 @@ public class Constants {
     public static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
 
     private Constants() {}
+
+    /** Hard deadline in seconds for a single fetch, -1 to disable. */
+    public static final String FETCH_TIMEOUT_PARAM_KEY = "fetcher.thread.timeout";
+
+    /**
+     * Maximum number of helper threads on which fetches with a timeout are run for protocols that
+     * can not enforce the timeout themselves. Defaults to twice fetcher.threads.number.
+     */
+    public static final String FETCH_TIMEOUT_HELPERS_PARAM_KEY = "fetcher.thread.timeout.helpers";
 }
