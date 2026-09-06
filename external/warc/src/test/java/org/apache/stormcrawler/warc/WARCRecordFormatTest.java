@@ -81,14 +81,14 @@ class WARCRecordFormatTest {
     void testGetDigestSha1() {
         byte[] content = {'a', 'b', 'c', 'd', 'e', 'f'};
         String sha1str = "sha1:D6FMCDZDYW23YELHXWUEXAZ6LQCXU56S";
-        assertEquals(sha1str, WARCRecordFormat.getDigestSha1(content), "Wrong sha1 digest");
+        assertEquals(sha1str, new WARCRecordFormat("").getDigest(content), "Wrong sha1 digest");
     }
 
     @Test
     void testGetDigestSha1Empty() {
         byte[] content = {};
         String sha1str = "sha1:3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ";
-        assertEquals(sha1str, WARCRecordFormat.getDigestSha1(content), "Wrong sha1 digest");
+        assertEquals(sha1str, new WARCRecordFormat("").getDigest(content), "Wrong sha1 digest");
     }
 
     @Test
@@ -97,7 +97,9 @@ class WARCRecordFormatTest {
         byte[] content2 = {'d', 'e', 'f'};
         String sha1str = "sha1:D6FMCDZDYW23YELHXWUEXAZ6LQCXU56S";
         assertEquals(
-                sha1str, WARCRecordFormat.getDigestSha1(content1, content2), "Wrong sha1 digest");
+                sha1str,
+                new WARCRecordFormat("").getDigest(content1, content2),
+                "Wrong sha1 digest");
     }
 
     @Test
@@ -106,7 +108,7 @@ class WARCRecordFormatTest {
         String robotsTxt = "User-agent: *\r\nDisallow:";
         byte[] content = robotsTxt.getBytes(StandardCharsets.UTF_8);
         String sha1str = "sha1:DHBVNHAJABWFHIYUHNCKYYIB3OBPFX3Y";
-        assertEquals(sha1str, WARCRecordFormat.getDigestSha1(content), "Wrong sha1 digest");
+        assertEquals(sha1str, new WARCRecordFormat("").getDigest(content), "Wrong sha1 digest");
     }
 
     @Test

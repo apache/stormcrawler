@@ -41,8 +41,23 @@ public class WARCRequestRecordFormat extends WARCRecordFormat {
     protected static final Pattern REQUEST_LINE_PATTERN =
             Pattern.compile("^\\S+ \\S+ HTTP/1\\.[01]$");
 
+    /** Creates a request record format computing the digests with the default algorithm (SHA-1). */
     public WARCRequestRecordFormat(String protocolMDprefix) {
         super(protocolMDprefix);
+    }
+
+    /**
+     * Creates a request record format computing the WARC-Block-Digest field with the given
+     * algorithm.
+     *
+     * @param protocolMDprefix prefix of the metadata keys holding the protocol response, as set by
+     *     {@code protocol.md.prefix}; may be empty
+     * @param digestAlgorithm algorithm for the digest fields; see {@link
+     *     WARCRecordFormat#WARCRecordFormat(String, String)}
+     * @throws IllegalArgumentException if the value is not a supported algorithm
+     */
+    public WARCRequestRecordFormat(String protocolMDprefix, String digestAlgorithm) {
+        super(protocolMDprefix, digestAlgorithm);
     }
 
     @Override
@@ -82,7 +97,7 @@ public class WARCRequestRecordFormat extends WARCRecordFormat {
         int contentLength = httpheaders.length;
         buffer.append("Content-Length: ").append(Integer.toString(contentLength)).append(CRLF);
 
-        String blockDigest = getDigestSha1(httpheaders);
+        String blockDigest = getDigest(httpheaders);
 
         String captureTime = getCaptureTime(metadata);
         buffer.append("WARC-Date: ").append(captureTime).append(CRLF);

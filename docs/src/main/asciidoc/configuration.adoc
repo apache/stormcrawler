@@ -737,6 +737,7 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/warc[warc
 | key | default value | description
 
 | warc.metadata.keys | - | Metadata keys to include as WARC metadata records (optional list).
+| warc.digest.algorithm | sha1 | Algorithm for the WARC-Payload-Digest and WARC-Block-Digest headers: `sha1` or `sha256`. SHA-1 is the convention across the WARC ecosystem; downstream tooling such as CDX indexers may expect `sha1` digests. Digest values are Base32-encoded without padding.
 |===
 
 NOTE: For complete WARC records, set `http.store.headers` to `true`. The OkHttp protocol (`org.apache.stormcrawler.protocol.okhttp.HttpProtocol`) is recommended for WARC generation as it provides verbatim HTTP headers.
