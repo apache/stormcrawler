@@ -275,6 +275,20 @@ config:
   # filters URLs in sitemaps based on their modified Date (if any)
   sitemap.filter.hours.since.modified: -1
 
+  # whether a document without the isSitemap key is classified as a sitemap
+  # by searching the first bytes of its content for the sitemaps.org
+  # namespace. Off by default: any page carrying the namespace string early
+  # enough would be reclassified as a sitemap and never reach the parser
+  # bolt. When enabled, a content type which rules a sitemap out (a page
+  # served as HTML) stops the sniffing.
+  sitemap.sniffContent: false
+
+  # whether the sitemap parser rejects documents which are not well formed
+  # sitemaps. Strict parsing also discards URLs a sitemap lists on hosts
+  # other than its own, and keeps an ordinary HTML page which mentions the
+  # sitemap namespace from being parsed leniently into half a sitemap.
+  sitemap.strict: true
+
   # staggered scheduling of sitemaps
   sitemap.schedule.delay: -1
 
