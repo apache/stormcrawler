@@ -49,10 +49,18 @@ import org.slf4j.LoggerFactory;
  *       {@link InetAddress#isLoopbackAddress()} is true
  *   <li><code>sitelocal</code> applies to all IP addresses for which {@link
  *       InetAddress#isSiteLocalAddress()} is true
+ *   <li><code>linklocal</code> applies to all IP addresses for which {@link
+ *       InetAddress#isLinkLocalAddress()} is true
+ *   <li><code>anylocal</code> applies to all IP addresses for which {@link
+ *       InetAddress#isAnyLocalAddress()} is true
+ *   <li><code>multicast</code> applies to all IP addresses for which {@link
+ *       InetAddress#isMulticastAddress()} is true
  * </ul>
  *
  * <p>Multiple IP ranges can be given either as a comma-separated string, e.g. <code>
- * loopback,sitelocal,fd00::/8</code>, or as a list in the configuration.
+ * loopback,sitelocal,fd00::/8</code>, or as a list in the configuration. A value which is neither a
+ * keyword, a CIDR block nor a single IP address is a configuration error and throws an {@link
+ * IllegalArgumentException}.
  */
 public class IPFilterRules {
 
@@ -119,15 +127,24 @@ public class IPFilterRules {
                     case "linklocal":
                         rules.add(InetAddress::isLinkLocalAddress);
                         break;
+                    case "anylocal":
+                        rules.add(InetAddress::isAnyLocalAddress);
+                        break;
+                    case "multicast":
+                        rules.add(InetAddress::isMulticastAddress);
+                        break;
                     default:
                         try {
                             CIDR cidr = new CIDR(ipRule);
                             rules.add(cidr::contains);
                         } catch (IllegalArgumentException e) {
-                            LOG.error(
-                                    "Failed to parse {} as CIDR, ignoring it while configuring IP rules ({})",
-                                    ipRule,
-                                    ipRuleProperty);
+                            throw new IllegalArgumentException(
+                                    "Failed to parse "
+                                            + ipRule
+                                            + " as CIDR while configuring IP rules ("
+                                            + ipRuleProperty
+                                            + ")",
+                                    e);
                         }
                 }
             }
