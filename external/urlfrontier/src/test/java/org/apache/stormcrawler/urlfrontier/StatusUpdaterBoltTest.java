@@ -101,27 +101,27 @@ class StatusUpdaterBoltTest {
     }
 
     private void store(String url, Status status, Metadata metadata) {
+        store(bolt, url, status, metadata);
+    }
+
+    private void store(String url, Status status) {
+        store(bolt, url, status, new Metadata());
+    }
+
+    private void store(StatusUpdaterBolt target, String url, Status status) {
+        store(target, url, status, new Metadata());
+    }
+
+    private void store(StatusUpdaterBolt target, String url, Status status, Metadata metadata) {
         Tuple tuple = mock(Tuple.class);
         when(tuple.getValueByField("status")).thenReturn(status);
         when(tuple.getStringByField("url")).thenReturn(url);
         when(tuple.getValueByField("metadata")).thenReturn(metadata);
-        bolt.execute(tuple);
+        target.execute(tuple);
     }
 
     private boolean isAcked(String url, long timeoutSeconds) {
-        try {
-            await().atMost(timeoutSeconds, TimeUnit.SECONDS)
-                    .until(
-                            () ->
-                                    output.getAckedTuples().stream()
-                                            .anyMatch(
-                                                    tuple ->
-                                                            tuple.getStringByField("url")
-                                                                    .equals(url)));
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        return isAcked(url, timeoutSeconds, output);
     }
 
     private boolean isAcked(String url, long timeoutSeconds, long start) {
@@ -135,6 +135,22 @@ class StatusUpdaterBoltTest {
                     .until(
                             () ->
                                     output.getAckedTuples().stream()
+                                            .anyMatch(
+                                                    tuple ->
+                                                            tuple.getStringByField("url")
+                                                                    .equals(url)));
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isAcked(String url, long timeoutSeconds, TestOutputCollector collector) {
+        try {
+            await().atMost(timeoutSeconds, TimeUnit.SECONDS)
+                    .until(
+                            () ->
+                                    collector.getAckedTuples().stream()
                                             .anyMatch(
                                                     tuple ->
                                                             tuple.getStringByField("url")
@@ -195,5 +211,87 @@ class StatusUpdaterBoltTest {
         urlFrontierContainer.start();
         store("http://example.com/?test=3", Status.DISCOVERED, new Metadata());
         Assertions.assertEquals(true, isAcked("http://example.com/?test=3", 10));
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void acknowledgesDiscoveredURLsSentInBatches() {
+        // a bolt with a small batch size and no cap on messages in flight
+        var connection = urlFrontierContainer.getFrontierConnection();
+        final var config = new HashMap<String, Object>();
+        config.put(
+                "urlbuffer.class", "org.apache.stormcrawler.persistence.urlbuffer.SimpleURLBuffer");
+        config.put(Constants.URLFRONTIER_HOST_KEY, connection.getHost());
+        config.put(Constants.URLFRONTIER_PORT_KEY, connection.getPort());
+        config.put("scheduler.class", "org.apache.stormcrawler.persistence.DefaultScheduler");
+        config.put("status.updater.cache.spec", "maximumSize=10000,expireAfterAccess=1h");
+        config.put("metadata.persist", persistedKey);
+        config.put(Constants.URLFRONTIER_BATCH_SIZE_KEY, 2);
+        config.put("urlfrontier.cache.expireafter.sec", 60);
+        var testOutput = new TestOutputCollector();
+        var batchedBolt = new StatusUpdaterBolt();
+        batchedBolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(testOutput));
+        try {
+            Assertions.assertTrue(batchedBolt.isBatching());
+            final int numURLs = 6;
+            for (int i = 0; i < numURLs; i++) {
+                store(batchedBolt, "https://www.url.net/batched-" + i, Status.DISCOVERED);
+            }
+            for (int i = 0; i < numURLs; i++) {
+                final String url = "https://www.url.net/batched-" + i;
+                Assertions.assertTrue(isAcked(url, 10, testOutput), url + " not acked");
+            }
+            // the buffer filled up: batches went out on the PutDiscovered endpoint
+            Assertions.assertTrue(batchedBolt.batchesSent() >= numURLs / 2);
+            Assertions.assertEquals(0, testOutput.getFailedTuples().size());
+        } finally {
+            batchedBolt.cleanup();
+        }
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void sendsDiscoveredURLsIndividuallyWhenBatchingDisabled() {
+        var connection = urlFrontierContainer.getFrontierConnection();
+        final var config = new HashMap<String, Object>();
+        config.put(
+                "urlbuffer.class", "org.apache.stormcrawler.persistence.urlbuffer.SimpleURLBuffer");
+        config.put(Constants.URLFRONTIER_HOST_KEY, connection.getHost());
+        config.put(Constants.URLFRONTIER_PORT_KEY, connection.getPort());
+        config.put("scheduler.class", "org.apache.stormcrawler.persistence.DefaultScheduler");
+        config.put("status.updater.cache.spec", "maximumSize=10000,expireAfterAccess=1h");
+        config.put("metadata.persist", persistedKey);
+        config.put(Constants.URLFRONTIER_BATCH_SIZE_KEY, 0);
+        config.put("urlfrontier.cache.expireafter.sec", 60);
+        var testOutput = new TestOutputCollector();
+        var streamingBolt = new StatusUpdaterBolt();
+        streamingBolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(testOutput));
+        try {
+            Assertions.assertFalse(streamingBolt.isBatching());
+            final var url = "https://www.url.net/streamed";
+            store(streamingBolt, url, Status.DISCOVERED, new Metadata());
+            Assertions.assertTrue(isAcked(url, 10, testOutput), url + " not acked");
+            // no batch message was sent
+            Assertions.assertEquals(0, streamingBolt.batchesSent());
+            Assertions.assertEquals(0, testOutput.getFailedTuples().size());
+        } finally {
+            streamingBolt.cleanup();
+        }
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void acksKnownURLsThroughStreamingEndpoint() {
+        // a known URL flushes the batch being built and travels on the streaming endpoint
+        final var discovered = "https://www.url.net/discovered-first";
+        store(discovered, Status.DISCOVERED, new Metadata());
+        Assertions.assertTrue(isAcked(discovered, 10));
+
+        final var known = "https://www.url.net/known";
+        final var meta = new Metadata();
+        meta.setValue(persistedKey, "somePersistedMetaInfo");
+        store(known, Status.FETCHED, meta);
+        Assertions.assertTrue(isAcked(known, 10), known + " not acked");
+        Assertions.assertEquals(0, output.getFailedTuples().size());
     }
 }

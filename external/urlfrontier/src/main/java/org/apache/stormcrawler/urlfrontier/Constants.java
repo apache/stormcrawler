@@ -46,6 +46,16 @@ public final class Constants {
     public static final String URLFRONTIER_CRAWL_ID_KEY = "urlfrontier.crawlid";
 
     /**
+     * Maximum number of discovered URLs sent in one message on the batched PutDiscovered endpoint
+     * added in URLFrontier 2.6. The outlinks of a page form a natural batch: grouping them
+     * amortises the per-message cost which limits the ingestion rate. A value of 0 sends the
+     * discovered URLs individually on the streaming PutURLs endpoint. Defaults to 100.
+     */
+    public static final String URLFRONTIER_BATCH_SIZE_KEY = "urlfrontier.batch.size";
+
+    public static final int URLFRONTIER_BATCH_SIZE_DEFAULT = 100;
+
+    /**
      * Maximum delay in seconds honoured when a server requests a back-off via the Retry-After HTTP
      * response header. {@code -1} disables the cap. Defaults to 86400 (24h).
      */
