@@ -49,6 +49,16 @@ streams:
     grouping:
       type: SHUFFLE
 
+  # rows the spout refuses to emit (e.g. a scheme not in the protocols
+  # list) are reported to the status updater, which marks the row ERROR
+  # and notifies the deletion stream
+  - from: "spout"
+    to: "status"
+    grouping:
+      type: FIELDS
+      args: ["url"]
+      streamId: "status"
+
   - from: "partitioner"
     to: "fetcher"
     grouping:
