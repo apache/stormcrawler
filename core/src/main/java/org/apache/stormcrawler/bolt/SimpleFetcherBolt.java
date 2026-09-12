@@ -612,23 +612,26 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
     private String getPolitenessKey(URL u) {
         String key;
+        // one canonical host for all queue modes: aliases of one server
+        // (percent-escaping, case, trailing dot) must share a queue
+        final String canonicalHost = URLUtil.getCanonicalHost(u);
         if (QUEUE_MODE_IP.equalsIgnoreCase(queueMode)) {
             try {
-                final InetAddress addr = InetAddress.getByName(u.getHost());
+                final InetAddress addr = InetAddress.getByName(canonicalHost);
                 key = addr.getHostAddress();
             } catch (final UnknownHostException e) {
                 // unable to resolve it, so don't fall back to host name
-                LOG.warn("Unable to resolve: {}, skipping.", u.getHost());
+                LOG.warn("Unable to resolve: {}, skipping.", canonicalHost);
                 return null;
             }
         } else if (QUEUE_MODE_DOMAIN.equalsIgnoreCase(queueMode)) {
-            key = PaidLevelDomain.getPLD(u.getHost());
+            key = PaidLevelDomain.getPLD(canonicalHost);
             if (key == null) {
                 LOG.warn("Unknown domain for url: {}, using hostname as key", u.toExternalForm());
-                key = u.getHost();
+                key = canonicalHost;
             }
         } else {
-            key = u.getHost();
+            key = canonicalHost;
             if (key == null) {
                 LOG.warn("Unknown host for url: {}, using URL string as key", u.toExternalForm());
                 key = u.toExternalForm();

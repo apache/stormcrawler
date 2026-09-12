@@ -22,6 +22,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -251,6 +252,140 @@ public class URLUtil {
         } catch (MalformedURLException e) {
             return null;
         }
+    }
+
+    /**
+     * Returns the form of the host used to key politeness queues and the robots.txt cache: what
+     * okhttp connects to, with the root label normalised away. Host strings which only differ in
+     * escaping or case reach the same server, so both spellings must end up under one key,
+     * otherwise one server is fetched under several queue ids and its robots.txt is downloaded once
+     * per spelling.
+     *
+     * @param url The url to check.
+     * @return String The canonical host for the url, or null if the url is not well formed or has
+     *     no host.
+     */
+    public static String getCanonicalHost(URL url) {
+        String host = url.getHost();
+        if (host == null) {
+            return null;
+        }
+        // okhttp percent-decodes the host when it parses the URL; do the same
+        // so keys derived from the URL string agree with what it connects to.
+        // The decoder never throws: crawled content is hostile input, and a
+        // malformed escape falls back to the raw spelling rather than blowing
+        // up the caller
+        String decoded = percentDecodeHost(host);
+        if (decoded.endsWith(".")) {
+            decoded = decoded.substring(0, decoded.length() - 1);
+        }
+        return decoded.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Percent-decodes a host string, leaving {@code +} alone and keeping malformed escapes as
+     * literal characters. The decoded octets are interpreted as UTF-8, so a multi-byte sequence
+     * like {@code %C3%BC} becomes one character ({@code ü}) rather than one character per octet.
+     * Unlike {@link URLDecoder#decode}, this never throws.
+     */
+    private static String percentDecodeHost(String host) {
+        if (!host.contains("%")) {
+            return host;
+        }
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream(host.length());
+        for (int i = 0; i < host.length(); i++) {
+            char c = host.charAt(i);
+            if (c == '%' && i + 2 < host.length()) {
+                int hi = Character.digit(host.charAt(i + 1), 16);
+                int lo = Character.digit(host.charAt(i + 2), 16);
+                if (hi != -1 && lo != -1) {
+                    bytes.write((hi << 4) | lo);
+                    i += 2;
+                    continue;
+                }
+            }
+            // a literal character: encode it as UTF-8 so it interleaves correctly
+            // with the decoded octets (hosts are ASCII in practice, but a raw
+            // non-ASCII label must not be mangled)
+            byte[] encoded = String.valueOf(c).getBytes(StandardCharsets.UTF_8);
+            bytes.write(encoded, 0, encoded.length);
+        }
+        return new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Returns the url with its host replaced by {@link #getCanonicalHost(URL)}: percent-escapes
+     * decoded, lowercased and without a trailing dot. Only the authority changes; everything else
+     * in the url is kept byte for byte. Host aliases of one server therefore end up as one record
+     * in the status store, one politeness queue and one robots.txt cache entry, but two different
+     * urls stay two different urls. The url is returned unchanged when it has no host, cannot be
+     * parsed, or is already canonical.
+     *
+     * @param url The url to normalise.
+     * @return String The url with a canonical host, or the input unchanged.
+     */
+    public static String normaliseHost(String url) {
+        try {
+            URL u = toURL(url);
+            String host = u.getHost();
+            if (host == null || host.isEmpty() || host.startsWith("[")) {
+                // no host, or an IPv6 literal: nothing to collapse, leave as is
+                return url;
+            }
+            String canonical = getCanonicalHost(u);
+            if (canonical == null || canonical.equals(host)) {
+                return url;
+            }
+            // the host never contains characters which would end the authority
+            // (":", "/", "?", "#", "@" are all illegal in a host); a decoded
+            // escape which produced one of them leaves the url unchanged
+            if (canonical.indexOf(':') >= 0
+                    || canonical.indexOf('/') >= 0
+                    || canonical.indexOf('?') >= 0
+                    || canonical.indexOf('#') >= 0
+                    || canonical.indexOf('@') >= 0) {
+                return url;
+            }
+            // splice the canonical host back into the original string, keeping
+            // the scheme, any user info, the port and everything after the
+            // authority exactly as they were
+            int schemeEnd = url.indexOf("//");
+            if (schemeEnd < 0) {
+                return url;
+            }
+            int authorityStart = schemeEnd + 2;
+            // the host part starts after the user info
+            int at = url.lastIndexOf('@', indexOfAuthorityEnd(url, authorityStart));
+            int hostStart = Math.max(at + 1, authorityStart);
+            int hostEnd = indexOfHostEnd(url, hostStart);
+            if (hostEnd < 0) {
+                return url;
+            }
+            return url.substring(0, hostStart) + canonical + url.substring(hostEnd);
+        } catch (MalformedURLException | IllegalArgumentException e) {
+            return url;
+        }
+    }
+
+    /** Index of the end of the authority of a URL string starting at pos. */
+    private static int indexOfAuthorityEnd(String url, int pos) {
+        for (int i = pos; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                return i;
+            }
+        }
+        return url.length();
+    }
+
+    /**
+     * Index just after the host part of an authority: hosts never contain ':', so the first colon
+     * after the host starts the port, and "/", "?" or "#" end the authority.
+     */
+    private static int indexOfHostEnd(String url, int hostStart) {
+        int authorityEnd = indexOfAuthorityEnd(url, hostStart);
+        int colon = url.indexOf(':', hostStart);
+        return colon == -1 || colon >= authorityEnd ? authorityEnd : colon;
     }
 
     /**

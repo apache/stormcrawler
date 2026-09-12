@@ -47,12 +47,14 @@ class AbstractStatusUpdaterBoltTest {
     private static class RecordingStatusUpdaterBolt extends AbstractStatusUpdaterBolt {
 
         Optional<Date> nextFetch;
+        String storedUrl;
         int stored = 0;
 
         @Override
         public void store(
                 String url, Status status, Metadata metadata, Optional<Date> nextFetch, Tuple t) {
             this.nextFetch = nextFetch;
+            this.storedUrl = url;
             this.stored++;
             ack(t, url);
         }
@@ -118,5 +120,67 @@ class AbstractStatusUpdaterBoltTest {
 
         assertEquals(1, bolt.stored, "the URL must still be stored");
         assertNotNull(bolt.nextFetch);
+    }
+
+    /** A bolt prepared with the given normalise-hosts and cache settings. */
+    private static RecordingStatusUpdaterBolt newBolt(boolean normaliseHosts, boolean useCache) {
+        RecordingStatusUpdaterBolt b = new RecordingStatusUpdaterBolt();
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(AbstractStatusUpdaterBolt.useCacheParamName, useCache);
+        conf.put(AbstractStatusUpdaterBolt.normaliseHostsParamName, normaliseHosts);
+        conf.put(
+                AbstractStatusUpdaterBolt.cacheConfigParamName,
+                "maximumSize=100,expireAfterAccess=1h");
+        conf.put(Scheduler.schedulerClassParamName, DefaultScheduler.class.getName());
+        conf.put(MetadataTransfer.metadataTransferClassParamName, MetadataTransfer.class.getName());
+        b.prepare(conf, TestUtil.getMockedTopologyContext(), mock(OutputCollector.class));
+        return b;
+    }
+
+    private static Tuple discoveredTuple(String url) {
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.getStringByField("url")).thenReturn(url);
+        when(tuple.getValueByField("metadata")).thenReturn(new Metadata());
+        when(tuple.getValueByField("status")).thenReturn(Status.DISCOVERED);
+        return tuple;
+    }
+
+    @Test
+    void discoveredHostIsNormalisedWhenEnabled() {
+        RecordingStatusUpdaterBolt b = newBolt(true, false);
+        b.execute(discoveredTuple("http://exampl%65.org./a"));
+        assertEquals("http://example.org/a", b.storedUrl, "the aliased host is stored normalised");
+    }
+
+    /** The dedup cache is keyed on the normalised URL, so aliases collapse. */
+    @Test
+    void normalisedAliasesHitTheDedupCache() {
+        RecordingStatusUpdaterBolt b = newBolt(true, true);
+        b.execute(discoveredTuple("http://example.org/a"));
+        b.execute(discoveredTuple("http://exampl%65.org/a"));
+        assertEquals(1, b.stored, "the second spelling is deduped against the first");
+    }
+
+    @Test
+    void discoveredHostIsLeftRawWhenDisabled() {
+        RecordingStatusUpdaterBolt b = newBolt(false, false);
+        b.execute(discoveredTuple("http://exampl%65.org./a"));
+        assertEquals(
+                "http://exampl%65.org./a", b.storedUrl, "the default keeps the URL byte for byte");
+    }
+
+    /** Only DISCOVERED is normalised; updates of stored URLs are not rewritten. */
+    @Test
+    void onlyDiscoveredStatusIsNormalised() {
+        RecordingStatusUpdaterBolt b = newBolt(true, false);
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.getStringByField("url")).thenReturn("http://exampl%65.org/a");
+        when(tuple.getValueByField("metadata")).thenReturn(new Metadata());
+        when(tuple.getValueByField("status")).thenReturn(Status.FETCHED);
+        b.execute(tuple);
+        assertEquals(
+                "http://exampl%65.org/a",
+                b.storedUrl,
+                "a FETCHED update carries a URL read back from the store and is not rewritten");
     }
 }

@@ -364,6 +364,7 @@ that is being calculated by a link:https://github.com/apache/stormcrawler/blob/m
 | status.updater.cache.spec | maximumSize=10000, expireAfterAccess=1h | Cache specification for the status updater.
 | status.updater.unit.round.date | SECOND | Unit for rounding the next fetch date. Can also be MINUTE or HOUR.
 | status.updater.use.cache | true | Whether to use cache to avoid re-persisting URLs.
+| status.updater.normalise.hosts | false | Normalise the host component of discovered URLs (percent-decoded, lowercased, trailing dot removed) so that aliases of one server are stored once, share a politeness queue and a robots.txt fetch. Off by default: document ids are hashed from the URL, so enabling it re-discovers aliases already stored in raw form as a second, bounded record.
 |===
 
 ==== Parsing

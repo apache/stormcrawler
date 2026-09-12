@@ -172,22 +172,26 @@ public class FetcherBolt extends StatusEmitterBolt {
                 return new FetchItem(url, t, queueId);
             }
 
+            // one canonical host for all queue modes: aliases of one server
+            // (percent-escaping, case, trailing dot) must share a queue
+            final String canonicalHost = URLUtil.getCanonicalHost(u);
+
             if (FetchItemQueues.QUEUE_MODE_IP.equalsIgnoreCase(queueMode)) {
                 try {
-                    final InetAddress addr = InetAddress.getByName(u.getHost());
+                    final InetAddress addr = InetAddress.getByName(canonicalHost);
                     key = addr.getHostAddress();
                 } catch (final UnknownHostException e) {
-                    LOG.warn("Unable to resolve IP for {}, using hostname as key.", u.getHost());
-                    key = u.getHost();
+                    LOG.warn("Unable to resolve IP for {}, using hostname as key.", canonicalHost);
+                    key = canonicalHost;
                 }
             } else if (FetchItemQueues.QUEUE_MODE_DOMAIN.equalsIgnoreCase(queueMode)) {
-                key = PaidLevelDomain.getPLD(u.getHost());
+                key = PaidLevelDomain.getPLD(canonicalHost);
                 if (key == null) {
                     LOG.warn("Unknown domain for url: {}, using hostname as key", url);
-                    key = u.getHost();
+                    key = canonicalHost;
                 }
             } else {
-                key = u.getHost();
+                key = canonicalHost;
             }
 
             if (key == null) {
@@ -496,7 +500,8 @@ public class FetcherBolt extends StatusEmitterBolt {
                         delay = Long.parseLong(v);
                     } catch (NumberFormatException e) {
                         LOG.warn(
-                                "Invalid crawl delay value '{}' in metadata for queue '{}', using default.",
+                                "Invalid crawl delay value '{}' in metadata for queue '{}', using"
+                                        + " default.",
                                 v,
                                 id);
                     }
@@ -508,7 +513,8 @@ public class FetcherBolt extends StatusEmitterBolt {
                         minDelay = Long.parseLong(v);
                     } catch (NumberFormatException e) {
                         LOG.warn(
-                                "Invalid min crawl delay value '{}' in metadata for queue '{}', using default.",
+                                "Invalid min crawl delay value '{}' in metadata for queue '{}',"
+                                        + " using default.",
                                 v,
                                 id);
                     }
@@ -541,7 +547,8 @@ public class FetcherBolt extends StatusEmitterBolt {
                                             threadVal = Integer.parseInt(val);
                                         } catch (NumberFormatException e) {
                                             LOG.warn(
-                                                    "Invalid max threads value '{}' in metadata for queue '{}', using default.",
+                                                    "Invalid max threads value '{}' in metadata for queue '{}',"
+                                                            + " using default.",
                                                     val,
                                                     k);
                                         }

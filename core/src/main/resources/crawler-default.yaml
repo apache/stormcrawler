@@ -381,6 +381,14 @@ config:
   status.updater.use.cache: true
   status.updater.cache.spec: "expireAfterAccess=1h,softValues"
 
+  # Normalise the host component of DISCOVERED URLs before they are stored,
+  # so that aliases of one server (percent-escaping, case, trailing dot)
+  # become a single record, a single politeness queue and a single robots.txt
+  # fetch. Off by default: document ids are hashed from the URL, so turning
+  # this on makes servers whose aliases were already stored in raw form be
+  # re-discovered under the normalised form as a second, bounded record.
+  status.updater.normalise.hosts: false
+
   # Can also take "MINUTE" or "HOUR"
   status.updater.unit.round.date: "SECOND"
 
