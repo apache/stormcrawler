@@ -105,9 +105,10 @@ class WARCHdfsBoltTest {
         assertEquals("response", records.get(2).type());
         WarcResponse response = (WarcResponse) records.get(2);
         assertEquals(MessageVersion.HTTP_1_1, response.http().version());
-        assertTrue(
-                response.headers().first("WARC-Protocol").isPresent(),
-                "WARC response record is expected to include WARC header \"WARC-Protocol\"");
+        assertEquals(
+                List.of("HTTP/1.1", "tls/1.3"),
+                response.headers().all("WARC-Protocol"),
+                "WARC response record is expected to repeat the WARC header \"WARC-Protocol\" for every protocol layer");
         assertTrue(
                 response.headers().first("WARC-IP-Address").isPresent(),
                 "WARC response record is expected to include WARC header \"WARC-IP-Address\"");
@@ -130,6 +131,13 @@ class WARCHdfsBoltTest {
         assertTrue(
                 response.headers().first("WARC-Protocol").isPresent(),
                 "WARC response record is expected to include WARC header \"WARC-Protocol\"");
+        assertEquals(
+                List.of("HTTP/2", "tls/1.3"),
+                response.headers().all("WARC-Protocol"),
+                "WARC response record is expected to repeat the WARC header \"WARC-Protocol\" for every protocol layer");
+        assertTrue(
+                response.headers().first("WARC-Cipher-Suite").isPresent(),
+                "WARC response record is expected to include WARC header \"WARC-Cipher-Suite\"");
         assertTrue(
                 response.headers().first("WARC-IP-Address").isPresent(),
                 "WARC response record is expected to include WARC header \"WARC-IP-Address\"");
@@ -241,7 +249,9 @@ class WARCHdfsBoltTest {
                         + "Connection: close\r\n\r\n");
         metadata.addValue(
                 protocolMDprefix + ProtocolResponse.PROTOCOL_VERSIONS_KEY,
-                httpVersionString + ",TLS_1_3,TLS_AES_256_GCM_SHA384");
+                httpVersionString + ",tls/1.3");
+        metadata.addValue(
+                protocolMDprefix + ProtocolResponse.CIPHER_SUITE_KEY, "TLS_AES_256_GCM_SHA384");
         metadata.addValue(protocolMDprefix + ProtocolResponse.RESPONSE_IP_KEY, "123.123.123.123");
         Tuple tuple = mock(Tuple.class);
         when(tuple.getBinaryByField("content")).thenReturn(content);

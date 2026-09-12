@@ -65,6 +65,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import okhttp3.Route;
+import okhttp3.TlsVersion;
 import okhttp3.brotli.Brotli;
 import okhttp3.zstd.Zstd;
 import okio.BufferedSource;
@@ -830,13 +831,37 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     static class HTTPHeadersInterceptor implements Interceptor {
 
-        private String getNormalizedProtocolName(Protocol protocol) {
+        private static String getNormalizedProtocolName(Protocol protocol) {
             String name = protocol.toString().toUpperCase(Locale.ROOT);
             if ("H2".equals(name)) {
                 // back-ward compatible protocol version name
                 name = "HTTP/2";
             }
             return name;
+        }
+
+        /**
+         * Maps a {@link TlsVersion} to the protocol identifier used in the <code>WARC-Protocol
+         * </code> header, see the <a
+         * href="https://github.com/iipc/warc-specifications/issues/42">WARC field proposal</a>. The
+         * enum names of {@link TlsVersion} (e.g. <code>TLS_1_3</code>) are not part of the
+         * registered values (e.g. <code>tls/1.3</code>).
+         */
+        private static String getProtocolIdentifier(TlsVersion tlsVersion) {
+            switch (tlsVersion) {
+                case SSL_3_0:
+                    return "ssl/3.0";
+                case TLS_1_0:
+                    return "tls/1.0";
+                case TLS_1_1:
+                    return "tls/1.1";
+                case TLS_1_2:
+                    return "tls/1.2";
+                case TLS_1_3:
+                    return "tls/1.3";
+                default:
+                    return tlsVersion.javaName().toLowerCase(Locale.ROOT);
+            }
         }
 
         @NotNull
@@ -914,25 +939,33 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                             .toString()
                                             .getBytes(StandardCharsets.ISO_8859_1));
 
+            Response.Builder respBuilder =
+                    response.newBuilder()
+                            .header(
+                                    ProtocolResponse.REQUEST_HEADERS_KEY,
+                                    new String(encodedBytesRequest, StandardCharsets.ISO_8859_1))
+                            .header(
+                                    ProtocolResponse.RESPONSE_HEADERS_KEY,
+                                    new String(encodedBytesResponse, StandardCharsets.ISO_8859_1))
+                            .header(ProtocolResponse.RESPONSE_IP_KEY, ipAddress)
+                            .header(
+                                    ProtocolResponse.REQUEST_TIME_KEY,
+                                    Long.toString(startFetchTime));
+
             final StringBuilder protocols = new StringBuilder(response.protocol().toString());
+            String cipherSuite = null;
             final Handshake handshake = connection.handshake();
             if (handshake != null) {
-                protocols.append(',').append(handshake.tlsVersion());
-                protocols.append(',').append(handshake.cipherSuite());
+                protocols.append(',').append(getProtocolIdentifier(handshake.tlsVersion()));
+                cipherSuite = handshake.cipherSuite().toString();
+                respBuilder = respBuilder.header(ProtocolResponse.CIPHER_SUITE_KEY, cipherSuite);
             }
+            respBuilder =
+                    respBuilder.header(
+                            ProtocolResponse.PROTOCOL_VERSIONS_KEY, protocols.toString());
 
             // returns a modified version of the response
-            return response.newBuilder()
-                    .header(
-                            ProtocolResponse.REQUEST_HEADERS_KEY,
-                            new String(encodedBytesRequest, StandardCharsets.ISO_8859_1))
-                    .header(
-                            ProtocolResponse.RESPONSE_HEADERS_KEY,
-                            new String(encodedBytesResponse, StandardCharsets.ISO_8859_1))
-                    .header(ProtocolResponse.RESPONSE_IP_KEY, ipAddress)
-                    .header(ProtocolResponse.REQUEST_TIME_KEY, Long.toString(startFetchTime))
-                    .header(ProtocolResponse.PROTOCOL_VERSIONS_KEY, protocols.toString())
-                    .build();
+            return respBuilder.build();
         }
     }
 
