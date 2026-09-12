@@ -43,6 +43,7 @@ import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.ProtocolFactory;
+import org.apache.stormcrawler.protocol.StuckProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -53,8 +54,10 @@ abstract class AbstractFetcherBoltTest {
     BaseRichBolt bolt;
 
     @AfterEach
-    void cleanupParserBolt() {
+    void cleanupParserBolt() throws ReflectiveOperationException {
         bolt.cleanup();
+        // the factory is a singleton configured once: never leak a protocol into the next test
+        resetProtocolFactory();
     }
 
     @Test
@@ -151,6 +154,122 @@ abstract class AbstractFetcherBoltTest {
 
         // nothing on the default stream — no content was fetched
         Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+    }
+
+    /**
+     * A fetch that hits the bolt-level timeout must not hold up the fetches that follow it: with
+     * one fetcher thread, a stuck fetch followed by two fast ones must yield two pages and one
+     * FETCH_ERROR within a few seconds, not one FETCH_ERROR per URL.
+     */
+    @Test
+    void stuckFetchDoesNotBlockTheFollowingFetches(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(
+                get(urlMatching("/slow"))
+                        .willReturn(aResponse().withStatus(200).withFixedDelay(10_000)));
+        stubFor(get(urlMatching("/fast.*")).willReturn(aResponse().withStatus(200).withBody("ok")));
+
+        resetProtocolFactory();
+        TestOutputCollector output = new TestOutputCollector();
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("fetcher.threads.number", 1);
+        config.put("fetcher.thread.timeout", 1L);
+        config.put("http.timeout", 30_000);
+        // same host: the second and third URL wait for the first one to release the queue
+        config.put("fetcher.server.delay", 0.0f);
+        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        String base = "http://localhost:" + wmRuntimeInfo.getHttpPort();
+        for (String path : new String[] {"/slow", "/fast1", "/fast2"}) {
+            Tuple tuple = mock(Tuple.class);
+            when(tuple.getSourceComponent()).thenReturn("source");
+            when(tuple.getStringByField("url")).thenReturn(base + path);
+            when(tuple.getValueByField("metadata")).thenReturn(null);
+            bolt.execute(tuple);
+        }
+
+        await().atMost(6, TimeUnit.SECONDS).until(() -> output.getAckedTuples().size() == 3);
+
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(1, statusTuples.size(), "only the slow URL should fail");
+        Assertions.assertEquals(base + "/slow", statusTuples.get(0).get(0));
+        Assertions.assertEquals(Status.FETCH_ERROR, statusTuples.get(0).get(2));
+        Assertions.assertEquals(2, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+    }
+
+    /**
+     * With a protocol that cannot be cancelled, timed-out fetches are abandoned on helper threads
+     * from a bounded pool shared by the bolt: every fetch actually starts until the pool is full,
+     * and the next one is rejected right away instead of queueing behind a stuck helper.
+     */
+    @Test
+    void abandonedFetchesUseABoundedSharedPool() throws ReflectiveOperationException {
+        StuckProtocol.STARTED.set(0);
+        resetProtocolFactory();
+        TestOutputCollector output = new TestOutputCollector();
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("http.protocol.implementation", StuckProtocol.class.getName());
+        config.put("fetcher.threads.number", 1);
+        config.put("fetcher.thread.timeout", 1L);
+        config.put("fetcher.thread.timeout.helpers", 2);
+        config.put("fetcher.server.delay", 0.0f);
+        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        for (String path : new String[] {"/1", "/2", "/3"}) {
+            Tuple tuple = mock(Tuple.class);
+            when(tuple.getSourceComponent()).thenReturn("source");
+            when(tuple.getStringByField("url")).thenReturn("http://stuck.example.com" + path);
+            when(tuple.getValueByField("metadata")).thenReturn(null);
+            bolt.execute(tuple);
+        }
+
+        await().atMost(6, TimeUnit.SECONDS).until(() -> output.getAckedTuples().size() == 3);
+
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(3, statusTuples.size());
+        for (List<Object> t : statusTuples) {
+            Assertions.assertEquals(Status.FETCH_ERROR, t.get(2));
+        }
+        // pool of 2 (twice the fetcher threads): the first two fetches really started
+        Assertions.assertEquals(2, StuckProtocol.STARTED.get(), "fetches actually started");
+        // the third found no free helper and was rejected with an explicit cause
+        long rejected =
+                statusTuples.stream()
+                        .map(t -> ((Metadata) t.get(1)).getFirstValue("fetch.exception"))
+                        .filter(m -> m != null && m.contains("helper"))
+                        .count();
+        Assertions.assertEquals(1, rejected, "one fetch rejected by the saturated pool");
+    }
+
+    /** The robots.txt lookup is part of the fetch: it must be covered by the timeout too. */
+    @Test
+    void hangingRobotsLookupIsReportedAtTheTimeout() throws ReflectiveOperationException {
+        StuckProtocol.HANG_ROBOTS = true;
+        try {
+            resetProtocolFactory();
+            TestOutputCollector output = new TestOutputCollector();
+            Map<String, Object> config = new HashMap<>();
+            config.put("http.agent.name", "this_is_only_a_test");
+            config.put("http.protocol.implementation", StuckProtocol.class.getName());
+            config.put("fetcher.threads.number", 1);
+            config.put("fetcher.thread.timeout", 1L);
+            bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+            Tuple tuple = mock(Tuple.class);
+            when(tuple.getSourceComponent()).thenReturn("source");
+            when(tuple.getStringByField("url")).thenReturn("http://stuck.example.com/robots");
+            when(tuple.getValueByField("metadata")).thenReturn(null);
+            bolt.execute(tuple);
+
+            await().atMost(6, TimeUnit.SECONDS).until(() -> output.getAckedTuples().size() == 1);
+            List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+            Assertions.assertEquals(1, statusTuples.size());
+            Assertions.assertEquals(Status.FETCH_ERROR, statusTuples.get(0).get(2));
+        } finally {
+            StuckProtocol.HANG_ROBOTS = false;
+        }
     }
 
     @Test

@@ -29,9 +29,17 @@ config:
   fetcher.max.urls.in.queues: -1
   fetcher.max.queue.size: -1
   fetcher.timeout.queue: -1
-  # hard timeout in seconds for a single protocol fetch at the bolt level;
-  # -1 disables (relies on protocol-level socket timeouts only)
+  # hard timeout in seconds for a single fetch (robots.txt lookup included),
+  # independent of the protocol's socket timeouts; -1 disables it. Never
+  # exceeds topology.message.timeout.secs. With okhttp the HTTP call itself
+  # is cancelled when the deadline passes (socket closed, URL reported as
+  # FETCH_ERROR); other protocols run on a helper thread and are abandoned
+  # there on timeout
   fetcher.thread.timeout: -1
+  # max helper threads per bolt for the abandoned fetches above; default is
+  # 2 x fetcher.threads.number (2 for SimpleFetcherBolt). When all are busy
+  # the URL is reported as FETCH_ERROR "No fetch helper available"
+  # fetcher.thread.timeout.helpers: 100
   # max. crawl-delay accepted in robots.txt (in seconds)
   fetcher.max.crawl.delay: 30
   # behavior of fetcher when the crawl-delay in the robots.txt

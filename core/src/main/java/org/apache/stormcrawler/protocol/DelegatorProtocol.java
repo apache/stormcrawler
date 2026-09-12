@@ -157,6 +157,10 @@ public class DelegatorProtocol implements Protocol {
             return protoInstance.getProtocolOutput(url, metadata);
         }
 
+        public boolean supportsFetchTimeout() {
+            return protoInstance.supportsFetchTimeout();
+        }
+
         public BaseRobotRules getRobotRules(String url) {
             return protoInstance.getRobotRules(url);
         }
@@ -318,6 +322,20 @@ public class DelegatorProtocol implements Protocol {
         }
         // execute and return protocol with url-meta combo
         return proto.getProtocolOutput(url, metadata);
+    }
+
+    /**
+     * True only when every delegate enforces the fetch timeout itself: the bolt does not know in
+     * advance which delegate a URL will be routed to.
+     */
+    @Override
+    public boolean supportsFetchTimeout() {
+        for (FilteredProtocol p : protocols) {
+            if (!p.supportsFetchTimeout()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
