@@ -58,6 +58,15 @@ public class ProtocolResponse {
     public static final String TRIMMED_RESPONSE_REASON_KEY = "http.trimmed.reason";
 
     /**
+     * Metadata key which holds the URL a followed redirect chain ended on, set when the content of
+     * a response does not come from the URL it was requested with. Related to, but distinct from,
+     * the {@code _redirTo} key the fetcher and parser bolts set on {@code Status.REDIRECTION}
+     * tuples: that one names the immediate target of a redirect which was NOT followed, this one
+     * names where an actually followed chain ended.
+     */
+    public static final String REDIRECTED_TO_KEY = "_redirectedTo";
+
+    /**
      * @since 1.17
      * @see <a href="https://github.com/apache/stormcrawler/issues/776">Issue 776</a>
      */
