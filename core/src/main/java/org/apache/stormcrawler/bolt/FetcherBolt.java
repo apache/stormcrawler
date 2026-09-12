@@ -985,7 +985,22 @@ public class FetcherBolt extends StatusEmitterBolt {
 
                         // https://github.com/apache/stormcrawler/issues/954
                         if (allowRedirs() && StringUtils.isNotBlank(redirection)) {
-                            emitOutlink(fit.tuple, url, redirection, mergedMetadata);
+                            // a sitemap which redirects (e.g. /sitemap.xml to
+                            // /sitemap_index.xml) must stay a sitemap: the key
+                            // is persisted, not transferred to outlinks by
+                            // default, so carry it onto the redirect target
+                            if (Boolean.parseBoolean(
+                                    mergedMetadata.getFirstValue(SiteMapParserBolt.isSitemapKey))) {
+                                emitOutlink(
+                                        fit.tuple,
+                                        url,
+                                        redirection,
+                                        mergedMetadata,
+                                        SiteMapParserBolt.isSitemapKey,
+                                        "true");
+                            } else {
+                                emitOutlink(fit.tuple, url, redirection, mergedMetadata);
+                            }
                         }
 
                         // mark this URL as redirected

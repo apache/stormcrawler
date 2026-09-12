@@ -556,7 +556,21 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                 }
 
                 if (allowRedirs() && StringUtils.isNotBlank(redirection)) {
-                    emitOutlink(input, url, redirection, mergedMetadata);
+                    // a sitemap which redirects must stay a sitemap: the key is
+                    // persisted, not transferred to outlinks by default, so
+                    // carry it onto the redirect target
+                    if (Boolean.parseBoolean(
+                            mergedMetadata.getFirstValue(SiteMapParserBolt.isSitemapKey))) {
+                        emitOutlink(
+                                input,
+                                url,
+                                redirection,
+                                mergedMetadata,
+                                SiteMapParserBolt.isSitemapKey,
+                                "true");
+                    } else {
+                        emitOutlink(input, url, redirection, mergedMetadata);
+                    }
                 }
                 // Mark URL as redirected
                 collector.emit(
