@@ -50,7 +50,8 @@ class CharsetIdentificationTest {
                         null,
                         () -> {
                             try {
-                                CharsetIdentification.getCharset(new Metadata(), content, maxlength);
+                                CharsetIdentification.getCharset(
+                                        new Metadata(), content, maxlength);
                             } catch (Throwable t) {
                                 thrown.set(t);
                             }
