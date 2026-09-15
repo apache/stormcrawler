@@ -53,6 +53,20 @@ public interface Protocol {
      */
     ProtocolResponse getProtocolOutput(String url, Metadata metadata) throws Exception;
 
+    /**
+     * Whether this protocol enforces {@code fetcher.thread.timeout} itself for the given URL, by
+     * cancelling the request when the deadline passes and throwing a {@link FetchTimeoutException}.
+     * When true the fetcher bolts call {@link #getProtocolOutput(String, Metadata)} and {@link
+     * #getRobotRules(String)} directly instead of running them on a helper thread that they abandon
+     * on timeout. Defaults to false.
+     *
+     * @param url the URL about to be fetched, or whose robots.txt is about to be looked up
+     * @param metadata the metadata of that URL, possibly null
+     */
+    default boolean supportsFetchTimeout(String url, Metadata metadata) {
+        return false;
+    }
+
     BaseRobotRules getRobotRules(String url);
 
     void cleanup();

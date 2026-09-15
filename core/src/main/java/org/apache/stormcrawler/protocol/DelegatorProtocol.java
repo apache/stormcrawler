@@ -74,7 +74,7 @@ public class DelegatorProtocol implements Protocol {
 
     protected static final org.slf4j.Logger LOG = LoggerFactory.getLogger(DelegatorProtocol.class);
 
-    private static final String ROBOTS = "robots.txt";
+    static final String ROBOTS = "robots.txt";
 
     static class Filter {
 
@@ -155,6 +155,10 @@ public class DelegatorProtocol implements Protocol {
 
         public ProtocolResponse getProtocolOutput(String url, Metadata metadata) throws Exception {
             return protoInstance.getProtocolOutput(url, metadata);
+        }
+
+        public boolean supportsFetchTimeout(String url, Metadata metadata) {
+            return protoInstance.supportsFetchTimeout(url, metadata);
         }
 
         public BaseRobotRules getRobotRules(String url) {
@@ -297,9 +301,7 @@ public class DelegatorProtocol implements Protocol {
 
     @Override
     public @NotNull BaseRobotRules getRobotRules(@NotNull String url) {
-        final Metadata m = new Metadata();
-        m.addValue(ROBOTS, "true");
-        FilteredProtocol proto = getProtocolFor(url, m);
+        FilteredProtocol proto = getProtocolFor(url, robotsMetadata());
         if (proto == null) {
             throw new RuntimeException("No sub protocol eligible to retrieve robots");
         }
@@ -318,6 +320,28 @@ public class DelegatorProtocol implements Protocol {
         }
         // execute and return protocol with url-meta combo
         return proto.getProtocolOutput(url, metadata);
+    }
+
+    /**
+     * Resolved per URL: true when the delegate the URL is routed to enforces the deadline itself.
+     * The robots.txt lookup of the URL may be routed differently (see {@link
+     * #getRobotRules(String)}), so that delegate must support it as well: a lookup run inline on a
+     * delegate which can not cancel it would hang the fetcher thread.
+     */
+    @Override
+    public boolean supportsFetchTimeout(String url, Metadata metadata) {
+        final FilteredProtocol forFetch = getProtocolFor(url, metadata);
+        final FilteredProtocol forRobots = getProtocolFor(url, robotsMetadata());
+        return forFetch != null
+                && forRobots != null
+                && forFetch.supportsFetchTimeout(url, metadata)
+                && forRobots.supportsFetchTimeout(url, metadata);
+    }
+
+    private static Metadata robotsMetadata() {
+        final Metadata m = new Metadata();
+        m.addValue(ROBOTS, "true");
+        return m;
     }
 
     @Override
