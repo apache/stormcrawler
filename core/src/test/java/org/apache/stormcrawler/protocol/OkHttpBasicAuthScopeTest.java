@@ -37,7 +37,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The Authorization header built from http.basicauth.* is only sent to the hosts listed in
- * http.basicauth.hosts. The local server is reached as localhost and as 127.0.0.1, which the
+ * http.basicauth.hosts, the credential headers of http.custom.headers only to the hosts listed in
+ * http.custom.headers.hosts. The local server is reached as localhost and as 127.0.0.1, which the
  * protocol treats as two different hosts.
  */
 class OkHttpBasicAuthScopeTest extends AbstractProtocolTest {
@@ -49,6 +50,12 @@ class OkHttpBasicAuthScopeTest extends AbstractProtocolTest {
 
     /** Authorization header seen per requested "host/path", "null" when absent. */
     static final Map<String, String> authorizationSeen = new ConcurrentHashMap<>();
+
+    /** X-Api-Key header, a credential, seen per requested "host/path", "null" when absent. */
+    static final Map<String, String> apiKeySeen = new ConcurrentHashMap<>();
+
+    /** X-Trace header, not a credential, seen per requested "host/path", "null" when absent. */
+    static final Map<String, String> traceSeen = new ConcurrentHashMap<>();
 
     /** Location the robots.txt of localhost redirects to, none when null. */
     static volatile String robotsRedirect;
@@ -65,9 +72,10 @@ class OkHttpBasicAuthScopeTest extends AbstractProtocolTest {
                         HttpServletResponse response)
                         throws IOException {
                     baseRequest.setHandled(true);
-                    authorizationSeen.put(
-                            request.getServerName() + target,
-                            String.valueOf(request.getHeader("Authorization")));
+                    final String seen = request.getServerName() + target;
+                    authorizationSeen.put(seen, String.valueOf(request.getHeader("Authorization")));
+                    apiKeySeen.put(seen, String.valueOf(request.getHeader("X-Api-Key")));
+                    traceSeen.put(seen, String.valueOf(request.getHeader("X-Trace")));
                     final String location;
                     if (target.equals("/redirect")) {
                         location = "http://127.0.0.1:" + HTTP_PORT + "/target";
@@ -101,18 +109,34 @@ class OkHttpBasicAuthScopeTest extends AbstractProtocolTest {
     @BeforeEach
     void reset() {
         authorizationSeen.clear();
+        apiKeySeen.clear();
+        traceSeen.clear();
         robotsRedirect = null;
     }
 
-    private Config config(Object hosts) {
+    private Config baseConfig() {
         final Config conf = new Config();
         conf.put("http.agent.name", "this_is_only_a_test");
         // the local server is cleartext HTTP: opt in so that only the host list decides
         conf.put("http.credentials.allow.insecure", true);
+        return conf;
+    }
+
+    private Config config(Object hosts) {
+        final Config conf = baseConfig();
         conf.put("http.basicauth.user", "wikiuser");
         conf.put("http.basicauth.password", "wikipass");
         if (hosts != null) {
             conf.put("http.basicauth.hosts", hosts);
+        }
+        return conf;
+    }
+
+    private Config customHeadersConfig(Object hosts) {
+        final Config conf = baseConfig();
+        conf.put("http.custom.headers", List.of("X-Api-Key=s3cret", "X-Trace=public"));
+        if (hosts != null) {
+            conf.put("http.custom.headers.hosts", hosts);
         }
         return conf;
     }
@@ -245,5 +269,99 @@ class OkHttpBasicAuthScopeTest extends AbstractProtocolTest {
             protocol.cleanup();
         }
         Assertions.assertEquals("null", authorizationSeen.get("localhost/page.html"));
+    }
+
+    @Test
+    void customCredentialHeadersOnlyGoToTheListedHost() throws Exception {
+        // the listed host is matched regardless of case
+        final HttpProtocol protocol = protocol(customHeadersConfig("LocalHost"));
+        try {
+            fetch(protocol, "localhost", "/page.html");
+            fetch(protocol, "127.0.0.1", "/page.html");
+        } finally {
+            protocol.cleanup();
+        }
+        Assertions.assertEquals("s3cret", apiKeySeen.get("localhost/page.html"));
+        Assertions.assertEquals(
+                "null",
+                apiKeySeen.get("127.0.0.1/page.html"),
+                "a host which is not listed must not receive the credential header");
+        Assertions.assertEquals("public", traceSeen.get("localhost/page.html"));
+        Assertions.assertEquals(
+                "public",
+                traceSeen.get("127.0.0.1/page.html"),
+                "a header which is not a credential is sent to every host");
+    }
+
+    @Test
+    void robotsTxtIsScopedLikeAnyOtherFetchForCustomCredentialHeaders() throws Exception {
+        final Config conf = customHeadersConfig(List.of("localhost"));
+        final HttpProtocol protocol = protocol(conf);
+        try {
+            final HttpRobotRulesParser parser = new HttpRobotRulesParser(conf);
+            parser.getRobotRulesSet(protocol, "http://localhost:" + HTTP_PORT + "/page.html");
+            parser.getRobotRulesSet(protocol, "http://127.0.0.1:" + HTTP_PORT + "/page.html");
+        } finally {
+            protocol.cleanup();
+        }
+        Assertions.assertEquals("s3cret", apiKeySeen.get("localhost/robots.txt"));
+        Assertions.assertEquals("null", apiKeySeen.get("127.0.0.1/robots.txt"));
+        Assertions.assertEquals("public", traceSeen.get("127.0.0.1/robots.txt"));
+    }
+
+    @Test
+    void crossHostRedirectDoesNotCarryCustomCredentialHeaders() throws Exception {
+        // both hosts are listed: only the change of host strips the header
+        final Config conf = customHeadersConfig("localhost,127.0.0.1");
+        conf.put("http.allow.redirects", true);
+        final HttpProtocol protocol = protocol(conf);
+        try {
+            fetch(protocol, "localhost", "/redirect");
+        } finally {
+            protocol.cleanup();
+        }
+        Assertions.assertEquals("s3cret", apiKeySeen.get("localhost/redirect"));
+        Assertions.assertEquals("null", apiKeySeen.get("127.0.0.1/target"));
+        Assertions.assertEquals("public", traceSeen.get("127.0.0.1/target"));
+    }
+
+    @Test
+    void customCredentialHeadersAreNotSentWithoutHosts() throws Exception {
+        // http.basicauth.hosts does not apply to http.custom.headers
+        final Config conf = customHeadersConfig(null);
+        conf.put("http.basicauth.user", "wikiuser");
+        conf.put("http.basicauth.password", "wikipass");
+        conf.put("http.basicauth.hosts", "localhost");
+        final HttpProtocol protocol = protocol(conf);
+        try {
+            fetch(protocol, "localhost", "/page.html");
+            fetch(protocol, "127.0.0.1", "/page.html");
+        } finally {
+            protocol.cleanup();
+        }
+        Assertions.assertEquals("null", apiKeySeen.get("localhost/page.html"));
+        Assertions.assertEquals("null", apiKeySeen.get("127.0.0.1/page.html"));
+        Assertions.assertEquals("public", traceSeen.get("localhost/page.html"));
+        Assertions.assertEquals("public", traceSeen.get("127.0.0.1/page.html"));
+        Assertions.assertEquals(EXPECTED, authorizationSeen.get("localhost/page.html"));
+    }
+
+    @Test
+    void customAuthorizationOnlyReplacesBasicAuthOnItsHosts() throws Exception {
+        final Config conf = config("localhost,127.0.0.1");
+        conf.put("http.custom.headers", List.of("Authorization=Bearer token"));
+        conf.put("http.custom.headers.hosts", "localhost");
+        final HttpProtocol protocol = protocol(conf);
+        try {
+            fetch(protocol, "localhost", "/page.html");
+            fetch(protocol, "127.0.0.1", "/page.html");
+        } finally {
+            protocol.cleanup();
+        }
+        Assertions.assertEquals("Bearer token", authorizationSeen.get("localhost/page.html"));
+        Assertions.assertEquals(
+                EXPECTED,
+                authorizationSeen.get("127.0.0.1/page.html"),
+                "the basic auth credentials are kept where the custom header is not sent");
     }
 }

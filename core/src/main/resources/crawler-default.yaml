@@ -202,13 +202,25 @@ config:
   # Breaking change in 4.0.0: the credentials used to be sent to every host
   # crawled. If http.basicauth.hosts is empty they are not sent at all and a
   # warning is logged at startup.
-  # Credential headers configured with http.custom.headers are still sent to
-  # every host; set them per site with protocol.set-header in the metadata of
-  # the URLs instead.
   # http.basicauth.user:
   # http.basicauth.password:
   # http.basicauth.hosts:
   # - "intranet.example.com"
+
+  # The headers of http.custom.headers which carry credentials (see
+  # http.credentials.headers) are only sent to the hosts listed in
+  # http.custom.headers.hosts, which takes the same entries and is matched in
+  # the same way as http.basicauth.hosts; the other custom headers are sent to
+  # every host. The two host lists are independent. On a host listed in both,
+  # an Authorization header of http.custom.headers replaces the one built from
+  # http.basicauth.*.
+  # Breaking change in 4.0.0: the credential headers used to be sent to every
+  # host crawled. If http.custom.headers.hosts is empty they are not sent at
+  # all and a warning is logged at startup.
+  # http.custom.headers:
+  # - "X-Api-Key=secret"
+  # http.custom.headers.hosts:
+  # - "api.example.com"
 
   # Maximum number of redirect hops followed when http.allow.redirects is
   # enabled (okhttp protocol only). A chain which does not end within this
@@ -256,7 +268,8 @@ config:
   # while staying on the same host and port is always followed, whatever this is
   # set to. When this is enabled, the robots.txt is re-fetched from the host
   # named in the Location header, for up to 5 hops, and each of these requests
-  # carries the headers configured through http.custom.headers, and those of
+  # carries the headers configured through http.custom.headers, the credential
+  # ones only if the host is listed in http.custom.headers.hosts, and those of
   # http.basicauth.* if the host is listed in http.basicauth.hosts, as any other
   # request does; http.filter.ipaddress.exclude
   # can be used to restrict the addresses those fetches may reach.

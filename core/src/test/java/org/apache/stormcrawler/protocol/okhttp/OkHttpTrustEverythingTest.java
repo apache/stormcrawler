@@ -184,6 +184,7 @@ class OkHttpTrustEverythingTest {
         final Config conf = config();
         conf.put("http.trust.everything", true);
         conf.put("http.custom.headers", List.of("X-Api-Key=s3cret", "X-Trace=public"));
+        conf.put("http.custom.headers.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         fetch(protocol(conf), "/customheaders");
         server.verify(
@@ -200,6 +201,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.trust.everything", true);
         conf.put("http.credentials.allow.insecure", true);
         conf.put("http.custom.headers", List.of("X-Api-Key=s3cret", "X-Trace=public"));
+        conf.put("http.custom.headers.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         fetch(protocol(conf), "/customheaders");
         server.verify(
@@ -268,6 +270,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.trust.everything", true);
         conf.put("http.credentials.headers", List.of("X-Auth-Token"));
         conf.put("http.custom.headers", List.of("X-Auth-Token=token1", "X-Other=plain"));
+        conf.put("http.custom.headers.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         fetch(protocol(conf), "/configuredheaders");
         server.verify(
@@ -289,6 +292,7 @@ class OkHttpTrustEverythingTest {
         conf.put(
                 "http.custom.headers",
                 List.of("Authorization=Basic c2VjcmV0", "X-Api-Key=key1", "Cookie=sid=x"));
+        conf.put("http.custom.headers.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         fetch(protocol(conf), "/builtinheaders");
         server.verify(
@@ -411,6 +415,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.basicauth.password", "secret");
         conf.put("http.basicauth.hosts", "localhost");
         conf.put("http.custom.headers", List.of("X-Api-Key=s3cret"));
+        conf.put("http.custom.headers.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         final HttpProtocol protocol = protocol(conf);
         trustTestKeystore(protocol, LOCALHOST_KEYSTORE);
@@ -450,6 +455,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.basicauth.password", "secret");
         conf.put("http.basicauth.hosts", "localhost");
         conf.put("http.custom.headers", List.of("X-Api-Key=s3cret"));
+        conf.put("http.custom.headers.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         final HttpProtocol protocol = protocol(conf);
         trustTestKeystore(protocol, LOCALHOST_KEYSTORE);
@@ -481,6 +487,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.allow.redirects", true);
         conf.put("http.store.headers", true);
         conf.put("http.custom.headers", List.of("X-Api-Key=s3cret"));
+        conf.put("http.custom.headers.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         final HttpProtocol protocol = protocol(conf);
         trustTestKeystore(protocol, LOCALHOST_KEYSTORE);
@@ -514,6 +521,7 @@ class OkHttpTrustEverythingTest {
         final Config conf = config();
         conf.put("http.allow.redirects", true);
         conf.put("http.custom.headers", List.of("Proxy-Authorization=Basic cHJveHk6c2VjcmV0"));
+        conf.put("http.custom.headers.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         final HttpProtocol protocol = protocol(conf);
         trustTestKeystore(protocol, LOCALHOST_KEYSTORE);
