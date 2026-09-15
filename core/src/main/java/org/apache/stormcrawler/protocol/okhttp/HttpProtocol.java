@@ -618,7 +618,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
                             System.currentTimeMillis() - buildStart);
                 }
 
-                LOG.debug("fetching with proxy {} - {} ", url, prox.toString());
+                LOG.debug(
+                        "fetching with proxy {} - {}:{} ", url, prox.getAddress(), prox.getPort());
             }
         }
 

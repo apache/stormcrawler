@@ -43,7 +43,7 @@ class SingleProxyManagerTest {
         Assertions.assertEquals("8080", proxy.getPort());
         Assertions.assertEquals("user1", proxy.getUsername());
         Assertions.assertEquals("pass1", proxy.getPassword());
-        Assertions.assertEquals("http://user1:pass1@example.com:8080", proxy.toString());
+        Assertions.assertEquals("http://user1:***@example.com:8080", proxy.toString());
     }
 
     @Test
@@ -131,7 +131,7 @@ class SingleProxyManagerTest {
         Optional<SCProxy> proxyOptional = pm.getProxy(metadata);
         Assertions.assertTrue(proxyOptional.isPresent());
         Assertions.assertEquals(
-                "https://metadata-user:metadata-pass@metadata.example.com:9443",
+                "https://metadata-user:***@metadata.example.com:9443",
                 proxyOptional.get().toString());
     }
 
@@ -187,7 +187,7 @@ class SingleProxyManagerTest {
         Optional<SCProxy> proxyOptional = pm.getProxy(metadata);
         Assertions.assertTrue(proxyOptional.isPresent());
         Assertions.assertEquals(
-                "http://user1:pass1@example.com:8080", proxyOptional.get().toString());
+                "http://user1:***@example.com:8080", proxyOptional.get().toString());
     }
 
     @Test

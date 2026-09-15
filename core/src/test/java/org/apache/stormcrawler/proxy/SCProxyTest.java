@@ -67,8 +67,28 @@ class SCProxyTest {
     }
 
     @Test
+    void invalidProxyMessageDoesNotContainConnectionString() {
+        String invalidProxy = "http://user1:pass1@example.com";
+
+        IllegalArgumentException exception =
+                Assertions.assertThrows(
+                        IllegalArgumentException.class, () -> new SCProxy(invalidProxy));
+
+        Assertions.assertFalse(exception.getMessage().contains(invalidProxy));
+        Assertions.assertFalse(exception.getMessage().contains("pass1"));
+    }
+
+    @Test
     void testToString() {
-        String[] proxyStrings = {
+        String[] expectedProxyStrings = {
+            "http://example.com:8080",
+            "https://example.com:8080",
+            "http://user1:***@example.com:8080",
+            "sock5://user1:***@example.com:8080",
+            "http://example.com:80",
+            "sock5://example.com:64000"
+        };
+        String[] inputProxyStrings = {
             "http://example.com:8080",
             "https://example.com:8080",
             "http://user1:pass1@example.com:8080",
@@ -76,9 +96,12 @@ class SCProxyTest {
             "http://example.com:80",
             "sock5://example.com:64000"
         };
-        for (String proxyString : proxyStrings) {
-            SCProxy proxy = new SCProxy(proxyString);
-            Assertions.assertEquals(proxyString, proxy.toString());
+        for (int i = 0; i < inputProxyStrings.length; i++) {
+            SCProxy proxy = new SCProxy(inputProxyStrings[i]);
+            Assertions.assertEquals(expectedProxyStrings[i], proxy.toString());
+            if (proxy.getPassword() != null) {
+                Assertions.assertFalse(proxy.toString().contains(proxy.getPassword()));
+            }
         }
     }
 
