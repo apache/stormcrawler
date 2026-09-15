@@ -30,7 +30,10 @@ import com.microsoft.playwright.Tracing;
 import com.microsoft.playwright.options.HttpHeader;
 import com.microsoft.playwright.options.Proxy;
 import com.microsoft.playwright.options.WaitUntilState;
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,6 +49,7 @@ import org.apache.storm.utils.MutableInt;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
+import org.apache.stormcrawler.protocol.IPFilterRules;
 import org.apache.stormcrawler.protocol.Protocol;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
@@ -83,6 +87,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
     private WaitUntilState loadEvent;
 
     private PageActions pageActions = PageActions.emptyPageActions;
+
+    private IPFilterRules ipFilterRules;
 
     @Override
     public void configure(final Config conf) {
@@ -145,29 +151,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
         overrideStatusOnContent =
                 ConfUtils.getBoolean(conf, "playwright.override.status.on.content", false);
 
-        final String ua = getAgentString(conf);
-
-        NewContextOptions b_c_options =
-                new Browser.NewContextOptions().setIsMobile(false).setUserAgent(ua);
-
-        // set Accept-Language if configured, as done by the other protocol implementations;
-        // an explicitly empty value overrides the browser's default with an empty header,
-        // only an absent key leaves the browser's default untouched
-        final String acceptLanguage = ConfUtils.getString(conf, "http.accept.language");
-        if (acceptLanguage != null) {
-            b_c_options.setExtraHTTPHeaders(Map.of("Accept-Language", acceptLanguage));
-        }
-
-        // global proxy
-        String proxyServer = ConfUtils.getString(conf, "http.proxy");
-        String proxyUser = ConfUtils.getString(conf, "http.proxy.username");
-        String proxyPwd = ConfUtils.getString(conf, "http.proxy.password");
-
-        final Proxy globalProxy = getProxy(proxyServer, proxyUser, proxyPwd);
-        if (globalProxy != null) {
-            b_c_options.setProxy(globalProxy);
-            b_c_options.setIgnoreHTTPSErrors(true);
-        }
+        final NewContextOptions b_c_options = buildContextOptions(conf, getAgentString(conf));
 
         context = browser.newContext(b_c_options);
 
@@ -188,6 +172,111 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         // optional chain of page actions applied after navigate, before content capture
         pageActions = PageActions.fromConf(conf);
+
+        configureIPFilter(conf);
+    }
+
+    /**
+     * Sets up the filtering of the requests made by the browser against http.filter.ipaddress.*. As
+     * with the OkHttp protocol, fetches through a proxy are not filtered.
+     */
+    void configureIPFilter(final Config conf) {
+        final IPFilterRules rules = new IPFilterRules(conf);
+        if (rules.isEmpty()) {
+            ipFilterRules = null;
+        } else if (StringUtils.isNotBlank(ConfUtils.getString(conf, "http.proxy"))) {
+            ipFilterRules = null;
+            LOG.info(
+                    "http.filter.ipaddress.* do not apply to fetches through a proxy, the proxy"
+                            + " resolves the target host and its own egress rules decide which"
+                            + " addresses are reached");
+        } else {
+            ipFilterRules = rules;
+        }
+    }
+
+    /**
+     * Checks the host of a request made by the browser against the IP filter rules. The host is
+     * resolved here, separately from the browser, so the address the browser connects to can
+     * differ, e.g. with short-lived DNS records or a remote browser using another resolver.
+     *
+     * @return false if any address of the host is rejected or the host cannot be resolved
+     */
+    boolean isAllowedAddress(final String url) {
+        if (ipFilterRules == null) {
+            return true;
+        }
+        final URI uri;
+        try {
+            uri = new URI(url);
+        } catch (URISyntaxException e) {
+            return false;
+        }
+        final String scheme = uri.getScheme();
+        if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
+            // data:, blob: and the like do not open a connection
+            return true;
+        }
+        String host = uri.getHost();
+        if (host == null) {
+            return false;
+        }
+        if (host.startsWith("[") && host.endsWith("]")) {
+            host = host.substring(1, host.length() - 1);
+        }
+        try {
+            for (InetAddress address : InetAddress.getAllByName(host)) {
+                if (!ipFilterRules.accept(address)) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (UnknownHostException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Builds the options of the browser context shared by all fetches, whether the browser is
+     * launched locally or reached via CDP or a remote Playwright server.
+     *
+     * @param conf the configuration
+     * @param userAgent the user agent string sent by the browser
+     * @return the context options
+     */
+    NewContextOptions buildContextOptions(final Config conf, final String userAgent) {
+        final NewContextOptions options =
+                new Browser.NewContextOptions().setIsMobile(false).setUserAgent(userAgent);
+
+        // set Accept-Language if configured, as done by the other protocol implementations;
+        // an explicitly empty value overrides the browser's default with an empty header,
+        // only an absent key leaves the browser's default untouched
+        final String acceptLanguage = ConfUtils.getString(conf, "http.accept.language");
+        if (acceptLanguage != null) {
+            options.setExtraHTTPHeaders(Map.of("Accept-Language", acceptLanguage));
+        }
+
+        // global proxy
+        final String proxyServer = ConfUtils.getString(conf, "http.proxy");
+        final String proxyUser = ConfUtils.getString(conf, "http.proxy.username");
+        final String proxyPwd = ConfUtils.getString(conf, "http.proxy.password");
+
+        final Proxy globalProxy = getProxy(proxyServer, proxyUser, proxyPwd);
+        if (globalProxy != null) {
+            options.setProxy(globalProxy);
+        }
+
+        // certificate validation is independent of the proxy settings
+        final boolean ignoreHTTPSErrors =
+                ConfUtils.getBoolean(conf, "playwright.ignore.https.errors", false);
+        if (ignoreHTTPSErrors) {
+            LOG.warn(
+                    "playwright.ignore.https.errors is true: TLS certificates are not validated by"
+                            + " the browser, any server able to answer for a host name is accepted");
+        }
+        options.setIgnoreHTTPSErrors(ignoreHTTPSErrors);
+
+        return options;
     }
 
     @Override
@@ -251,6 +340,11 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                 } else if (resourceTypesToSkip.contains(
                                         route.request().resourceType())) {
                                     route.abort();
+                                } else if (!isAllowedAddress(route.request().url())) {
+                                    LOG.warn(
+                                            "Blocked request to forbidden IP address: {}",
+                                            route.request().url());
+                                    route.abort("addressunreachable");
                                 } else {
                                     route.resume();
                                 }
