@@ -93,7 +93,10 @@ public class HttpRobotRulesParser extends RobotRulesParser {
             sources.add("http.basicauth.* (if the target is listed in http.basicauth.hosts)");
         }
         if (!ConfUtils.loadListFromConf("http.custom.headers", conf).isEmpty()) {
-            sources.add("http.custom.headers");
+            // credential headers only reach a target listed in http.custom.headers.hosts
+            sources.add(
+                    "http.custom.headers (credential headers if the target is listed in "
+                            + "http.custom.headers.hosts)");
         }
         if (!sources.isEmpty()) {
             LOG.warn(
