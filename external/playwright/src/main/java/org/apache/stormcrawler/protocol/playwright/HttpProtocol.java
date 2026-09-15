@@ -63,13 +63,6 @@ public class HttpProtocol extends AbstractHttpProtocol {
     public static final String MD_EVALUATIONS = "playwright.evaluations";
     public static final String MD_SKIPS = "playwright.skip.resource.types";
 
-    /**
-     * If true, the browser context accepts any TLS certificate, including self-signed, expired or
-     * otherwise invalid ones. Applies to every page, navigation and subresource of the context,
-     * independently of whether a proxy is configured.
-     */
-    public static final String IGNORE_HTTPS_ERRORS_KEY = "playwright.ignore.https.errors";
-
     private int timeout = 10000;
 
     private boolean captureContentOnError = false;
@@ -183,7 +176,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
      * @param userAgent the user agent string sent by the browser
      * @return the context options
      */
-    static NewContextOptions buildContextOptions(final Config conf, final String userAgent) {
+    NewContextOptions buildContextOptions(final Config conf, final String userAgent) {
         final NewContextOptions options =
                 new Browser.NewContextOptions().setIsMobile(false).setUserAgent(userAgent);
 
@@ -207,12 +200,11 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         // certificate validation is independent of the proxy settings
         final boolean ignoreHTTPSErrors =
-                ConfUtils.getBoolean(conf, IGNORE_HTTPS_ERRORS_KEY, false);
+                ConfUtils.getBoolean(conf, "playwright.ignore.https.errors", false);
         if (ignoreHTTPSErrors) {
             LOG.warn(
-                    "{} is true: TLS certificates are not validated by the browser, any server"
-                            + " able to answer for a host name is accepted",
-                    IGNORE_HTTPS_ERRORS_KEY);
+                    "playwright.ignore.https.errors is true: TLS certificates are not validated by"
+                            + " the browser, any server able to answer for a host name is accepted");
         }
         options.setIgnoreHTTPSErrors(ignoreHTTPSErrors);
 
@@ -421,7 +413,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
     }
 
     /** Returns a proxy object if required * */
-    private static Proxy getProxy(String proxyserver, String proxyuser, String proxypwd) {
+    private Proxy getProxy(String proxyserver, String proxyuser, String proxypwd) {
         if (proxyserver == null) {
             return null;
         }

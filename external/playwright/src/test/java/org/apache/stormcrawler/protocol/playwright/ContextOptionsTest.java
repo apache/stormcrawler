@@ -35,7 +35,7 @@ class ContextOptionsTest {
     @Test
     void certificatesValidatedByDefault() {
         final NewContextOptions options =
-                HttpProtocol.buildContextOptions(new Config(), USER_AGENT);
+                new HttpProtocol().buildContextOptions(new Config(), USER_AGENT);
         Assertions.assertNull(options.proxy);
         Assertions.assertEquals(Boolean.FALSE, options.ignoreHTTPSErrors);
         Assertions.assertEquals(USER_AGENT, options.userAgent);
@@ -47,7 +47,7 @@ class ContextOptionsTest {
         conf.put("http.proxy", PROXY);
         conf.put("http.proxy.username", "user");
         conf.put("http.proxy.password", "secret");
-        final NewContextOptions options = HttpProtocol.buildContextOptions(conf, USER_AGENT);
+        final NewContextOptions options = new HttpProtocol().buildContextOptions(conf, USER_AGENT);
         Assertions.assertNotNull(options.proxy);
         Assertions.assertEquals(PROXY, options.proxy.server);
         Assertions.assertEquals("user", options.proxy.username);
@@ -58,8 +58,8 @@ class ContextOptionsTest {
     @Test
     void ignoreHttpsErrorsWithoutProxy() {
         final Config conf = new Config();
-        conf.put(HttpProtocol.IGNORE_HTTPS_ERRORS_KEY, true);
-        final NewContextOptions options = HttpProtocol.buildContextOptions(conf, USER_AGENT);
+        conf.put("playwright.ignore.https.errors", true);
+        final NewContextOptions options = new HttpProtocol().buildContextOptions(conf, USER_AGENT);
         Assertions.assertNull(options.proxy);
         Assertions.assertEquals(Boolean.TRUE, options.ignoreHTTPSErrors);
     }
@@ -68,8 +68,8 @@ class ContextOptionsTest {
     void ignoreHttpsErrorsWithProxy() {
         final Config conf = new Config();
         conf.put("http.proxy", PROXY);
-        conf.put(HttpProtocol.IGNORE_HTTPS_ERRORS_KEY, true);
-        final NewContextOptions options = HttpProtocol.buildContextOptions(conf, USER_AGENT);
+        conf.put("playwright.ignore.https.errors", true);
+        final NewContextOptions options = new HttpProtocol().buildContextOptions(conf, USER_AGENT);
         Assertions.assertNotNull(options.proxy);
         Assertions.assertEquals(Boolean.TRUE, options.ignoreHTTPSErrors);
     }
@@ -78,8 +78,8 @@ class ContextOptionsTest {
     void explicitFalseKeepsCertificateValidationWithProxy() {
         final Config conf = new Config();
         conf.put("http.proxy", PROXY);
-        conf.put(HttpProtocol.IGNORE_HTTPS_ERRORS_KEY, false);
-        final NewContextOptions options = HttpProtocol.buildContextOptions(conf, USER_AGENT);
+        conf.put("playwright.ignore.https.errors", false);
+        final NewContextOptions options = new HttpProtocol().buildContextOptions(conf, USER_AGENT);
         Assertions.assertNotNull(options.proxy);
         Assertions.assertEquals(Boolean.FALSE, options.ignoreHTTPSErrors);
     }
