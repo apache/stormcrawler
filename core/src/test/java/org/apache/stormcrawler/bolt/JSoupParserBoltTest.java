@@ -28,10 +28,13 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.parse.ParsingTester;
 import org.apache.stormcrawler.persistence.Status;
+import org.apache.stormcrawler.util.CharsetIdentification;
 import org.apache.stormcrawler.util.RobotsTags;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 class JSoupParserBoltTest extends ParsingTester {
 
@@ -113,6 +116,31 @@ class JSoupParserBoltTest extends ParsingTester {
     void setupParserBolt() {
         bolt = new JSoupParserBolt();
         setupParserBolt(bolt);
+    }
+
+    /** A failure inside charset detection is a parse error of that URL, not a dead worker. */
+    @Test
+    void charsetDetectionFailureIsReportedAsParseError() throws IOException {
+        bolt.prepare(
+                new HashMap<>(), TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        try (MockedStatic<CharsetIdentification> detection =
+                Mockito.mockStatic(CharsetIdentification.class)) {
+            detection
+                    .when(
+                            () ->
+                                    CharsetIdentification.getCharset(
+                                            Mockito.any(), Mockito.any(), Mockito.anyInt()))
+                    .thenThrow(new StackOverflowError());
+            parse("https://stormcrawler.apache.org", "stormcrawler.apache.org.html");
+        }
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(1, statusTuples.size());
+        Assertions.assertEquals(Status.ERROR, statusTuples.get(0).get(2));
+        Metadata metadata = (Metadata) statusTuples.get(0).get(1);
+        Assertions.assertEquals(
+                "content parsing", metadata.getFirstValue(Constants.STATUS_ERROR_SOURCE));
+        Assertions.assertEquals(1, output.getAckedTuples().size());
+        Assertions.assertTrue(output.getEmitted().isEmpty(), "no document must be emitted");
     }
 
     /** Checks that content in script is not included in the text representation. */
