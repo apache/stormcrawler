@@ -206,7 +206,9 @@ class OkHttpFollowRedirectsTest extends AbstractProtocolTest {
         conf.put("http.credentials.allow.insecure", true);
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
+        conf.put("http.basicauth.hosts", "127.0.0.1");
         conf.put("http.custom.headers", java.util.List.of("X-Api-Key=s3cret"));
+        conf.put("http.custom.headers.hosts", "127.0.0.1");
         HttpProtocol protocol = protocol(conf);
         protocol.getProtocolOutput("http://127.0.0.1:" + HTTP_PORT + "/start", new Metadata());
         protocol.cleanup();
@@ -229,7 +231,10 @@ class OkHttpFollowRedirectsTest extends AbstractProtocolTest {
         conf.put("http.credentials.allow.insecure", true);
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
+        // both hosts are listed: only the origin change strips the header
+        conf.put("http.basicauth.hosts", java.util.List.of("127.0.0.1", "localhost"));
         conf.put("http.custom.headers", java.util.List.of("X-Api-Key=s3cret"));
+        conf.put("http.custom.headers.hosts", java.util.List.of("127.0.0.1", "localhost"));
         HttpProtocol protocol = protocol(conf);
         ProtocolResponse response =
                 protocol.getProtocolOutput(
@@ -259,7 +264,9 @@ class OkHttpFollowRedirectsTest extends AbstractProtocolTest {
             conf.put("http.credentials.allow.insecure", true);
             conf.put("http.basicauth.user", "user");
             conf.put("http.basicauth.password", "secret");
+            conf.put("http.basicauth.hosts", "127.0.0.1");
             conf.put("http.custom.headers", java.util.List.of("X-Api-Key=s3cret"));
+            conf.put("http.custom.headers.hosts", "127.0.0.1");
             HttpProtocol protocol = protocol(conf);
             ProtocolResponse response =
                     protocol.getProtocolOutput(

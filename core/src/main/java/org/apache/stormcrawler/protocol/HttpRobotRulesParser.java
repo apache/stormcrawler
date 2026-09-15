@@ -87,11 +87,16 @@ public class HttpRobotRulesParser extends RobotRulesParser {
      */
     private static void logForwardedRequestHeaders(Config conf) {
         List<String> sources = new ArrayList<>();
-        if (StringUtils.isNotBlank(ConfUtils.getString(conf, "http.basicauth.user", null))) {
-            sources.add("http.basicauth.user");
+        if (StringUtils.isNotBlank(ConfUtils.getString(conf, "http.basicauth.user", null))
+                && !ConfUtils.loadListFromConf("http.basicauth.hosts", conf).isEmpty()) {
+            // only reaches a target whose host is listed in http.basicauth.hosts
+            sources.add("http.basicauth.* (if the target is listed in http.basicauth.hosts)");
         }
         if (!ConfUtils.loadListFromConf("http.custom.headers", conf).isEmpty()) {
-            sources.add("http.custom.headers");
+            // credential headers only reach a target listed in http.custom.headers.hosts
+            sources.add(
+                    "http.custom.headers (credential headers if the target is listed in "
+                            + "http.custom.headers.hosts)");
         }
         if (!sources.isEmpty()) {
             LOG.warn(

@@ -145,8 +145,19 @@ public class HttpProtocol extends AbstractHttpProtocol {
     // lower case header names considered to carry credentials
     private Set<String> credentialHeaders = DEFAULT_CREDENTIAL_HEADERS;
 
-    // request headers withheld from servers which were not authenticated
+    // credential headers of http.custom.headers, only sent to customCredentialHosts and withheld
+    // from servers which were not authenticated
     private final List<KeyValue> credentialRequestHeaders = new LinkedList<>();
+
+    // http.custom.headers.hosts: hosts (canonical form, see HttpUrl#host) the
+    // credentialRequestHeaders are sent to
+    private final Set<String> customCredentialHosts = new HashSet<>();
+
+    // value of the Authorization header built from http.basicauth.*, null when not sent at all
+    private String basicAuthorization;
+
+    // http.basicauth.hosts: hosts (canonical form, see HttpUrl#host) basicAuthorization is sent to
+    private final Set<String> basicAuthHosts = new HashSet<>();
 
     // http.trust.everything: accept any certificate chain
     private boolean trustEverything = false;
@@ -321,27 +332,56 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         final String basicAuthUser = ConfUtils.getString(conf, "http.basicauth.user", null);
 
-        // use a basic auth? the header is withheld unless the server was authenticated
+        // use a basic auth? the header is only sent to the hosts listed in http.basicauth.hosts
+        // and withheld unless the server was authenticated
         if (StringUtils.isNotBlank(basicAuthUser)) {
-            final String basicAuthPass = ConfUtils.getString(conf, "http.basicauth.password", "");
-            final String encoding =
-                    Base64.getEncoder()
-                            .encodeToString(
-                                    (basicAuthUser + ":" + basicAuthPass)
-                                            .getBytes(StandardCharsets.UTF_8));
-            credentialRequestHeaders.add(
-                    new KeyValue(HttpHeaders.AUTHORIZATION, "Basic " + encoding));
+            addHosts(conf, "http.basicauth.hosts", basicAuthHosts);
+            if (basicAuthHosts.isEmpty()) {
+                // fail closed: before 4.0.0 the credentials went to every host crawled
+                LOG.warn(
+                        "http.basicauth.user is set but http.basicauth.hosts lists no host, the "
+                                + "credentials are not sent to any server. Since 4.0.0 they are "
+                                + "only sent to the hosts listed in http.basicauth.hosts; add the "
+                                + "host names of the sites which require them there.");
+            } else {
+                final String basicAuthPass =
+                        ConfUtils.getString(conf, "http.basicauth.password", "");
+                final String encoding =
+                        Base64.getEncoder()
+                                .encodeToString(
+                                        (basicAuthUser + ":" + basicAuthPass)
+                                                .getBytes(StandardCharsets.UTF_8));
+                basicAuthorization = "Basic " + encoding;
+            }
         }
 
+        // credential headers are only sent to the hosts listed in http.custom.headers.hosts, the
+        // other custom headers to every host
+        final List<KeyValue> credentialCustomHeaders = new ArrayList<>();
         for (KeyValue customHeader : customHeaders) {
             if (isCredentialHeader(customHeader.getKey())) {
-                credentialRequestHeaders.add(customHeader);
+                credentialCustomHeaders.add(customHeader);
             } else {
                 customRequestHeaders.add(customHeader);
             }
         }
+        if (!credentialCustomHeaders.isEmpty()) {
+            addHosts(conf, "http.custom.headers.hosts", customCredentialHosts);
+            if (customCredentialHosts.isEmpty()) {
+                // fail closed: before 4.0.0 the credential headers went to every host crawled
+                LOG.warn(
+                        "http.custom.headers sets the credential headers {} but "
+                                + "http.custom.headers.hosts lists no host, they are not sent to "
+                                + "any server. Since 4.0.0 they are only sent to the hosts listed "
+                                + "in http.custom.headers.hosts; add the host names of the sites "
+                                + "which require them there.",
+                        credentialCustomHeaders.stream().map(KeyValue::getKey).toList());
+            } else {
+                credentialRequestHeaders.addAll(credentialCustomHeaders);
+            }
+        }
 
-        if (!credentialRequestHeaders.isEmpty() || useCookies) {
+        if (basicAuthorization != null || !credentialRequestHeaders.isEmpty() || useCookies) {
             if (trustEverything && !insecureCredentialsAllowed) {
                 LOG.warn(
                         "Credentials configured with http.basicauth.*, credential headers in "
@@ -499,6 +539,63 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
     }
 
+    /**
+     * Adds the hosts configured under the key, a list or a comma-separated string, to the set of
+     * hosts a credential is sent to.
+     */
+    private void addHosts(Config conf, String key, Set<String> hosts) {
+        for (String entry : ConfUtils.loadListFromConf(key, conf)) {
+            for (String host : entry.split(",")) {
+                addHost(key, host, hosts);
+            }
+        }
+    }
+
+    /**
+     * Adds a host configured under the key in the canonical form OkHttp reports for the host of a
+     * request, i.e. lower case and IDNs in punycode. An IPv6 address may be given with or without
+     * brackets. An entry with a scheme, port, user info, path, query or wildcard is not a plain
+     * host and is ignored.
+     */
+    private void addHost(String key, String entry, Set<String> hosts) {
+        if (StringUtils.isBlank(entry)) {
+            return;
+        }
+        String host = entry.trim();
+        if (!host.startsWith("[") && StringUtils.countMatches(host, ':') > 1) {
+            // an IPv6 address without brackets
+            host = "[" + host + "]";
+        }
+        // checked on the entry itself: HttpUrl keeps '*' as part of the host name and drops the
+        // default port 80, so neither would be noticed on the parsed url
+        final String afterAddress =
+                host.startsWith("[") ? StringUtils.substringAfter(host, "]") : host;
+        final HttpUrl parsed =
+                host.contains("*") || afterAddress.contains(":")
+                        ? null
+                        : HttpUrl.parse("http://" + host + "/");
+        if (parsed == null
+                || !parsed.equals(
+                        new HttpUrl.Builder().scheme("http").host(parsed.host()).build())) {
+            LOG.warn(
+                    "Ignoring '{}' in {}, expected a host name or IP address "
+                            + "without scheme, port, path or wildcard",
+                    entry,
+                    key);
+            return;
+        }
+        hosts.add(parsed.host());
+    }
+
+    /**
+     * Whether the host of the url is one of the hosts. Hosts match exactly, ignoring case:
+     * subdomains of a listed host are not included.
+     */
+    private boolean isListedHost(Set<String> hosts, String url) {
+        final HttpUrl parsed = HttpUrl.parse(url);
+        return parsed != null && hosts.contains(parsed.host());
+    }
+
     /** Whether the header carries credentials, see http.credentials.headers. */
     private boolean isCredentialHeader(String name) {
         if (name == null) {
@@ -624,6 +721,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
 
         final boolean sendCredentials = credentialsAllowed(url);
+        final boolean basicAuthForHost =
+                basicAuthorization != null && isListedHost(basicAuthHosts, url);
+        final boolean customCredentialsForHost =
+                !credentialRequestHeaders.isEmpty() && isListedHost(customCredentialHosts, url);
 
         final Builder rb = new Request.Builder().url(url);
         customRequestHeaders.forEach(
@@ -631,11 +732,18 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     rb.header(k.getKey(), k.getValue());
                 });
         if (sendCredentials) {
-            credentialRequestHeaders.forEach(
-                    (k) -> {
-                        rb.header(k.getKey(), k.getValue());
-                    });
-        } else if (!credentialRequestHeaders.isEmpty()
+            if (basicAuthForHost) {
+                // set first so that an Authorization in http.custom.headers still replaces it on
+                // the hosts listed in http.custom.headers.hosts
+                rb.header(HttpHeaders.AUTHORIZATION, basicAuthorization);
+            }
+            if (customCredentialsForHost) {
+                credentialRequestHeaders.forEach(
+                        (k) -> {
+                            rb.header(k.getKey(), k.getValue());
+                        });
+            }
+        } else if ((basicAuthForHost || customCredentialsForHost)
                 && withheldRequestHeadersLogged.compareAndSet(false, true)) {
             LOG.warn(
                     "Configured credential headers (http.basicauth.*, http.custom.headers) are "

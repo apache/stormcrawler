@@ -402,9 +402,26 @@ By default, StormCrawler's OkHttp protocol validates the certificate chains of H
 ----
 http.basicauth.user: "username"
 http.basicauth.password: "password"
+http.basicauth.hosts:
+  - "intranet.example.com"
 ----
 
-These credentials are sent as an `Authorization` header with requests to servers authenticated by their TLS certificate; they are withheld from cleartext http:// requests and from https:// requests when `http.trust.everything` is enabled or `http.verify.hostnames` is disabled, unless `http.credentials.allow.insecure` is set to `true`. For per-site authentication, use metadata-driven headers instead (see <<Metadata-dependent Behavior For HTTP Protocols>> in the Internals section).
+These credentials are sent as an `Authorization` header only to the hosts listed in `http.basicauth.hosts`. Entries are host names or IP addresses without scheme, port, path or wildcard; an entry which is not is ignored with a warning. Hosts are matched exactly and case-insensitively against the host of each request, including robots.txt fetches and redirect targets; subdomains are not included and have to be listed separately. Redirects followed with `http.allow.redirects` never carry the header to another scheme, host or port. Within these hosts, the header is sent with requests to servers authenticated by their TLS certificate; it is withheld from cleartext http:// requests and from https:// requests when `http.trust.everything` is enabled or `http.verify.hostnames` is disabled, unless `http.credentials.allow.insecure` is set to `true`.
+
+**Other credential headers**, e.g. a bearer token or an API key, can be configured with `http.custom.headers`:
+
+[source,yaml]
+----
+http.custom.headers:
+  - "Authorization=Bearer token"
+  - "X-Trace=crawler"
+http.custom.headers.hosts:
+  - "api.example.com"
+----
+
+The headers of `http.custom.headers` which carry credentials (see `http.credentials.headers`) are only sent to the hosts listed in `http.custom.headers.hosts`, which takes entries of the same form and is matched in the same way as `http.basicauth.hosts`; the other headers, like `X-Trace` above, are sent to every host. The two host lists are independent of each other. On a host listed in both, an `Authorization` header of `http.custom.headers` replaces the one built from `http.basicauth.*`; on a host listed only in `http.basicauth.hosts`, the Basic Authentication header is sent. Credential headers are withheld from servers which were not authenticated in the same way as the Basic Authentication credentials. For per-URL authentication, use metadata-driven headers instead (see <<Metadata-dependent Behavior For HTTP Protocols>> in the Internals section).
+
+WARNING: Breaking change in 4.0.0: before, the credentials of `http.basicauth.*` and the credential headers of `http.custom.headers` were sent to every host crawled, including the targets of outlinks. If `http.basicauth.hosts` or `http.custom.headers.hosts` is empty, the corresponding credentials are now not sent at all, and a warning is logged at startup.
 
 ==== Proxy Authentication
 
