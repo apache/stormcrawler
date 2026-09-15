@@ -34,7 +34,7 @@ under the License.
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <stormcrawler.version>${StormCrawlerVersion}</stormcrawler.version>
-        <storm.version>3.0.0</storm.version>
+        <storm.version>3.1.0</storm.version>
     </properties>
 
     <build>
