@@ -70,8 +70,7 @@ public class SCProxy {
         if (!matcher.matches()) {
             throw new IllegalArgumentException(
                     "passed connection string is not of valid proxy format "
-                            + "(<PROTO>://(<USER>:<PASS>@)<HOST>:<PORT>) : "
-                            + connectionString);
+                            + "(<PROTO>://(<USER>:<PASS>@)<HOST>:<PORT>)");
         }
 
         // load required parameters

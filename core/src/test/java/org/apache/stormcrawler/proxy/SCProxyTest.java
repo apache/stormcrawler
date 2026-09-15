@@ -67,6 +67,18 @@ class SCProxyTest {
     }
 
     @Test
+    void invalidProxyMessageDoesNotContainConnectionString() {
+        String invalidProxy = "http://user1:pass1@example.com";
+
+        IllegalArgumentException exception =
+                Assertions.assertThrows(
+                        IllegalArgumentException.class, () -> new SCProxy(invalidProxy));
+
+        Assertions.assertFalse(exception.getMessage().contains(invalidProxy));
+        Assertions.assertFalse(exception.getMessage().contains("pass1"));
+    }
+
+    @Test
     void testToString() {
         String[] expectedProxyStrings = {
             "http://example.com:8080",
