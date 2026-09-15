@@ -14,12 +14,12 @@ List of third-party dependencies grouped by their license type.
 
     AL 2.0, GPL v2, MPL 2.0
 
-        * RabbitMQ Java Client (com.rabbitmq:amqp-client:5.30.0 - https://www.rabbitmq.com)
+        * RabbitMQ Java Client (com.rabbitmq:amqp-client:5.35.0 - https://www.rabbitmq.com)
 
     Apache License, Version 2.0
 
         * aggs-matrix-stats (org.opensearch.plugin:aggs-matrix-stats-client:2.19.6 - https://github.com/opensearch-project/OpenSearch.git)
-        * Apache Avro (org.apache.avro:avro:1.12.1 - https://avro.apache.org)
+        * Apache Avro (org.apache.avro:avro:1.12.2 - https://avro.apache.org)
         * Apache Commons CLI (commons-cli:commons-cli:1.11.0 - https://commons.apache.org/proper/commons-cli/)
         * Apache Commons Codec (commons-codec:commons-codec:1.22.1 - https://commons.apache.org/proper/commons-codec/)
         * Apache Commons Collections (org.apache.commons:commons-collections4:4.6.0 - https://commons.apache.org/proper/commons-collections/)
@@ -46,8 +46,8 @@ List of third-party dependencies grouped by their license type.
         * Apache HttpCore NIO (org.apache.httpcomponents:httpcore-nio:4.4.16 - http://hc.apache.org/httpcomponents-core-ga)
         * Apache James :: Mime4j :: Core (org.apache.james:apache-mime4j-core:0.8.14 - http://james.apache.org/mime4j/apache-mime4j-core)
         * Apache James :: Mime4j :: DOM (org.apache.james:apache-mime4j-dom:0.8.14 - http://james.apache.org/mime4j/apache-mime4j-dom)
-        * Apache Log4j API (org.apache.logging.log4j:log4j-api:2.26.0 - https://logging.apache.org/log4j/2.x/)
-        * Apache Log4j Core (org.apache.logging.log4j:log4j-core:2.26.0 - https://logging.apache.org/log4j/2.x/)
+        * Apache Log4j API (org.apache.logging.log4j:log4j-api:2.26.1 - https://logging.apache.org/log4j/2.x/)
+        * Apache Log4j Core (org.apache.logging.log4j:log4j-core:2.26.1 - https://logging.apache.org/log4j/2.x/)
         * Apache Log4j JUL Adapter (org.apache.logging.log4j:log4j-jul:2.25.4 - https://logging.apache.org/log4j/2.x/)
         * Apache Lucene (module: backward-codecs) (org.apache.lucene:lucene-backward-codecs:9.12.3 - https://lucene.apache.org/)
         * Apache Lucene (module: common) (org.apache.lucene:lucene-analysis-common:9.12.3 - https://lucene.apache.org/)
@@ -151,7 +151,7 @@ List of third-party dependencies grouped by their license type.
         * error-prone annotations (com.google.errorprone:error_prone_annotations:2.50.0 - https://errorprone.info/error_prone_annotations)
         * FindBugs-jsr305 (com.google.code.findbugs:jsr305:3.0.2 - http://findbugs.sourceforge.net/)
         * Google Android Annotations Library (com.google.android:annotations:4.1.1.4 - http://source.android.com/)
-        * Graphite Integration for Metrics (io.dropwizard.metrics:metrics-graphite:4.2.39 - https://metrics.dropwizard.io/metrics-graphite)
+        * Graphite Integration for Metrics (io.dropwizard.metrics:metrics-graphite:4.2.40 - https://metrics.dropwizard.io/metrics-graphite)
         * Gson (com.google.code.gson:gson:2.11.0 - https://github.com/google/gson)
         * Gson (com.google.code.gson:gson:2.14.0 - https://github.com/google/gson)
         * Guava: Google Core Libraries for Java (com.google.guava:guava:18.0 - http://code.google.com/p/guava-libraries/guava)
@@ -185,7 +185,7 @@ List of third-party dependencies grouped by their license type.
         * jsonic (net.arnx:jsonic:1.2.11 - http://jsonic.sourceforge.jp/)
         * JSpecify annotations (org.jspecify:jspecify:1.0.0 - http://jspecify.org/)
         * JSpecify annotations (org.jspecify:jspecify:1.0.1 - https://jspecify.dev/)
-        * JVM Integration for Metrics (io.dropwizard.metrics:metrics-jvm:4.2.39 - https://metrics.dropwizard.io/metrics-jvm)
+        * JVM Integration for Metrics (io.dropwizard.metrics:metrics-jvm:4.2.40 - https://metrics.dropwizard.io/metrics-jvm)
         * jwarc (org.netpreserve:jwarc:0.36.0 - https://github.com/iipc/jwarc)
         * jwarc (org.netpreserve:jwarc:0.37.0 - https://github.com/iipc/jwarc)
         * Kotlin Stdlib (org.jetbrains.kotlin:kotlin-stdlib:2.1.21 - https://kotlinlang.org/)
@@ -197,29 +197,29 @@ List of third-party dependencies grouped by their license type.
         * lang-mustache (org.opensearch.plugin:lang-mustache-client:2.19.6 - https://github.com/opensearch-project/OpenSearch.git)
         * language-detector (com.optimaize.languagedetector:language-detector:0.6 - https://github.com/optimaize/language-detector)
         * mapper-extras (org.opensearch.plugin:mapper-extras-client:2.19.6 - https://github.com/opensearch-project/OpenSearch.git)
-        * Metrics Core (io.dropwizard.metrics:metrics-core:4.2.39 - https://metrics.dropwizard.io/metrics-core)
-        * Metrics Integration with JMX (io.dropwizard.metrics:metrics-jmx:4.2.39 - https://metrics.dropwizard.io/metrics-jmx)
+        * Metrics Core (io.dropwizard.metrics:metrics-core:4.2.40 - https://metrics.dropwizard.io/metrics-core)
+        * Metrics Integration with JMX (io.dropwizard.metrics:metrics-jmx:4.2.40 - https://metrics.dropwizard.io/metrics-jmx)
         * Netty/Buffer (io.netty:netty-buffer:4.1.119.Final - https://netty.io/netty-buffer/)
         * Netty/Buffer (io.netty:netty-buffer:4.1.137.Final - https://netty.io/netty-buffer/)
-        * Netty/Buffer (io.netty:netty-buffer:4.2.12.Final - https://netty.io/netty-buffer/)
-        * Netty/Codec/Base (io.netty:netty-codec-base:4.2.12.Final - https://netty.io/netty-codec-base/)
-        * Netty/Codec/Compression (io.netty:netty-codec-compression:4.2.12.Final - https://netty.io/netty-codec-compression/)
+        * Netty/Buffer (io.netty:netty-buffer:4.2.17.Final - https://netty.io/netty-buffer/)
+        * Netty/Codec/Base (io.netty:netty-codec-base:4.2.17.Final - https://netty.io/netty-codec-base/)
+        * Netty/Codec/Compression (io.netty:netty-codec-compression:4.2.17.Final - https://netty.io/netty-codec-compression/)
         * Netty/Codec/HTTP (io.netty:netty-codec-http:4.1.137.Final - https://netty.io/netty-codec-http/)
         * Netty/Codec/HTTP2 (io.netty:netty-codec-http2:4.1.137.Final - https://netty.io/netty-codec-http2/)
-        * Netty/Codec/Marshalling (io.netty:netty-codec-marshalling:4.2.12.Final - https://netty.io/netty-codec-marshalling/)
-        * Netty/Codec/Protobuf (io.netty:netty-codec-protobuf:4.2.12.Final - https://netty.io/netty-codec-protobuf/)
+        * Netty/Codec/Marshalling (io.netty:netty-codec-marshalling:4.2.17.Final - https://netty.io/netty-codec-marshalling/)
+        * Netty/Codec/Protobuf (io.netty:netty-codec-protobuf:4.2.17.Final - https://netty.io/netty-codec-protobuf/)
         * Netty/Codec (io.netty:netty-codec:4.1.119.Final - https://netty.io/netty-codec/)
         * Netty/Codec (io.netty:netty-codec:4.1.137.Final - https://netty.io/netty-codec/)
-        * Netty/Codec (io.netty:netty-codec:4.2.12.Final - https://netty.io/netty-codec/)
+        * Netty/Codec (io.netty:netty-codec:4.2.17.Final - https://netty.io/netty-codec/)
         * Netty/Common (io.netty:netty-common:4.1.119.Final - https://netty.io/netty-common/)
         * Netty/Common (io.netty:netty-common:4.1.137.Final - https://netty.io/netty-common/)
-        * Netty/Common (io.netty:netty-common:4.2.12.Final - https://netty.io/netty-common/)
+        * Netty/Common (io.netty:netty-common:4.2.17.Final - https://netty.io/netty-common/)
         * Netty/Handler (io.netty:netty-handler:4.1.119.Final - https://netty.io/netty-handler/)
         * Netty/Handler (io.netty:netty-handler:4.1.137.Final - https://netty.io/netty-handler/)
-        * Netty/Handler (io.netty:netty-handler:4.2.12.Final - https://netty.io/netty-handler/)
+        * Netty/Handler (io.netty:netty-handler:4.2.17.Final - https://netty.io/netty-handler/)
         * Netty/Resolver (io.netty:netty-resolver:4.1.119.Final - https://netty.io/netty-resolver/)
         * Netty/Resolver (io.netty:netty-resolver:4.1.137.Final - https://netty.io/netty-resolver/)
-        * Netty/Resolver (io.netty:netty-resolver:4.2.12.Final - https://netty.io/netty-resolver/)
+        * Netty/Resolver (io.netty:netty-resolver:4.2.17.Final - https://netty.io/netty-resolver/)
         * Netty/TomcatNative [BoringSSL - Static] (io.netty:netty-tcnative-boringssl-static:2.0.70.Final - https://github.com/netty/netty-tcnative/netty-tcnative-boringssl-static/)
         * Netty/TomcatNative [OpenSSL - Classes] (io.netty:netty-tcnative-classes:2.0.70.Final - https://github.com/netty/netty-tcnative/netty-tcnative-classes/)
         * Netty/Transport/Classes/Epoll (io.netty:netty-transport-classes-epoll:4.1.119.Final - https://netty.io/netty-transport-classes-epoll/)
@@ -227,10 +227,10 @@ List of third-party dependencies grouped by their license type.
         * Netty/Transport/Native/Epoll (io.netty:netty-transport-native-epoll:4.1.119.Final - https://netty.io/netty-transport-native-epoll/)
         * Netty/Transport/Native/Unix/Common (io.netty:netty-transport-native-unix-common:4.1.119.Final - https://netty.io/netty-transport-native-unix-common/)
         * Netty/Transport/Native/Unix/Common (io.netty:netty-transport-native-unix-common:4.1.137.Final - https://netty.io/netty-transport-native-unix-common/)
-        * Netty/Transport/Native/Unix/Common (io.netty:netty-transport-native-unix-common:4.2.12.Final - https://netty.io/netty-transport-native-unix-common/)
+        * Netty/Transport/Native/Unix/Common (io.netty:netty-transport-native-unix-common:4.2.17.Final - https://netty.io/netty-transport-native-unix-common/)
         * Netty/Transport (io.netty:netty-transport:4.1.119.Final - https://netty.io/netty-transport/)
         * Netty/Transport (io.netty:netty-transport:4.1.137.Final - https://netty.io/netty-transport/)
-        * Netty/Transport (io.netty:netty-transport:4.2.12.Final - https://netty.io/netty-transport/)
+        * Netty/Transport (io.netty:netty-transport:4.2.17.Final - https://netty.io/netty-transport/)
         * Non-Blocking Reactive Foundation for the JVM (io.projectreactor:reactor-core:3.7.19 - https://github.com/reactor/reactor-core)
         * Objenesis (org.objenesis:objenesis:3.3 - http://objenesis.org/objenesis)
         * Ogg and Vorbis for Java, Core (org.gagravarr:vorbis-java-core:0.8 - https://github.com/Gagravarr/VorbisJava)
@@ -301,11 +301,11 @@ List of third-party dependencies grouped by their license type.
 
     Bouncy Castle Licence
 
-        * Bouncy Castle ASN.1 Extension and Utility APIs (org.bouncycastle:bcutil-jdk18on:1.84 - https://www.bouncycastle.org/download/bouncy-castle-java/)
+        * Bouncy Castle ASN.1 Extension and Utility APIs (org.bouncycastle:bcutil-jdk18on:1.85 - https://www.bouncycastle.org/download/bouncy-castle-java/)
         * Bouncy Castle JavaMail Jakarta S/MIME APIs (org.bouncycastle:bcjmail-jdk18on:1.85 - https://www.bouncycastle.org/download/bouncy-castle-java/)
-        * Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs (org.bouncycastle:bcpkix-jdk18on:1.84 - https://www.bouncycastle.org/download/bouncy-castle-java/)
-        * Bouncy Castle Provider (org.bouncycastle:bcprov-jdk18on:1.84 - https://www.bouncycastle.org/download/bouncy-castle-java/)
+        * Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs (org.bouncycastle:bcpkix-jdk18on:1.85 - https://www.bouncycastle.org/download/bouncy-castle-java/)
         * Bouncy Castle Provider (org.bouncycastle:bcprov-jdk18on:1.85.2 - https://www.bouncycastle.org/download/bouncy-castle-java/)
+        * Bouncy Castle Provider (org.bouncycastle:bcprov-jdk18on:1.85 - https://www.bouncycastle.org/download/bouncy-castle-java/)
 
     BSD-2-Clause
 
@@ -319,7 +319,7 @@ List of third-party dependencies grouped by their license type.
 
     BSD 2-Clause License
 
-        * zstd-jni (com.github.luben:zstd-jni:1.5.7-11 - https://github.com/luben/zstd-jni)
+        * zstd-jni (com.github.luben:zstd-jni:1.5.7-15 - https://github.com/luben/zstd-jni)
 
     BSD 3-Clause License
 
@@ -355,9 +355,9 @@ List of third-party dependencies grouped by their license type.
 
         * Angus Activation Registries (org.eclipse.angus:angus-activation:2.0.3 - https://github.com/eclipse-ee4j/angus-activation/angus-activation)
         * istack common utility code runtime (com.sun.istack:istack-commons-runtime:4.1.2 - https://projects.eclipse.org/projects/ee4j/istack-commons/istack-commons-runtime)
+        * Jakarta Activation (com.sun.activation:jakarta.activation:2.0.1 - https://github.com/eclipse-ee4j/jaf/jakarta.activation)
+        * Jakarta Activation API jar (jakarta.activation:jakarta.activation-api:2.0.1 - https://github.com/eclipse-ee4j/jaf/jakarta.activation-api)
         * Jakarta XML Binding API (jakarta.xml.bind:jakarta.xml.bind-api:4.0.5 - https://github.com/jakartaee/jaxb-api/jakarta.xml.bind-api)
-        * JavaBeans Activation Framework (com.sun.activation:jakarta.activation:1.2.1 - https://github.com/eclipse-ee4j/jaf/jakarta.activation)
-        * JavaBeans Activation Framework API jar (jakarta.activation:jakarta.activation-api:1.2.1 - https://github.com/eclipse-ee4j/jaf/jakarta.activation-api)
         * JAXB Core (org.glassfish.jaxb:jaxb-core:4.0.9 - https://eclipse-ee4j.github.io/jaxb-ri/)
         * JAXB Runtime (org.glassfish.jaxb:jaxb-runtime:4.0.9 - https://eclipse-ee4j.github.io/jaxb-ri/)
         * TXW2 Runtime (org.glassfish.jaxb:txw2:4.0.9 - https://eclipse-ee4j.github.io/jaxb-ri/)
