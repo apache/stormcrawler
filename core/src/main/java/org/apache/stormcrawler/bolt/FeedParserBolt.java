@@ -52,6 +52,7 @@ import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
+import org.apache.stormcrawler.util.HttpHeaderResolver;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
@@ -86,7 +87,8 @@ public class FeedParserBolt extends StatusEmitterBolt {
                 // won't work when servers return text/xml
                 // TODO: use Tika instead?
                 String ct =
-                        metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix);
+                        HttpHeaderResolver.getFirstValue(
+                                metadata, HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix);
                 if (ct != null && ct.contains("rss+xml")) {
                     isfeed = true;
                 } else {
