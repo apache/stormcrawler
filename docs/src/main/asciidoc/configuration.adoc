@@ -291,10 +291,11 @@ the protocol only sees the address of the proxy, which may well be private. What
 reach through a proxy is then decided by the egress rules of the proxy.
 
 The Playwright protocol (`org.apache.stormcrawler.protocol.playwright.HttpProtocol`) applies the same
-rules to every request the browser makes, including redirects and subresources, and aborts the
-rejected ones. It cannot see the address the browser connects to: the host is resolved separately,
-so short-lived DNS records or a remote browser using another resolver can lead to a different
-address. WebSocket connections are not checked.
+rules to the requests of the page, its subresources and popups, and aborts the rejected ones.
+Service workers are blocked while the filter is active, as their requests cannot be intercepted.
+Redirect hops and WebSocket connections are not checked. The host is resolved separately from the
+browser, so short-lived DNS records or a remote browser using another resolver can lead to a
+different address.
 
 Two properties control the behaviour:
 
@@ -324,8 +325,9 @@ http.filter.ipaddress.include: "10.0.0.0/8"
 grade NAT (`100.64.0.0/10`) and IPv6 unique local addresses (`fd00::/8`) have no keyword and are added
 as CIDR blocks when they are also to be blocked.
 
-When a connection to a blocked address is attempted, the fetch fails with an `IOException` and a
-warning is logged. If neither property is set, no IP filtering is performed.
+When a connection to a blocked address is attempted, a warning is logged. With OkHttp the fetch
+fails with an `IOException`. With Playwright the request is aborted: a blocked page fails the fetch,
+a blocked subresource is missing from the rendered page. If neither property is set, no IP filtering is performed.
 
 NOTE: When a proxy is configured, the connection is established to the proxy and the filter sees the
 proxy's IP address rather than the target host's resolved address. IP filtering is therefore

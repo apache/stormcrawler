@@ -245,7 +245,7 @@ config:
   # like it does when redirects are not followed at all.
   http.allow.redirects.max: 5
 
-  # IP address filtering (okhttp protocol only). Optionally limit or block
+  # IP address filtering (okhttp and playwright protocols). Optionally limit or block
   # connections to IP address ranges once the host name has been resolved. This
   # prevents information leakage to a public index when a DNS entry points to a
   # private or loopback address. Rules can be given as a comma-separated string
@@ -271,9 +271,9 @@ config:
   # Fetches through a proxy are not filtered: the proxy resolves and connects
   # to the target, so only its address is known here and a proxy on a private
   # address is fine. The proxy's own egress rules decide what it may reach.
-  # Applies to the okhttp and playwright protocols. Playwright checks each
-  # request of the browser (page, redirects, subresources) against an address
-  # resolved separately from the browser; WebSockets are not checked.
+  # Playwright checks the page, its subresources and popups against an address
+  # resolved separately from the browser and blocks service workers; redirect
+  # hops and WebSockets are not checked.
   http.filter.ipaddress.exclude: "localhost,sitelocal,linklocal,anylocal,multicast,100.64.0.0/10,0.0.0.0/8,fc00::/7,::/128"
 
   # Allow all if robots.txt cannot be parsed due to code 403 (Forbidden):

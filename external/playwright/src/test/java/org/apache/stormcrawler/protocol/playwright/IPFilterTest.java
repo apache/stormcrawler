@@ -17,6 +17,7 @@
 
 package org.apache.stormcrawler.protocol.playwright;
 
+import com.microsoft.playwright.options.ServiceWorkerPolicy;
 import org.apache.storm.Config;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,24 @@ class IPFilterTest {
     void urlsWithoutConnectionAreAllowed() {
         final HttpProtocol protocol = protocol(excludeLocal());
         Assertions.assertTrue(protocol.isAllowedAddress("data:text/plain,hello"));
+    }
+
+    @Test
+    void urlsChromiumSendsAsIsAreParsed() {
+        final HttpProtocol protocol = protocol(excludeLocal());
+        Assertions.assertFalse(protocol.isAllowedAddress("http://127.0.0.1/a|b[c]?q={x}^"));
+        Assertions.assertTrue(protocol.isAllowedAddress("http://8.8.8.8/a|b[c]?q={x}^"));
+    }
+
+    @Test
+    void serviceWorkersBlockedOnlyWithRules() {
+        Assertions.assertEquals(
+                ServiceWorkerPolicy.BLOCK,
+                protocol(excludeLocal())
+                        .buildContextOptions(excludeLocal(), "test")
+                        .serviceWorkers);
+        Assertions.assertNull(
+                protocol(new Config()).buildContextOptions(new Config(), "test").serviceWorkers);
     }
 
     @Test

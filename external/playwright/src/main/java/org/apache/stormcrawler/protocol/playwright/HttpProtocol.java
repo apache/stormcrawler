@@ -29,10 +29,10 @@ import com.microsoft.playwright.Request;
 import com.microsoft.playwright.Tracing;
 import com.microsoft.playwright.options.HttpHeader;
 import com.microsoft.playwright.options.Proxy;
+import com.microsoft.playwright.options.ServiceWorkerPolicy;
 import com.microsoft.playwright.options.WaitUntilState;
 import java.net.InetAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import okhttp3.HttpUrl;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.Config;
 import org.apache.storm.utils.MutableInt;
@@ -151,11 +152,29 @@ public class HttpProtocol extends AbstractHttpProtocol {
         overrideStatusOnContent =
                 ConfUtils.getBoolean(conf, "playwright.override.status.on.content", false);
 
+        configureIPFilter(conf);
+
         final NewContextOptions b_c_options = buildContextOptions(conf, getAgentString(conf));
 
         context = browser.newContext(b_c_options);
 
         context.setDefaultTimeout(timeout);
+
+        // on the context so that popups are covered too, the page route falls back to it
+        if (ipFilterRules != null) {
+            context.route(
+                    lambdaUrl -> true,
+                    route -> {
+                        if (isAllowedAddress(route.request().url())) {
+                            route.resume();
+                        } else {
+                            LOG.warn(
+                                    "Blocked request to forbidden IP address: {}",
+                                    route.request().url());
+                            route.abort("addressunreachable");
+                        }
+                    });
+        }
 
         // list of resource types to skip
         // document, stylesheet, image, media, font, script, texttrack, xhr, fetch,
@@ -172,8 +191,6 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         // optional chain of page actions applied after navigate, before content capture
         pageActions = PageActions.fromConf(conf);
-
-        configureIPFilter(conf);
     }
 
     /**
@@ -206,26 +223,15 @@ public class HttpProtocol extends AbstractHttpProtocol {
         if (ipFilterRules == null) {
             return true;
         }
-        final URI uri;
-        try {
-            uri = new URI(url);
-        } catch (URISyntaxException e) {
-            return false;
-        }
-        final String scheme = uri.getScheme();
-        if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
+        // lenient like the browser, e.g. with '|' in the path or '_' in the host name
+        final HttpUrl parsed = HttpUrl.parse(url);
+        if (parsed == null) {
             // data:, blob: and the like do not open a connection
-            return true;
-        }
-        String host = uri.getHost();
-        if (host == null) {
-            return false;
-        }
-        if (host.startsWith("[") && host.endsWith("]")) {
-            host = host.substring(1, host.length() - 1);
+            return !StringUtils.startsWithIgnoreCase(url, "http:")
+                    && !StringUtils.startsWithIgnoreCase(url, "https:");
         }
         try {
-            for (InetAddress address : InetAddress.getAllByName(host)) {
+            for (InetAddress address : InetAddress.getAllByName(parsed.host())) {
                 if (!ipFilterRules.accept(address)) {
                     return false;
                 }
@@ -275,6 +281,11 @@ public class HttpProtocol extends AbstractHttpProtocol {
                             + " the browser, any server able to answer for a host name is accepted");
         }
         options.setIgnoreHTTPSErrors(ignoreHTTPSErrors);
+
+        // requests of a service worker are not routed, so they would bypass the IP filter
+        if (ipFilterRules != null) {
+            options.setServiceWorkers(ServiceWorkerPolicy.BLOCK);
+        }
 
         return options;
     }
@@ -340,13 +351,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                 } else if (resourceTypesToSkip.contains(
                                         route.request().resourceType())) {
                                     route.abort();
-                                } else if (!isAllowedAddress(route.request().url())) {
-                                    LOG.warn(
-                                            "Blocked request to forbidden IP address: {}",
-                                            route.request().url());
-                                    route.abort("addressunreachable");
                                 } else {
-                                    route.resume();
+                                    // lets the IP filter on the context check the request
+                                    route.fallback();
                                 }
                             });
 
