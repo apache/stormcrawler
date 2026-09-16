@@ -165,6 +165,10 @@ public class DelegatorProtocol implements Protocol {
             return protoInstance.getRobotRules(url);
         }
 
+        public void robotRulesTimedOut(String url) {
+            protoInstance.robotRulesTimedOut(url);
+        }
+
         public void cleanup() {
             protoInstance.cleanup();
         }
@@ -336,6 +340,14 @@ public class DelegatorProtocol implements Protocol {
                 && forRobots != null
                 && forFetch.supportsFetchTimeout(url, metadata)
                 && forRobots.supportsFetchTimeout(url, metadata);
+    }
+
+    @Override
+    public void robotRulesTimedOut(@NotNull String url) {
+        FilteredProtocol proto = getProtocolFor(url, robotsMetadata());
+        if (proto != null) {
+            proto.robotRulesTimedOut(url);
+        }
     }
 
     private static Metadata robotsMetadata() {

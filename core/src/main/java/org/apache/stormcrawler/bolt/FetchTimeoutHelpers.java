@@ -22,11 +22,13 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.storm.task.TopologyContext;
 import org.apache.stormcrawler.Constants;
@@ -49,6 +51,12 @@ import org.apache.stormcrawler.util.ConfUtils;
  * once with {@link SaturatedException}. Helper threads are created on demand and released after a
  * minute of inactivity: with the default protocol none is ever created.
  *
+ * <p>The bound is a {@link Semaphore} of in-flight calls in front of a queueing executor, not the
+ * executor's own rejection: a worker hands its result back before it is back polling for work, so a
+ * pool with a {@code SynchronousQueue} would reject the page fetch submitted right after the
+ * robots.txt lookup whenever it is at its maximum. A permit is released when the call completes on
+ * the helper, whether the caller is still waiting for it or has given up.
+ *
  * <p>The deadline is the one of {@link FetchTimeout#secs(Map)}, clamped to the message timeout on
  * both paths.
  */
@@ -64,6 +72,9 @@ final class FetchTimeoutHelpers {
     private final long timeoutSecs;
     private final ThreadPoolExecutor helpers;
 
+    /** One permit per helper: a call runs only if it gets one, and holds it until it completes. */
+    private final Semaphore permits;
+
     /**
      * @param conf the bolt configuration
      * @param defaultMaxHelpers pool bound used unless {@code fetcher.thread.timeout.helpers} is set
@@ -75,25 +86,34 @@ final class FetchTimeoutHelpers {
                 ConfUtils.getInt(
                         conf, Constants.FETCH_TIMEOUT_HELPERS_PARAM_KEY, defaultMaxHelpers);
         final AtomicInteger helperNum = new AtomicInteger();
+        final int bound = Math.max(1, maxHelpers);
+        this.permits = new Semaphore(bound);
+        // core == max so a thread is started for every call while fewer than the bound exist;
+        // the queue only ever holds a call whose helper is between two tasks
         this.helpers =
                 new ThreadPoolExecutor(
-                        0,
-                        Math.max(1, maxHelpers),
+                        bound,
+                        bound,
                         60L,
                         TimeUnit.SECONDS,
-                        new SynchronousQueue<>(),
+                        new LinkedBlockingQueue<>(),
                         r -> {
                             Thread t =
                                     new Thread(r, threadNamePrefix + helperNum.incrementAndGet());
                             t.setDaemon(true);
                             return t;
                         });
+        this.helpers.allowCoreThreadTimeOut(true);
     }
 
-    /** Registers the {@code fetchhelpers} gauge: number of helper threads busy with a call. */
+    /** Registers the {@code fetchhelpers} gauge: number of helpers busy with a call. */
     void registerMetrics(TopologyContext context, Map<String, Object> conf, int bucketSecs) {
-        CrawlerMetrics.registerGauge(
-                context, conf, "fetchhelpers", helpers::getActiveCount, bucketSecs);
+        CrawlerMetrics.registerGauge(context, conf, "fetchhelpers", this::busy, bucketSecs);
+    }
+
+    /** Number of calls in flight on the helpers, abandoned ones included. */
+    int busy() {
+        return helpers.getMaximumPoolSize() - permits.availablePermits();
     }
 
     /** Whether a timeout is configured at all. */
@@ -132,10 +152,27 @@ final class FetchTimeoutHelpers {
         if (timeoutSecs <= 0 || protocol.supportsFetchTimeout(url, metadata)) {
             return call.call();
         }
+        if (!permits.tryAcquire()) {
+            throw new SaturatedException(url);
+        }
+        // the permit is given back by whoever knows the call is over: the helper once the call
+        // has run, or the caller if it cancelled the call before the helper ever started it
+        final AtomicBoolean started = new AtomicBoolean(false);
         final Future<T> future;
         try {
-            future = helpers.submit(call);
+            future =
+                    helpers.submit(
+                            () -> {
+                                started.set(true);
+                                try {
+                                    return call.call();
+                                } finally {
+                                    permits.release();
+                                }
+                            });
         } catch (RejectedExecutionException e) {
+            // shut down
+            permits.release();
             throw new SaturatedException(url);
         }
         try {
@@ -143,6 +180,11 @@ final class FetchTimeoutHelpers {
         } catch (TimeoutException e) {
             // a courtesy for protocols which do honour interruption
             future.cancel(true);
+            // once cancelled the task can no longer start: if it had not, nobody else will
+            // release the permit
+            if (!started.get()) {
+                permits.release();
+            }
             throw new FetchTimeoutException(url, timeoutSecs);
         } catch (CancellationException e) {
             throw new Exception("Fetch cancelled for " + url);

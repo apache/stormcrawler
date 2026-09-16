@@ -210,4 +210,14 @@ public abstract class RobotRulesParser {
     }
 
     public abstract BaseRobotRules getRobotRulesSet(Protocol protocol, URL url);
+
+    /**
+     * Records that a lookup of the robots.txt for the URL failed outside {@link
+     * #getRobotRulesSet(Protocol, URL)}, as when the fetcher abandoned it on a helper thread at the
+     * deadline, so that the rules used for the failure (allow all) are served from the error cache
+     * to later URLs of the host instead of being looked up again. Does nothing by default.
+     *
+     * @param url a URL of the host whose robots.txt could not be obtained
+     */
+    public void cacheLookupFailure(String url) {}
 }

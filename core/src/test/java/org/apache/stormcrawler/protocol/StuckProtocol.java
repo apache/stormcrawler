@@ -20,7 +20,10 @@ package org.apache.stormcrawler.protocol;
 import crawlercommons.robots.BaseRobotRules;
 import crawlercommons.robots.SimpleRobotRules;
 import crawlercommons.robots.SimpleRobotRules.RobotRulesMode;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
@@ -33,6 +36,12 @@ import org.apache.stormcrawler.util.ConfUtils;
 public class StuckProtocol implements Protocol {
 
     public static final AtomicInteger STARTED = new AtomicInteger();
+
+    /** Number of robots.txt lookups which actually hung. */
+    public static final AtomicInteger ROBOTS_HUNG = new AtomicInteger();
+
+    /** Hosts whose robots.txt lookup the fetcher reported as timed out: served at once after. */
+    public static final Set<String> ROBOTS_TIMED_OUT = ConcurrentHashMap.newKeySet();
 
     public static final long HANG_MILLIS = 10_000;
 
@@ -55,10 +64,25 @@ public class StuckProtocol implements Protocol {
 
     @Override
     public BaseRobotRules getRobotRules(String url) {
-        if (hangRobots) {
+        if (hangRobots && !ROBOTS_TIMED_OUT.contains(host(url))) {
+            ROBOTS_HUNG.incrementAndGet();
             hang();
         }
         return new SimpleRobotRules(RobotRulesMode.ALLOW_ALL);
+    }
+
+    /** Like the HTTP protocols, remembers the failure so the host is not looked up again. */
+    @Override
+    public void robotRulesTimedOut(String url) {
+        ROBOTS_TIMED_OUT.add(host(url));
+    }
+
+    private static String host(String url) {
+        try {
+            return new URL(url).getHost();
+        } catch (Exception e) {
+            return url;
+        }
     }
 
     private static void hang() {

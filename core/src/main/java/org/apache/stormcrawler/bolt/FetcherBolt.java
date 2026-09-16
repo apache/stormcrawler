@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -240,6 +241,9 @@ public class FetcherBolt extends StatusEmitterBolt {
 
         final AtomicLong crawlDelay;
 
+        /** Consecutive fetches of this queue rejected because every helper thread was busy. */
+        private final AtomicInteger saturations = new AtomicInteger();
+
         public FetchItemQueue(
                 String id, int maxThreads, long crawlDelay, long minCrawlDelay, int maxQueueSize) {
             this.id = id;
@@ -336,7 +340,33 @@ public class FetcherBolt extends StatusEmitterBolt {
 
         void finish(boolean asap) {
             inProgress.decrementAndGet();
+            saturations.set(0);
             setNextFetchTime(System.currentTimeMillis(), asap);
+        }
+
+        /**
+         * Like {@link #finish} for a fetch which never ran because every helper thread was busy.
+         * The helpers are shared by all queues and are not freed by trying again, so instead of
+         * being ready at once the queue is backed off exponentially: its own delay, doubled at each
+         * consecutive rejection, up to {@code maxBackoff}. Any other outcome resets the backoff.
+         *
+         * <p>The delay is spread with equal jitter, between half the computed value and the value
+         * itself: a stuck protocol rejects the fetches of many queues within the same instant, and
+         * without jitter they would all become ready together and hit the pool as a herd again.
+         *
+         * @return the delay applied, in milliseconds
+         */
+        long finishSaturated(long maxBackoff) {
+            inProgress.decrementAndGet();
+            // 2^30 x 1 s is already far beyond any sensible cap: bound the shift, not the counter
+            final int rejections = Math.min(saturations.incrementAndGet(), 30);
+            final long base =
+                    Math.max(1000L, maxThreads > 1 ? minCrawlDelay.get() : crawlDelay.get());
+            final long computed = Math.min(maxBackoff, base << (rejections - 1));
+            final long half = computed / 2;
+            final long delay = half + ThreadLocalRandom.current().nextLong(computed - half + 1);
+            nextFetchTime.set(System.currentTimeMillis() + delay);
+            return delay;
         }
 
         private void setNextFetchTime(long endTime, boolean asap) {
@@ -386,6 +416,9 @@ public class FetcherBolt extends StatusEmitterBolt {
         final long crawlDelay;
         final long minCrawlDelay;
 
+        /** Cap of the backoff applied to a queue whose fetches find every helper thread busy. */
+        final long maxBackoff;
+
         int maxQueueSize;
 
         final Config conf;
@@ -419,6 +452,8 @@ public class FetcherBolt extends StatusEmitterBolt {
             if (this.maxQueueSize == -1) {
                 this.maxQueueSize = Integer.MAX_VALUE;
             }
+            // a queue is never put off for longer than the longest politeness delay accepted
+            this.maxBackoff = ConfUtils.getInt(conf, "fetcher.max.crawl.delay", 30) * 1000L;
 
             // order is not guaranteed
             for (Entry<String, Object> e : conf.entrySet()) {
@@ -465,6 +500,27 @@ public class FetcherBolt extends StatusEmitterBolt {
                 return;
             }
             fiq.finish(asap);
+            rescheduleOrReap(fiq);
+        }
+
+        /**
+         * Releases the slot of an item whose fetch found every helper thread busy and backs the
+         * queue off, see {@link FetchItemQueue#finishSaturated}.
+         *
+         * @return the delay applied to the queue in milliseconds, -1 if the queue is unknown
+         */
+        public long backOffFetchItem(FetchItem it) {
+            FetchItemQueue fiq = queues.get(it.queueId);
+            if (fiq == null) {
+                LOG.warn("Attempting to back off item from unknown queue: {}", it.queueId);
+                return -1;
+            }
+            long delay = fiq.finishSaturated(maxBackoff);
+            rescheduleOrReap(fiq);
+            return delay;
+        }
+
+        private void rescheduleOrReap(FetchItemQueue fiq) {
             if (fiq.queue.isEmpty()) {
                 reapIfEmpty(fiq);
             } else {
@@ -705,6 +761,8 @@ public class FetcherBolt extends StatusEmitterBolt {
                 String robotsCrawlDelaySecs = null;
 
                 boolean asap = false;
+                // the fetch never ran because every helper thread was busy
+                boolean saturated = false;
 
                 try {
                     URL url = URLUtil.toURL(fit.url);
@@ -725,12 +783,15 @@ public class FetcherBolt extends StatusEmitterBolt {
                                         metadata);
                     } catch (FetchTimeoutException e) {
                         // same outcome as with okhttp, where HttpRobotRulesParser turns a
-                        // failed lookup into empty rules: the page is fetched without rules
+                        // failed lookup into empty rules: the page is fetched without rules.
+                        // The protocol caches the failure so that the next URLs of the host
+                        // do not each occupy a helper for a full deadline
                         LOG.info(
                                 "[Fetcher #{}] robots.txt lookup timed out for {}",
                                 taskId,
                                 fit.url);
                         eventCounter.scope("robots.timeout").incrBy(1);
+                        protocol.robotRulesTimedOut(fit.url);
                         rules = RobotRulesParser.EMPTY_RULES;
                     }
                     boolean fromCache = false;
@@ -996,14 +1057,17 @@ public class FetcherBolt extends StatusEmitterBolt {
                 } catch (FetchTimeoutHelpers.SaturatedException e) {
                     // the URL never reached the network: like a URL which waited too long in
                     // the queue, it is acked without a status so that the spout retries it
-                    // later, rather than taking a strike towards max.fetch.errors
+                    // later, rather than taking a strike towards max.fetch.errors. The queue
+                    // is backed off rather than made ready at once (see finally): the helpers
+                    // are shared and retrying immediately would only drain the queue into
+                    // more rejections
                     eventCounter.scope("fetch.helper.rejected").incrBy(1);
                     LOG.warn(
                             "[Fetcher #{}] {}: all {} fetch helpers are busy",
                             taskId,
                             e.getMessage(),
                             fetchHelpers.maxHelpers());
-                    asap = true;
+                    saturated = true;
                 } catch (Exception exece) {
                     String message = exece.getMessage();
                     if (message == null) {
@@ -1047,7 +1111,16 @@ public class FetcherBolt extends StatusEmitterBolt {
 
                     eventCounter.scope("exception").incrBy(1);
                 } finally {
-                    fetchQueues.finishFetchItem(fit, asap);
+                    if (saturated) {
+                        long delay = fetchQueues.backOffFetchItem(fit);
+                        LOG.debug(
+                                "[Fetcher #{}] queue {} backed off for {} ms",
+                                taskId,
+                                fit.queueId,
+                                delay);
+                    } else {
+                        fetchQueues.finishFetchItem(fit, asap);
+                    }
                     activeThreads.decrementAndGet(); // count threads
                     // ack it whatever happens
                     collector.ack(fit.tuple);

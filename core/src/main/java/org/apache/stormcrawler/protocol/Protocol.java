@@ -69,6 +69,18 @@ public interface Protocol {
 
     BaseRobotRules getRobotRules(String url);
 
+    /**
+     * Called by the fetcher bolts when a {@link #getRobotRules(String)} call for the URL was
+     * abandoned on a helper thread because {@code fetcher.thread.timeout} passed. A protocol which
+     * caches robots.txt lookups should record the failure, so that later URLs of the same host do
+     * not each start a lookup of their own and wait a full deadline: the HTTP protocols cache the
+     * timeout like any other failed lookup, as empty rules in the robots error cache. Does nothing
+     * by default.
+     *
+     * @param url the URL whose robots.txt lookup timed out
+     */
+    default void robotRulesTimedOut(String url) {}
+
     void cleanup();
 
     public static void main(Protocol protocol, String[] args) throws Exception {

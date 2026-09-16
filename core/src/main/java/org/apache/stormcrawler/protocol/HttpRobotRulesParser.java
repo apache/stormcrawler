@@ -203,6 +203,27 @@ public class HttpRobotRulesParser extends RobotRulesParser {
     }
 
     /**
+     * Caches empty rules for the host of the URL in the error cache, as for any lookup which fails
+     * with an exception, unless rules for the host are already cached: a lookup abandoned at the
+     * deadline may have completed on its helper thread in the meantime.
+     */
+    @Override
+    public void cacheLookupFailure(String url) {
+        URL u;
+        try {
+            u = URLUtil.toURL(url);
+        } catch (Exception e) {
+            return;
+        }
+        String cacheKey = getCacheKey(u);
+        if (ERRORCACHE.getIfPresent(cacheKey) != null || CACHE.getIfPresent(cacheKey) != null) {
+            return;
+        }
+        LOG.debug("Caching robots lookup failure for {} under key {}", url, cacheKey);
+        ERRORCACHE.put(cacheKey, new RobotRules(EMPTY_RULES));
+    }
+
+    /**
      * Get the rules from robots.txt which applies for the given {@code url}. Robot rules are cached
      * for a unique combination of host, protocol, and port. If no rules are found in the cache, a
      * HTTP request is send to fetch {{protocol://host:port/robots.txt}}. The robots.txt is then

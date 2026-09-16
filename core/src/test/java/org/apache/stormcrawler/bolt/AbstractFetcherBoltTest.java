@@ -32,6 +32,7 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.topology.base.BaseRichBolt;
@@ -254,6 +255,7 @@ abstract class AbstractFetcherBoltTest {
     @Test
     void hangingRobotsLookupDoesNotFailTheUrl() throws ReflectiveOperationException {
         StuckProtocol.STARTED.set(0);
+        StuckProtocol.ROBOTS_TIMED_OUT.clear();
         resetProtocolFactory();
         TestOutputCollector output = new TestOutputCollector();
         Map<String, Object> config = new HashMap<>();
@@ -281,6 +283,47 @@ abstract class AbstractFetcherBoltTest {
         Assertions.assertEquals(
                 "Socket timeout fetching",
                 ((Metadata) statusTuples.get(0).get(1)).getFirstValue("fetch.exception"));
+    }
+
+    /**
+     * A robots.txt lookup abandoned at the deadline is reported to the protocol so that it can
+     * cache the failure: the next URL of the host must not start a lookup of its own and wait a
+     * full deadline on another helper.
+     */
+    @Test
+    void timedOutRobotsLookupIsReportedToTheProtocolAndNotRepeated()
+            throws ReflectiveOperationException {
+        StuckProtocol.STARTED.set(0);
+        StuckProtocol.ROBOTS_HUNG.set(0);
+        StuckProtocol.ROBOTS_TIMED_OUT.clear();
+        resetProtocolFactory();
+        TestOutputCollector output = new TestOutputCollector();
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("http.protocol.implementation", StuckProtocol.class.getName());
+        config.put(StuckProtocol.HANG_ROBOTS_KEY, true);
+        config.put("fetcher.threads.number", 1);
+        config.put("fetcher.thread.timeout", 1L);
+        // the first URL leaves two helpers stuck (robots, then page): room for the second page
+        config.put("fetcher.thread.timeout.helpers", 4);
+        config.put("fetcher.server.delay", 0.0f);
+        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+
+        for (String path : new String[] {"/1", "/2"}) {
+            Tuple tuple = mock(Tuple.class);
+            when(tuple.getSourceComponent()).thenReturn("source");
+            when(tuple.getStringByField("url")).thenReturn("http://stuck.example.com" + path);
+            when(tuple.getValueByField("metadata")).thenReturn(null);
+            bolt.execute(tuple);
+        }
+
+        await().atMost(8, TimeUnit.SECONDS).until(() -> output.getAckedTuples().size() == 2);
+        Assertions.assertEquals(
+                Set.of("stuck.example.com"),
+                StuckProtocol.ROBOTS_TIMED_OUT,
+                "the protocol was told about the timed-out lookup");
+        Assertions.assertEquals(1, StuckProtocol.ROBOTS_HUNG.get(), "robots.txt looked up once");
+        Assertions.assertEquals(2, StuckProtocol.STARTED.get(), "both pages were fetched");
     }
 
     @Test

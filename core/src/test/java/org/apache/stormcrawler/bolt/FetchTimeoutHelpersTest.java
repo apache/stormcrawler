@@ -208,6 +208,53 @@ class FetchTimeoutHelpersTest {
         Assertions.assertEquals(1, helpers(1, 0).maxHelpers());
     }
 
+    /**
+     * A helper hands its result back before it is back polling for work. A call submitted right
+     * then, as the page fetch is after the robots.txt lookup, must still find the helper free when
+     * the pool is at its bound: the bound counts calls in flight, not idle workers.
+     */
+    @Test
+    void callSubmittedRightAfterAnotherCompletesIsNotRejected() throws Exception {
+        FetchTimeoutHelpers h = helpers(1, 2);
+        StuckProtocol stuck = new StuckProtocol();
+        // one helper stuck for good: the pool is at its bound as soon as a second call runs
+        Assertions.assertThrows(
+                FetchTimeoutException.class,
+                () ->
+                        h.call(
+                                () -> stuck.getProtocolOutput("http://a.net/", null),
+                                stuck,
+                                "u",
+                                null));
+        Assertions.assertEquals(1, h.busy());
+        for (int i = 0; i < 500; i++) {
+            // robots.txt lookup then, at once, the page fetch
+            Assertions.assertEquals("robots", h.call(() -> "robots", stuck, "http://a.net/", null));
+            Assertions.assertEquals("page", h.call(() -> "page", stuck, "http://a.net/", null));
+        }
+        Assertions.assertEquals(2, h.largestPoolSize());
+        Assertions.assertEquals(1, h.busy(), "only the stuck call still holds a helper");
+    }
+
+    /** A call cancelled before its helper started it gives its permit back. */
+    @Test
+    void timedOutCallWhichNeverStartedReleasesItsPermit() throws Exception {
+        FetchTimeoutHelpers h = helpers(1, 1);
+        StuckProtocol stuck = new StuckProtocol();
+        Assertions.assertThrows(
+                FetchTimeoutException.class,
+                () ->
+                        h.call(
+                                () -> stuck.getProtocolOutput("http://a.net/", null),
+                                stuck,
+                                "u",
+                                null));
+        Assertions.assertEquals(1, h.busy());
+        Assertions.assertThrows(
+                FetchTimeoutHelpers.SaturatedException.class,
+                () -> h.call(() -> "never", stuck, "http://a.net/2", null));
+    }
+
     @Test
     void afterShutdownCallsAreRejected() {
         FetchTimeoutHelpers h = helpers(1, null);

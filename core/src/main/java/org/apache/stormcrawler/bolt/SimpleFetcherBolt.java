@@ -296,9 +296,12 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                                 metadata);
             } catch (FetchTimeoutException e) {
                 // same outcome as with okhttp, where HttpRobotRulesParser turns a failed
-                // lookup into empty rules: the page is fetched without rules
+                // lookup into empty rules: the page is fetched without rules. The protocol
+                // caches the failure so that the next URLs of the host do not each occupy a
+                // helper for a full deadline
                 LOG.info("[Fetcher #{}] robots.txt lookup timed out for {}", taskId, urlString);
                 eventCounter.scope("robots.timeout").incrBy(1);
+                protocol.robotRulesTimedOut(urlString);
                 rules = RobotRulesParser.EMPTY_RULES;
             }
             boolean fromCache = false;

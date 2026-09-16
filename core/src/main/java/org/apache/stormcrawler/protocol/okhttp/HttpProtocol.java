@@ -751,7 +751,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 if (deadlineNanos != 0) {
                     // hard deadline for the whole chain, enforced by okio's watchdog: on
                     // expiry the call is cancelled, the socket closed and execute() or the
-                    // body read throw immediately. Every hop gets the time that is left
+                    // body read throw immediately. Every hop gets the time that is left.
+                    // DNS can still hold the fetcher thread past this deadline: cancellation
+                    // cannot release the synchronous lookup until the resolver returns
                     final long remaining = deadlineNanos - System.nanoTime();
                     if (remaining <= 0) {
                         throw new FetchTimeoutException(url, fetchTimeout);

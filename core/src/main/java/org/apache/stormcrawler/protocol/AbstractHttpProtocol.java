@@ -175,6 +175,13 @@ public abstract class AbstractHttpProtocol implements Protocol {
     }
 
     @Override
+    public void robotRulesTimedOut(String url) {
+        if (!this.skipRobots) {
+            robots.cacheLookupFailure(url);
+        }
+    }
+
+    @Override
     public void cleanup() {}
 
     /**

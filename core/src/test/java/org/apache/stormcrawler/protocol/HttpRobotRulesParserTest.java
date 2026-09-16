@@ -116,4 +116,28 @@ class HttpRobotRulesParserTest {
         allowNone(403, modifiedConf, wmRuntimeInfo);
         allowAll(500, modifiedConf, wmRuntimeInfo);
     }
+
+    /**
+     * A lookup failure reported from outside, as when the fetcher abandons the lookup at the
+     * deadline, is cached in the error cache like any other failure: the next lookup for the host
+     * is served from the cache, allows all, and sends no request.
+     */
+    @Test
+    void reportedLookupFailureIsCachedAsEmptyRules(WireMockRuntimeInfo wmRuntimeInfo) {
+        stubFor(
+                get(urlPathEqualTo("/robots.txt"))
+                        .willReturn(aResponse().withBody(body).withStatus(200)));
+        HttpRobotRulesParser parser = new HttpRobotRulesParser();
+        parser.setConf(conf);
+        String base = wmRuntimeInfo.getHttpBaseUrl();
+        parser.cacheLookupFailure(base + "/some/page");
+        BaseRobotRules rules = parser.getRobotRulesSet(protocol, base + "/other");
+        Assertions.assertTrue(rules.isAllowAll(), "the real robots.txt was not fetched");
+        Assertions.assertInstanceOf(RobotRules.class, rules);
+        Assertions.assertEquals(0, ((RobotRules) rules).getContentLengthFetched().length);
+        Assertions.assertEquals(
+                0,
+                wmRuntimeInfo.getWireMock().getServeEvents().size(),
+                "no request was sent to the server");
+    }
 }
