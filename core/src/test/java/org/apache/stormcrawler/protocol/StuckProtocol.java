@@ -31,17 +31,19 @@ import org.apache.stormcrawler.util.ConfUtils;
 
 /**
  * A protocol whose fetches hang for a long time and ignore interruption, like a client blocked on a
- * socket. Counts the fetches that actually started.
+ * socket. Counts the fetches that actually started. All state is per instance: a test gets the
+ * instance a bolt uses from the {@link ProtocolFactory} once the bolt is prepared.
  */
 public class StuckProtocol implements Protocol {
 
-    public static final AtomicInteger STARTED = new AtomicInteger();
+    /** Number of fetches which actually started. */
+    private final AtomicInteger started = new AtomicInteger();
 
     /** Number of robots.txt lookups which actually hung. */
-    public static final AtomicInteger ROBOTS_HUNG = new AtomicInteger();
+    private final AtomicInteger robotsHung = new AtomicInteger();
 
     /** Hosts whose robots.txt lookup the fetcher reported as timed out: served at once after. */
-    public static final Set<String> ROBOTS_TIMED_OUT = ConcurrentHashMap.newKeySet();
+    private final Set<String> robotsTimedOut = ConcurrentHashMap.newKeySet();
 
     public static final long HANG_MILLIS = 10_000;
 
@@ -57,15 +59,15 @@ public class StuckProtocol implements Protocol {
 
     @Override
     public ProtocolResponse getProtocolOutput(String url, Metadata metadata) throws Exception {
-        STARTED.incrementAndGet();
+        started.incrementAndGet();
         hang();
         return new ProtocolResponse("late".getBytes(StandardCharsets.UTF_8), 200, new Metadata());
     }
 
     @Override
     public BaseRobotRules getRobotRules(String url) {
-        if (hangRobots && !ROBOTS_TIMED_OUT.contains(host(url))) {
-            ROBOTS_HUNG.incrementAndGet();
+        if (hangRobots && !robotsTimedOut.contains(host(url))) {
+            robotsHung.incrementAndGet();
             hang();
         }
         return new SimpleRobotRules(RobotRulesMode.ALLOW_ALL);
@@ -74,7 +76,19 @@ public class StuckProtocol implements Protocol {
     /** Like the HTTP protocols, remembers the failure so the host is not looked up again. */
     @Override
     public void robotRulesTimedOut(String url) {
-        ROBOTS_TIMED_OUT.add(host(url));
+        robotsTimedOut.add(host(url));
+    }
+
+    public int started() {
+        return started.get();
+    }
+
+    public int robotsHung() {
+        return robotsHung.get();
+    }
+
+    public Set<String> robotsTimedOut() {
+        return Set.copyOf(robotsTimedOut);
     }
 
     private static String host(String url) {

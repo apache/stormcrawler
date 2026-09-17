@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.storm.Config;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Tuple;
@@ -206,7 +207,6 @@ abstract class AbstractFetcherBoltTest {
      */
     @Test
     void abandonedFetchesUseABoundedSharedPool() throws ReflectiveOperationException {
-        StuckProtocol.STARTED.set(0);
         resetProtocolFactory();
         TestOutputCollector output = new TestOutputCollector();
         Map<String, Object> config = new HashMap<>();
@@ -230,7 +230,7 @@ abstract class AbstractFetcherBoltTest {
 
         // pool of 2 (twice the fetcher threads): the first two fetches really started and
         // timed out
-        Assertions.assertEquals(2, StuckProtocol.STARTED.get(), "fetches actually started");
+        Assertions.assertEquals(2, stuckProtocol(config).started(), "fetches actually started");
         List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
         Assertions.assertEquals(2, statusTuples.size());
         for (List<Object> t : statusTuples) {
@@ -254,8 +254,6 @@ abstract class AbstractFetcherBoltTest {
      */
     @Test
     void hangingRobotsLookupDoesNotFailTheUrl() throws ReflectiveOperationException {
-        StuckProtocol.STARTED.set(0);
-        StuckProtocol.ROBOTS_TIMED_OUT.clear();
         resetProtocolFactory();
         TestOutputCollector output = new TestOutputCollector();
         Map<String, Object> config = new HashMap<>();
@@ -276,7 +274,7 @@ abstract class AbstractFetcherBoltTest {
         await().atMost(6, TimeUnit.SECONDS).until(() -> output.getAckedTuples().size() == 1);
         long elapsed = System.currentTimeMillis() - start;
         Assertions.assertTrue(elapsed >= 2_000 && elapsed < 5_000, "took " + elapsed + " ms");
-        Assertions.assertEquals(1, StuckProtocol.STARTED.get(), "the page fetch was attempted");
+        Assertions.assertEquals(1, stuckProtocol(config).started(), "the page fetch was attempted");
         List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
         Assertions.assertEquals(1, statusTuples.size());
         Assertions.assertEquals(Status.FETCH_ERROR, statusTuples.get(0).get(2));
@@ -293,9 +291,6 @@ abstract class AbstractFetcherBoltTest {
     @Test
     void timedOutRobotsLookupIsReportedToTheProtocolAndNotRepeated()
             throws ReflectiveOperationException {
-        StuckProtocol.STARTED.set(0);
-        StuckProtocol.ROBOTS_HUNG.set(0);
-        StuckProtocol.ROBOTS_TIMED_OUT.clear();
         resetProtocolFactory();
         TestOutputCollector output = new TestOutputCollector();
         Map<String, Object> config = new HashMap<>();
@@ -318,12 +313,13 @@ abstract class AbstractFetcherBoltTest {
         }
 
         await().atMost(8, TimeUnit.SECONDS).until(() -> output.getAckedTuples().size() == 2);
+        StuckProtocol stuck = stuckProtocol(config);
         Assertions.assertEquals(
                 Set.of("stuck.example.com"),
-                StuckProtocol.ROBOTS_TIMED_OUT,
+                stuck.robotsTimedOut(),
                 "the protocol was told about the timed-out lookup");
-        Assertions.assertEquals(1, StuckProtocol.ROBOTS_HUNG.get(), "robots.txt looked up once");
-        Assertions.assertEquals(2, StuckProtocol.STARTED.get(), "both pages were fetched");
+        Assertions.assertEquals(1, stuck.robotsHung(), "robots.txt looked up once");
+        Assertions.assertEquals(2, stuck.started(), "both pages were fetched");
     }
 
     @Test
@@ -415,6 +411,13 @@ abstract class AbstractFetcherBoltTest {
         Assertions.assertEquals(1, statusTuples.size());
         Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
         return statusTuples.get(0);
+    }
+
+    /** The protocol instance the prepared bolt fetches with. */
+    private static StuckProtocol stuckProtocol(Map<String, Object> config) {
+        Config conf = new Config();
+        conf.putAll(config);
+        return (StuckProtocol) ProtocolFactory.getInstance(conf).getProtocol("http")[0];
     }
 
     static void resetProtocolFactory() throws ReflectiveOperationException {
