@@ -28,7 +28,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.storm.task.TopologyContext;
 import org.apache.stormcrawler.Constants;
@@ -54,8 +53,9 @@ import org.apache.stormcrawler.util.ConfUtils;
  * <p>The bound is a {@link Semaphore} of in-flight calls in front of a queueing executor, not the
  * executor's own rejection: a worker hands its result back before it is back polling for work, so a
  * pool with a {@code SynchronousQueue} would reject the page fetch submitted right after the
- * robots.txt lookup whenever it is at its maximum. A permit is released when the call completes on
- * the helper, whether the caller is still waiting for it or has given up.
+ * robots.txt lookup whenever it is at its maximum. A permit is released exactly once, by whoever
+ * wins the {@link Handoff}: the helper once the call has run, whether the caller is still waiting
+ * for it or has given up, or the caller if it gave up before the helper took the call.
  *
  * <p>The deadline is the one of {@link FetchTimeout#secs(Map)}, clamped to the message timeout on
  * both paths.
@@ -66,6 +66,31 @@ final class FetchTimeoutHelpers {
     static final class SaturatedException extends Exception {
         SaturatedException(String url) {
             super("No fetch helper available for " + url);
+        }
+    }
+
+    /**
+     * Decides who releases the permit of a call: the helper which runs it, or the caller which
+     * abandons it before it ran. {@link Future#cancel} alone cannot tell: it succeeds until the
+     * call returns, also once {@link java.util.concurrent.FutureTask#run} is past its own check and
+     * about to invoke the call, so a flag set by the call would still be unset while the call is on
+     * its way. A single state moved by a compare-and-set settles it: exactly one side wins.
+     */
+    static final class Handoff {
+        private static final int PENDING = 0;
+        private static final int RUNNING = 1;
+        private static final int ABANDONED = 2;
+
+        private final AtomicInteger state = new AtomicInteger(PENDING);
+
+        /** Called by the helper before the call: false if the caller abandoned it, so don't run. */
+        boolean startedByHelper() {
+            return state.compareAndSet(PENDING, RUNNING);
+        }
+
+        /** Called by the caller at the deadline: true if the helper never took the call. */
+        boolean abandonedByCaller() {
+            return state.compareAndSet(PENDING, ABANDONED);
         }
     }
 
@@ -155,15 +180,17 @@ final class FetchTimeoutHelpers {
         if (!permits.tryAcquire()) {
             throw new SaturatedException(url);
         }
-        // the permit is given back by whoever knows the call is over: the helper once the call
-        // has run, or the caller if it cancelled the call before the helper ever started it
-        final AtomicBoolean started = new AtomicBoolean(false);
+        final Handoff handoff = new Handoff();
         final Future<T> future;
         try {
             future =
                     helpers.submit(
                             () -> {
-                                started.set(true);
+                                if (!handoff.startedByHelper()) {
+                                    // abandoned at the deadline before it ran: the caller has
+                                    // released the permit and is not waiting for a result
+                                    return null;
+                                }
                                 try {
                                     return call.call();
                                 } finally {
@@ -180,9 +207,7 @@ final class FetchTimeoutHelpers {
         } catch (TimeoutException e) {
             // a courtesy for protocols which do honour interruption
             future.cancel(true);
-            // once cancelled the task can no longer start: if it had not, nobody else will
-            // release the permit
-            if (!started.get()) {
+            if (handoff.abandonedByCaller()) {
                 permits.release();
             }
             throw new FetchTimeoutException(url, timeoutSecs);

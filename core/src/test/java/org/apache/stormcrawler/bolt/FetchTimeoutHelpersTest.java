@@ -255,6 +255,51 @@ class FetchTimeoutHelpersTest {
                 () -> h.call(() -> "never", stuck, "http://a.net/2", null));
     }
 
+    /**
+     * The permit of a call is released by exactly one side. Whatever the interleaving of the helper
+     * taking the call and the caller giving up on it, only the first to move wins the handoff, so a
+     * call abandoned while its task was already past the cancellation check cannot be released
+     * twice.
+     */
+    @Test
+    void permitHandoffHasExactlyOneWinner() {
+        FetchTimeoutHelpers.Handoff helperFirst = new FetchTimeoutHelpers.Handoff();
+        Assertions.assertTrue(helperFirst.startedByHelper(), "the helper took the call");
+        Assertions.assertFalse(helperFirst.abandonedByCaller(), "the helper releases");
+        Assertions.assertFalse(helperFirst.startedByHelper(), "moved once only");
+
+        FetchTimeoutHelpers.Handoff callerFirst = new FetchTimeoutHelpers.Handoff();
+        Assertions.assertTrue(callerFirst.abandonedByCaller(), "the caller gave up first");
+        Assertions.assertFalse(callerFirst.startedByHelper(), "the call must not run");
+        Assertions.assertFalse(callerFirst.abandonedByCaller(), "moved once only");
+    }
+
+    /**
+     * Every call, timed out or not, leaves the pool as it found it: the number of busy helpers
+     * never goes negative and returns to the calls still stuck once the rest have completed.
+     */
+    @Test
+    void permitsAreNeverReleasedTwice() throws Exception {
+        FetchTimeoutHelpers h = helpers(1, 2);
+        StuckProtocol stuck = new StuckProtocol();
+        for (int i = 0; i < 20; i++) {
+            Assertions.assertEquals("x", h.call(() -> "x", PLAIN, "http://a.net/" + i, null));
+            Assertions.assertTrue(h.busy() >= 0, "busy went negative");
+        }
+        Assertions.assertEquals(0, h.busy());
+        Assertions.assertThrows(
+                FetchTimeoutException.class,
+                () ->
+                        h.call(
+                                () -> stuck.getProtocolOutput("http://a.net/", null),
+                                stuck,
+                                "u",
+                                null));
+        Assertions.assertEquals(1, h.busy(), "the abandoned call still holds its helper");
+        Assertions.assertEquals("y", h.call(() -> "y", PLAIN, "http://a.net/y", null));
+        Assertions.assertEquals(1, h.busy(), "a completed call gave its permit back once");
+    }
+
     @Test
     void afterShutdownCallsAreRejected() {
         FetchTimeoutHelpers h = helpers(1, null);
