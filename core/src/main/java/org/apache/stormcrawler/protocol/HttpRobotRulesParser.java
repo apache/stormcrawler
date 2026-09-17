@@ -205,7 +205,8 @@ public class HttpRobotRulesParser extends RobotRulesParser {
     /**
      * Caches empty rules for the host of the URL in the error cache, as for any lookup which fails
      * with an exception, unless rules for the host are already cached: a lookup abandoned at the
-     * deadline may have completed on its helper thread in the meantime.
+     * deadline may have completed on its helper thread in the meantime, before or after this call,
+     * and its rules must win either way.
      */
     @Override
     public void cacheLookupFailure(String url) {
@@ -221,6 +222,11 @@ public class HttpRobotRulesParser extends RobotRulesParser {
         }
         LOG.debug("Caching robots lookup failure for {} under key {}", url, cacheKey);
         ERRORCACHE.put(cacheKey, new RobotRules(EMPTY_RULES));
+        // the lookup may have completed between the check above and the put: it invalidated an
+        // entry which was not there yet, so check again now that the entry is visible to it
+        if (CACHE.getIfPresent(cacheKey) != null) {
+            ERRORCACHE.invalidate(cacheKey);
+        }
     }
 
     /**
@@ -314,6 +320,7 @@ public class HttpRobotRulesParser extends RobotRulesParser {
                                     keyredir,
                                     cacheKey);
                             CACHE.put(cacheKey, cachedRediRobotRules);
+                            ERRORCACHE.invalidate(cacheKey);
                             return cachedRediRobotRules;
                         } else {
                             // Remember the target host/authority, we can cache the rules, too.

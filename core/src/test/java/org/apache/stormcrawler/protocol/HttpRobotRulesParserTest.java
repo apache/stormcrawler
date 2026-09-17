@@ -21,11 +21,13 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static org.awaitility.Awaitility.await;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import crawlercommons.robots.BaseRobotRules;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.apache.storm.Config;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -160,9 +162,9 @@ class HttpRobotRulesParserTest {
         CompletableFuture<BaseRobotRules> abandoned =
                 CompletableFuture.supplyAsync(
                         () -> parser.getRobotRulesSet(protocol, base + "/some/page"));
-        while (wmRuntimeInfo.getWireMock().getServeEvents().isEmpty() && !abandoned.isDone()) {
-            Thread.onSpinWait();
-        }
+        await().atMost(5, TimeUnit.SECONDS)
+                .until(() -> !wmRuntimeInfo.getWireMock().getServeEvents().isEmpty());
+        Assertions.assertFalse(abandoned.isDone(), "the lookup is still in flight");
         parser.cacheLookupFailure(base + "/some/page");
         BaseRobotRules obtained = abandoned.join();
         Assertions.assertFalse(obtained.isAllowed(base + "/restricted/page"));
