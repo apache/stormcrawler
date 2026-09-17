@@ -25,6 +25,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import crawlercommons.robots.BaseRobotRules;
+import java.util.concurrent.CompletableFuture;
 import org.apache.storm.Config;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -139,5 +140,38 @@ class HttpRobotRulesParserTest {
                 0,
                 wmRuntimeInfo.getWireMock().getServeEvents().size(),
                 "no request was sent to the server");
+    }
+
+    /**
+     * A lookup abandoned at the deadline keeps running on its helper thread and completes after the
+     * failure was reported: the rules it obtained must win over the failure entry, as the
+     * robots.txt of the host was actually fetched.
+     */
+    @Test
+    void rulesObtainedAfterReportedFailureReplaceIt(WireMockRuntimeInfo wmRuntimeInfo) {
+        stubFor(
+                get(urlPathEqualTo("/robots.txt"))
+                        .willReturn(
+                                aResponse().withBody(body).withStatus(200).withFixedDelay(1000)));
+        HttpRobotRulesParser parser = new HttpRobotRulesParser();
+        parser.setConf(conf);
+        String base = wmRuntimeInfo.getHttpBaseUrl();
+        // the lookup the fetcher abandons: it goes on while the failure is reported
+        CompletableFuture<BaseRobotRules> abandoned =
+                CompletableFuture.supplyAsync(
+                        () -> parser.getRobotRulesSet(protocol, base + "/some/page"));
+        while (wmRuntimeInfo.getWireMock().getServeEvents().isEmpty() && !abandoned.isDone()) {
+            Thread.onSpinWait();
+        }
+        parser.cacheLookupFailure(base + "/some/page");
+        BaseRobotRules obtained = abandoned.join();
+        Assertions.assertFalse(obtained.isAllowed(base + "/restricted/page"));
+        BaseRobotRules rules = parser.getRobotRulesSet(protocol, base + "/other");
+        Assertions.assertFalse(rules.isAllowAll(), "the failure entry hides the fetched rules");
+        Assertions.assertFalse(rules.isAllowed(base + "/restricted/page"));
+        Assertions.assertEquals(
+                1,
+                wmRuntimeInfo.getWireMock().getServeEvents().size(),
+                "the rules were served from the cache");
     }
 }

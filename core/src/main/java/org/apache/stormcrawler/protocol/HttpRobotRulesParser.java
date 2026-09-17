@@ -383,6 +383,12 @@ public class HttpRobotRulesParser extends RobotRulesParser {
 
         LOG.debug("Caching robots for {} under key {} in cache {}", url, cacheKey, cacheName);
         cacheToUse.put(cacheKey, cached);
+        if (cacheRule) {
+            // a lookup abandoned at the deadline and completed here on its helper thread may have
+            // been recorded as a failure in the meantime: the error cache is read first, so its
+            // entry would hide the rules for the whole error TTL
+            ERRORCACHE.invalidate(cacheKey);
+        }
 
         // cache robot rules for redirections
         // get here only if the target has not been found in the cache
@@ -398,6 +404,9 @@ public class HttpRobotRulesParser extends RobotRulesParser {
                         keyredir,
                         cacheName);
                 cacheToUse.put(keyredir, cached);
+                if (cacheRule) {
+                    ERRORCACHE.invalidate(keyredir);
+                }
             }
         }
 
