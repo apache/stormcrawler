@@ -29,6 +29,11 @@ class CharsetIdentificationTest {
     /** detect.charset.maxlength as set in crawler-default.yaml. */
     private static final int MAXLENGTH = 10000;
 
+    /**
+     * META_CHARSET_LOOKAHEAD in CharsetIdentification: bytes read past the window for the quote.
+     */
+    private static final int LOOKAHEAD = 64;
+
     /** A body which opens a meta charset declaration and never closes it. */
     private static byte[] unterminatedMetaCharset(int size) {
         byte[] content = new byte[size];
@@ -82,22 +87,59 @@ class CharsetIdentificationTest {
         Assertions.assertNull(thrown, "charset detection threw " + thrown);
     }
 
+    /** ASCII content, no BOM and no HTTP header: only the meta tag can yield this charset. */
+    private static final String DECLARED = "windows-1251";
+
+    /** More than the look-ahead of body behind the tag, so that the look-ahead bounds the read. */
+    private static final String BODY =
+            "</head><body>" + "<p>text</p>".repeat(20) + "</body></html>";
+
     /** A declaration cut by the detection window is still read, see #870. */
     @Test
     void metaCharsetCutByTheDetectionWindowIsStillRead() {
-        // ASCII content, no BOM and no HTTP header: only the meta tag can yield this charset
-        String declaration = "<meta charset=\"windows-1251\">";
         StringBuilder page = new StringBuilder("<html><head>");
         while (page.length() < MAXLENGTH) {
             page.append("<!-- padding -->");
         }
-        // the window ends inside the charset name, the buffer ends right after the tag
+        // the window ends inside the charset name
         int cut = page.length() + "<meta charset=\"win".length();
-        page.append(declaration).append("</head><body></body></html>");
+        page.append("<meta charset=\"").append(DECLARED).append("\">").append(BODY);
         byte[] content = page.toString().getBytes(StandardCharsets.US_ASCII);
 
         String charset = CharsetIdentification.getCharsetFast(new Metadata(), content, cut);
 
-        Assertions.assertEquals("windows-1251", charset);
+        Assertions.assertEquals(DECLARED, charset);
+    }
+
+    /**
+     * A page whose declaration opens on the last bytes of a window of {@link #MAXLENGTH} and closes
+     * {@code quoteOffset} bytes after it. The name is padded with spaces, which the validation
+     * trims, so the charset is used whenever the closing quote is read.
+     */
+    private static byte[] metaCharsetClosingAfterTheWindow(int quoteOffset) {
+        StringBuilder page = new StringBuilder("<html><head>");
+        while (page.length() < MAXLENGTH) {
+            page.append("<!-- padding -->");
+        }
+        page.setLength(MAXLENGTH - "<meta charset=\"".length());
+        page.append("<meta charset=\"");
+        page.append(" ".repeat(quoteOffset - DECLARED.length())).append(DECLARED).append("\">");
+        page.append(BODY);
+        return page.toString().getBytes(StandardCharsets.US_ASCII);
+    }
+
+    /** The look-ahead is bounded: a quote on its last byte is read, one byte further is not. */
+    @Test
+    void lookAheadForTheClosingQuoteIsBounded() {
+        String within =
+                CharsetIdentification.getCharsetFast(
+                        new Metadata(), metaCharsetClosingAfterTheWindow(LOOKAHEAD - 1), MAXLENGTH);
+        String beyond =
+                CharsetIdentification.getCharsetFast(
+                        new Metadata(), metaCharsetClosingAfterTheWindow(LOOKAHEAD), MAXLENGTH);
+
+        Assertions.assertEquals(DECLARED, within);
+        Assertions.assertNotEquals(
+                DECLARED, beyond, "a declaration closing beyond the look-ahead is not used");
     }
 }
