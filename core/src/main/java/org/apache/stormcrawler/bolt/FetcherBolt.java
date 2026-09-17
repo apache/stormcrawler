@@ -85,9 +85,9 @@ public class FetcherBolt extends StatusEmitterBolt {
     public static final String QUEUED_TIMEOUT_PARAM_KEY = "fetcher.timeout.queue";
 
     /**
-     * @deprecated since 3.8, use {@link Constants#FETCH_TIMEOUT_PARAM_KEY}
+     * @deprecated since 4.0, use {@link Constants#FETCH_TIMEOUT_PARAM_KEY}
      */
-    @Deprecated(since = "3.8", forRemoval = true)
+    @Deprecated(since = "4.0", forRemoval = true)
     public static final String FETCH_TIMEOUT_PARAM_KEY = Constants.FETCH_TIMEOUT_PARAM_KEY;
 
     /** Key name of the custom crawl delay for a queue that may be present in the metadata. */
