@@ -60,6 +60,7 @@ import org.apache.stormcrawler.parse.ParseFilters;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.persistence.DefaultScheduler;
 import org.apache.stormcrawler.persistence.Status;
+import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
@@ -111,13 +112,16 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
     private List<Extension> extensionsToParse;
 
+    /** Prefix under which the fetcher stores the response headers, see protocol.md.prefix. */
+    private String protocolMetadataPrefix = "";
+
     @Override
     public void execute(Tuple tuple) {
         Metadata metadata = (Metadata) tuple.getValueByField("metadata");
         byte[] content = tuple.getBinaryByField("content");
         String url = tuple.getStringByField("url");
 
-        String ct = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE);
+        String ct = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix);
 
         LOG.debug("Processing {}", url);
 
@@ -391,6 +395,11 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
     public void prepare(
             Map<String, Object> stormConf, TopologyContext context, OutputCollector collector) {
         super.prepare(stormConf, context, collector);
+        protocolMetadataPrefix =
+                ConfUtils.getString(
+                        stormConf,
+                        ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM,
+                        protocolMetadataPrefix);
         strict = ConfUtils.getBoolean(stormConf, "sitemap.strict", false);
         parser = new SiteMapParser(strict);
         sniffContent = ConfUtils.getBoolean(stormConf, "sitemap.sniffContent", false);
