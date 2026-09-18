@@ -460,15 +460,7 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
             final int byteLength = response.getContent().length;
 
             // get any metrics from the protocol metadata
-            response.getMetadata().keySet("metrics.").stream()
-                    .forEach(
-                            s ->
-                                    averagedMetrics
-                                            .scope(s.substring(8))
-                                            .update(
-                                                    Long.parseLong(
-                                                            response.getMetadata()
-                                                                    .getFirstValue(s))));
+            ProtocolMetrics.update(averagedMetrics, response.getMetadata());
 
             averagedMetrics.scope("wait_time").update(timeWaiting);
             averagedMetrics.scope("fetch_time").update(timeFetching);

@@ -419,6 +419,30 @@ abstract class AbstractFetcherBoltTest {
                 md.getValues(AbstractHttpProtocol.SET_HEADER_BY_REQUEST, PROTOCOL_MD_PREFIX));
     }
 
+    /**
+     * The protocols copy every response header into the response metadata, so a header named
+     * metrics.something reaches the loop which feeds the fetcher metric registry. A value which is
+     * not a number must not turn a complete fetch into a FETCH_ERROR, see issue #2099.
+     */
+    @Test
+    void nonNumericMetricsHeaderDoesNotFailTheFetch(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(
+                get(urlEqualTo("/metrics-header"))
+                        .willReturn(
+                                aResponse()
+                                        .withStatus(200)
+                                        .withHeader("metrics.dns_time", "not-a-number")
+                                        .withBody("hello")));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+
+        TestOutputCollector output = fetch(wmRuntimeInfo, config, "/metrics-header");
+        Assertions.assertEquals(1, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+        Assertions.assertEquals(0, output.getEmitted(Constants.StatusStreamName).size());
+    }
+
     TestOutputCollector fetch(
             WireMockRuntimeInfo wmRuntimeInfo, Map<String, Object> config, String path)
             throws ReflectiveOperationException {
