@@ -58,6 +58,7 @@ import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.metrics.ScopedReducedMetric;
 import org.apache.stormcrawler.persistence.Status;
+import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
 import org.apache.stormcrawler.protocol.FetchTimeoutException;
 import org.apache.stormcrawler.protocol.Protocol;
 import org.apache.stormcrawler.protocol.ProtocolFactory;
@@ -983,6 +984,15 @@ public class FetcherBolt extends StatusEmitterBolt {
                     // Only the locally parsed robots.txt value may populate this control signal.
                     // A colliding protocol prefix/header must not pace an unrelated queue.
                     mergedMetadata.remove(Constants.ROBOTS_CRAWL_DELAY_KEY);
+
+                    // Request shaping comes from the configuration, never from a fetched page: a
+                    // response header named set-header lands on exactly the key the protocols read
+                    // to add headers to an outgoing request. Any value configured for this URL is
+                    // put back after the response metadata has been dropped.
+                    final String setHeaderKey =
+                            protocolMetadataPrefix + AbstractHttpProtocol.SET_HEADER_BY_REQUEST;
+                    mergedMetadata.remove(setHeaderKey);
+                    mergedMetadata.setValues(setHeaderKey, metadata.getValues(setHeaderKey));
                     if (robotsCrawlDelaySecs != null) {
                         mergedMetadata.setValue(
                                 Constants.ROBOTS_CRAWL_DELAY_KEY, robotsCrawlDelaySecs);
