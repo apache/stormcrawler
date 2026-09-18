@@ -188,6 +188,28 @@ config:
   # http.credentials.headers:
   # - "x-auth-token"
 
+  # Basic authentication for the sites which require it. The Authorization
+  # header built from http.basicauth.user and http.basicauth.password is only
+  # sent to the hosts listed in http.basicauth.hosts (a list or a
+  # comma-separated string): host names or IP addresses without scheme, port,
+  # path or wildcard, matched exactly and case-insensitively; other entries are
+  # ignored with a warning. Subdomains are not included, list each host
+  # separately. The host of every request is checked, robots.txt fetches and
+  # redirect targets included; a redirect followed with http.allow.redirects
+  # never carries the header to another scheme, host or port. The header is
+  # also withheld from servers which were not authenticated, see
+  # http.credentials.allow.insecure.
+  # Breaking change in 4.0.0: the credentials used to be sent to every host
+  # crawled. If http.basicauth.hosts is empty they are not sent at all and a
+  # warning is logged at startup.
+  # Credential headers configured with http.custom.headers are still sent to
+  # every host; set them per site with protocol.set-header in the metadata of
+  # the URLs instead.
+  # http.basicauth.user:
+  # http.basicauth.password:
+  # http.basicauth.hosts:
+  # - "intranet.example.com"
+
   # Maximum number of redirect hops followed when http.allow.redirects is
   # enabled (okhttp protocol only). A chain which does not end within this
   # many hops returns its last redirect response, which the caller handles
@@ -234,8 +256,9 @@ config:
   # while staying on the same host and port is always followed, whatever this is
   # set to. When this is enabled, the robots.txt is re-fetched from the host
   # named in the Location header, for up to 5 hops, and each of these requests
-  # carries the headers configured through http.basicauth.* and
-  # http.custom.headers as any other request does; http.filter.ipaddress.exclude
+  # carries the headers configured through http.custom.headers, and those of
+  # http.basicauth.* if the host is listed in http.basicauth.hosts, as any other
+  # request does; http.filter.ipaddress.exclude
   # can be used to restrict the addresses those fetches may reach.
   http.robots.redirect.crossorigin.allow: false
 

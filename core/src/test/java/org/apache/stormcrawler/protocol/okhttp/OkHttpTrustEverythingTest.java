@@ -152,6 +152,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.trust.everything", true);
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
+        conf.put("http.basicauth.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         fetch(protocol(conf), "/basicauth");
         server.verify(
@@ -165,6 +166,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.credentials.allow.insecure", true);
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
+        conf.put("http.basicauth.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         fetch(protocol(conf), "/basicauth");
         final String expected =
@@ -235,6 +237,7 @@ class OkHttpTrustEverythingTest {
         final Config conf = config();
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
+        conf.put("http.basicauth.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         final ProtocolResponse response =
                 fetchUrl(protocol(conf), httpUrl("/cleartext"), new Metadata());
@@ -249,6 +252,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.credentials.allow.insecure", true);
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
+        conf.put("http.basicauth.hosts", "localhost");
         startServer(LOCALHOST_KEYSTORE);
         fetchUrl(protocol(conf), httpUrl("/cleartext"), new Metadata());
         final String expected = "Basic " + base64("user:secret");
@@ -307,6 +311,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.verify.hostnames", false);
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
+        conf.put("http.basicauth.hosts", "localhost");
         startServer(OTHERHOST_KEYSTORE);
         final ProtocolResponse response = fetch(protocol(conf), "/nohostnamecheck");
         assertEquals(200, response.getStatusCode(), "the connection succeeds as configured");
@@ -324,6 +329,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.credentials.allow.insecure", true);
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
+        conf.put("http.basicauth.hosts", "localhost");
         startServer(OTHERHOST_KEYSTORE);
         fetch(protocol(conf), "/nohostnamecheckinsecure");
         final String expected = "Basic " + base64("user:secret");
@@ -403,6 +409,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.allow.redirects", true);
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
+        conf.put("http.basicauth.hosts", "localhost");
         conf.put("http.custom.headers", List.of("X-Api-Key=s3cret"));
         startServer(LOCALHOST_KEYSTORE);
         final HttpProtocol protocol = protocol(conf);
@@ -441,6 +448,7 @@ class OkHttpTrustEverythingTest {
         conf.put("http.credentials.allow.insecure", true);
         conf.put("http.basicauth.user", "user");
         conf.put("http.basicauth.password", "secret");
+        conf.put("http.basicauth.hosts", "localhost");
         conf.put("http.custom.headers", List.of("X-Api-Key=s3cret"));
         startServer(LOCALHOST_KEYSTORE);
         final HttpProtocol protocol = protocol(conf);
