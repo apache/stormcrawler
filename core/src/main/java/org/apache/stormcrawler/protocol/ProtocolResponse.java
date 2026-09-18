@@ -17,6 +17,10 @@
 
 package org.apache.stormcrawler.protocol;
 
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.stormcrawler.Metadata;
 
 public class ProtocolResponse {
@@ -77,6 +81,37 @@ public class ProtocolResponse {
      * @see <a href="https://github.com/apache/stormcrawler/issues/776">Issue 776</a>
      */
     public static final String PROTOCOL_MD_PREFIX_PARAM = "protocol.md.prefix";
+
+    /** Prefix of the metadata keys holding the timings a protocol reports about a fetch. */
+    public static final String METRICS_PREFIX = "metrics.";
+
+    /** Lowercased: metadata keys are normalised that way, and so are header names. */
+    private static final Set<String> RESERVED_METADATA_KEYS =
+            Stream.of(
+                            REQUEST_HEADERS_KEY,
+                            RESPONSE_HEADERS_KEY,
+                            RESPONSE_IP_KEY,
+                            REQUEST_TIME_KEY,
+                            PROTOCOL_VERSIONS_KEY,
+                            CIPHER_SUITE_KEY,
+                            TRIMMED_RESPONSE_KEY,
+                            TRIMMED_RESPONSE_REASON_KEY,
+                            REDIRECTED_TO_KEY)
+                    .map(key -> key.toLowerCase(Locale.ROOT))
+                    .collect(Collectors.toUnmodifiableSet());
+
+    /**
+     * Whether a metadata key is one the crawler writes itself to record how a fetch went. The
+     * protocols copy the response headers into the metadata, and a header name is not restricted to
+     * anything: a value arriving from the wire must never populate one of these keys. The WARC
+     * writer reads them as the crawler's own account of the request and the fetcher bolts read
+     * {@value #METRICS_PREFIX} as their protocol timings.
+     */
+    public static boolean isReservedMetadataKey(String key) {
+        final String normalised = key.toLowerCase(Locale.ROOT);
+        return RESERVED_METADATA_KEYS.contains(normalised)
+                || normalised.startsWith(METRICS_PREFIX);
+    }
 
     /** Enum of reasons which may cause that protocol content is trimmed. */
     public enum TrimmedContentReason {

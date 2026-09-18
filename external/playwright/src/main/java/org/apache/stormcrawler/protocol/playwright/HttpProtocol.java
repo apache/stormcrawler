@@ -325,7 +325,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                         response.allHeaders()
                                                 .forEach(
                                                         (k, v) -> {
-                                                            responseMetaData.addValue(k, v);
+                                                            addResponseHeader(
+                                                                    responseMetaData, k, v, url);
                                                         });
                                         recordCookieOrigin(responseMetaData, url);
                                         storeVerbatimHeaders(response, responseMetaData);
@@ -371,7 +372,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                         response.allHeaders()
                                 .forEach(
                                         (k, v) -> {
-                                            responseMetaData.addValue(k, v);
+                                            addResponseHeader(responseMetaData, k, v, url);
                                         });
                         recordCookieOrigin(responseMetaData, url);
                         storeVerbatimHeaders(response, responseMetaData);
@@ -447,6 +448,24 @@ public class HttpProtocol extends AbstractHttpProtocol {
         if (responseMetaData.getFirstValue(RESPONSE_COOKIES_HEADER) != null) {
             responseMetaData.setValue(RESPONSE_COOKIES_ORIGIN, url);
         }
+    }
+
+    /**
+     * Copies one response header into the metadata, unless it names metadata the crawler writes
+     * itself. A header name is not restricted to anything, so without this a fetched server could
+     * choose the verbatim request and response blocks the WARC writer records as the crawler's own
+     * capture, and the timings the fetcher bolts read as their protocol metrics.
+     */
+    private static void addResponseHeader(
+            final Metadata metadata, final String key, final String value, final String url) {
+        if (ProtocolResponse.isReservedMetadataKey(key)) {
+            LOG.warn(
+                    "Ignoring response header {} from {}: it names crawler metadata",
+                    key,
+                    url);
+            return;
+        }
+        metadata.addValue(key, value);
     }
 
     /**
