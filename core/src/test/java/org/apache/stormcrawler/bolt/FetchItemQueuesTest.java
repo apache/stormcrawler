@@ -530,6 +530,44 @@ class FetchItemQueuesTest {
         assertJittered(2000, q.backOffFetchItem(it));
     }
 
+    /**
+     * A negative fetcher.max.crawl.delay accepts any crawl delay: the backoff falls back to the
+     * default cap of 30 s instead of a negative one.
+     */
+    @Test
+    void saturatedFetchBackoffWithUnboundedMaxCrawlDelay() throws Exception {
+        FetchItemQueues q = queues("fetcher.server.delay", 8.0f, "fetcher.max.crawl.delay", -1);
+        for (int i = 0; i < 8; i++) {
+            add(q, "http://a.net/" + i);
+        }
+        FetchItem it = q.getFetchItem();
+        Assertions.assertNotNull(it);
+        FetchItemQueue fiq = q.queues.get(it.queueId);
+
+        long[] expected = {8000, 16000, 30000, 30000};
+        for (long computed : expected) {
+            assertJittered(computed, q.backOffFetchItem(it));
+            fiq.poll();
+        }
+    }
+
+    /** A cap below the queue's own delay does not make a rejected queue retry sooner. */
+    @Test
+    void saturatedFetchBackoffNeverBelowTheQueueDelay() throws Exception {
+        FetchItemQueues q = queues("fetcher.server.delay", 10.0f, "fetcher.max.crawl.delay", 5);
+        for (int i = 0; i < 8; i++) {
+            add(q, "http://a.net/" + i);
+        }
+        FetchItem it = q.getFetchItem();
+        Assertions.assertNotNull(it);
+        FetchItemQueue fiq = q.queues.get(it.queueId);
+
+        for (int i = 0; i < 3; i++) {
+            assertJittered(10000, q.backOffFetchItem(it));
+            fiq.poll();
+        }
+    }
+
     /** The backoff never starts below one second, even for a queue with no delay at all. */
     @Test
     void saturatedFetchBackoffHasAOneSecondFloor() throws Exception {

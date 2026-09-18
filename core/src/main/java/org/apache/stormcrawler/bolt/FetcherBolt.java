@@ -348,7 +348,8 @@ public class FetcherBolt extends StatusEmitterBolt {
          * Like {@link #finish} for a fetch which never ran because every helper thread was busy.
          * The helpers are shared by all queues and are not freed by trying again, so instead of
          * being ready at once the queue is backed off exponentially: its own delay, doubled at each
-         * consecutive rejection, up to {@code maxBackoff}. Any other outcome resets the backoff.
+         * consecutive rejection, up to {@code maxBackoff} or its own delay if longer. Any other
+         * outcome resets the backoff.
          *
          * <p>The delay is spread with equal jitter, between half the computed value and the value
          * itself: a stuck protocol rejects the fetches of many queues within the same instant, and
@@ -362,7 +363,8 @@ public class FetcherBolt extends StatusEmitterBolt {
             final int rejections = Math.min(saturations.incrementAndGet(), 30);
             final long base =
                     Math.max(1000L, maxThreads > 1 ? minCrawlDelay.get() : crawlDelay.get());
-            final long computed = Math.min(maxBackoff, base << (rejections - 1));
+            // the cap never shortens the queue's own delay
+            final long computed = Math.min(Math.max(maxBackoff, base), base << (rejections - 1));
             final long half = computed / 2;
             final long delay = half + ThreadLocalRandom.current().nextLong(computed - half + 1);
             nextFetchTime.set(System.currentTimeMillis() + delay);
@@ -452,8 +454,10 @@ public class FetcherBolt extends StatusEmitterBolt {
             if (this.maxQueueSize == -1) {
                 this.maxQueueSize = Integer.MAX_VALUE;
             }
-            // a queue is never put off for longer than the longest politeness delay accepted
-            this.maxBackoff = ConfUtils.getInt(conf, "fetcher.max.crawl.delay", 30) * 1000L;
+            // a queue is never put off for longer than the longest politeness delay accepted,
+            // or the default one when any delay is accepted (negative value)
+            final int maxCrawlDelaySecs = ConfUtils.getInt(conf, "fetcher.max.crawl.delay", 30);
+            this.maxBackoff = (maxCrawlDelaySecs < 0 ? 30 : maxCrawlDelaySecs) * 1000L;
 
             // order is not guaranteed
             for (Entry<String, Object> e : conf.entrySet()) {

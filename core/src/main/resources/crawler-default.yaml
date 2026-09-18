@@ -46,7 +46,8 @@ config:
   # the URL is acked without a status, like one which waited too long in
   # the queue, and the spout retries it later; its queue is backed off
   # exponentially (its crawl delay, doubled at each consecutive rejection,
-  # up to fetcher.max.crawl.delay, with equal jitter) instead of being retried at once
+  # up to fetcher.max.crawl.delay, or 30s if negative, but never below the queue's
+  # own delay, with equal jitter) instead of being retried at once
   # fetcher.thread.timeout.helpers: 100
   # max. crawl-delay accepted in robots.txt (in seconds)
   fetcher.max.crawl.delay: 30

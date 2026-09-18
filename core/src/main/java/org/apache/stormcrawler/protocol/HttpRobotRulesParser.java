@@ -221,7 +221,9 @@ public class HttpRobotRulesParser extends RobotRulesParser {
             return;
         }
         LOG.debug("Caching robots lookup failure for {} under key {}", url, cacheKey);
-        ERRORCACHE.put(cacheKey, new RobotRules(EMPTY_RULES));
+        // the lookup may also have completed with an error of its own (e.g. a 5xx) since the
+        // check above: keep its rules rather than replacing them with empty ones
+        ERRORCACHE.asMap().putIfAbsent(cacheKey, new RobotRules(EMPTY_RULES));
         // the lookup may have completed between the check above and the put: it invalidated an
         // entry which was not there yet, so check again now that the entry is visible to it
         if (CACHE.getIfPresent(cacheKey) != null) {
