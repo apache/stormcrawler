@@ -558,10 +558,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
         if (parsed == null
                 || !parsed.equals(
                         new HttpUrl.Builder().scheme("http").host(parsed.host()).build())) {
+            // the entry is not logged: a URL pasted with its user info would leak the credentials
             LOG.warn(
-                    "Ignoring '{}' in http.basicauth.hosts, expected a host name or IP address "
-                            + "without scheme, port, path or wildcard",
-                    entry);
+                    "Ignoring an entry of http.basicauth.hosts, expected a host name or IP address "
+                            + "without scheme, port, user info, path or wildcard");
             return;
         }
         basicAuthHosts.add(parsed.host());
