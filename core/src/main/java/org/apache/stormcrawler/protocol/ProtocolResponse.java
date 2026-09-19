@@ -109,8 +109,7 @@ public class ProtocolResponse {
      */
     public static boolean isReservedMetadataKey(String key) {
         final String normalised = key.toLowerCase(Locale.ROOT);
-        return RESERVED_METADATA_KEYS.contains(normalised)
-                || normalised.startsWith(METRICS_PREFIX);
+        return RESERVED_METADATA_KEYS.contains(normalised) || normalised.startsWith(METRICS_PREFIX);
     }
 
     /** Enum of reasons which may cause that protocol content is trimmed. */

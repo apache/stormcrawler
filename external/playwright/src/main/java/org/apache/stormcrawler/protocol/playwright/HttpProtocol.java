@@ -459,10 +459,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
     private static void addResponseHeader(
             final Metadata metadata, final String key, final String value, final String url) {
         if (ProtocolResponse.isReservedMetadataKey(key)) {
-            LOG.warn(
-                    "Ignoring response header {} from {}: it names crawler metadata",
-                    key,
-                    url);
+            LOG.warn("Ignoring response header {} from {}: it names crawler metadata", key, url);
             return;
         }
         metadata.addValue(key, value);
