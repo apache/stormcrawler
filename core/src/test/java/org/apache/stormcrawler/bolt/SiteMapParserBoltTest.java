@@ -256,6 +256,66 @@ class SiteMapParserBoltTest extends ParsingTester {
         Assertions.assertEquals(1, output.getEmitted().size());
     }
 
+    /**
+     * The fetcher stores the response headers under protocol.md.prefix, so the content type has to
+     * be read with that prefix. Without it the value is never found and every sitemap is identified
+     * by guessing: a page served as text/html is then promoted by the sniffing, see issue #2100.
+     */
+    @Test
+    void prefixedContentTypeStopsHtmlBeingSniffedAsSitemap() throws IOException {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("sitemap.sniffContent", true);
+        parserConfig.put("sitemap.offset.guess", 1024);
+        parserConfig.put("protocol.md.prefix", "protocol.");
+        parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
+        bolt.prepare(
+                parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        Metadata metadata = new Metadata();
+        metadata.setValue("protocol." + HttpHeaders.CONTENT_TYPE, "text/html");
+        parse("https://stormcrawler.apache.org/sitemap.xml", "stormcrawler.sitemap.xml", metadata);
+        Assertions.assertEquals(0, output.getEmitted(Constants.StatusStreamName).size());
+        Assertions.assertEquals(1, output.getEmitted().size());
+    }
+
+    /** A sitemap content type stored under the prefix is found and lets the sniffing promote. */
+    @Test
+    void prefixedContentTypeIsFound() throws IOException {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("sitemap.sniffContent", true);
+        parserConfig.put("sitemap.offset.guess", 1024);
+        parserConfig.put("protocol.md.prefix", "protocol.");
+        parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
+        bolt.prepare(
+                parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        Metadata metadata = new Metadata();
+        metadata.setValue("protocol." + HttpHeaders.CONTENT_TYPE, "application/xml");
+        parse("https://stormcrawler.apache.org/sitemap.xml", "stormcrawler.sitemap.xml", metadata);
+        Assertions.assertEquals(7, output.getEmitted(Constants.StatusStreamName).size());
+    }
+
+    /**
+     * The declared content type only gates the sniffing and is not passed on to crawler-commons,
+     * which would trust it instead of detecting the format: a gzipped sitemap served as XML with a
+     * Content-Encoding the protocol does not decode (x-gzip) still parses.
+     */
+    @Test
+    void gzipSitemapDeclaredAsXmlStillParses() throws IOException {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("protocol.md.prefix", "protocol.");
+        parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
+        bolt.prepare(
+                parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        Metadata metadata = new Metadata();
+        metadata.setValue(SiteMapParserBolt.isSitemapKey, "true");
+        metadata.setValue("protocol." + HttpHeaders.CONTENT_TYPE, "application/xml");
+        metadata.setValue("protocol.Content-Encoding", "x-gzip");
+        parse(
+                "https://stormcrawler.apache.org/sitemap.xml.gz",
+                "stormcrawler.sitemap.xml.gz",
+                metadata);
+        Assertions.assertEquals(7, output.getEmitted(Constants.StatusStreamName).size());
+    }
+
     private void assertNewsAttributes(Metadata metadata) {
         long numAttributes = metadata.keySet(Extension.NEWS.name() + ".").size();
         Assertions.assertEquals(7, numAttributes);

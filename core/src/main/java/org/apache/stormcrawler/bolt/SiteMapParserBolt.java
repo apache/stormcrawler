@@ -60,6 +60,7 @@ import org.apache.stormcrawler.parse.ParseFilters;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.persistence.DefaultScheduler;
 import org.apache.stormcrawler.persistence.Status;
+import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
@@ -111,13 +112,22 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
     private List<Extension> extensionsToParse;
 
+    /** Prefix under which the fetcher stores the response headers, see protocol.md.prefix. */
+    private String protocolMetadataPrefix = "";
+
     @Override
     public void execute(Tuple tuple) {
         Metadata metadata = (Metadata) tuple.getValueByField("metadata");
         byte[] content = tuple.getBinaryByField("content");
         String url = tuple.getStringByField("url");
 
-        String ct = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE);
+        // the declared type only gates the sniffing below. It is not handed to
+        // crawler-commons, which trusts a declared XML type instead of detecting
+        // the format: a gzipped sitemap served as XML with a Content-Encoding the
+        // protocol does not decode, such as x-gzip, would then fail to parse
+        final String declaredCt =
+                metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix);
+        String ct = null;
 
         LOG.debug("Processing {}", url);
 
@@ -127,7 +137,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
         // page deciding how the pipeline treats it must not depend on a string
         // in its body, and a promoted document also needs a sitemap compatible
         // content type
-        if (isSitemap == null && sniffContent && sniffsAsSitemap(ct, content)) {
+        if (isSitemap == null && sniffContent && sniffsAsSitemap(declaredCt, content)) {
             LOG.info("{} detected as sitemap based on content and content type", url);
             ct = "application/xml";
             isSitemap = "true";
@@ -391,6 +401,11 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
     public void prepare(
             Map<String, Object> stormConf, TopologyContext context, OutputCollector collector) {
         super.prepare(stormConf, context, collector);
+        protocolMetadataPrefix =
+                ConfUtils.getString(
+                        stormConf,
+                        ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM,
+                        protocolMetadataPrefix);
         strict = ConfUtils.getBoolean(stormConf, "sitemap.strict", false);
         parser = new SiteMapParser(strict);
         sniffContent = ConfUtils.getBoolean(stormConf, "sitemap.sniffContent", false);
