@@ -963,11 +963,29 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 final String key = headers.name(i);
                 String value = headers.value(i);
 
-                if (key.equals(ProtocolResponse.REQUEST_HEADERS_KEY)
-                        || key.equals(ProtocolResponse.RESPONSE_HEADERS_KEY)) {
-                    value =
-                            new String(
-                                    Base64.getDecoder().decode(value), StandardCharsets.ISO_8859_1);
+                if (ProtocolResponse.isReservedMetadataKey(key)) {
+                    // HTTPHeadersInterceptor passes the crawler's own record of the
+                    // fetch through the response headers, so a reserved key is only
+                    // trustworthy when that interceptor ran. It is installed with
+                    // http.store.headers; without it a value under one of these names
+                    // can only have come from the server, and the WARC writer would
+                    // record it as what the crawler sent and received. The keys the
+                    // interceptor does not carry are written into the metadata further
+                    // down and are never accepted from the wire.
+                    if (!storeHttpHeaders || !INTERCEPTOR_METADATA_KEYS.contains(key)) {
+                        LOG.warn(
+                                "Ignoring response header {} from {}: it names crawler metadata",
+                                key,
+                                url);
+                        continue;
+                    }
+                    if (key.equals(ProtocolResponse.REQUEST_HEADERS_KEY)
+                            || key.equals(ProtocolResponse.RESPONSE_HEADERS_KEY)) {
+                        value =
+                                new String(
+                                        Base64.getDecoder().decode(value),
+                                        StandardCharsets.ISO_8859_1);
+                    }
                 }
 
                 responsemetadata.addValue(key.toLowerCase(Locale.ROOT), value);
@@ -1170,6 +1188,20 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
     }
 
+    /**
+     * The metadata keys {@link HTTPHeadersInterceptor} passes to {@link #getProtocolOutput} as
+     * response headers. Only these may be read back off a response, and only when the interceptor
+     * is installed, see http.store.headers.
+     */
+    private static final Set<String> INTERCEPTOR_METADATA_KEYS =
+            Set.of(
+                    ProtocolResponse.REQUEST_HEADERS_KEY,
+                    ProtocolResponse.RESPONSE_HEADERS_KEY,
+                    ProtocolResponse.RESPONSE_IP_KEY,
+                    ProtocolResponse.REQUEST_TIME_KEY,
+                    ProtocolResponse.PROTOCOL_VERSIONS_KEY,
+                    ProtocolResponse.CIPHER_SUITE_KEY);
+
     static class HTTPHeadersInterceptor implements Interceptor {
 
         private static String getNormalizedProtocolName(Protocol protocol) {
@@ -1300,6 +1332,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 protocols.append(',').append(getProtocolIdentifier(handshake.tlsVersion()));
                 cipherSuite = handshake.cipherSuite().toString();
                 respBuilder = respBuilder.header(ProtocolResponse.CIPHER_SUITE_KEY, cipherSuite);
+            } else {
+                // no handshake over http://, so nothing overwrites a header the server
+                // may have sent under this name
+                respBuilder = respBuilder.removeHeader(ProtocolResponse.CIPHER_SUITE_KEY);
             }
             respBuilder =
                     respBuilder.header(
