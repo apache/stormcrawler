@@ -288,7 +288,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             address = host + ":" + port;
         }
 
-        channel = ManagedChannelUtil.createChannel(address);
+        channel = ManagedChannelUtil.createChannel(address, stormConf);
         channel.notifyWhenStateChanged(
                 ConnectivityState.SHUTDOWN, () -> onChannelStateChange(ConnectivityState.SHUTDOWN));
 
