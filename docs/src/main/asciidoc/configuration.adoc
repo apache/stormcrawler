@@ -441,9 +441,10 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/opensearc
 |===
 | key | default value | description
 
-| opensearch.addresses | - | OpenSearch server address(es).
-| opensearch.user | - | Username for authentication (optional).
+| opensearch.addresses | - | OpenSearch server address(es). An address without a scheme is contacted over plain http, on port 9200 if none is given; use `https://` when credentials are configured.
+| opensearch.user | - | Username for Basic authentication (optional). The credentials are only sent to the hosts and ports listed in the addresses, not to nodes discovered by sniffing under another address; list those nodes in the addresses or disable `opensearch.<type>.sniff`, which is on by default. A warning is logged when sniffing is enabled together with credentials, and if an address other than a loopback one uses plain http.
 | opensearch.password | - | Password for authentication (optional).
+| opensearch.disable.tls.validation | false | Do not check the certificates and host names of the OpenSearch nodes. A warning is logged when this is enabled.
 | opensearch.concurrentRequests | 2 | Number of concurrent bulk requests.
 | opensearch.indexer.index.name | content | Index name for crawled documents.
 | opensearch.indexer.create | false | Auto-create index if it does not exist.
