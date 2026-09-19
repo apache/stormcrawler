@@ -124,9 +124,10 @@ public class Spout extends AbstractQueryingSpout {
                             ConfUtils.getString(
                                     stormConf, URLFRONTIER_HOST_KEY, URLFRONTIER_DEFAULT_HOST),
                             ConfUtils.getInt(
-                                    stormConf, URLFRONTIER_PORT_KEY, URLFRONTIER_DEFAULT_PORT));
+                                    stormConf, URLFRONTIER_PORT_KEY, URLFRONTIER_DEFAULT_PORT),
+                            stormConf);
         } else {
-            channel = ManagedChannelUtil.createChannel(address);
+            channel = ManagedChannelUtil.createChannel(address, stormConf);
         }
 
         frontier = URLFrontierGrpc.newStub(channel).withWaitForReady();

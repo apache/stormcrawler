@@ -24,6 +24,30 @@ urlfrontier.max.buckets: 10
 urlfrontier.max.urls.per.bucket:10
 ```
 
+## Transport security
+
+The gRPC channels to the frontier are plaintext unless TLS is enabled. Plaintext is kept as the
+default so that existing deployments keep working. The channel carries the URLs and their metadata, so enable TLS whenever the
+frontier runs on another host:
+
+```yaml
+urlfrontier.tls.enabled: true
+# PEM file with the certificates trusted to sign the server certificate;
+# the JVM trust store is used if not set
+urlfrontier.tls.trust.cert.collection: /etc/stormcrawler/frontier-ca.pem
+# client certificate and PKCS#8 private key for mutual TLS, both or neither
+urlfrontier.tls.client.cert.chain: /etc/stormcrawler/crawler.pem
+urlfrontier.tls.client.private.key: /etc/stormcrawler/crawler-key.pem
+# only needed if the private key is encrypted
+urlfrontier.tls.client.private.key.password: changeit
+```
+
+The server certificate must be valid for the host name in `urlfrontier.address` or
+`urlfrontier.host`. Setting only one of `urlfrontier.tls.client.cert.chain` and
+`urlfrontier.tls.client.private.key`, or pointing a key at a file which cannot be read, fails
+the component at startup. The settings apply to `Spout`, `StatusUpdaterBolt` and
+`QueueRegulatorBolt`.
+
 ## Sending discovered URLs in batches
 
 `StatusUpdaterBolt` sends known URLs (fetched, redirections, errors...) to the frontier's
