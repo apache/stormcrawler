@@ -88,6 +88,13 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
     private int maxOffsetGuess = 300;
 
     /**
+     * Maximum number of URLs emitted as DISCOVERED per sitemap, -1 for no limit. The URLs are
+     * already parsed at this point, so this bounds what reaches the status stream, not the memory
+     * used by the parse.
+     */
+    private int maxOutlinksPerSitemap = -1;
+
+    /**
      * Whether a document without the {@code isSitemap} key is classified as a sitemap by searching
      * the first bytes for the sitemaps.org namespace. Any page that carries the namespace string
      * early enough is reclassified as a sitemap and never reaches the parser bolt, so this defaults
@@ -210,7 +217,19 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
         }
 
         // send to status stream
-        for (Outlink ol : parse.getOutlinks()) {
+        final List<Outlink> found = parse.getOutlinks();
+        int emitted = 0;
+        for (Outlink ol : found) {
+            // got enough
+            if (maxOutlinksPerSitemap >= 0 && emitted >= maxOutlinksPerSitemap) {
+                LOG.warn(
+                        "Found {} links in sitemap {} trimming to {}",
+                        found.size(),
+                        url,
+                        maxOutlinksPerSitemap);
+                break;
+            }
+            emitted++;
             Values v = new Values(ol.getTargetURL(), ol.getMetadata(), Status.DISCOVERED);
             collector.emit(Constants.StatusStreamName, tuple, v);
         }
@@ -413,6 +432,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
                 ConfUtils.getInt(stormConf, "sitemap.filter.hours.since.modified", -1);
         parseFilters = ParseFilters.fromConf(stormConf);
         maxOffsetGuess = ConfUtils.getInt(stormConf, "sitemap.offset.guess", 300);
+        maxOutlinksPerSitemap = ConfUtils.getInt(stormConf, "sitemap.emitOutlinks.max", -1);
         averagedMetrics =
                 CrawlerMetrics.registerSingleMeanMetric(
                         context, stormConf, "sitemap_average_processing_time", 30);
