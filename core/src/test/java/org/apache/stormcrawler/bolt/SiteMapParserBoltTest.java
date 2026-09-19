@@ -33,6 +33,7 @@ import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.parse.ParsingTester;
+import org.apache.stormcrawler.persistence.Status;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -314,6 +315,42 @@ class SiteMapParserBoltTest extends ParsingTester {
                 "stormcrawler.sitemap.xml.gz",
                 metadata);
         Assertions.assertEquals(7, output.getEmitted(Constants.StatusStreamName).size());
+    }
+
+    /** A cap below the number of URLs trims the emitted URLs, the sitemap is still FETCHED. */
+    @Test
+    void outlinksAreTrimmedToTheCap() throws IOException {
+        List<List<Object>> emitted = parseWithOutlinksCap(3);
+        // 3 discovered + the sitemap itself
+        Assertions.assertEquals(4, emitted.size());
+        for (int i = 0; i < 3; i++) {
+            Assertions.assertEquals(Status.DISCOVERED, emitted.get(i).get(2));
+        }
+        Assertions.assertEquals(
+                "https://stormcrawler.apache.org/sitemap.xml", emitted.get(3).get(0));
+        Assertions.assertEquals(Status.FETCHED, emitted.get(3).get(2));
+    }
+
+    @Test
+    void outlinksAreNotTrimmedWithoutCap() throws IOException {
+        Assertions.assertEquals(7, parseWithOutlinksCap(-1).size());
+    }
+
+    @Test
+    void outlinksAreNotTrimmedBelowTheCap() throws IOException {
+        Assertions.assertEquals(7, parseWithOutlinksCap(100).size());
+    }
+
+    private List<List<Object>> parseWithOutlinksCap(int max) throws IOException {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("sitemap.emitOutlinks.max", max);
+        parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
+        bolt.prepare(
+                parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        Metadata metadata = new Metadata();
+        metadata.setValue(SiteMapParserBolt.isSitemapKey, "true");
+        parse("https://stormcrawler.apache.org/sitemap.xml", "stormcrawler.sitemap.xml", metadata);
+        return output.getEmitted(Constants.StatusStreamName);
     }
 
     private void assertNewsAttributes(Metadata metadata) {
