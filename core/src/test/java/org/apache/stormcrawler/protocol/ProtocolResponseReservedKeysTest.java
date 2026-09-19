@@ -39,6 +39,8 @@ class ProtocolResponseReservedKeysTest {
                 "http.trimmed",
                 "http.trimmed.reason",
                 "_redirectedTo",
+                "playwright.protocol.start",
+                "playwright.protocol.end",
                 "metrics.dns.resolution.msec",
                 "metrics.anything.a.server.invents"
             })
