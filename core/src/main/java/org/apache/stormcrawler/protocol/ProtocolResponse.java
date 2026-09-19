@@ -108,9 +108,9 @@ public class ProtocolResponse {
      * Whether a metadata key is one the crawler writes itself to record how a fetch went. The
      * protocols copy the response headers into the metadata, and a header name is not restricted to
      * anything: a value arriving from the wire must never populate one of these keys. The WARC
-     * writer reads them as the crawler's own account of the request, the fetcher bolts read
-     * {@value #METRICS_PREFIX} as their protocol timings and the JS rendering guards treat
-     * playwright.protocol.end as proof that the page was already rendered.
+     * writer reads them as the crawler's own account of the request, the JS rendering guards treat
+     * playwright.protocol.end as proof that the page was already rendered and the fetcher bolts
+     * read {@value #METRICS_PREFIX} as their protocol timings.
      */
     public static boolean isReservedMetadataKey(String key) {
         final String normalised = key.toLowerCase(Locale.ROOT);
