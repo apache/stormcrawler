@@ -264,8 +264,8 @@ header.
 | http.accept.language | en-us,en-gb,en;q=0.7,*;q=0.3 | HTTP Accept-Language
 header.
 | http.content.partial.as.trimmed | false | Accepts partially fetched content in OKHTTP.
-| http.filter.ipaddress.include | - | (OkHttp only) Comma-separated list (or YAML list) of allowed IP ranges. If empty, all addresses are allowed unless excluded. See <<IP Address Filtering>>.
-| http.filter.ipaddress.exclude | localhost, sitelocal, linklocal, anylocal, multicast, 100.64.0.0/10, 0.0.0.0/8, fc00::/7, ::/128 | (OkHttp only) Comma-separated list (or YAML list) of blocked IP ranges. Set to `""` to crawl private address space. See <<IP Address Filtering>>.
+| http.filter.ipaddress.include | - | (OkHttp and Playwright) Comma-separated list (or YAML list) of allowed IP ranges. If empty, all addresses are allowed unless excluded. See <<IP Address Filtering>>.
+| http.filter.ipaddress.exclude | localhost, sitelocal, linklocal, anylocal, multicast, 100.64.0.0/10, 0.0.0.0/8, fc00::/7, ::/128 | (OkHttp and Playwright) Comma-separated list (or YAML list) of blocked IP ranges. Set to `""` to crawl private address space. See <<IP Address Filtering>>.
 | http.trust.everything | false | (OkHttp only) If true, accept any TLS certificate, including self-signed, expired or otherwise invalid ones. The servers are then not authenticated: anyone able to answer for the host name receives everything sent to them. Credentials (basic auth, credential headers, cookies) are withheld from cleartext http:// requests and from https:// requests on such connections unless `http.credentials.allow.insecure` is set to true.
 | http.verify.hostnames | true | (OkHttp only) If true, check that the certificate presented by the server matches the host name contacted. Independent of `http.trust.everything`: a valid certificate for a different name is accepted when this is false. Credentials are then withheld unless `http.credentials.allow.insecure` is set to true.
 | http.credentials.allow.insecure | false | (OkHttp only) If true, send credentials (basic auth, credential headers, cookies) even on connections which do not authenticate the server: cleartext http:// urls and, when `http.trust.everything` is true or `http.verify.hostnames` is false, https:// urls as well. Redirect hops to another origin (scheme, host or port) never carry them.
@@ -289,6 +289,13 @@ crawl an intranet, override `http.filter.ipaddress.exclude`; setting only
 Fetches through a proxy are not filtered. The proxy resolves the target host and connects to it, so
 the protocol only sees the address of the proxy, which may well be private. What the fetcher can
 reach through a proxy is then decided by the egress rules of the proxy.
+
+The Playwright protocol (`org.apache.stormcrawler.protocol.playwright.HttpProtocol`) applies the same
+rules to the requests of the page, its subresources and popups, and aborts the rejected ones.
+Service workers are blocked while the filter is active, as their requests cannot be intercepted.
+Redirect hops and WebSocket connections are not checked. The host is resolved separately from the
+browser, so short-lived DNS records or a remote browser using another resolver can lead to a
+different address.
 
 Two properties control the behaviour:
 
@@ -318,8 +325,9 @@ http.filter.ipaddress.include: "10.0.0.0/8"
 grade NAT (`100.64.0.0/10`) and IPv6 unique local addresses (`fd00::/8`) have no keyword and are added
 as CIDR blocks when they are also to be blocked.
 
-When a connection to a blocked address is attempted, the fetch fails with an `IOException` and a
-warning is logged. If neither property is set, no IP filtering is performed.
+When a connection to a blocked address is attempted, a warning is logged. With OkHttp the fetch
+fails with an `IOException`. With Playwright the request is aborted: a blocked page fails the fetch,
+a blocked subresource is missing from the rendered page. If neither property is set, no IP filtering is performed.
 
 NOTE: When a proxy is configured, the connection is established to the proxy and the filter sees the
 proxy's IP address rather than the target host's resolved address. IP filtering is therefore

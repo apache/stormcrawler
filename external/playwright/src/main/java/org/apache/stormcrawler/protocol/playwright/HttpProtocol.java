@@ -29,8 +29,11 @@ import com.microsoft.playwright.Request;
 import com.microsoft.playwright.Tracing;
 import com.microsoft.playwright.options.HttpHeader;
 import com.microsoft.playwright.options.Proxy;
+import com.microsoft.playwright.options.ServiceWorkerPolicy;
 import com.microsoft.playwright.options.WaitUntilState;
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,12 +43,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import okhttp3.HttpUrl;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.Config;
 import org.apache.storm.utils.MutableInt;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
+import org.apache.stormcrawler.protocol.IPFilterRules;
 import org.apache.stormcrawler.protocol.Protocol;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.util.ConfUtils;
@@ -83,6 +88,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
     private WaitUntilState loadEvent;
 
     private PageActions pageActions = PageActions.emptyPageActions;
+
+    private IPFilterRules ipFilterRules;
 
     @Override
     public void configure(final Config conf) {
@@ -145,11 +152,29 @@ public class HttpProtocol extends AbstractHttpProtocol {
         overrideStatusOnContent =
                 ConfUtils.getBoolean(conf, "playwright.override.status.on.content", false);
 
+        configureIPFilter(conf);
+
         final NewContextOptions b_c_options = buildContextOptions(conf, getAgentString(conf));
 
         context = browser.newContext(b_c_options);
 
         context.setDefaultTimeout(timeout);
+
+        // on the context so that popups are covered too, the page route falls back to it
+        if (ipFilterRules != null) {
+            context.route(
+                    lambdaUrl -> true,
+                    route -> {
+                        if (isAllowedAddress(route.request().url())) {
+                            route.resume();
+                        } else {
+                            LOG.warn(
+                                    "Blocked request to forbidden IP address: {}",
+                                    route.request().url());
+                            route.abort("addressunreachable");
+                        }
+                    });
+        }
 
         // list of resource types to skip
         // document, stylesheet, image, media, font, script, texttrack, xhr, fetch,
@@ -166,6 +191,55 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         // optional chain of page actions applied after navigate, before content capture
         pageActions = PageActions.fromConf(conf);
+    }
+
+    /**
+     * Sets up the filtering of the requests made by the browser against http.filter.ipaddress.*. As
+     * with the OkHttp protocol, fetches through a proxy are not filtered.
+     */
+    void configureIPFilter(final Config conf) {
+        final IPFilterRules rules = new IPFilterRules(conf);
+        if (rules.isEmpty()) {
+            ipFilterRules = null;
+        } else if (StringUtils.isNotBlank(ConfUtils.getString(conf, "http.proxy"))) {
+            ipFilterRules = null;
+            LOG.info(
+                    "http.filter.ipaddress.* do not apply to fetches through a proxy, the proxy"
+                            + " resolves the target host and its own egress rules decide which"
+                            + " addresses are reached");
+        } else {
+            ipFilterRules = rules;
+        }
+    }
+
+    /**
+     * Checks the host of a request made by the browser against the IP filter rules. The host is
+     * resolved here, separately from the browser, so the address the browser connects to can
+     * differ, e.g. with short-lived DNS records or a remote browser using another resolver.
+     *
+     * @return false if any address of the host is rejected or the host cannot be resolved
+     */
+    boolean isAllowedAddress(final String url) {
+        if (ipFilterRules == null) {
+            return true;
+        }
+        // lenient like the browser, e.g. with '|' in the path or '_' in the host name
+        final HttpUrl parsed = HttpUrl.parse(url);
+        if (parsed == null) {
+            // data:, blob: and the like do not open a connection
+            return !StringUtils.startsWithIgnoreCase(url, "http:")
+                    && !StringUtils.startsWithIgnoreCase(url, "https:");
+        }
+        try {
+            for (InetAddress address : InetAddress.getAllByName(parsed.host())) {
+                if (!ipFilterRules.accept(address)) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (UnknownHostException e) {
+            return false;
+        }
     }
 
     /**
@@ -207,6 +281,11 @@ public class HttpProtocol extends AbstractHttpProtocol {
                             + " the browser, any server able to answer for a host name is accepted");
         }
         options.setIgnoreHTTPSErrors(ignoreHTTPSErrors);
+
+        // requests of a service worker are not routed, so they would bypass the IP filter
+        if (ipFilterRules != null) {
+            options.setServiceWorkers(ServiceWorkerPolicy.BLOCK);
+        }
 
         return options;
     }
@@ -273,7 +352,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                         route.request().resourceType())) {
                                     route.abort();
                                 } else {
-                                    route.resume();
+                                    // lets the IP filter on the context check the request
+                                    route.fallback();
                                 }
                             });
 
