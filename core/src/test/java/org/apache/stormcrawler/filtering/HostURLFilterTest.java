@@ -21,8 +21,15 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.host.HostURLFilter;
 import org.apache.stormcrawler.util.URLUtil;
@@ -142,5 +149,52 @@ class HostURLFilterTest {
         String filterResult =
                 allAllowed.filter(sourceURL, metadata, "http://www.anotherDomain.com/index.html");
         Assertions.assertEquals("http://www.anotherDomain.com/index.html", filterResult);
+    }
+
+    /**
+     * A single filter instance is shared by all the fetcher threads of a bolt, each of them calling
+     * it with its own source URL. The decision must depend on the source URL passed in and on
+     * nothing which is kept between calls, see issue #2101.
+     */
+    @Test
+    void testSourceUrlNotSharedBetweenThreads() throws Exception {
+        final int threads = 8;
+        final int iterations = 2000;
+        final HostURLFilter filter = createFilter(true, false);
+        final ExecutorService executor = Executors.newFixedThreadPool(threads);
+        final CountDownLatch start = new CountDownLatch(1);
+        final List<Future<String>> results = new ArrayList<>();
+        try {
+            for (int t = 0; t < threads; t++) {
+                final String host = "host" + t + ".example.com";
+                results.add(
+                        executor.submit(
+                                () -> {
+                                    final URL sourceURL = URLUtil.toURL("http://" + host + "/");
+                                    final Metadata metadata = new Metadata();
+                                    start.await();
+                                    for (int i = 0; i < iterations; i++) {
+                                        final String sameHost = "http://" + host + "/page" + i;
+                                        if (!sameHost.equals(
+                                                filter.filter(sourceURL, metadata, sameHost))) {
+                                            return "dropped a URL on its own host: " + sameHost;
+                                        }
+                                        final String otherHost =
+                                                "http://elsewhere.example.org/page" + i;
+                                        if (filter.filter(sourceURL, metadata, otherHost) != null) {
+                                            return "admitted a URL outside the source host, source "
+                                                    + sourceURL;
+                                        }
+                                    }
+                                    return null;
+                                }));
+            }
+            start.countDown();
+            for (Future<String> result : results) {
+                Assertions.assertNull(result.get(60, TimeUnit.SECONDS));
+            }
+        } finally {
+            executor.shutdownNow();
+        }
     }
 }

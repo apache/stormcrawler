@@ -45,10 +45,6 @@ public class HostURLFilter extends URLFilter {
     private boolean ignoreOutsideHost;
     private boolean ignoreOutsideDomain;
 
-    private URL previousSourceUrl;
-    private String previousSourceHost;
-    private String previousSourceDomain;
-
     @Override
     public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode filterParams) {
         JsonNode filterByHostNode = filterParams.get("ignoreOutsideHost");
@@ -88,22 +84,10 @@ public class HostURLFilter extends URLFilter {
             return null;
         }
 
-        String fromHost;
+        String fromHost = sourceUrl.getHost();
         String fromDomain = null;
-        // Using identity comparison because URL.equals performs poorly
-        if (sourceUrl == previousSourceUrl) {
-            fromHost = previousSourceHost;
-            if (ignoreOutsideDomain) {
-                fromDomain = previousSourceDomain;
-            }
-        } else {
-            fromHost = sourceUrl.getHost();
-            if (ignoreOutsideDomain) {
-                fromDomain = PaidLevelDomain.getPLD(fromHost);
-            }
-            previousSourceHost = fromHost;
-            previousSourceDomain = fromDomain;
-            previousSourceUrl = sourceUrl;
+        if (ignoreOutsideDomain) {
+            fromDomain = PaidLevelDomain.getPLD(fromHost);
         }
 
         // resolve the hosts
