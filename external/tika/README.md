@@ -37,4 +37,6 @@ Note that a configuration which is present on the classpath but invalid is treat
 
 Embedded documents are only parsed when `parser.extract.embedded` is set to `true` (default `false`).
 
+The length of the text extracted from a document can be limited with `parser.tika.text.maxlength` (number of characters, default `-1`, any negative value means no limit). When the limit is reached the parse stops, the text and outlinks extracted so far are kept and the document is emitted with the metadata `parse.text.trimmed` set to `true`.
+
 Since Tika 4, Tika metadata keys use namespaced names, which surface as renamed `parse.*` keys, e.g. `parse.resourceName` is now `parse.tk:resource-name`.
