@@ -293,6 +293,29 @@ class SiteMapParserBoltTest extends ParsingTester {
         Assertions.assertEquals(7, output.getEmitted(Constants.StatusStreamName).size());
     }
 
+    /**
+     * The declared content type only gates the sniffing and is not passed on to crawler-commons,
+     * which would trust it instead of detecting the format: a gzipped sitemap served as XML with a
+     * Content-Encoding the protocol does not decode (x-gzip) still parses.
+     */
+    @Test
+    void gzipSitemapDeclaredAsXmlStillParses() throws IOException {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("protocol.md.prefix", "protocol.");
+        parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
+        bolt.prepare(
+                parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        Metadata metadata = new Metadata();
+        metadata.setValue(SiteMapParserBolt.isSitemapKey, "true");
+        metadata.setValue("protocol." + HttpHeaders.CONTENT_TYPE, "application/xml");
+        metadata.setValue("protocol.Content-Encoding", "x-gzip");
+        parse(
+                "https://stormcrawler.apache.org/sitemap.xml.gz",
+                "stormcrawler.sitemap.xml.gz",
+                metadata);
+        Assertions.assertEquals(7, output.getEmitted(Constants.StatusStreamName).size());
+    }
+
     private void assertNewsAttributes(Metadata metadata) {
         long numAttributes = metadata.keySet(Extension.NEWS.name() + ".").size();
         Assertions.assertEquals(7, numAttributes);

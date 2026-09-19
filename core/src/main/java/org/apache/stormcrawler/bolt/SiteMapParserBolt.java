@@ -121,7 +121,13 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
         byte[] content = tuple.getBinaryByField("content");
         String url = tuple.getStringByField("url");
 
-        String ct = metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix);
+        // the declared type only gates the sniffing below. It is not handed to
+        // crawler-commons, which trusts a declared XML type instead of detecting
+        // the format: a gzipped sitemap served as XML with a Content-Encoding the
+        // protocol does not decode, such as x-gzip, would then fail to parse
+        final String declaredCt =
+                metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix);
+        String ct = null;
 
         LOG.debug("Processing {}", url);
 
@@ -131,7 +137,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
         // page deciding how the pipeline treats it must not depend on a string
         // in its body, and a promoted document also needs a sitemap compatible
         // content type
-        if (isSitemap == null && sniffContent && sniffsAsSitemap(ct, content)) {
+        if (isSitemap == null && sniffContent && sniffsAsSitemap(declaredCt, content)) {
             LOG.info("{} detected as sitemap based on content and content type", url);
             ct = "application/xml";
             isSitemap = "true";
