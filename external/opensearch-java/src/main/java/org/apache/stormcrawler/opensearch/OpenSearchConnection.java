@@ -24,10 +24,14 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.auth.AuthScope;
@@ -217,6 +221,55 @@ public final class OpenSearchConnection {
         return null;
     }
 
+    /**
+     * Returns the scopes the Basic credentials are registered for: the host and port of each
+     * configured address. A request to any other host or port does not receive them.
+     */
+    static List<AuthScope> credentialScopes(List<HttpHost> hosts) {
+        final Set<AuthScope> scopes = new LinkedHashSet<>();
+        for (HttpHost host : hosts) {
+            scopes.add(new AuthScope(host.getHostName(), host.getPort()));
+        }
+        return new ArrayList<>(scopes);
+    }
+
+    /**
+     * Returns the addresses which use plain http and are not a loopback address, i.e. those the
+     * Basic credentials would be sent to in the clear over the network.
+     */
+    static List<HttpHost> plainHttpHosts(List<HttpHost> hosts) {
+        final List<HttpHost> plain = new ArrayList<>();
+        for (HttpHost host : hosts) {
+            if ("http".equalsIgnoreCase(host.getSchemeName()) && !isLoopback(host.getHostName())) {
+                plain.add(host);
+            }
+        }
+        return plain;
+    }
+
+    private static final Pattern IPV4_LOOPBACK = Pattern.compile("127(\\.\\d{1,3}){3}");
+
+    /** Whether the host is localhost or a loopback IP literal. No name is resolved. */
+    static boolean isLoopback(String hostname) {
+        String host = StringUtils.strip(hostname.toLowerCase(Locale.ROOT), "[]");
+        return host.equals("localhost")
+                || IPV4_LOOPBACK.matcher(host).matches()
+                || host.equals("::1")
+                || host.equals("0:0:0:0:0:0:0:1");
+    }
+
+    private static void warnAboutPlainHttp(String boltType, List<HttpHost> hosts) {
+        final List<HttpHost> plain = plainHttpHosts(hosts);
+        if (!plain.isEmpty()) {
+            LOG.warn(
+                    "OpenSearch credentials are configured for {} but the addresses {} use plain "
+                            + "http, the credentials are sent unencrypted. Give the addresses an "
+                            + "https:// scheme.",
+                    boltType,
+                    plain);
+        }
+    }
+
     // internal helpers
     private record ClientResources(OpenSearchClient client, OpenSearchTransport transport) {}
 
@@ -349,6 +402,16 @@ public final class OpenSearchConnection {
                                 .setConnectTimeout(Timeout.ofMilliseconds(connectTimeout))
                                 .setSocketTimeout(Timeout.ofMilliseconds(socketTimeout)));
 
+        if (needsUser) {
+            warnAboutPlainHttp(boltType, hosts);
+        }
+        if (disableTlsValidation) {
+            LOG.warn(
+                    "opensearch.disable.tls.validation is set: the certificates and host names of "
+                            + "the OpenSearch nodes used for {} are not checked",
+                    boltType);
+        }
+
         // Auth, proxy, and/or trust-all SSL via HttpClient customisation
         if (needsUser || needsProxy || disableTlsValidation) {
             builder.setHttpClientConfigCallback(
@@ -357,9 +420,11 @@ public final class OpenSearchConnection {
                         if (needsUser) {
                             final BasicCredentialsProvider credentialsProvider =
                                     new BasicCredentialsProvider();
-                            credentialsProvider.setCredentials(
-                                    new AuthScope(null, -1),
-                                    new UsernamePasswordCredentials(user, password.toCharArray()));
+                            final UsernamePasswordCredentials credentials =
+                                    new UsernamePasswordCredentials(user, password.toCharArray());
+                            for (AuthScope scope : credentialScopes(hosts)) {
+                                credentialsProvider.setCredentials(scope, credentials);
+                            }
                             httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
                         }
                         // hc.client5 proxy: HttpHost(scheme, host, port)

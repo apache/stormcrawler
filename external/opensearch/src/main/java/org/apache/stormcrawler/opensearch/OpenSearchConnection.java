@@ -24,9 +24,13 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
@@ -139,8 +143,18 @@ public final class OpenSearchConnection {
                 ConfUtils.getBoolean(
                         stormConf, Constants.PARAMPREFIX, "", "disable.tls.validation", false);
 
-        final boolean needsUser = StringUtils.isNotBlank(user) && StringUtils.isNotBlank(password);
+        final boolean needsUser = hasCredentials(user, password);
         final boolean needsProxy = StringUtils.isNotBlank(proxyhost) && proxyport != -1;
+
+        if (needsUser) {
+            warnAboutPlainHttp(boltType, hosts);
+        }
+        if (disableTlsValidation) {
+            LOG.warn(
+                    "opensearch.disable.tls.validation is set: the certificates and host names of "
+                            + "the OpenSearch nodes used for {} are not checked",
+                    boltType);
+        }
 
         if (needsUser || needsProxy || disableTlsValidation) {
             builder.setHttpClientConfigCallback(
@@ -148,8 +162,11 @@ public final class OpenSearchConnection {
                         if (needsUser) {
                             final CredentialsProvider credentialsProvider =
                                     new BasicCredentialsProvider();
-                            credentialsProvider.setCredentials(
-                                    AuthScope.ANY, new UsernamePasswordCredentials(user, password));
+                            final UsernamePasswordCredentials credentials =
+                                    new UsernamePasswordCredentials(user, password);
+                            for (AuthScope scope : credentialScopes(hosts)) {
+                                credentialsProvider.setCredentials(scope, credentials);
+                            }
                             httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
                         }
                         if (needsProxy) {
@@ -230,6 +247,61 @@ public final class OpenSearchConnection {
         return new RestHighLevelClient(builder);
     }
 
+    /** Basic authentication is only set up when both the user and the password are given. */
+    static boolean hasCredentials(String user, String password) {
+        return StringUtils.isNotBlank(user) && StringUtils.isNotBlank(password);
+    }
+
+    /**
+     * Returns the scopes the Basic credentials are registered for: the host and port of each
+     * configured address. A node reached under any other host or port, such as one found by the
+     * sniffer under the address it publishes, does not receive them.
+     */
+    static List<AuthScope> credentialScopes(List<HttpHost> hosts) {
+        final Set<AuthScope> scopes = new LinkedHashSet<>();
+        for (HttpHost host : hosts) {
+            scopes.add(new AuthScope(host.getHostName(), host.getPort()));
+        }
+        return new ArrayList<>(scopes);
+    }
+
+    /**
+     * Returns the addresses which use plain http and are not a loopback address, i.e. those the
+     * Basic credentials would be sent to in the clear over the network.
+     */
+    static List<HttpHost> plainHttpHosts(List<HttpHost> hosts) {
+        final List<HttpHost> plain = new ArrayList<>();
+        for (HttpHost host : hosts) {
+            if ("http".equalsIgnoreCase(host.getSchemeName()) && !isLoopback(host.getHostName())) {
+                plain.add(host);
+            }
+        }
+        return plain;
+    }
+
+    private static final Pattern IPV4_LOOPBACK = Pattern.compile("127(\\.\\d{1,3}){3}");
+
+    /** Whether the host is localhost or a loopback IP literal. No name is resolved. */
+    static boolean isLoopback(String hostname) {
+        String host = StringUtils.strip(hostname.toLowerCase(Locale.ROOT), "[]");
+        return host.equals("localhost")
+                || IPV4_LOOPBACK.matcher(host).matches()
+                || host.equals("::1")
+                || host.equals("0:0:0:0:0:0:0:1");
+    }
+
+    private static void warnAboutPlainHttp(String boltType, List<HttpHost> hosts) {
+        final List<HttpHost> plain = plainHttpHosts(hosts);
+        if (!plain.isEmpty()) {
+            LOG.warn(
+                    "OpenSearch credentials are configured for {} but the addresses {} use plain "
+                            + "http, the credentials are sent unencrypted. Give the addresses an "
+                            + "https:// scheme.",
+                    boltType,
+                    plain);
+        }
+    }
+
     public void addToProcessor(final DocWriteRequest<?> request) {
         processor.add(request);
     }
@@ -306,6 +378,21 @@ public final class OpenSearchConnection {
                     ConfUtils.getBoolean(
                             stormConf, Constants.PARAMPREFIX, dottedType, "sniff", true);
             if (sniff) {
+                if (hasCredentials(
+                        ConfUtils.getString(stormConf, Constants.PARAMPREFIX, dottedType, "user"),
+                        ConfUtils.getString(
+                                stormConf, Constants.PARAMPREFIX, dottedType, "password"))) {
+                    LOG.warn(
+                            "Sniffing is enabled for {} and OpenSearch credentials are configured. "
+                                    + "The credentials are only sent to the configured addresses: "
+                                    + "requests to a node the sniffer finds under another host or "
+                                    + "port are sent without them and fail if the cluster requires "
+                                    + "authentication. List every node in opensearch.{}.addresses "
+                                    + "or set opensearch.{}.sniff: false.",
+                            boltType,
+                            boltType,
+                            boltType);
+                }
                 sniffer = Sniffer.builder(client.getLowLevelClient()).build();
             }
 
