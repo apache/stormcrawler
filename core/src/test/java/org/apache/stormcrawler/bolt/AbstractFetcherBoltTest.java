@@ -20,6 +20,7 @@ package org.apache.stormcrawler.bolt;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
@@ -44,6 +45,7 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.persistence.Status;
+import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
 import org.apache.stormcrawler.protocol.ProtocolFactory;
 import org.apache.stormcrawler.protocol.StuckProtocol;
 import org.junit.jupiter.api.AfterEach;
@@ -52,6 +54,9 @@ import org.junit.jupiter.api.Test;
 
 @WireMockTest
 abstract class AbstractFetcherBoltTest {
+
+    /** Value of protocol.md.prefix in crawler-default.yaml, set explicitly by the tests. */
+    static final String PROTOCOL_MD_PREFIX = "protocol.";
 
     BaseRichBolt bolt;
 
@@ -361,8 +366,70 @@ abstract class AbstractFetcherBoltTest {
         Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
     }
 
+    /**
+     * A response header named set-header lands on the same metadata key the protocols read to add
+     * headers to an outgoing request, so a crawled site could shape the requests sent afterwards.
+     * The merge must drop it, see issue #2090.
+     */
+    @Test
+    void setHeaderFromResponseIsNotMerged(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(
+                get(urlEqualTo("/set-header"))
+                        .willReturn(
+                                aResponse()
+                                        .withStatus(200)
+                                        .withHeader("set-header", "X-Injected=yes")
+                                        .withBody("hello")));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("protocol.md.prefix", PROTOCOL_MD_PREFIX);
+
+        Metadata md = fetchAndGetContentMetadata(wmRuntimeInfo, config, "/set-header");
+        Assertions.assertNull(
+                md.getFirstValue(AbstractHttpProtocol.SET_HEADER_BY_REQUEST, PROTOCOL_MD_PREFIX));
+    }
+
+    /** Dropping the response value must leave a value configured for the URL in place. */
+    @Test
+    void configuredSetHeaderSurvivesTheMerge(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(
+                get(urlEqualTo("/set-header"))
+                        .willReturn(
+                                aResponse()
+                                        .withStatus(200)
+                                        .withHeader("set-header", "X-Injected=yes")
+                                        .withBody("hello")));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("protocol.md.prefix", PROTOCOL_MD_PREFIX);
+
+        Metadata sourceMetadata = new Metadata();
+        sourceMetadata.setValue(
+                PROTOCOL_MD_PREFIX + AbstractHttpProtocol.SET_HEADER_BY_REQUEST,
+                "X-Configured=yes");
+
+        Metadata md =
+                fetchAndGetContentMetadata(wmRuntimeInfo, config, "/set-header", sourceMetadata);
+        Assertions.assertArrayEquals(
+                new String[] {"X-Configured=yes"},
+                md.getValues(AbstractHttpProtocol.SET_HEADER_BY_REQUEST, PROTOCOL_MD_PREFIX));
+    }
+
     TestOutputCollector fetch(
             WireMockRuntimeInfo wmRuntimeInfo, Map<String, Object> config, String path)
+            throws ReflectiveOperationException {
+        return fetch(wmRuntimeInfo, config, path, null);
+    }
+
+    TestOutputCollector fetch(
+            WireMockRuntimeInfo wmRuntimeInfo,
+            Map<String, Object> config,
+            String path,
+            Metadata sourceMetadata)
             throws ReflectiveOperationException {
         resetProtocolFactory();
         TestOutputCollector output = new TestOutputCollector();
@@ -372,7 +439,8 @@ abstract class AbstractFetcherBoltTest {
         when(tuple.getSourceComponent()).thenReturn("source");
         when(tuple.getStringByField("url"))
                 .thenReturn("http://localhost:" + wmRuntimeInfo.getHttpPort() + path);
-        when(tuple.getValueByField("metadata")).thenReturn(null);
+        when(tuple.contains("metadata")).thenReturn(sourceMetadata != null);
+        when(tuple.getValueByField("metadata")).thenReturn(sourceMetadata);
         bolt.execute(tuple);
 
         await().atMost(30, TimeUnit.SECONDS)
@@ -391,7 +459,16 @@ abstract class AbstractFetcherBoltTest {
     Metadata fetchAndGetContentMetadata(
             WireMockRuntimeInfo wmRuntimeInfo, Map<String, Object> config, String path)
             throws ReflectiveOperationException {
-        TestOutputCollector output = fetch(wmRuntimeInfo, config, path);
+        return fetchAndGetContentMetadata(wmRuntimeInfo, config, path, null);
+    }
+
+    Metadata fetchAndGetContentMetadata(
+            WireMockRuntimeInfo wmRuntimeInfo,
+            Map<String, Object> config,
+            String path,
+            Metadata sourceMetadata)
+            throws ReflectiveOperationException {
+        TestOutputCollector output = fetch(wmRuntimeInfo, config, path, sourceMetadata);
         List<List<Object>> contentTuples = output.getEmitted(Utils.DEFAULT_STREAM_ID);
         Assertions.assertEquals(1, contentTuples.size());
         Assertions.assertEquals(0, output.getEmitted(Constants.StatusStreamName).size());

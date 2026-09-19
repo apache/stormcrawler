@@ -77,7 +77,12 @@ public abstract class AbstractHttpProtocol implements Protocol {
      */
     protected static final String RESPONSE_COOKIES_ORIGIN = "set-cookie-origin";
 
-    protected static final String SET_HEADER_BY_REQUEST = "set-header";
+    /**
+     * Metadata key holding the headers to add to an outgoing request. It is a configuration
+     * setting: the fetcher bolts drop it from the metadata merged out of a response so that a
+     * crawled site cannot shape the requests sent afterwards.
+     */
+    public static final String SET_HEADER_BY_REQUEST = "set-header";
 
     protected String protocolMetadataPrefix = "";
 
