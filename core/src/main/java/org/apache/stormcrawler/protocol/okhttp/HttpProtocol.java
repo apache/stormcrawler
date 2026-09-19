@@ -78,6 +78,8 @@ import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilters;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
+import org.apache.stormcrawler.protocol.FetchTimeout;
+import org.apache.stormcrawler.protocol.FetchTimeoutException;
 import org.apache.stormcrawler.protocol.IPFilterRules;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.ProtocolResponse.TrimmedContentReason;
@@ -106,6 +108,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
     private int globalMaxContent;
 
     private int completionTimeout = -1;
+
+    /** Per-call deadline in seconds from fetcher.thread.timeout, -1 when disabled. */
+    private long fetchTimeout = -1;
 
     /** Accept partially fetched content as trimmed content */
     private boolean partialContentAsTrimmed = false;
@@ -220,6 +225,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         this.completionTimeout =
                 ConfUtils.getInt(conf, "topology.message.timeout.secs", completionTimeout);
+
+        // clamped to the message timeout: the per-call deadline replaces the client-level
+        // callTimeout derived from it and must not loosen it
+        this.fetchTimeout = FetchTimeout.secs(conf);
 
         this.partialContentAsTrimmed =
                 ConfUtils.getBoolean(conf, "http.content.partial.as.trimmed", false);
@@ -657,6 +666,11 @@ public class HttpProtocol extends AbstractHttpProtocol {
     }
 
     @Override
+    public boolean supportsFetchTimeout(String url, Metadata metadata) {
+        return fetchTimeout > 0;
+    }
+
+    @Override
     public ProtocolResponse getProtocolOutput(String url, final Metadata metadata)
             throws Exception {
         // create default local client
@@ -830,6 +844,9 @@ public class HttpProtocol extends AbstractHttpProtocol {
         // every hop creates its own Call and DNS timing entry: track them all
         // so intermediate entries are cleaned up too, including on exceptions
         final List<Call> hopCalls = new ArrayList<>();
+        // fetcher.thread.timeout, shared by all the hops of the chain
+        final long deadlineNanos =
+                fetchTimeout > 0 ? System.nanoTime() + TimeUnit.SECONDS.toNanos(fetchTimeout) : 0;
 
         try {
             for (int hops = 0; hops <= maxRedirectHops; hops++) {
@@ -840,6 +857,18 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 }
                 call = fetchClient.newCall(currentRequest);
                 hopCalls.add(call);
+                if (deadlineNanos != 0) {
+                    // hard deadline for the whole chain, enforced by okio's watchdog: on
+                    // expiry the call is cancelled, the socket closed and execute() or the
+                    // body read throw immediately. Every hop gets the time that is left.
+                    // DNS can still hold the fetcher thread past this deadline: cancellation
+                    // cannot release the synchronous lookup until the resolver returns
+                    final long remaining = deadlineNanos - System.nanoTime();
+                    if (remaining <= 0) {
+                        throw new FetchTimeoutException(url, fetchTimeout);
+                    }
+                    call.timeout().timeout(remaining, TimeUnit.NANOSECONDS);
+                }
                 try {
                     lastResponse = call.execute();
                 } catch (IOException | RuntimeException e) {
@@ -998,6 +1027,13 @@ public class HttpProtocol extends AbstractHttpProtocol {
             }
 
             return new ProtocolResponse(bytes, response.code(), responsemetadata);
+        } catch (InterruptedIOException e) {
+            if (deadlineNanos != 0 && call != null && call.isCanceled()) {
+                // cancelled by the watchdog at the deadline: tell it apart from the socket
+                // timeouts of http.timeout, which are SocketTimeoutExceptions
+                throw new FetchTimeoutException(url, fetchTimeout, e);
+            }
+            throw e;
         } finally {
             if (lastResponse != null) {
                 lastResponse.close();

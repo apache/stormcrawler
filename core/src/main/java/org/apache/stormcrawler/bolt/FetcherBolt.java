@@ -31,17 +31,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -63,10 +58,12 @@ import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.metrics.ScopedReducedMetric;
 import org.apache.stormcrawler.persistence.Status;
+import org.apache.stormcrawler.protocol.FetchTimeoutException;
 import org.apache.stormcrawler.protocol.Protocol;
 import org.apache.stormcrawler.protocol.ProtocolFactory;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.RobotRules;
+import org.apache.stormcrawler.protocol.RobotRulesParser;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
@@ -88,12 +85,10 @@ public class FetcherBolt extends StatusEmitterBolt {
     public static final String QUEUED_TIMEOUT_PARAM_KEY = "fetcher.timeout.queue";
 
     /**
-     * Hard timeout in seconds for a single call to {@link Protocol#getProtocolOutput}. If a fetch
-     * exceeds this duration the thread is interrupted, the URL is marked as FETCH_ERROR, and the
-     * thread moves on to the next item. A value of {@code -1} (the default) disables the bolt-level
-     * timeout, relying solely on the protocol-level socket timeouts.
+     * @deprecated since 4.0, use {@link Constants#FETCH_TIMEOUT_PARAM_KEY}
      */
-    public static final String FETCH_TIMEOUT_PARAM_KEY = "fetcher.thread.timeout";
+    @Deprecated(since = "4.0", forRemoval = true)
+    public static final String FETCH_TIMEOUT_PARAM_KEY = Constants.FETCH_TIMEOUT_PARAM_KEY;
 
     /** Key name of the custom crawl delay for a queue that may be present in the metadata. */
     private static final String CRAWL_DELAY_KEY_NAME = "crawl.delay";
@@ -129,6 +124,14 @@ public class FetcherBolt extends StatusEmitterBolt {
     private int maxNumberUrlsInQueues = -1;
 
     private String[] beingFetched;
+
+    /** Runs protocol calls under fetcher.thread.timeout, see {@link FetchTimeoutHelpers}. */
+    private FetchTimeoutHelpers fetchHelpers;
+
+    /** Largest number of helper threads ever alive; for tests. */
+    int helperPoolSize() {
+        return fetchHelpers == null ? 0 : fetchHelpers.largestPoolSize();
+    }
 
     @Override
     public Map<String, Object> getComponentConfiguration() {
@@ -238,6 +241,9 @@ public class FetcherBolt extends StatusEmitterBolt {
 
         final AtomicLong crawlDelay;
 
+        /** Consecutive fetches of this queue rejected because every helper thread was busy. */
+        private final AtomicInteger saturations = new AtomicInteger();
+
         public FetchItemQueue(
                 String id, int maxThreads, long crawlDelay, long minCrawlDelay, int maxQueueSize) {
             this.id = id;
@@ -334,7 +340,35 @@ public class FetcherBolt extends StatusEmitterBolt {
 
         void finish(boolean asap) {
             inProgress.decrementAndGet();
+            saturations.set(0);
             setNextFetchTime(System.currentTimeMillis(), asap);
+        }
+
+        /**
+         * Like {@link #finish} for a fetch which never ran because every helper thread was busy.
+         * The helpers are shared by all queues and are not freed by trying again, so instead of
+         * being ready at once the queue is backed off exponentially: its own delay, doubled at each
+         * consecutive rejection, up to {@code maxBackoff} or its own delay if longer. Any other
+         * outcome resets the backoff.
+         *
+         * <p>The delay is spread with equal jitter, between half the computed value and the value
+         * itself: a stuck protocol rejects the fetches of many queues within the same instant, and
+         * without jitter they would all become ready together and hit the pool as a herd again.
+         *
+         * @return the delay applied, in milliseconds
+         */
+        long finishSaturated(long maxBackoff) {
+            inProgress.decrementAndGet();
+            // 2^30 x 1 s is already far beyond any sensible cap: bound the shift, not the counter
+            final int rejections = Math.min(saturations.incrementAndGet(), 30);
+            final long base =
+                    Math.max(1000L, maxThreads > 1 ? minCrawlDelay.get() : crawlDelay.get());
+            // the cap never shortens the queue's own delay
+            final long computed = Math.min(Math.max(maxBackoff, base), base << (rejections - 1));
+            final long half = computed / 2;
+            final long delay = half + ThreadLocalRandom.current().nextLong(computed - half + 1);
+            nextFetchTime.set(System.currentTimeMillis() + delay);
+            return delay;
         }
 
         private void setNextFetchTime(long endTime, boolean asap) {
@@ -384,6 +418,9 @@ public class FetcherBolt extends StatusEmitterBolt {
         final long crawlDelay;
         final long minCrawlDelay;
 
+        /** Cap of the backoff applied to a queue whose fetches find every helper thread busy. */
+        final long maxBackoff;
+
         int maxQueueSize;
 
         final Config conf;
@@ -417,6 +454,10 @@ public class FetcherBolt extends StatusEmitterBolt {
             if (this.maxQueueSize == -1) {
                 this.maxQueueSize = Integer.MAX_VALUE;
             }
+            // a queue is never put off for longer than the longest politeness delay accepted,
+            // or the default one when any delay is accepted (negative value)
+            final int maxCrawlDelaySecs = ConfUtils.getInt(conf, "fetcher.max.crawl.delay", 30);
+            this.maxBackoff = (maxCrawlDelaySecs < 0 ? 30 : maxCrawlDelaySecs) * 1000L;
 
             // order is not guaranteed
             for (Entry<String, Object> e : conf.entrySet()) {
@@ -463,6 +504,27 @@ public class FetcherBolt extends StatusEmitterBolt {
                 return;
             }
             fiq.finish(asap);
+            rescheduleOrReap(fiq);
+        }
+
+        /**
+         * Releases the slot of an item whose fetch found every helper thread busy and backs the
+         * queue off, see {@link FetchItemQueue#finishSaturated}.
+         *
+         * @return the delay applied to the queue in milliseconds, -1 if the queue is unknown
+         */
+        public long backOffFetchItem(FetchItem it) {
+            FetchItemQueue fiq = queues.get(it.queueId);
+            if (fiq == null) {
+                LOG.warn("Attempting to back off item from unknown queue: {}", it.queueId);
+                return -1;
+            }
+            long delay = fiq.finishSaturated(maxBackoff);
+            rescheduleOrReap(fiq);
+            return delay;
+        }
+
+        private void rescheduleOrReap(FetchItemQueue fiq) {
             if (fiq.queue.isEmpty()) {
                 reapIfEmpty(fiq);
             } else {
@@ -635,15 +697,6 @@ public class FetcherBolt extends StatusEmitterBolt {
 
         private long timeoutInQueues = -1;
 
-        /** Hard timeout in seconds for a single protocol fetch. -1 means disabled. */
-        private long fetchTimeout = -1;
-
-        /**
-         * Single-thread executor used to run the protocol call so that it can be interrupted via
-         * {@link Future#cancel(boolean)} when the bolt-level timeout fires.
-         */
-        private final ExecutorService fetchExecutor;
-
         // by default remains as is-pre 1.17
         private String protocolMetadataPrefix = "";
 
@@ -657,24 +710,11 @@ public class FetcherBolt extends StatusEmitterBolt {
             this.crawlDelayForce = ConfUtils.getBoolean(conf, "fetcher.server.delay.force", false);
             this.threadNum = num;
             timeoutInQueues = ConfUtils.getLong(conf, QUEUED_TIMEOUT_PARAM_KEY, timeoutInQueues);
-            fetchTimeout = ConfUtils.getLong(conf, FETCH_TIMEOUT_PARAM_KEY, fetchTimeout);
             protocolMetadataPrefix =
                     ConfUtils.getString(
                             conf,
                             ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM,
                             protocolMetadataPrefix);
-
-            if (fetchTimeout > 0) {
-                fetchExecutor =
-                        Executors.newSingleThreadExecutor(
-                                r -> {
-                                    Thread t = new Thread(r, "FetcherTimeout #" + num);
-                                    t.setDaemon(true);
-                                    return t;
-                                });
-            } else {
-                fetchExecutor = null;
-            }
         }
 
         @Override
@@ -725,6 +765,8 @@ public class FetcherBolt extends StatusEmitterBolt {
                 String robotsCrawlDelaySecs = null;
 
                 boolean asap = false;
+                // the fetch never ran because every helper thread was busy
+                boolean saturated = false;
 
                 try {
                     URL url = URLUtil.toURL(fit.url);
@@ -735,7 +777,27 @@ public class FetcherBolt extends StatusEmitterBolt {
                                 "No protocol implementation found for " + fit.url);
                     }
 
-                    BaseRobotRules rules = protocol.getRobotRules(fit.url);
+                    BaseRobotRules rules;
+                    try {
+                        rules =
+                                fetchHelpers.call(
+                                        () -> protocol.getRobotRules(fit.url),
+                                        protocol,
+                                        fit.url,
+                                        metadata);
+                    } catch (FetchTimeoutException e) {
+                        // same outcome as with okhttp, where HttpRobotRulesParser turns a
+                        // failed lookup into empty rules: the page is fetched without rules.
+                        // The protocol caches the failure so that the next URLs of the host
+                        // do not each occupy a helper for a full deadline
+                        LOG.info(
+                                "[Fetcher #{}] robots.txt lookup timed out for {}",
+                                taskId,
+                                fit.url);
+                        eventCounter.scope("robots.timeout").incrBy(1);
+                        protocol.robotRulesTimedOut(fit.url);
+                        rules = RobotRulesParser.EMPTY_RULES;
+                    }
                     boolean fromCache = false;
                     if (rules instanceof RobotRules
                             && ((RobotRules) rules).getContentLengthFetched().length == 0) {
@@ -871,33 +933,12 @@ public class FetcherBolt extends StatusEmitterBolt {
 
                     final Metadata fetchMetadata = metadata;
                     ProtocolResponse response;
-                    if (fetchExecutor != null) {
-                        Future<ProtocolResponse> future =
-                                fetchExecutor.submit(
-                                        () -> protocol.getProtocolOutput(fit.url, fetchMetadata));
-                        try {
-                            response = future.get(fetchTimeout, TimeUnit.SECONDS);
-                        } catch (TimeoutException e) {
-                            future.cancel(true);
-                            throw new Exception(
-                                    "Fetch timed out after "
-                                            + fetchTimeout
-                                            + "s fetching "
-                                            + fit.url,
-                                    e);
-                        } catch (CancellationException e) {
-                            throw new Exception("Fetch cancelled for " + fit.url);
-                        } catch (ExecutionException e) {
-                            // unwrap the real cause so existing catch logic handles it
-                            Throwable cause = e.getCause();
-                            if (cause instanceof Exception) {
-                                throw (Exception) cause;
-                            }
-                            throw new Exception(cause);
-                        }
-                    } else {
-                        response = protocol.getProtocolOutput(fit.url, metadata);
-                    }
+                    response =
+                            fetchHelpers.call(
+                                    () -> protocol.getProtocolOutput(fit.url, fetchMetadata),
+                                    protocol,
+                                    fit.url,
+                                    fetchMetadata);
 
                     long timeFetching = System.currentTimeMillis() - start;
 
@@ -1017,6 +1058,20 @@ public class FetcherBolt extends StatusEmitterBolt {
                         collector.emit(Constants.StatusStreamName, fit.tuple, tupleToSend);
                     }
 
+                } catch (FetchTimeoutHelpers.SaturatedException e) {
+                    // the URL never reached the network: like a URL which waited too long in
+                    // the queue, it is acked without a status so that the spout retries it
+                    // later, rather than taking a strike towards max.fetch.errors. The queue
+                    // is backed off rather than made ready at once (see finally): the helpers
+                    // are shared and retrying immediately would only drain the queue into
+                    // more rejections
+                    eventCounter.scope("fetch.helper.rejected").incrBy(1);
+                    LOG.warn(
+                            "[Fetcher #{}] {}: all {} fetch helpers are busy",
+                            taskId,
+                            e.getMessage(),
+                            fetchHelpers.maxHelpers());
+                    saturated = true;
                 } catch (Exception exece) {
                     String message = exece.getMessage();
                     if (message == null) {
@@ -1024,10 +1079,15 @@ public class FetcherBolt extends StatusEmitterBolt {
                     }
 
                     // common exceptions for which we log only a short message
-                    if (exece.getCause() instanceof java.util.concurrent.TimeoutException
+                    if (exece instanceof java.io.InterruptedIOException
                             || message.contains(" timed out")) {
                         LOG.info("Socket timeout fetching {}", fit.url);
                         message = "Socket timeout fetching";
+                        eventCounter.scope("fetch.timeout").incrBy(1);
+                        if (exece instanceof FetchTimeoutException) {
+                            // the hard deadline, as opposed to the protocol's socket timeouts
+                            eventCounter.scope("fetch.deadline").incrBy(1);
+                        }
                     } else if (exece.getCause() instanceof java.net.UnknownHostException
                             || exece instanceof java.net.UnknownHostException) {
                         LOG.info("Unknown host {}", fit.url);
@@ -1055,7 +1115,16 @@ public class FetcherBolt extends StatusEmitterBolt {
 
                     eventCounter.scope("exception").incrBy(1);
                 } finally {
-                    fetchQueues.finishFetchItem(fit, asap);
+                    if (saturated) {
+                        long delay = fetchQueues.backOffFetchItem(fit);
+                        LOG.debug(
+                                "[Fetcher #{}] queue {} backed off for {} ms",
+                                taskId,
+                                fit.queueId,
+                                delay);
+                    } else {
+                        fetchQueues.finishFetchItem(fit, asap);
+                    }
                     activeThreads.decrementAndGet(); // count threads
                     // ack it whatever happens
                     collector.ack(fit.tuple);
@@ -1137,6 +1206,11 @@ public class FetcherBolt extends StatusEmitterBolt {
         int threadCount = ConfUtils.getInt(conf, "fetcher.threads.number", 10);
         int startDelay = ConfUtils.getInt(conf, "fetcher.threads.start.delay", 10);
 
+        // helpers for protocols which can not cancel a fetch themselves; no thread until needed
+        fetchHelpers =
+                new FetchTimeoutHelpers(conf, Math.max(1, threadCount * 2), "FetcherTimeout-");
+        fetchHelpers.registerMetrics(context, stormConf, metricsTimeBucketSecs);
+
         for (int i = 0; i < threadCount; i++) {
             if (startDelay > 0 && i > 0) {
                 // short delay to avoid that DNS or other resources are temporarily
@@ -1183,6 +1257,9 @@ public class FetcherBolt extends StatusEmitterBolt {
     @Override
     public void cleanup() {
         super.cleanup();
+        if (fetchHelpers != null) {
+            fetchHelpers.shutdown();
+        }
         protocolFactory.cleanup();
     }
 
