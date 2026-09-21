@@ -398,6 +398,7 @@ Configures parsing of fetched text and the handling of discovered URIs
 | parsefilters.config.file | parsefilters.json | Path to JSON config defining ParseFilters. See link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/parsefilters.json[default parsefilters.json].
 | parser.emitOutlinks | true | Emit discovered links as DISCOVERED tuples.
 | parser.emitOutlinks.max.per.page | -1 | Limit number of emitted links per page.
+| sitemap.emitOutlinks.max | -1 | Limit the number of URLs emitted as DISCOVERED per sitemap, or child sitemaps per sitemap index. -1 disables the limit. A trimmed sitemap is still marked as FETCHED and a warning is logged. This is a partial mitigation: the URLs have already been parsed when the limit applies, so it bounds what reaches the status stream, not the memory used by the parse.
 | sitemap.filter.hours.since.modified | -1 | Filter URLs in sitemaps based on their modification date. -1 disables filtering.
 | sitemap.schedule.delay | -1 | Staggered scheduling delay for sitemaps (minutes). -1 disables staggering.
 | sitemap.extensions | - | Sitemap extensions to parse (IMAGE, LINKS, MOBILE, NEWS, VIDEO).
