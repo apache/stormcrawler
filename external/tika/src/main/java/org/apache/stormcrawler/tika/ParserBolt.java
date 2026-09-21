@@ -63,6 +63,7 @@ import org.apache.stormcrawler.util.URLUtil;
 import org.apache.tika.Tika;
 import org.apache.tika.config.loader.TikaLoader;
 import org.apache.tika.exception.TikaConfigException;
+import org.apache.tika.exception.WriteLimitReachedException;
 import org.apache.tika.io.TikaInputStream;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.parser.EmptyParser;
@@ -82,6 +83,18 @@ import org.xml.sax.ContentHandler;
 
 /** Uses Tika to parse the output of a fetch and extract text + metadata. */
 public class ParserBolt extends BaseRichBolt {
+
+    /**
+     * Configuration key for the maximum number of characters of text extracted from a document, a
+     * negative value for no limit.
+     */
+    public static final String TEXT_MAX_LENGTH_PARAM = "parser.tika.text.maxlength";
+
+    /**
+     * Metadata key set to "true" when the extracted text has been cut at {@link
+     * #TEXT_MAX_LENGTH_PARAM}.
+     */
+    public static final String TEXT_TRIMMED_KEY = "parse.text.trimmed";
 
     private Tika tika;
 
@@ -109,6 +122,8 @@ public class ParserBolt extends BaseRichBolt {
     private List<Pattern> mimeTypeWhiteList = new LinkedList<>();
 
     private String protocolMDprefix;
+
+    private int textMaxLength = -1;
 
     @Override
     public void prepare(
@@ -150,6 +165,10 @@ public class ParserBolt extends BaseRichBolt {
         }
 
         protocolMDprefix = ConfUtils.getString(conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "");
+
+        // Tika only treats exactly -1 as unlimited and fails on other negative values
+        int maxLength = ConfUtils.getInt(conf, TEXT_MAX_LENGTH_PARAM, -1);
+        textMaxLength = maxLength < 0 ? -1 : maxLength;
 
         tika = instantiateTika(conf);
 
@@ -258,7 +277,7 @@ public class ParserBolt extends BaseRichBolt {
         }
 
         LinkContentHandler linkHandler = new LinkContentHandler();
-        ContentHandler textHandler = new BodyContentHandler(-1);
+        ContentHandler textHandler = new BodyContentHandler(textMaxLength);
         TeeContentHandler teeHandler = new TeeContentHandler(linkHandler, textHandler);
         // seed the context with the components configured in the
         // "parse-context" section of the Tika configuration
@@ -293,18 +312,31 @@ public class ParserBolt extends BaseRichBolt {
 
         // parse
         String text;
+        boolean textTrimmed = false;
         try (TikaInputStream tis = TikaInputStream.get(content)) {
             tika.getParser().parse(tis, teeHandler, md, parseContext);
             text = textHandler.toString();
         } catch (Throwable e) {
-            handleException(url, e, metadata, tuple, "parse error");
-            return;
+            if (!WriteLimitReachedException.isWriteLimitReached(e)) {
+                handleException(url, e, metadata, tuple, "parse error");
+                return;
+            }
+            // the parse stopped at the text limit: keep the text and the
+            // links extracted so far instead of failing the document
+            text = textHandler.toString();
+            textTrimmed = true;
+            LOG.info("Text of {} trimmed to {} characters", url, textMaxLength);
+            eventCounter.scope("text_trimmed").incrBy(1);
         }
 
         // add parse md to metadata
         for (String k : md.names()) {
             String[] values = md.getValues(k);
             metadata.setValues("parse." + k, values);
+        }
+
+        if (textTrimmed) {
+            metadata.setValue(TEXT_TRIMMED_KEY, "true");
         }
 
         long duration = System.currentTimeMillis() - start;
