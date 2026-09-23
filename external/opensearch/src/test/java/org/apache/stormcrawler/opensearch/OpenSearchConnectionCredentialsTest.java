@@ -23,66 +23,143 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.client.CredentialsProvider;
 import org.junit.jupiter.api.Test;
+import org.opensearch.client.Request;
+import org.opensearch.client.RestClient;
 import org.opensearch.client.sniff.OpenSearchNodesSniffer;
 
 class OpenSearchConnectionCredentialsTest {
 
-    private static BasicCredentialsProvider providerFor(List<HttpHost> hosts) {
-        final BasicCredentialsProvider provider = new BasicCredentialsProvider();
-        final UsernamePasswordCredentials credentials =
-                new UsernamePasswordCredentials("crawler", "s3cret");
-        for (AuthScope scope : OpenSearchConnection.credentialScopes(hosts)) {
-            provider.setCredentials(scope, credentials);
-        }
-        return provider;
+    private static final Credentials CREDENTIALS =
+            new UsernamePasswordCredentials("crawler", "s3cret");
+
+    private static CredentialsProvider providerFor(HttpHost... hosts) {
+        return new OpenSearchConnection.OriginCredentialsProvider(List.of(hosts), CREDENTIALS);
+    }
+
+    /** The scope HttpClient looks the credentials up with for a request to the given node. */
+    private static AuthScope request(String scheme, String host, int port) {
+        return new AuthScope(new HttpHost(host, port, scheme), AuthScope.ANY_REALM, "Basic");
     }
 
     @Test
-    void scopesCoverTheConfiguredHostsAndPorts() {
-        final List<AuthScope> scopes =
-                OpenSearchConnection.credentialScopes(
-                        List.of(
-                                new HttpHost("opensearch1.example.org", 9200, "https"),
-                                new HttpHost("opensearch2.example.org", 9201, "https")));
+    void credentialsAreGivenToTheConfiguredAddresses() {
+        final CredentialsProvider provider =
+                providerFor(
+                        new HttpHost("opensearch1.example.org", 9200, "https"),
+                        new HttpHost("OpenSearch2.example.org", 9201, "https"));
         assertEquals(
-                List.of(
-                        new AuthScope("opensearch1.example.org", 9200),
-                        new AuthScope("opensearch2.example.org", 9201)),
-                scopes);
-    }
-
-    @Test
-    void duplicateAddressesGiveOneScope() {
-        final List<AuthScope> scopes =
-                OpenSearchConnection.credentialScopes(
-                        List.of(
-                                new HttpHost("opensearch1.example.org", 9200, "https"),
-                                new HttpHost("OpenSearch1.example.org", 9200, "https")));
-        assertEquals(1, scopes.size());
-    }
-
-    @Test
-    void noAddressGivesNoScope() {
-        assertTrue(OpenSearchConnection.credentialScopes(List.of()).isEmpty());
+                CREDENTIALS,
+                provider.getCredentials(request("https", "opensearch1.example.org", 9200)));
+        assertEquals(
+                CREDENTIALS,
+                provider.getCredentials(request("HTTPS", "opensearch2.example.org", 9201)));
     }
 
     @Test
     void credentialsAreOnlyGivenToTheConfiguredHosts() {
-        final BasicCredentialsProvider provider =
-                providerFor(List.of(new HttpHost("opensearch1.example.org", 9200, "https")));
+        final CredentialsProvider provider =
+                providerFor(new HttpHost("opensearch1.example.org", 9200, "https"));
 
-        assertNotNull(provider.getCredentials(new AuthScope("opensearch1.example.org", 9200)));
         // a node found by the sniffer under the address it publishes
-        assertNull(provider.getCredentials(new AuthScope("10.0.0.12", 9200)));
+        assertNull(provider.getCredentials(request("https", "10.0.0.12", 9200)));
         // same host, another port
-        assertNull(provider.getCredentials(new AuthScope("opensearch1.example.org", 9300)));
-        assertNull(provider.getCredentials(new AuthScope("other.example.org", 9200)));
+        assertNull(provider.getCredentials(request("https", "opensearch1.example.org", 9300)));
+        assertNull(provider.getCredentials(request("https", "other.example.org", 9200)));
+    }
+
+    @Test
+    void credentialsAreMatchedOnTheScheme() {
+        final CredentialsProvider provider =
+                providerFor(new HttpHost("opensearch1.example.org", 9200, "https"));
+        assertNull(provider.getCredentials(request("http", "opensearch1.example.org", 9200)));
+    }
+
+    @Test
+    void credentialsNeedAnOrigin() {
+        final CredentialsProvider provider =
+                providerFor(new HttpHost("opensearch1.example.org", 9200, "https"));
+        assertNull(provider.getCredentials(new AuthScope("opensearch1.example.org", 9200)));
+        assertNull(provider.getCredentials(AuthScope.ANY));
+    }
+
+    @Test
+    void noAddressGivesTheCredentialsToNoOne() {
+        assertNull(providerFor().getCredentials(request("https", "opensearch1.example.org", 9200)));
+    }
+
+    /**
+     * Sends a request with the client to a local server and returns the Authorization header it
+     * received, if any.
+     */
+    private static String authorizationSentTo(HttpHost configured) throws Exception {
+        try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            final int port = server.getLocalPort();
+            final CompletableFuture<String> authorization =
+                    CompletableFuture.supplyAsync(
+                            () -> {
+                                try (Socket socket = server.accept()) {
+                                    final BufferedReader in =
+                                            new BufferedReader(
+                                                    new InputStreamReader(
+                                                            socket.getInputStream(),
+                                                            StandardCharsets.US_ASCII));
+                                    String header = null;
+                                    for (String line = in.readLine();
+                                            line != null && !line.isEmpty();
+                                            line = in.readLine()) {
+                                        if (line.regionMatches(true, 0, "Authorization:", 0, 14)) {
+                                            header = line.substring(14).trim();
+                                        }
+                                    }
+                                    socket.getOutputStream()
+                                            .write(
+                                                    "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                                                            .getBytes(StandardCharsets.US_ASCII));
+                                    return header;
+                                } catch (IOException e) {
+                                    throw new UncheckedIOException(e);
+                                }
+                            });
+            final HttpHost configuredHere =
+                    new HttpHost(configured.getHostName(), port, configured.getSchemeName());
+            try (RestClient client =
+                    RestClient.builder(new HttpHost("127.0.0.1", port, "http"))
+                            .setHttpClientConfigCallback(
+                                    b ->
+                                            b.setDefaultCredentialsProvider(
+                                                    providerFor(configuredHere)))
+                            .build()) {
+                client.performRequest(new Request("GET", "/"));
+            }
+            return authorization.get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    void clientSendsTheCredentialsToAConfiguredAddress() throws Exception {
+        assertNotNull(authorizationSentTo(new HttpHost("127.0.0.1", 0, "http")));
+    }
+
+    @Test
+    void clientSendsNoCredentialsToAnotherAddress() throws Exception {
+        assertNull(authorizationSentTo(new HttpHost("127.0.0.1", 0, "https")));
     }
 
     @Test

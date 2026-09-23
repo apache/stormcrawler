@@ -51,8 +51,8 @@ class OpenSearchConnectionCredentialsTest {
                                 new HttpHost("https", "opensearch2.example.org", 9201)));
         assertEquals(
                 List.of(
-                        new AuthScope("opensearch1.example.org", 9200),
-                        new AuthScope("opensearch2.example.org", 9201)),
+                        new AuthScope("https", "opensearch1.example.org", 9200, null, null),
+                        new AuthScope("https", "opensearch2.example.org", 9201, null, null)),
                 scopes);
     }
 
@@ -77,12 +77,25 @@ class OpenSearchConnectionCredentialsTest {
                 providerFor(List.of(new HttpHost("https", "opensearch1.example.org", 9200)));
 
         assertNotNull(
-                provider.getCredentials(new AuthScope("opensearch1.example.org", 9200), null));
+                provider.getCredentials(request("https", "opensearch1.example.org", 9200), null));
         // another node of the cluster which is not listed in the addresses
-        assertNull(provider.getCredentials(new AuthScope("10.0.0.12", 9200), null));
+        assertNull(provider.getCredentials(request("https", "10.0.0.12", 9200), null));
         // same host, another port
-        assertNull(provider.getCredentials(new AuthScope("opensearch1.example.org", 9300), null));
-        assertNull(provider.getCredentials(new AuthScope("other.example.org", 9200), null));
+        assertNull(
+                provider.getCredentials(request("https", "opensearch1.example.org", 9300), null));
+        assertNull(provider.getCredentials(request("https", "other.example.org", 9200), null));
+    }
+
+    @Test
+    void credentialsAreMatchedOnTheScheme() {
+        final BasicCredentialsProvider provider =
+                providerFor(List.of(new HttpHost("https", "opensearch1.example.org", 9200)));
+        assertNull(provider.getCredentials(request("http", "opensearch1.example.org", 9200), null));
+    }
+
+    /** The scope HttpClient looks the credentials up with for a request to the given node. */
+    private static AuthScope request(String scheme, String host, int port) {
+        return new AuthScope(new HttpHost(scheme, host, port), null, "Basic");
     }
 
     @Test

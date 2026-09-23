@@ -222,13 +222,13 @@ public final class OpenSearchConnection {
     }
 
     /**
-     * Returns the scopes the Basic credentials are registered for: the host and port of each
-     * configured address. A request to any other host or port does not receive them.
+     * Returns the scopes the Basic credentials are registered for: the scheme, host and port of
+     * each configured address. A request to any other address does not receive them.
      */
     static List<AuthScope> credentialScopes(List<HttpHost> hosts) {
         final Set<AuthScope> scopes = new LinkedHashSet<>();
         for (HttpHost host : hosts) {
-            scopes.add(new AuthScope(host.getHostName(), host.getPort()));
+            scopes.add(new AuthScope(host));
         }
         return new ArrayList<>(scopes);
     }

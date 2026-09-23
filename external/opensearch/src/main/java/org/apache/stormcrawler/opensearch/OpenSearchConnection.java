@@ -34,11 +34,11 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.TrustAllStrategy;
-import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.jetbrains.annotations.NotNull;
@@ -161,14 +161,10 @@ public final class OpenSearchConnection {
             builder.setHttpClientConfigCallback(
                     httpClientBuilder -> {
                         if (needsUser) {
-                            final CredentialsProvider credentialsProvider =
-                                    new BasicCredentialsProvider();
-                            final UsernamePasswordCredentials credentials =
-                                    new UsernamePasswordCredentials(user, password);
-                            for (AuthScope scope : credentialScopes(hosts)) {
-                                credentialsProvider.setCredentials(scope, credentials);
-                            }
-                            httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+                            httpClientBuilder.setDefaultCredentialsProvider(
+                                    new OriginCredentialsProvider(
+                                            hosts,
+                                            new UsernamePasswordCredentials(user, password)));
                         }
                         if (needsProxy) {
                             httpClientBuilder.setProxy(
@@ -254,16 +250,47 @@ public final class OpenSearchConnection {
     }
 
     /**
-     * Returns the scopes the Basic credentials are registered for: the host and port of each
-     * configured address. A node reached under any other host or port, such as one found by the
+     * Gives the Basic credentials only to requests for one of the configured addresses, matched on
+     * scheme, host and port. A node reached under any other address, such as one found by the
      * sniffer under the address it publishes, does not receive them.
      */
-    static List<AuthScope> credentialScopes(List<HttpHost> hosts) {
-        final Set<AuthScope> scopes = new LinkedHashSet<>();
-        for (HttpHost host : hosts) {
-            scopes.add(new AuthScope(host.getHostName(), host.getPort()));
+    static final class OriginCredentialsProvider implements CredentialsProvider {
+
+        private final Set<String> origins = new LinkedHashSet<>();
+        private final Credentials credentials;
+
+        OriginCredentialsProvider(List<HttpHost> hosts, Credentials credentials) {
+            for (HttpHost host : hosts) {
+                origins.add(origin(host));
+            }
+            this.credentials = credentials;
         }
-        return new ArrayList<>(scopes);
+
+        private static String origin(HttpHost host) {
+            final String scheme = host.getSchemeName().toLowerCase(Locale.ROOT);
+            int port = host.getPort();
+            if (port < 0) {
+                port = "https".equals(scheme) ? 443 : 80;
+            }
+            return scheme + "://" + host.getHostName().toLowerCase(Locale.ROOT) + ":" + port;
+        }
+
+        @Override
+        public Credentials getCredentials(AuthScope scope) {
+            final HttpHost origin = scope.getOrigin();
+            if (origin != null && origins.contains(origin(origin))) {
+                return credentials;
+            }
+            return null;
+        }
+
+        @Override
+        public void setCredentials(AuthScope scope, Credentials credentials) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void clear() {}
     }
 
     /**
@@ -281,9 +308,9 @@ public final class OpenSearchConnection {
     }
 
     /**
-     * Returns the scheme under which the sniffer registers the nodes it finds. The nodes publish
-     * no scheme, so https is used as soon as one configured address uses it; otherwise sniffing
-     * would move the requests to plain http after the first round.
+     * Returns the scheme under which the sniffer registers the nodes it finds. The nodes publish no
+     * scheme, so https is used as soon as one configured address uses it; otherwise sniffing would
+     * move the requests to plain http after the first round.
      */
     static OpenSearchNodesSniffer.Scheme sniffScheme(List<HttpHost> hosts) {
         for (HttpHost host : hosts) {
