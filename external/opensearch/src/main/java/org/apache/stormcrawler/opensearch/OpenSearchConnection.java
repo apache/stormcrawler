@@ -53,6 +53,7 @@ import org.opensearch.client.RequestOptions;
 import org.opensearch.client.RestClient;
 import org.opensearch.client.RestClientBuilder;
 import org.opensearch.client.RestHighLevelClient;
+import org.opensearch.client.sniff.OpenSearchNodesSniffer;
 import org.opensearch.client.sniff.Sniffer;
 import org.opensearch.common.unit.TimeValue;
 import org.slf4j.Logger;
@@ -279,6 +280,20 @@ public final class OpenSearchConnection {
         return plain;
     }
 
+    /**
+     * Returns the scheme under which the sniffer registers the nodes it finds. The nodes publish
+     * no scheme, so https is used as soon as one configured address uses it; otherwise sniffing
+     * would move the requests to plain http after the first round.
+     */
+    static OpenSearchNodesSniffer.Scheme sniffScheme(List<HttpHost> hosts) {
+        for (HttpHost host : hosts) {
+            if ("https".equalsIgnoreCase(host.getSchemeName())) {
+                return OpenSearchNodesSniffer.Scheme.HTTPS;
+            }
+        }
+        return OpenSearchNodesSniffer.Scheme.HTTP;
+    }
+
     private static final Pattern IPV4_LOOPBACK = Pattern.compile("127(\\.\\d{1,3}){3}");
 
     /** Whether the host is localhost or a loopback IP literal. No name is resolved. */
@@ -393,7 +408,20 @@ public final class OpenSearchConnection {
                             boltType,
                             boltType);
                 }
-                sniffer = Sniffer.builder(client.getLowLevelClient()).build();
+                final RestClient lowLevelClient = client.getLowLevelClient();
+                final List<HttpHost> configured = new ArrayList<>();
+                for (Node node : lowLevelClient.getNodes()) {
+                    configured.add(node.getHost());
+                }
+                sniffer =
+                        Sniffer.builder(lowLevelClient)
+                                .setNodesSniffer(
+                                        new OpenSearchNodesSniffer(
+                                                lowLevelClient,
+                                                OpenSearchNodesSniffer
+                                                        .DEFAULT_SNIFF_REQUEST_TIMEOUT,
+                                                sniffScheme(configured)))
+                                .build();
             }
 
             return new OpenSearchConnection(client, bulkProcessor, sniffer);

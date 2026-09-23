@@ -29,6 +29,7 @@ import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.junit.jupiter.api.Test;
+import org.opensearch.client.sniff.OpenSearchNodesSniffer;
 
 class OpenSearchConnectionCredentialsTest {
 
@@ -96,6 +97,24 @@ class OpenSearchConnectionCredentialsTest {
                                 new HttpHost("127.0.0.1", 9200, "http"),
                                 new HttpHost("[::1]", 9200, "http")));
         assertEquals(List.of(remote), plain);
+    }
+
+    @Test
+    void sniffedNodesKeepTheSchemeOfTheAddresses() {
+        assertEquals(
+                OpenSearchNodesSniffer.Scheme.HTTPS,
+                OpenSearchConnection.sniffScheme(
+                        List.of(new HttpHost("opensearch1.example.org", 9200, "https"))));
+        assertEquals(
+                OpenSearchNodesSniffer.Scheme.HTTPS,
+                OpenSearchConnection.sniffScheme(
+                        List.of(
+                                new HttpHost("opensearch1.example.org", 9200, "http"),
+                                new HttpHost("opensearch2.example.org", 9200, "https"))));
+        assertEquals(
+                OpenSearchNodesSniffer.Scheme.HTTP,
+                OpenSearchConnection.sniffScheme(
+                        List.of(new HttpHost("opensearch1.example.org", 9200, "http"))));
     }
 
     @Test
