@@ -34,19 +34,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Checks that parser.tika.timeout, backed by Tika Pipes, actually stops a stuck parse instead of
- * merely asking it to stop. Uses Tika's own {@code MockParser} test fixture (from the tika-core
- * test-jar) to drive a parse that spins forever and explicitly ignores {@code Thread.interrupt()}:
- * the kind of parser a cooperative-interruption approach (checking the interrupt flag from a SAX
- * callback) cannot touch, since it is never reached. Killing the forked process is the only thing
- * that works here, and the point of this test is to prove that it does.
+ * Proves parser.tika.timeout (Tika Pipes) kills a stuck parse outright, unlike cooperative
+ * interruption: MockParser.hang(interruptible=false) never checks Thread.interrupt() and
+ * produces no SAX events, so a callback-based interrupt check would never even run.
  *
- * <p>{@code MockParser} is dispatched to via {@code application/mock+xml}, which the tika-core
- * test-jar registers by {@code <root-XML localName="mock"/>} in its own {@code
- * custom-mimetypes.xml}. Root-XML sniffing only refines a document magic detection has already
- * classified as generic {@code application/xml}, so the {@code <mock>} content below must carry an
- * {@code <?xml ...?>} declaration -- without one, detection never gets past magic bytes and falls
- * back to {@code text/plain}. No content-type hint is needed once that declaration is present.
+ * <p>{@code <mock>} content needs an {@code <?xml ...?>} declaration: MockParser is dispatched
+ * via {@code application/mock+xml} (registered as root-XML "mock" in tika-core's own
+ * custom-mimetypes.xml), and root-XML sniffing only refines bytes already magic-classified as
+ * {@code application/xml}. Without the declaration it falls back to text/plain.
  *
  * @see <a href="https://github.com/apache/stormcrawler/issues/2097">#2097</a>
  * @see <a href="https://github.com/apache/stormcrawler/pull/2182">#2182</a>
@@ -64,18 +59,13 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
     private void prepare(Map<String, Object> extraConf) {
         Map<String, Object> conf = new HashMap<>(extraConf);
         conf.putIfAbsent(ParserBolt.PARSE_TIMEOUT_PARAM, 5_000L);
-        // a single, light forked JVM is enough for these tests and starts faster
+        // one light fork is enough here and starts faster
         conf.putIfAbsent(ParserBolt.PIPES_NUM_CLIENTS_PARAM, 1);
         conf.putIfAbsent(ParserBolt.PIPES_JVM_ARGS_PARAM, "-Xmx256m");
         bolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
     }
 
-    /**
-     * MockParser.hang(millis, interruptible=false) keeps sleeping through interruption for the full
-     * duration: exactly the kind of parser PR #2182's SAX-callback interrupt check can never reach,
-     * since it is not producing any SAX events at all. A short parser.tika.timeout must still stop
-     * the bolt well before the hang's own (much longer) duration elapses.
-     */
+    /** A 2s timeout must stop the bolt well before the hang's own 60s duration elapses. */
     @Test
     @Timeout(30)
     void parserThatIgnoresInterruptsIsKilledByTimeout() throws IOException {
@@ -109,10 +99,7 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
         Assertions.assertEquals(1, output.getAckedTuples().size());
     }
 
-    /**
-     * A document that parses well within the timeout is emitted normally, text and outlinks
-     * included.
-     */
+    /** Parses normally within the timeout: text and outlinks are still emitted. */
     @Test
     @Timeout(30)
     void documentIsParsedUnderTimeout() throws IOException {
