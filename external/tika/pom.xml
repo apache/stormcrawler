@@ -60,6 +60,14 @@ under the License.
             <version>${tika.version}</version>
         </dependency>
 
+        <!-- Runs the parse in a forked JVM under parser.tika.timeout so that a stuck
+             parse can be killed outright instead of relying on cooperative interruption -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-pipes-fork-parser</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+
         <!-- In Tika 4 the standard parser package is a POM aggregating the
              individual parser modules; depending on it with type=pom brings
              them all in as transitive dependencies -->
@@ -89,6 +97,17 @@ under the License.
             <groupId>org.apache.stormcrawler</groupId>
             <artifactId>stormcrawler-core</artifactId>
             <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- MockParser: drives a parse that ignores Thread.interrupt(), to prove that
+             parser.tika.timeout kills the forked process outright rather than relying on
+             cooperative interruption -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
