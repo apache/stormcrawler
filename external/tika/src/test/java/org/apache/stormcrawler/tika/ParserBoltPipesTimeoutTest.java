@@ -35,11 +35,11 @@ import org.junit.jupiter.api.Timeout;
 
 /**
  * Proves parser.tika.timeout (Tika Pipes) kills a stuck parse outright, unlike cooperative
- * interruption: MockParser.hang(interruptible=false) never checks Thread.interrupt() and
- * produces no SAX events, so a callback-based interrupt check would never even run.
+ * interruption: MockParser.hang(interruptible=false) never checks Thread.interrupt() and produces
+ * no SAX events, so a callback-based interrupt check would never even run.
  *
- * <p>{@code <mock>} content needs an {@code <?xml ...?>} declaration: MockParser is dispatched
- * via {@code application/mock+xml} (registered as root-XML "mock" in tika-core's own
+ * <p>{@code <mock>} content needs an {@code <?xml ...?>} declaration: MockParser is dispatched via
+ * {@code application/mock+xml} (registered as root-XML "mock" in tika-core's own
  * custom-mimetypes.xml), and root-XML sniffing only refines bytes already magic-classified as
  * {@code application/xml}. Without the declaration it falls back to text/plain.
  *
