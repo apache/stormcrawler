@@ -172,7 +172,8 @@ class ParserBoltTimeoutTest extends ParsingTester {
         // not a valid PDF, the parser fails
         Metadata metadata = new Metadata();
         metadata.setValue("Content-Type", "application/pdf");
-        parse("https://example.org/broken.pdf", "%PDF-1.4 broken".getBytes(), metadata);
+        byte[] content = "%PDF-1.4 broken".getBytes(StandardCharsets.UTF_8);
+        parse("https://example.org/broken.pdf", content, metadata);
 
         List<List<Object>> status = output.getEmitted(Constants.StatusStreamName);
         Assertions.assertEquals(1, status.size());
