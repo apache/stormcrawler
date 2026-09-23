@@ -39,4 +39,6 @@ Embedded documents are only parsed when `parser.extract.embedded` is set to `tru
 
 The length of the text extracted from a document can be limited with `parser.tika.text.maxlength` (number of characters, default `-1`, any negative value means no limit). When the limit is reached the parse stops, the text and outlinks extracted so far are kept and the document is emitted with the metadata `parse.text.trimmed` set to `true`.
 
+The time spent parsing a document can be limited with `parser.tika.timeout` (milliseconds, default `-1`, 0 or less means no limit). When it is set, documents are parsed on a separate thread and a document which takes longer is sent to the status stream as an `ERROR` with the message `parse timeout`. The parse is interrupted, and stops at its next output; a parser which is stuck without producing output and ignores the interrupt keeps its thread until it returns, and the following documents are parsed on a new thread. Keep the timeout below `topology.message.timeout.secs` so that the tuple is not replayed while it is being parsed.
+
 Since Tika 4, Tika metadata keys use namespaced names, which surface as renamed `parse.*` keys, e.g. `parse.resourceName` is now `parse.tk:resource-name`.

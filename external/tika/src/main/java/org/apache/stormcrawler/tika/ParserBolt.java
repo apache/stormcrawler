@@ -33,6 +33,13 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.html.dom.HTMLDocumentImpl;
@@ -72,6 +79,7 @@ import org.apache.tika.parser.Parser;
 import org.apache.tika.parser.html.HtmlMapper;
 import org.apache.tika.parser.html.IdentityHtmlMapper;
 import org.apache.tika.sax.BodyContentHandler;
+import org.apache.tika.sax.ContentHandlerDecorator;
 import org.apache.tika.sax.Link;
 import org.apache.tika.sax.LinkContentHandler;
 import org.apache.tika.sax.TeeContentHandler;
@@ -79,7 +87,9 @@ import org.apache.tika.sax.XHTMLContentHandler;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
+import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
+import org.xml.sax.SAXException;
 
 /** Uses Tika to parse the output of a fetch and extract text + metadata. */
 public class ParserBolt extends BaseRichBolt {
@@ -95,6 +105,14 @@ public class ParserBolt extends BaseRichBolt {
      * #TEXT_MAX_LENGTH_PARAM}.
      */
     public static final String TEXT_TRIMMED_KEY = "parse.text.trimmed";
+
+    /**
+     * Configuration key for the maximum time in milliseconds a document may take to parse, a value
+     * of 0 or less for no limit.
+     */
+    public static final String PARSE_TIMEOUT_PARAM = "parser.tika.timeout";
+
+    private static final AtomicInteger PARSE_THREAD_COUNT = new AtomicInteger();
 
     private Tika tika;
 
@@ -124,6 +142,11 @@ public class ParserBolt extends BaseRichBolt {
     private String protocolMDprefix;
 
     private int textMaxLength = -1;
+
+    private long parseTimeout = -1;
+
+    /** runs the parses when a timeout is set, replaced after each timeout */
+    private ExecutorService parseExecutor;
 
     @Override
     public void prepare(
@@ -169,6 +192,11 @@ public class ParserBolt extends BaseRichBolt {
         // Tika only treats exactly -1 as unlimited and fails on other negative values
         int maxLength = ConfUtils.getInt(conf, TEXT_MAX_LENGTH_PARAM, -1);
         textMaxLength = maxLength < 0 ? -1 : maxLength;
+
+        parseTimeout = ConfUtils.getLong(conf, PARSE_TIMEOUT_PARAM, -1);
+        if (parseTimeout > 0) {
+            parseExecutor = newParseExecutor();
+        }
 
         tika = instantiateTika(conf);
 
@@ -314,8 +342,11 @@ public class ParserBolt extends BaseRichBolt {
         String text;
         boolean textTrimmed = false;
         try (TikaInputStream tis = TikaInputStream.get(content)) {
-            tika.getParser().parse(tis, teeHandler, md, parseContext);
+            parseWithTimeout(tis, teeHandler, md, parseContext);
             text = textHandler.toString();
+        } catch (TimeoutException e) {
+            handleException(url, null, metadata, tuple, "parse timeout");
+            return;
         } catch (Throwable e) {
             if (!WriteLimitReachedException.isWriteLimitReached(e)) {
                 handleException(url, e, metadata, tuple, "parse error");
@@ -394,6 +425,112 @@ public class ParserBolt extends BaseRichBolt {
 
         collector.ack(tuple);
         eventCounter.scope("tuple_success").incrBy(1);
+    }
+
+    /**
+     * Parses the document on the executor thread, or on a separate thread under {@link
+     * #PARSE_TIMEOUT_PARAM} if a timeout is set.
+     *
+     * @throws TimeoutException if the parse did not complete in time
+     */
+    private void parseWithTimeout(
+            TikaInputStream tis,
+            ContentHandler handler,
+            org.apache.tika.metadata.Metadata md,
+            ParseContext parseContext)
+            throws Exception {
+        if (parseExecutor == null) {
+            parse(tis, handler, md, parseContext);
+            return;
+        }
+        Future<?> future =
+                parseExecutor.submit(
+                        () -> {
+                            parse(tis, new InterruptibleContentHandler(handler), md, parseContext);
+                            return null;
+                        });
+        try {
+            future.get(parseTimeout, TimeUnit.MILLISECONDS);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception ex) {
+                throw ex;
+            }
+            if (cause instanceof Error err) {
+                throw err;
+            }
+            throw e;
+        } catch (TimeoutException e) {
+            // parsers rarely check for interrupts; the handler throws at the next
+            // SAX event but a parser stuck without producing output keeps its thread,
+            // so the next documents get a new one
+            future.cancel(true);
+            parseExecutor.shutdownNow();
+            parseExecutor = newParseExecutor();
+            throw e;
+        } catch (InterruptedException e) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw e;
+        }
+    }
+
+    /** Parses the document with the Tika parser. Overridden in tests. */
+    void parse(
+            TikaInputStream tis,
+            ContentHandler handler,
+            org.apache.tika.metadata.Metadata md,
+            ParseContext parseContext)
+            throws Exception {
+        tika.getParser().parse(tis, handler, md, parseContext);
+    }
+
+    private static ExecutorService newParseExecutor() {
+        return Executors.newSingleThreadExecutor(
+                r -> {
+                    Thread t = new Thread(r, "tika-parse-" + PARSE_THREAD_COUNT.incrementAndGet());
+                    t.setDaemon(true);
+                    return t;
+                });
+    }
+
+    /** Stops the parse at the next SAX event once the parsing thread has been interrupted. */
+    private static class InterruptibleContentHandler extends ContentHandlerDecorator {
+
+        InterruptibleContentHandler(ContentHandler handler) {
+            super(handler);
+        }
+
+        private static void checkInterrupted() throws SAXException {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new SAXException("Parse interrupted");
+            }
+        }
+
+        @Override
+        public void startElement(String uri, String localName, String name, Attributes atts)
+                throws SAXException {
+            checkInterrupted();
+            super.startElement(uri, localName, name, atts);
+        }
+
+        @Override
+        public void endElement(String uri, String localName, String name) throws SAXException {
+            checkInterrupted();
+            super.endElement(uri, localName, name);
+        }
+
+        @Override
+        public void characters(char[] ch, int start, int length) throws SAXException {
+            checkInterrupted();
+            super.characters(ch, start, length);
+        }
+
+        @Override
+        public void ignorableWhitespace(char[] ch, int start, int length) throws SAXException {
+            checkInterrupted();
+            super.ignorableWhitespace(ch, start, length);
+        }
     }
 
     private static boolean isEmptyDocument(ParseData parseDoc) {
@@ -548,6 +685,9 @@ public class ParserBolt extends BaseRichBolt {
 
     @Override
     public void cleanup() {
+        if (parseExecutor != null) {
+            parseExecutor.shutdownNow();
+        }
         if (parseFilters != null) {
             parseFilters.cleanup();
         }

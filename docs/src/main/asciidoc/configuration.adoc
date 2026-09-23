@@ -570,6 +570,7 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/tika[tika
 | parser.tika.config.file | tika-config.json | Name of the classpath resource holding the Tika configuration (JSON format since Tika 4).
 | parser.extract.embedded | false | Whether to parse embedded documents. Since Tika 4 embedded documents are no longer parsed unless this is set to `true`.
 | parser.tika.text.maxlength | -1 | Maximum number of characters of text extracted from a document, -1 (or any negative value) for no limit. When the limit is reached the parse stops, the text and outlinks extracted so far are kept and the metadata `parse.text.trimmed` is set to `true`.
+| parser.tika.timeout | -1 | Maximum time in milliseconds a document may take to parse, 0 or less for no limit. When set, documents are parsed on a separate thread; a document which takes longer is sent to the status stream as an `ERROR` with the message `parse timeout`. A parser which neither produces output nor checks for interrupts keeps its thread after the timeout, and later documents are parsed on a new one. Keep the value below `topology.message.timeout.secs`.
 |===
 
 NOTE: When using the Tika `ParserBolt` alongside `JSoupParserBolt`, set `jsoup.treat.non.html.as.error` to `false` so that non-HTML content is passed through to the Tika parser rather than being treated as an error.
