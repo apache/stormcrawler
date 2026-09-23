@@ -119,8 +119,8 @@ public class ParserBolt extends BaseRichBolt {
     public static final String PARSE_TIMEOUT_PARAM = "parser.tika.timeout";
 
     /**
-     * Directory holding Tika Pipes plugin zips, only needed under {@link #PARSE_TIMEOUT_PARAM}
-     * for documents over the 10MB inline-transfer threshold. Unset uses Tika's default.
+     * Directory holding Tika Pipes plugin zips, only needed under {@link #PARSE_TIMEOUT_PARAM} for
+     * documents over the 10MB inline-transfer threshold. Unset uses Tika's default.
      */
     public static final String PIPES_PLUGINS_DIR_PARAM = "parser.tika.pipes.plugins.dir";
 
@@ -545,9 +545,8 @@ public class ParserBolt extends BaseRichBolt {
     }
 
     /**
-     * Builds the {@link PipesForkParser} used under {@link #PARSE_TIMEOUT_PARAM}: the parent
-     * kills the forked process outright via {@code socketTimeoutMillis}, not cooperative
-     * interruption.
+     * Builds the {@link PipesForkParser} used under {@link #PARSE_TIMEOUT_PARAM}: the parent kills
+     * the forked process outright via {@code socketTimeoutMillis}, not cooperative interruption.
      */
     private PipesForkParser buildPipesForkParser(Map<String, Object> conf) {
         PipesForkParserConfig pipesConfig = new PipesForkParserConfig();
@@ -628,8 +627,8 @@ public class ParserBolt extends BaseRichBolt {
     private record PipesParseOutcome(org.apache.tika.metadata.Metadata metadata, boolean trimmed) {}
 
     /**
-     * Parses {@code tis} in a forked JVM, then replays the returned content into {@code handler}
-     * as if parsed in-process, so outlink/text/DOM handling downstream is unchanged.
+     * Parses {@code tis} in a forked JVM, then replays the returned content into {@code handler} as
+     * if parsed in-process, so outlink/text/DOM handling downstream is unchanged.
      */
     private PipesParseOutcome parseWithPipes(
             TikaInputStream tis,
