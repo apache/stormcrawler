@@ -70,7 +70,9 @@ class QueueRegulatorBoltTest {
         container = new URLFrontierContainer(image);
         container.start();
         var connection = container.getFrontierConnection();
-        channel = ManagedChannelUtil.createChannel(connection.getHost(), connection.getPort());
+        channel =
+                ManagedChannelUtil.createChannel(
+                        connection.getHost(), connection.getPort(), Map.of());
         blocking = URLFrontierGrpc.newBlockingStub(channel);
     }
 

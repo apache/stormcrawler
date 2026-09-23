@@ -223,7 +223,7 @@ public class QueueRegulatorBolt extends BaseRichBolt {
             Collections.sort(addresses);
             address = addresses.get(context.getThisTaskIndex() % addresses.size());
         }
-        this.channel = ManagedChannelUtil.createChannel(address);
+        this.channel = ManagedChannelUtil.createChannel(address, conf);
         this.frontier = URLFrontierGrpc.newStub(channel).withWaitForReady();
     }
 

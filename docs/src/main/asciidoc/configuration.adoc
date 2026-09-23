@@ -530,6 +530,11 @@ probe exercises only representative metadata.
 | urlfrontier.host | localhost | URLFrontier service hostname.
 | urlfrontier.port | 7071 | URLFrontier service port.
 | urlfrontier.address | - | URLFrontier service address (can be used instead of host and port).
+| urlfrontier.tls.enabled | false | Use TLS on the channels to URLFrontier. If false, the channels are plaintext.
+| urlfrontier.tls.trust.cert.collection | - | PEM file with the certificates trusted to sign the URLFrontier server certificate. The JVM trust store is used if not set.
+| urlfrontier.tls.client.cert.chain | - | PEM file with the client certificate chain sent for mutual TLS. Must be set together with `urlfrontier.tls.client.private.key`.
+| urlfrontier.tls.client.private.key | - | PKCS#8 PEM file with the private key of the client certificate. Must be set together with `urlfrontier.tls.client.cert.chain`.
+| urlfrontier.tls.client.private.key.password | - | Password of the client private key, if it is encrypted.
 | urlfrontier.max.buckets | 10 | Number of buckets to request from the frontier.
 | urlfrontier.max.urls.per.bucket | 10 | Maximum URLs per bucket. Must be 1 when robots crawl-delay pacing is enabled so one request cannot hand out several URLs from the same host.
 | urlfrontier.robots.crawl.delay.enabled | false | Enables forwarding long robots.txt Crawl-delays from the queue stream to URLFrontier. Also requires `fetcher.max.crawl.delay.force: true` and the validated configuration described above.
