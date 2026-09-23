@@ -27,8 +27,14 @@ textextractor.llm.model: ""
 # Allows to define a custom prompt. {HTML} is replaced with the page html, {REQUEST} is replaced with the content of textextractor.llm.user_request
 #textextractor.llm.prompt: "see llm-default-prompt.txt - can be a multi line string with placeholders"
 
+# Marker tokens of the form <|NAME|> found in the prompt are removed from the page html before it is substituted.
+
 # Allows to configure a special user request which the LLM should honour.
 #textextractor.llm.user_request: "-"
+
+# Maximum number of characters of extracted text, -1 for no limit. The text is taken from the <content> envelope
+# of the reply if there is one, with any markup removed, before it is truncated.
+#textextractor.llm.text.maxlength: -1
 
 # Allows to define the listener class to have the possibility to hook in usage metrics (i.e. for payment related metrics)
 #textextractor.llm.listener.clazz: "org.apache.stormcrawler.ai.listener.NoOpListener"

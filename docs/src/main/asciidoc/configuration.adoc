@@ -612,8 +612,9 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/ai[ai mod
 | textextractor.llm.url | - | LLM API endpoint URL (e.g., OpenAI or Ollama endpoint).
 | textextractor.llm.model | - | Model name to use (e.g., "gpt-4", "llama2").
 | textextractor.system.prompt | - | System prompt for the LLM (optional).
-| textextractor.llm.prompt | - | User prompt template. Use `\{HTML}` and `\{REQUEST}` as placeholders (optional).
+| textextractor.llm.prompt | - | User prompt template. Use `\{HTML}` and `\{REQUEST}` as placeholders (optional). Marker tokens of the form `<\|NAME\|>` in the template are removed from the page HTML before it is substituted.
 | textextractor.llm.user_request | - | Extra user request passed to the prompt template (optional).
+| textextractor.llm.text.maxlength | -1 | Maximum number of characters of extracted text, -1 for no limit. The text is taken from the `<content>` envelope of the reply if there is one, and any markup is removed.
 | textextractor.llm.listener.clazz | - | Listener class for tracking LLM response metrics (optional).
 |===
 

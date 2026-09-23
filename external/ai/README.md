@@ -50,9 +50,16 @@ textextractor.llm.prompt: |
 # Optional: extra request passed into the user prompt
 textextractor.llm.user_request: "Only include body content relevant to articles."
 
+# Optional: maximum number of characters of extracted text, -1 (default) for no limit
+textextractor.llm.text.maxlength: 100000
+
 # Optional: listener class implementing LlmResponseListener to hook into success/failure of LLM response, i.e. for tracking usage metrics.
 textextractor.llm.listener.clazz: "<your-listener-class>"
 ```
+
+Marker tokens of the form `<|NAME|>` that appear in the prompt template, such as `<|HTML_CONTENT_END|>` in the default one, are removed from the page HTML before it is substituted, so that a page cannot open or close a section of the prompt. If your own template delimits its sections, use markers of that form.
+
+The text returned is the content of the `<content>…</content>` envelope that the default prompt asks for, or the whole reply if it has none. Any HTML markup left in it is removed, so the result contains only text, as with the default `TextExtractor`.
 
 Note: You **must** set `textextractor.class` to use this extractor in a StormCrawler topology. 
 
