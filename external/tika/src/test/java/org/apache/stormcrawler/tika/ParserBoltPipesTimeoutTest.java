@@ -36,18 +36,17 @@ import org.junit.jupiter.api.Timeout;
 /**
  * Checks that parser.tika.timeout, backed by Tika Pipes, actually stops a stuck parse instead of
  * merely asking it to stop. Uses Tika's own {@code MockParser} test fixture (from the tika-core
- * test-jar) to drive a parse that spins forever and explicitly ignores {@code
- * Thread.interrupt()}: the kind of parser a cooperative-interruption approach (checking the
- * interrupt flag from a SAX callback) cannot touch, since it is never reached. Killing the forked
- * process is the only thing that works here, and the point of this test is to prove that it does.
+ * test-jar) to drive a parse that spins forever and explicitly ignores {@code Thread.interrupt()}:
+ * the kind of parser a cooperative-interruption approach (checking the interrupt flag from a SAX
+ * callback) cannot touch, since it is never reached. Killing the forked process is the only thing
+ * that works here, and the point of this test is to prove that it does.
  *
  * <p>{@code MockParser} is dispatched to via {@code application/mock+xml}, which the tika-core
  * test-jar registers by {@code <root-XML localName="mock"/>} in its own {@code
  * custom-mimetypes.xml}. Root-XML sniffing only refines a document magic detection has already
- * classified as generic {@code application/xml}, so the {@code <mock>} content below must carry
- * an {@code <?xml ...?>} declaration -- without one, detection never gets past magic bytes and
- * falls back to {@code text/plain}. No content-type hint is needed once that declaration is
- * present.
+ * classified as generic {@code application/xml}, so the {@code <mock>} content below must carry an
+ * {@code <?xml ...?>} declaration -- without one, detection never gets past magic bytes and falls
+ * back to {@code text/plain}. No content-type hint is needed once that declaration is present.
  *
  * @see <a href="https://github.com/apache/stormcrawler/issues/2097">#2097</a>
  * @see <a href="https://github.com/apache/stormcrawler/pull/2182">#2182</a>
@@ -72,10 +71,10 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
     }
 
     /**
-     * MockParser.hang(millis, interruptible=false) keeps sleeping through interruption for the
-     * full duration: exactly the kind of parser PR #2182's SAX-callback interrupt check can never
-     * reach, since it is not producing any SAX events at all. A short parser.tika.timeout must
-     * still stop the bolt well before the hang's own (much longer) duration elapses.
+     * MockParser.hang(millis, interruptible=false) keeps sleeping through interruption for the full
+     * duration: exactly the kind of parser PR #2182's SAX-callback interrupt check can never reach,
+     * since it is not producing any SAX events at all. A short parser.tika.timeout must still stop
+     * the bolt well before the hang's own (much longer) duration elapses.
      */
     @Test
     @Timeout(30)
@@ -94,7 +93,11 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
         long elapsed = System.currentTimeMillis() - start;
 
         Assertions.assertTrue(
-                elapsed < 20_000, "the bolt should not have waited anywhere near the hang's" + " own 60s duration, took " + elapsed + "ms");
+                elapsed < 20_000,
+                "the bolt should not have waited anywhere near the hang's"
+                        + " own 60s duration, took "
+                        + elapsed
+                        + "ms");
 
         Assertions.assertTrue(output.getEmitted().isEmpty());
         List<List<Object>> status = output.getEmitted(Constants.StatusStreamName);
@@ -106,7 +109,10 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
         Assertions.assertEquals(1, output.getAckedTuples().size());
     }
 
-    /** A document that parses well within the timeout is emitted normally, text and outlinks included. */
+    /**
+     * A document that parses well within the timeout is emitted normally, text and outlinks
+     * included.
+     */
     @Test
     @Timeout(30)
     void documentIsParsedUnderTimeout() throws IOException {
@@ -120,8 +126,9 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
                         .getBytes(StandardCharsets.UTF_8);
         parse(url, content, new Metadata());
 
-        Assertions.assertTrue(output.getEmitted(Constants.StatusStreamName).stream()
-                .noneMatch(t -> t.get(2) == Status.ERROR));
+        Assertions.assertTrue(
+                output.getEmitted(Constants.StatusStreamName).stream()
+                        .noneMatch(t -> t.get(2) == Status.ERROR));
         List<List<Object>> emitted = output.getEmitted();
         Assertions.assertEquals(1, emitted.size());
         Assertions.assertTrue(emitted.get(0).get(3).toString().contains("hello world"));
@@ -168,7 +175,11 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
         List<List<Object>> outTuples = output.getEmitted();
         Assertions.assertEquals(1, outTuples.size());
         Assertions.assertFalse(
-                outTuples.get(0).get(3).toString().contains("Life, Liberty and the pursuit of Happiness"),
+                outTuples
+                        .get(0)
+                        .get(3)
+                        .toString()
+                        .contains("Life, Liberty and the pursuit of Happiness"),
                 "embedded documents should not be parsed when parser.extract.embedded is false");
     }
 }

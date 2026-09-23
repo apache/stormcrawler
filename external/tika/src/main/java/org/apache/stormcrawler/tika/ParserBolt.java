@@ -81,7 +81,6 @@ import org.apache.tika.pipes.api.PipesResult;
 import org.apache.tika.pipes.core.PipesException;
 import org.apache.tika.pipes.fork.PipesForkParser;
 import org.apache.tika.pipes.fork.PipesForkParserConfig;
-import org.apache.tika.pipes.fork.PipesForkParserException;
 import org.apache.tika.pipes.fork.PipesForkResult;
 import org.apache.tika.sax.BasicContentHandlerFactory;
 import org.apache.tika.sax.BodyContentHandler;
@@ -113,22 +112,23 @@ public class ParserBolt extends BaseRichBolt {
     public static final String TEXT_TRIMMED_KEY = "parse.text.trimmed";
 
     /**
-     * Configuration key for the maximum time in milliseconds a document may take to parse, a
-     * value of 0 or less for no limit. When set, the parse runs in a forked JVM (Tika Pipes) so
-     * that a parse which exceeds this is killed outright rather than merely asked to stop; the
-     * fork restarts before the next document. Keep this below {@code
-     * topology.message.timeout.secs}.
+     * Configuration key for the maximum time in milliseconds a document may take to parse, a value
+     * of 0 or less for no limit. When set, the parse runs in a forked JVM (Tika Pipes) so that a
+     * parse which exceeds this is killed outright rather than merely asked to stop; the fork
+     * restarts before the next document. Keep this below {@code topology.message.timeout.secs}.
      */
     public static final String PARSE_TIMEOUT_PARAM = "parser.tika.timeout";
 
     /**
-     * Directory holding the Tika Pipes plugin zips (only needed under {@link
-     * #PARSE_TIMEOUT_PARAM} for documents over the 10MB inline-transfer threshold). Unset uses
-     * Tika's default plugin directory resolution.
+     * Directory holding the Tika Pipes plugin zips (only needed under {@link #PARSE_TIMEOUT_PARAM}
+     * for documents over the 10MB inline-transfer threshold). Unset uses Tika's default plugin
+     * directory resolution.
      */
     public static final String PIPES_PLUGINS_DIR_PARAM = "parser.tika.pipes.plugins.dir";
 
-    /** Number of forked JVMs to keep under {@link #PARSE_TIMEOUT_PARAM}, unset uses Tika's default. */
+    /**
+     * Number of forked JVMs to keep under {@link #PARSE_TIMEOUT_PARAM}, unset uses Tika's default.
+     */
     public static final String PIPES_NUM_CLIENTS_PARAM = "parser.tika.pipes.numclients";
 
     /** JVM arguments passed to each forked process under {@link #PARSE_TIMEOUT_PARAM}. */
@@ -550,10 +550,10 @@ public class ParserBolt extends BaseRichBolt {
     }
 
     /**
-     * Builds the {@link PipesForkParser} used under {@link #PARSE_TIMEOUT_PARAM}. The parse
-     * itself runs in a forked JVM so that {@link #parseTimeout} is enforced by killing the
-     * process outright (the parent-side {@code socketTimeoutMillis}), not by cooperative
-     * interruption; a stuck parser cannot keep the bolt's own thread blocked past the timeout.
+     * Builds the {@link PipesForkParser} used under {@link #PARSE_TIMEOUT_PARAM}. The parse itself
+     * runs in a forked JVM so that {@link #parseTimeout} is enforced by killing the process
+     * outright (the parent-side {@code socketTimeoutMillis}), not by cooperative interruption; a
+     * stuck parser cannot keep the bolt's own thread blocked past the timeout.
      */
     private PipesForkParser buildPipesForkParser(Map<String, Object> conf) {
         PipesForkParserConfig pipesConfig = new PipesForkParserConfig();
@@ -615,14 +615,18 @@ public class ParserBolt extends BaseRichBolt {
         }
     }
 
-    /** The parse under {@link #PARSE_TIMEOUT_PARAM} did not complete within {@link #parseTimeout}. */
+    /**
+     * The parse under {@link #PARSE_TIMEOUT_PARAM} did not complete within {@link #parseTimeout}.
+     */
     private static final class ParseTimeoutException extends Exception {
         ParseTimeoutException(String message) {
             super(message);
         }
     }
 
-    /** The forked JVM crashed (OOM or otherwise) while parsing; it restarts for the next document. */
+    /**
+     * The forked JVM crashed (OOM or otherwise) while parsing; it restarts for the next document.
+     */
     private static final class ParseCrashException extends Exception {
         ParseCrashException(String message) {
             super(message);
@@ -720,9 +724,9 @@ public class ParserBolt extends BaseRichBolt {
     }
 
     /**
-     * Replays already-extracted XML content into {@code handler} via a local SAX parse. The
-     * content was produced by Tika's {@code ToXMLContentHandler}, which always self-closes and
-     * escapes, so it is well-formed and safe to re-read this way.
+     * Replays already-extracted XML content into {@code handler} via a local SAX parse. The content
+     * was produced by Tika's {@code ToXMLContentHandler}, which always self-closes and escapes, so
+     * it is well-formed and safe to re-read this way.
      */
     private static void reparseIntoHandler(String xml, ContentHandler handler)
             throws SAXException, IOException {
@@ -849,7 +853,10 @@ public class ParserBolt extends BaseRichBolt {
             try {
                 Files.deleteIfExists(resolvedTikaConfigPath);
             } catch (IOException e) {
-                LOG.warn("Failed to delete temporary Tika configuration {}", resolvedTikaConfigPath, e);
+                LOG.warn(
+                        "Failed to delete temporary Tika configuration {}",
+                        resolvedTikaConfigPath,
+                        e);
             }
         }
     }
