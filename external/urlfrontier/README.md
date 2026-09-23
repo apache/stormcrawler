@@ -28,7 +28,13 @@ urlfrontier.max.urls.per.bucket:10
 
 The gRPC channels to the frontier are plaintext unless TLS is enabled. Plaintext is kept as the
 default so that existing deployments keep working. The channel carries the URLs and their metadata, so enable TLS whenever the
-frontier runs on another host:
+frontier runs on another host.
+
+URLFrontier 2.6 only listens in plaintext, so until
+[crawler-commons/url-frontier#219](https://github.com/crawler-commons/url-frontier/pull/219) is
+released, the frontier needs a TLS terminating proxy in front of it, and `urlfrontier.address` or
+`urlfrontier.host` and `urlfrontier.port` must point at that proxy. Once the frontier supports TLS
+itself, the same settings connect to it directly:
 
 ```yaml
 urlfrontier.tls.enabled: true
@@ -45,8 +51,10 @@ urlfrontier.tls.client.private.key.password: changeit
 The server certificate must be valid for the host name in `urlfrontier.address` or
 `urlfrontier.host`. Setting only one of `urlfrontier.tls.client.cert.chain` and
 `urlfrontier.tls.client.private.key`, or pointing a key at a file which cannot be read, fails
-the component at startup. The settings apply to `Spout`, `StatusUpdaterBolt` and
-`QueueRegulatorBolt`.
+the component at startup. A failed TLS handshake, on the other hand, does not: the channel keeps
+reconnecting, `Spout` and `StatusUpdaterBolt` wait for it without a deadline, and the topology
+runs without fetching or updating anything. The settings apply to `Spout`, `StatusUpdaterBolt`
+and `QueueRegulatorBolt`.
 
 ## Sending discovered URLs in batches
 
