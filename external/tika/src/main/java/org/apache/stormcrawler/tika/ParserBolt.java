@@ -74,6 +74,7 @@ import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.parser.EmptyParser;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.Parser;
+import org.apache.tika.parser.html.DefaultHtmlMapper;
 import org.apache.tika.parser.html.HtmlMapper;
 import org.apache.tika.parser.html.IdentityHtmlMapper;
 import org.apache.tika.pipes.api.ParseMode;
@@ -94,6 +95,7 @@ import org.w3c.dom.DocumentFragment;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 import org.xml.sax.XMLReader;
 
 /** Uses Tika to parse the output of a fetch and extract text + metadata. */
@@ -119,15 +121,10 @@ public class ParserBolt extends BaseRichBolt {
     public static final String PARSE_TIMEOUT_PARAM = "parser.tika.timeout";
 
     /**
-     * Directory holding Tika Pipes plugin zips, only needed under {@link #PARSE_TIMEOUT_PARAM} for
-     * documents over the 10MB inline-transfer threshold. Unset uses Tika's default.
+     * Directory holding Tika Pipes plugin zips under {@link #PARSE_TIMEOUT_PARAM}, not needed by
+     * default. Unset uses Tika's default.
      */
     public static final String PIPES_PLUGINS_DIR_PARAM = "parser.tika.pipes.plugins.dir";
-
-    /**
-     * Number of forked JVMs to keep under {@link #PARSE_TIMEOUT_PARAM}, unset uses Tika's default.
-     */
-    public static final String PIPES_NUM_CLIENTS_PARAM = "parser.tika.pipes.numclients";
 
     /** JVM arguments passed to each forked process under {@link #PARSE_TIMEOUT_PARAM}. */
     public static final String PIPES_JVM_ARGS_PARAM = "parser.tika.pipes.jvmargs";
@@ -137,8 +134,8 @@ public class ParserBolt extends BaseRichBolt {
             "parser.tika.pipes.maxfilesperprocess";
 
     /**
-     * Safety cap on markup a fork may return, independent of {@link #textMaxLength}: bounds
-     * tag/entity overhead, not visible text.
+     * Cap on the characters of text a fork may return when {@link #TEXT_MAX_LENGTH_PARAM} is not
+     * set. Tika counts text only, the markup around it comes on top.
      */
     private static final int PIPES_WRITE_LIMIT_CHARS = 20_000_000;
 
@@ -250,6 +247,8 @@ public class ParserBolt extends BaseRichBolt {
 
         if (parseTimeout > 0) {
             pipesForkParser = buildPipesForkParser(conf);
+        } else {
+            deleteTemporaryTikaConfig();
         }
 
         this.collector = collector;
@@ -399,8 +398,7 @@ public class ParserBolt extends BaseRichBolt {
                 md = outcome.metadata();
                 textTrimmed = outcome.trimmed();
                 if (textTrimmed) {
-                    // fork's own write limit or deadline, not the textMaxLength trim below
-                    LOG.info("Parse of {} was trimmed by the forked process", url);
+                    LOG.info("Text of {} trimmed", url);
                     eventCounter.scope("text_trimmed").incrBy(1);
                 }
             } else {
@@ -408,7 +406,6 @@ public class ParserBolt extends BaseRichBolt {
             }
             text = textHandler.toString();
         } catch (ParseTimeoutException e) {
-            LOG.info("parse timeout -> {}", url);
             handleException(url, null, metadata, tuple, "parse timeout");
             return;
         } catch (ParseCrashException e) {
@@ -522,9 +519,8 @@ public class ParserBolt extends BaseRichBolt {
             if ("file".equals(tikaConfigUrl.getProtocol())) {
                 configPath = Paths.get(tikaConfigUrl.toURI());
             } else {
-                // TikaLoader needs a filesystem path; kept alive (not deleted here) so a
-                // forked JVM under parser.tika.timeout can merge it too -- cleaned up in
-                // cleanup(), with deleteOnExit() as a safety net.
+                // TikaLoader needs a filesystem path; kept until cleanup() when the forked
+                // JVMs under parser.tika.timeout need it too, deleteOnExit() as a safety net
                 configPath = Files.createTempFile("tika-config", ".json");
                 configPath.toFile().deleteOnExit();
                 resolvedTikaConfigPathIsTemporary = true;
@@ -553,7 +549,8 @@ public class ParserBolt extends BaseRichBolt {
         // XML, not HTML: ToXMLContentHandler always self-closes/escapes (safe to re-parse
         // locally); ToHTMLContentHandler leaves some elements unclosed per the HTML spec.
         pipesConfig.setHandlerType(BasicContentHandlerFactory.HANDLER_TYPE.XML);
-        pipesConfig.setWriteLimit(PIPES_WRITE_LIMIT_CHARS);
+        // stop the fork where the text would be trimmed anyway
+        pipesConfig.setWriteLimit(textMaxLength >= 0 ? textMaxLength : PIPES_WRITE_LIMIT_CHARS);
         // matches how the direct parse already merges embedded content into one stream
         pipesConfig.setParseMode(ParseMode.CONCATENATE);
         pipesConfig.setMaxEmbeddedCount(extractEmbedded ? -1 : 0);
@@ -564,10 +561,13 @@ public class ParserBolt extends BaseRichBolt {
             pipesConfig.setUserConfigPath(resolvedTikaConfigPath);
         }
 
-        int numClients = ConfUtils.getInt(conf, PIPES_NUM_CLIENTS_PARAM, -1);
-        if (numClients > 0) {
-            pipesConfig.setNumClients(numClients);
-        }
+        // execute() parses one document at a time, a second fork per bolt would sit idle
+        pipesConfig.setNumClients(1);
+        // same JVM as the Storm worker instead of whatever "java" is on the PATH
+        pipesConfig
+                .getPipesConfig()
+                .setJavaPath(
+                        Paths.get(System.getProperty("java.home"), "bin", "java").toString());
         int maxFilesPerProcess = ConfUtils.getInt(conf, PIPES_MAX_FILES_PER_PROCESS_PARAM, -1);
         if (maxFilesPerProcess > 0) {
             pipesConfig.setMaxFilesPerProcess(maxFilesPerProcess);
@@ -581,14 +581,16 @@ public class ParserBolt extends BaseRichBolt {
             pipesConfig.setJvmArgs(jvmArgs);
         }
 
-        // see the warning below: a live HtmlMapper can't cross the fork's IPC boundary
-        LOG.warn(
-                "parser.htmlmapper.classname ({}) is not applied to parses running under {}: a "
-                        + "live HtmlMapper cannot be sent to the forked JVM; set it in the "
-                        + "\"parse-context\" section of the Tika configuration file instead if "
-                        + "needed there",
-                htmlMapperClass.getName(),
-                PARSE_TIMEOUT_PARAM);
+        // an HtmlMapper can't be passed to the forked JVM, which always uses Tika's default
+        if (!DefaultHtmlMapper.class.equals(htmlMapperClass)) {
+            LOG.warn(
+                    "parser.htmlmapper.classname ({}) is ignored under {}: the forked JVM maps"
+                            + " HTML with {}, which drops some elements from the DOM given to"
+                            + " the parse filters",
+                    htmlMapperClass.getName(),
+                    PARSE_TIMEOUT_PARAM,
+                    DefaultHtmlMapper.class.getSimpleName());
+        }
 
         try {
             return new PipesForkParser(pipesConfig);
@@ -688,16 +690,31 @@ public class ParserBolt extends BaseRichBolt {
                                     : result.getMessage()));
         }
 
-        String xml = result.getContent();
-        if (StringUtils.isNotBlank(xml)) {
-            reparseIntoHandler(xml, handler);
-        }
-
         boolean trimmed =
                 result.getStatus() == PipesResult.RESULT_STATUS.PARSE_SUCCESS_WITH_EXCEPTION
                         || result.getStatus() == PipesResult.RESULT_STATUS.PARTIAL_TIMEOUT;
-        return new PipesParseOutcome(
-                resultMetadata != null ? resultMetadata : seedMetadata, trimmed);
+
+        String xml = result.getContent();
+        if (StringUtils.isNotBlank(xml)) {
+            try {
+                reparseIntoHandler(xml, handler);
+            } catch (SAXException e) {
+                if (WriteLimitReachedException.isWriteLimitReached(e)) {
+                    trimmed = true;
+                } else if (!(trimmed && e instanceof SAXParseException)) {
+                    throw e;
+                }
+                // a trimmed fork returns XML cut off mid-document: the handlers keep
+                // what they got before the cut, as with a trimmed direct parse
+            }
+        }
+
+        org.apache.tika.metadata.Metadata md =
+                resultMetadata != null ? resultMetadata : seedMetadata;
+        // the fork returns the content as metadata, it must not end up in parse.*
+        md.remove(TikaCoreProperties.TIKA_CONTENT.getName());
+        md.remove(TikaCoreProperties.TIKA_CONTENT_HANDLER_TYPE.getName());
+        return new PipesParseOutcome(md, trimmed);
     }
 
     private static boolean isWriteLimitReached(org.apache.tika.metadata.Metadata metadata) {
@@ -830,6 +847,10 @@ public class ParserBolt extends BaseRichBolt {
                 LOG.warn("Failed to close the Tika Pipes fork parser", e);
             }
         }
+        deleteTemporaryTikaConfig();
+    }
+
+    private void deleteTemporaryTikaConfig() {
         if (resolvedTikaConfigPathIsTemporary && resolvedTikaConfigPath != null) {
             try {
                 Files.deleteIfExists(resolvedTikaConfigPath);
@@ -839,6 +860,7 @@ public class ParserBolt extends BaseRichBolt {
                         resolvedTikaConfigPath,
                         e);
             }
+            resolvedTikaConfigPathIsTemporary = false;
         }
     }
 }

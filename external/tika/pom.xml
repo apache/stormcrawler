@@ -66,6 +66,18 @@ under the License.
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-pipes-fork-parser</artifactId>
             <version>${tika.version}</version>
+            <exclusions>
+                <!-- the Storm worker provides the logging backend, which the forked JVM
+                     inherits through the classpath -->
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-slf4j2-impl</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- In Tika 4 the standard parser package is a POM aggregating the

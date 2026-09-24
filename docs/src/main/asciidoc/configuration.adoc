@@ -570,11 +570,10 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/tika[tika
 | parser.tika.config.file | tika-config.json | Name of the classpath resource holding the Tika configuration (JSON format since Tika 4).
 | parser.extract.embedded | false | Whether to parse embedded documents. Since Tika 4 embedded documents are no longer parsed unless this is set to `true`.
 | parser.tika.text.maxlength | -1 | Maximum number of characters of text extracted from a document, -1 (or any negative value) for no limit. When the limit is reached the parse stops, the text and outlinks extracted so far are kept and the metadata `parse.text.trimmed` is set to `true`.
-| parser.tika.timeout | -1 | Maximum time in milliseconds a document may take to parse, 0 or less for no limit. When set, the parse runs in a forked JVM (Tika Pipes); a parse that exceeds this is killed outright and reported to the status stream as an `ERROR` with the message `parse timeout`. Keep the value below `topology.message.timeout.secs`.
-| parser.tika.pipes.numclients | - | Number of forked JVMs to keep under `parser.tika.timeout`. Unset uses Tika's own CPU-derived default.
+| parser.tika.timeout | -1 | Maximum time in milliseconds a document may take to parse, 0 or less for no limit. When set, the parse runs in a forked JVM (Tika Pipes), one per bolt instance; a parse that exceeds this is killed outright and reported to the status stream as an `ERROR` with the message `parse timeout`. Keep the value below `topology.message.timeout.secs`. `parser.htmlmapper.classname` is ignored in this mode, see the README of the module.
 | parser.tika.pipes.jvmargs | - | JVM arguments passed to each forked process under `parser.tika.timeout`, e.g. `-Xmx512m`.
 | parser.tika.pipes.maxfilesperprocess | - | Restart a forked process after this many documents under `parser.tika.timeout`, to bound slow leaks in parsing libraries.
-| parser.tika.pipes.plugins.dir | - | Directory holding Tika Pipes plugin zips. Only needed under `parser.tika.timeout` for documents over the 10MB inline-transfer threshold; unset uses Tika's default plugin directory resolution.
+| parser.tika.pipes.plugins.dir | - | Directory holding Tika Pipes plugin zips under `parser.tika.timeout`, not needed by default. Unset uses Tika's default plugin directory resolution.
 |===
 
 NOTE: When using the Tika `ParserBolt` alongside `JSoupParserBolt`, set `jsoup.treat.non.html.as.error` to `false` so that non-HTML content is passed through to the Tika parser rather than being treated as an error.
