@@ -921,11 +921,12 @@ public class FetcherBolt extends StatusEmitterBolt {
                     long start = System.currentTimeMillis();
                     long timeInQueues = start - fit.creationTime;
 
-                    // been in the queue far too long and already failed
-                    // by the timeout - let's not fetch it
+                    // waited longer than fetcher.timeout.queue: not fetched, acked without a
+                    // status (see finally)
                     if (timeoutInQueues != -1 && timeInQueues > timeoutInQueues * 1000) {
                         LOG.info(
                                 "[Fetcher #{}] Waited in queue for too long - {}", taskId, fit.url);
+                        eventCounter.scope("queue.timeout").incrBy(1);
                         // no need to wait next time as we won't request from
                         // that site
                         asap = true;
