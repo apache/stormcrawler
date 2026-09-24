@@ -56,6 +56,40 @@ reconnecting, `Spout` and `StatusUpdaterBolt` wait for it without a deadline, an
 runs without fetching or updating anything. The settings apply to `Spout`, `StatusUpdaterBolt`
 and `QueueRegulatorBolt`.
 
+## Depth metric
+
+The spout counts the URLs handed out by the frontier per depth level, so that the shape of the
+crawl (broad first, or sinking into a few sites) can be observed. The counter is named `depth`
+and has one scope per depth value read from the `depth` metadata written when
+`metadata.track.depth` is enabled: `depth.0`, `depth.1`, ... URLs without a numeric depth are
+counted under `depth.unknown`. To keep the number of scopes bounded when no `MaxDepthFilter` is
+configured, depths at or beyond
+
+```
+urlfrontier.depth.metric.max: 10
+```
+
+share a single `depth.10+` scope.
+
+A second counter, `depth_le`, holds the cumulative counts, in the style of Prometheus histograms:
+`depth_le.X` is the number of URLs with a depth at most X and `depth_le.inf` the number of URLs
+with a valid depth, so `depth_le.X / depth_le.inf` is the cumulative distribution P(depth ≤ X).
+URLs beyond the cap only count in `depth_le.inf`, and `unknown` ones in neither. The spout exposes
+the same ratio, computed in constant time since it was opened, through
+`probabilityDepthAtMost(int depth)`; it returns NaN until the first URL with a depth arrives.
+
+`windowProbabilityDepthAtMost(int depth)` gives the same ratio restricted to the URLs handed out
+within the last
+
+```
+urlfrontier.depth.window.secs: 300
+```
+
+so that it follows the current shape of the crawl rather than its whole history, which is what a
+control loop reacting to a drift into depth needs. The window is a ring of ten slots, so the
+oldest data it includes is between nine and ten tenths of the window old. It returns NaN when
+nothing was received within the window.
+
 ## Sending discovered URLs in batches
 
 `StatusUpdaterBolt` sends known URLs (fetched, redirections, errors...) to the frontier's

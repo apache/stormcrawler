@@ -177,4 +177,38 @@ public final class Constants {
      */
     public static final String URLFRONTIER_BACKOFF_STATUS_CODES_KEY =
             "urlfrontier.backoff.status.codes";
+
+    /**
+     * Name of the counter metric holding the number of URLs handed out by the frontier per depth.
+     */
+    public static final String DEPTH_METRIC_NAME = "depth";
+
+    /** Scope of the depth metric for URLs without a valid depth. */
+    public static final String DEPTH_METRIC_UNKNOWN_SCOPE = "unknown";
+
+    /**
+     * Name of the cumulative counter metric: the scope X holds the number of URLs handed out by the
+     * frontier with a depth at most X, and the scope {@link #DEPTH_METRIC_INF_SCOPE} the number of
+     * URLs with any valid depth. Their ratio is the cumulative distribution of the depth.
+     */
+    public static final String DEPTH_LE_METRIC_NAME = "depth_le";
+
+    /** Scope of the cumulative depth metric holding the total of URLs with a valid depth. */
+    public static final String DEPTH_METRIC_INF_SCOPE = "inf";
+
+    /**
+     * Depth from which URLs are counted in a single "N+" scope of the depth metric, so that the
+     * number of scopes stays bounded. Defaults to 10.
+     */
+    public static final String URLFRONTIER_DEPTH_METRIC_MAX_KEY = "urlfrontier.depth.metric.max";
+
+    public static final int URLFRONTIER_DEPTH_METRIC_MAX_DEFAULT = 10;
+
+    /**
+     * Length in seconds of the sliding window over which the spout computes the recent cumulative
+     * distribution of the depth. Defaults to 300 (5m).
+     */
+    public static final String URLFRONTIER_DEPTH_WINDOW_KEY = "urlfrontier.depth.window.secs";
+
+    public static final int URLFRONTIER_DEPTH_WINDOW_DEFAULT = 300;
 }
