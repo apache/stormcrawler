@@ -280,7 +280,6 @@ List of third-party dependencies grouped by their license type.
         * rome (com.rometools:rome:2.1.0 - http://rometools.com/rome)
         * rome-utils (com.rometools:rome-utils:2.1.0 - http://rometools.com/rome-utils)
         * server (org.opensearch:opensearch:2.19.6 - https://github.com/opensearch-project/OpenSearch.git)
-        * SLF4J 2 Provider for Log4j API (org.apache.logging.log4j:log4j-slf4j2-impl:2.26.1 - https://logging.apache.org/log4j/2.x/)
         * SmallRye Mutiny Zero (io.smallrye.reactive:mutiny-zero:1.3.1 - https://smallrye.io)
         * SnakeYAML (org.yaml:snakeyaml:2.7 - https://codeberg.org/snakeyaml/snakeyaml)
         * snappy-java (org.xerial.snappy:snappy-java:1.1.10.4 - https://github.com/xerial/snappy-java)

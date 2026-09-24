@@ -59,8 +59,6 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
     private void prepare(Map<String, Object> extraConf) {
         Map<String, Object> conf = new HashMap<>(extraConf);
         conf.putIfAbsent(ParserBolt.PARSE_TIMEOUT_PARAM, 5_000L);
-        // one light fork is enough here and starts faster
-        conf.putIfAbsent(ParserBolt.PIPES_NUM_CLIENTS_PARAM, 1);
         conf.putIfAbsent(ParserBolt.PIPES_JVM_ARGS_PARAM, "-Xmx256m");
         bolt.prepare(conf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
     }
@@ -119,6 +117,11 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
         List<List<Object>> emitted = output.getEmitted();
         Assertions.assertEquals(1, emitted.size());
         Assertions.assertTrue(emitted.get(0).get(3).toString().contains("hello world"));
+        Metadata parseMetadata = (Metadata) emitted.get(0).get(2);
+        Assertions.assertEquals("t", parseMetadata.getFirstValue("parse.dc:title"));
+        // the fork returns the content as metadata, it must not be copied to parse.*
+        Assertions.assertNull(parseMetadata.getFirstValue("parse.tk:content"));
+        Assertions.assertNull(parseMetadata.getFirstValue("parse.tk:content-handler-type"));
 
         List<List<Object>> discovered =
                 output.getEmitted(Constants.StatusStreamName).stream()
@@ -126,6 +129,62 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
                         .toList();
         Assertions.assertEquals(1, discovered.size());
         Assertions.assertEquals("http://example.com/next", discovered.get(0).get(0));
+    }
+
+    /**
+     * The fork stops at parser.tika.text.maxlength and returns XML cut off mid-document: the
+     * document is still emitted, trimmed, instead of failing on the truncated XML.
+     */
+    @Test
+    @Timeout(30)
+    void textIsTrimmedUnderTimeout() throws IOException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(ParserBolt.TEXT_MAX_LENGTH_PARAM, 5);
+        prepare(conf);
+
+        String url = "https://example.org/long.html";
+        byte[] content =
+                ("<html><head><title>t</title></head><body><p>hello world</p>"
+                                + "<p>more text after the limit</p></body></html>")
+                        .getBytes(StandardCharsets.UTF_8);
+        parse(url, content, new Metadata());
+
+        Assertions.assertTrue(
+                output.getEmitted(Constants.StatusStreamName).stream()
+                        .noneMatch(t -> t.get(2) == Status.ERROR));
+        List<List<Object>> emitted = output.getEmitted();
+        Assertions.assertEquals(1, emitted.size());
+        Assertions.assertFalse(emitted.get(0).get(3).toString().contains("more text"));
+        Metadata parseMetadata = (Metadata) emitted.get(0).get(2);
+        Assertions.assertEquals(
+                "true", parseMetadata.getFirstValue(ParserBolt.TEXT_TRIMMED_KEY));
+    }
+
+    /** A forked JVM dying mid-parse is reported as "parse crash" and the bolt carries on. */
+    @Test
+    @Timeout(60)
+    void crashedForkIsReportedUnderTimeout() throws IOException {
+        prepare(new HashMap<>());
+
+        String url = "https://example.org/crash.xml";
+        byte[] content =
+                (XML_DECLARATION + "<mock><system_exit/></mock>")
+                        .getBytes(StandardCharsets.UTF_8);
+        parse(url, content, new Metadata());
+
+        List<List<Object>> status = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(1, status.size());
+        Metadata md = (Metadata) status.get(0).get(1);
+        Assertions.assertEquals("parse crash", md.getFirstValue(Constants.STATUS_ERROR_MESSAGE));
+
+        // the fork restarts for the next document
+        parse(
+                "https://example.org/fast.html",
+                "<html><body><p>hello again</p></body></html>".getBytes(StandardCharsets.UTF_8),
+                new Metadata());
+        List<List<Object>> emitted = output.getEmitted();
+        Assertions.assertEquals(1, emitted.size());
+        Assertions.assertTrue(emitted.get(0).get(3).toString().contains("hello again"));
     }
 
     /** A genuine parse failure (not a timeout or a crash) is still reported as "parse error". */

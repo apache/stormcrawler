@@ -89,6 +89,43 @@ under the License.
                                         <Build-Date></Build-Date>
                                     </manifestEntries>
                                 </transformer>
+                                <!-- Tika 4 registers its components in index files present in several jars -->
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/extensions.idx</resource>
+                                </transformer>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/tika/detectors.idx</resource>
+                                </transformer>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/tika/encoding-detectors.idx</resource>
+                                </transformer>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/tika/language-detectors.idx</resource>
+                                </transformer>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/tika/metadata-filters.idx</resource>
+                                </transformer>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/tika/parse-context.idx</resource>
+                                </transformer>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/tika/parsers.idx</resource>
+                                </transformer>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/tika/renderers.idx</resource>
+                                </transformer>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/tika/translators.idx</resource>
+                                </transformer>
                             </transformers>
               <!-- The filters below are necessary if you want to include the Tika
                   module -->
