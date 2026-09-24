@@ -156,8 +156,7 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
         Assertions.assertEquals(1, emitted.size());
         Assertions.assertFalse(emitted.get(0).get(3).toString().contains("more text"));
         Metadata parseMetadata = (Metadata) emitted.get(0).get(2);
-        Assertions.assertEquals(
-                "true", parseMetadata.getFirstValue(ParserBolt.TEXT_TRIMMED_KEY));
+        Assertions.assertEquals("true", parseMetadata.getFirstValue(ParserBolt.TEXT_TRIMMED_KEY));
     }
 
     /** A forked JVM dying mid-parse is reported as "parse crash" and the bolt carries on. */
@@ -168,8 +167,7 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
 
         String url = "https://example.org/crash.xml";
         byte[] content =
-                (XML_DECLARATION + "<mock><system_exit/></mock>")
-                        .getBytes(StandardCharsets.UTF_8);
+                (XML_DECLARATION + "<mock><system_exit/></mock>").getBytes(StandardCharsets.UTF_8);
         parse(url, content, new Metadata());
 
         List<List<Object>> status = output.getEmitted(Constants.StatusStreamName);
