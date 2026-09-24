@@ -566,8 +566,7 @@ public class ParserBolt extends BaseRichBolt {
         // same JVM as the Storm worker instead of whatever "java" is on the PATH
         pipesConfig
                 .getPipesConfig()
-                .setJavaPath(
-                        Paths.get(System.getProperty("java.home"), "bin", "java").toString());
+                .setJavaPath(Paths.get(System.getProperty("java.home"), "bin", "java").toString());
         int maxFilesPerProcess = ConfUtils.getInt(conf, PIPES_MAX_FILES_PER_PROCESS_PARAM, -1);
         if (maxFilesPerProcess > 0) {
             pipesConfig.setMaxFilesPerProcess(maxFilesPerProcess);
