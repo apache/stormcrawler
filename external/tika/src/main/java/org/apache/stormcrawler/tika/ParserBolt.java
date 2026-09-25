@@ -549,8 +549,9 @@ public class ParserBolt extends BaseRichBolt {
     }
 
     /**
-     * Builds the {@link PipesForkParser} used under {@link #PARSE_TIMEOUT_PARAM}: the parent kills
-     * the forked process outright via {@code socketTimeoutMillis}, not cooperative interruption.
+     * Builds the {@link PipesForkParser} used under {@link #PARSE_TIMEOUT_PARAM}: the fork kills a
+     * parse that runs past its {@code TimeoutLimits} outright, without relying on cooperative
+     * interruption.
      */
     private PipesForkParser buildPipesForkParser(Map<String, Object> conf) {
         PipesForkParserConfig pipesConfig = new PipesForkParserConfig();
@@ -563,8 +564,6 @@ public class ParserBolt extends BaseRichBolt {
         pipesConfig.setParseMode(ParseMode.CONCATENATE);
         pipesConfig.setMaxEmbeddedCount(extractEmbedded ? -1 : 0);
         pipesConfig.setTimeoutLimits(new TimeoutLimits(parseTimeout, parseTimeout));
-        // the real enforcement: kills the forked process outright if it doesn't respond in time
-        pipesConfig.getPipesConfig().setSocketTimeoutMillis(parseTimeout);
         if (resolvedTikaConfigPath != null) {
             pipesConfig.setUserConfigPath(resolvedTikaConfigPath);
         }
