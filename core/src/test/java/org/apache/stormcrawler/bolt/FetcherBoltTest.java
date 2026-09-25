@@ -19,21 +19,38 @@ package org.apache.stormcrawler.bolt;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.storm.metric.api.MultiCountMetric;
+import org.apache.storm.task.OutputCollector;
+import org.apache.storm.task.TopologyContext;
+import org.apache.storm.tuple.Tuple;
+import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.TestOutputCollector;
+import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.persistence.Status;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 public class FetcherBoltTest extends AbstractFetcherBoltTest {
 
@@ -173,5 +190,39 @@ public class FetcherBoltTest extends AbstractFetcherBoltTest {
         Assertions.assertTrue(
                 System.currentTimeMillis() - start < 6_000, "robots.txt lookup was not bounded");
         assertEquals(0, ((FetcherBolt) bolt).helperPoolSize());
+    }
+
+    /** The queue timeout is checked after the robots.txt lookup, which the stub delays past it. */
+    @Test
+    void urlOverQueueTimeoutIsAckedWithoutFetchOrStatusAndCounted(WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        stubFor(
+                get(urlEqualTo("/robots.txt"))
+                        .willReturn(aResponse().withStatus(404).withFixedDelay(1500)));
+        stubFor(get(urlEqualTo("/page")).willReturn(aResponse().withStatus(200).withBody("hello")));
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        // above the robots.txt delay, so that the lookup completes
+        config.put("http.timeout", 10_000);
+        config.put("fetcher.timeout.queue", 1);
+
+        resetProtocolFactory();
+        TopologyContext context = TestUtil.getMockedTopologyContext();
+        TestOutputCollector output = new TestOutputCollector();
+        bolt.prepare(config, context, new OutputCollector(output));
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.getSourceComponent()).thenReturn("source");
+        when(tuple.getStringByField("url"))
+                .thenReturn("http://localhost:" + wmRuntimeInfo.getHttpPort() + "/page");
+        bolt.execute(tuple);
+
+        await().atMost(10, TimeUnit.SECONDS).until(() -> output.getAckedTuples().contains(tuple));
+        WireMock.verify(0, getRequestedFor(urlEqualTo("/page")));
+        // no sitemap in this robots.txt, so nothing at all is emitted
+        assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+        assertEquals(0, output.getEmitted(Constants.StatusStreamName).size());
+        ArgumentCaptor<MultiCountMetric> counters = ArgumentCaptor.forClass(MultiCountMetric.class);
+        Mockito.verify(context).registerMetric(eq("fetcher_counter"), counters.capture(), anyInt());
+        assertEquals(1L, counters.getValue().getValueAndReset().get("queue.timeout"));
     }
 }
