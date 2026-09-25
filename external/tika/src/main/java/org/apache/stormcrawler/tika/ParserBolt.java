@@ -25,6 +25,7 @@ import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -253,6 +254,7 @@ public class ParserBolt extends BaseRichBolt {
 
         if (parseTimeout > 0) {
             pipesForkParser = buildPipesForkParser(conf);
+            startFork();
         } else {
             deleteTemporaryTikaConfig();
         }
@@ -624,6 +626,37 @@ public class ParserBolt extends BaseRichBolt {
     }
 
     /**
+     * Parses a one-word document so that a fork which cannot start fails the bolt here, instead of
+     * failing every document with a "parse pipes error" status. The fork starts lazily otherwise.
+     */
+    private void startFork() {
+        final PipesForkResult result;
+        try (TikaInputStream tis =
+                TikaInputStream.get("StormCrawler".getBytes(StandardCharsets.UTF_8))) {
+            result = pipesForkParser.parse(tis);
+        } catch (IOException | TikaException | PipesException e) {
+            throw new IllegalStateException(
+                    "The Tika Pipes fork for " + PARSE_TIMEOUT_PARAM + " did not start", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(
+                    "Interrupted while starting the Tika Pipes fork for " + PARSE_TIMEOUT_PARAM, e);
+        }
+        if (!result.isSuccess()) {
+            throw new IllegalStateException(
+                    "The Tika Pipes fork for "
+                            + PARSE_TIMEOUT_PARAM
+                            + " failed a test parse: "
+                            + describe(result));
+        }
+    }
+
+    private static String describe(PipesForkResult result) {
+        return result.getStatus()
+                + (result.getMessage() != null ? " - " + result.getMessage() : "");
+    }
+
+    /**
      * The parse under {@link #PARSE_TIMEOUT_PARAM} did not complete within {@link #parseTimeout}.
      */
     private static final class ParseTimeoutException extends Exception {
@@ -681,20 +714,11 @@ public class ParserBolt extends BaseRichBolt {
                         "Tika parse of " + url + " exceeded " + parseTimeout + "ms");
             }
             throw new ParseCrashException(
-                    "Tika parse of "
-                            + url
-                            + " crashed the forked process: "
-                            + result.getStatus()
-                            + (result.getMessage() != null ? " - " + result.getMessage() : ""));
+                    "Tika parse of " + url + " crashed the forked process: " + describe(result));
         }
 
         if (!result.isSuccess()) {
-            throw new IOException(
-                    "Tika Pipes parse of "
-                            + url
-                            + " failed: "
-                            + result.getStatus()
-                            + (result.getMessage() != null ? " - " + result.getMessage() : ""));
+            throw new IOException("Tika Pipes parse of " + url + " failed: " + describe(result));
         }
 
         org.apache.tika.metadata.Metadata resultMetadata = result.getMetadata();
