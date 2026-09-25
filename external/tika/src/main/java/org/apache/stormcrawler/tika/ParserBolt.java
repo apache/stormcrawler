@@ -126,8 +126,14 @@ public class ParserBolt extends BaseRichBolt {
      */
     public static final String PIPES_PLUGINS_DIR_PARAM = "parser.tika.pipes.plugins.dir";
 
-    /** JVM arguments passed to each forked process under {@link #PARSE_TIMEOUT_PARAM}. */
+    /**
+     * JVM arguments passed to each forked process under {@link #PARSE_TIMEOUT_PARAM}. The fork gets
+     * {@code -Xmx512m} when they set no maximum heap.
+     */
     public static final String PIPES_JVM_ARGS_PARAM = "parser.tika.pipes.jvmargs";
+
+    /** Heap of a forked process when {@link #PIPES_JVM_ARGS_PARAM} sets none. */
+    private static final String PIPES_DEFAULT_HEAP = "-Xmx512m";
 
     /** Restart a forked process after this many documents under {@link #PARSE_TIMEOUT_PARAM}. */
     public static final String PIPES_MAX_FILES_PER_PROCESS_PARAM =
@@ -575,10 +581,7 @@ public class ParserBolt extends BaseRichBolt {
         if (StringUtils.isNotBlank(pluginsDir)) {
             pipesConfig.setPluginsDir(Paths.get(pluginsDir));
         }
-        List<String> jvmArgs = ConfUtils.loadListFromConf(PIPES_JVM_ARGS_PARAM, conf);
-        if (!jvmArgs.isEmpty()) {
-            pipesConfig.setJvmArgs(jvmArgs);
-        }
+        pipesConfig.setJvmArgs(forkedJvmArgs(conf));
 
         // an HtmlMapper can't be passed to the forked JVM, which always uses Tika's default
         if (!DefaultHtmlMapper.class.equals(htmlMapperClass)) {
@@ -598,6 +601,26 @@ public class ParserBolt extends BaseRichBolt {
                     "Failed to initialise the Tika Pipes fork parser for " + PARSE_TIMEOUT_PARAM,
                     e);
         }
+    }
+
+    /**
+     * Returns the JVM arguments of a forked process: the configured ones, plus {@link
+     * #PIPES_DEFAULT_HEAP} when none of them sets a maximum heap. Without it Tika gives each fork
+     * 60% of the RAM, whatever the number of forks on the host.
+     */
+    static List<String> forkedJvmArgs(Map<String, Object> conf) {
+        final List<String> jvmArgs =
+                new ArrayList<>(ConfUtils.loadListFromConf(PIPES_JVM_ARGS_PARAM, conf));
+        if (jvmArgs.stream().noneMatch(ParserBolt::setsHeap)) {
+            jvmArgs.add(PIPES_DEFAULT_HEAP);
+        }
+        return jvmArgs;
+    }
+
+    private static boolean setsHeap(String jvmArg) {
+        return jvmArg.startsWith("-Xmx")
+                || jvmArg.startsWith("-XX:MaxHeapSize")
+                || jvmArg.startsWith("-XX:MaxRAM");
     }
 
     /**
