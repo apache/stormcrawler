@@ -1,4 +1,4 @@
-[![StormCrawler](https://stormcrawler.apache.org/img/logo-dark.png)](https://stormcrawler.apache.org/)
+[![StormCrawler](https://www.apache.org/logos/res/stormcrawler/stormcrawler.png)](https://stormcrawler.apache.org/)
 =============
 
 [![license](https://img.shields.io/github/license/apache/stormcrawler.svg?maxAge=2592000?style=plastic)](http://www.apache.org/licenses/LICENSE-2.0)
