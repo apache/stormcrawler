@@ -159,6 +159,15 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
         Assertions.assertEquals("true", parseMetadata.getFirstValue(ParserBolt.TEXT_TRIMMED_KEY));
     }
 
+    /** A fork which cannot start fails the bolt in prepare, not every document afterwards. */
+    @Test
+    @Timeout(60)
+    void forkThatCannotStartFailsPrepare() {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(ParserBolt.PIPES_JVM_ARGS_PARAM, "-XX:NoSuchOption");
+        Assertions.assertThrows(IllegalStateException.class, () -> prepare(conf));
+    }
+
     /** A forked JVM dying mid-parse is reported as "parse crash" and the bolt carries on. */
     @Test
     @Timeout(60)
