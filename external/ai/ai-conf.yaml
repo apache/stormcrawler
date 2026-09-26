@@ -27,6 +27,8 @@ textextractor.llm.model: ""
 # Allows to define a custom prompt. {HTML} is replaced with the page html, {REQUEST} is replaced with the content of textextractor.llm.user_request
 #textextractor.llm.prompt: "see llm-default-prompt.txt - can be a multi line string with placeholders"
 
+# <| in the page html is written as < | before it is substituted, so the page cannot contain a marker token of the form <|NAME|>.
+
 # Allows to configure a special user request which the LLM should honour.
 #textextractor.llm.user_request: "-"
 
