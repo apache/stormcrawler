@@ -50,16 +50,13 @@ textextractor.llm.prompt: |
 # Optional: extra request passed into the user prompt
 textextractor.llm.user_request: "Only include body content relevant to articles."
 
-# Optional: maximum number of characters of extracted text, -1 (default) for no limit
-textextractor.llm.text.maxlength: 100000
-
 # Optional: listener class implementing LlmResponseListener to hook into success/failure of LLM response, i.e. for tracking usage metrics.
 textextractor.llm.listener.clazz: "<your-listener-class>"
 ```
 
-Marker tokens of the form `<|NAME|>` that appear in the prompt template, such as `<|HTML_CONTENT_END|>` in the default one, are removed from the page HTML before it is substituted, so that a page cannot open or close a section of the prompt. If your own template delimits its sections, use markers of that form.
+`<|` in the page HTML is written as `< |` before it is substituted, so that a page cannot open or close a section of the prompt with a marker token such as `<|HTML_CONTENT_END|>` in the default template. If your own template delimits its sections, use markers of the form `<|NAME|>`.
 
-The text returned is the content of the `<content>…</content>` envelope that the default prompt asks for, or the whole reply if it has none. Any HTML markup left in it is removed, so the result contains only text, as with the default `TextExtractor`.
+The text returned is the content of the `<content>…</content>` envelope that the default prompt asks for, or the whole reply if it has none. Any HTML markup outside fenced code blocks is removed; the code blocks are kept as they are. `textextractor.skip.after` limits its length, as for the default `TextExtractor`.
 
 Note: You **must** set `textextractor.class` to use this extractor in a StormCrawler topology. 
 
@@ -68,7 +65,6 @@ The `LlmTextExtractor` does not support the following configuration options from
 - `textextractor.include.pattern`
 - `textextractor.exclude.tags`
 - `textextractor.no.text`
-- `textextractor.skip.after`
 
 ## Additional Notes
 - **LLM Costs:** Calls to LLM APIs may incur costs - monitor usage if billing is a concern. In addition, certain providers might impose **rate limits**, which are not (yet) handled by our implementation as it is vendor specific behaviour.
