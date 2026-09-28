@@ -70,7 +70,7 @@ under the License.
         <jackson-annotations.version>2.22</jackson-annotations.version>
         <jackson.version>2.22.0</jackson.version>
         <tika.version>4.0.0</tika.version>
-        <mockito.version>5.23.0</mockito.version>
+        <mockito.version>5.24.0</mockito.version>
         <slf4j-simple.version>2.0.20</slf4j-simple.version>
         <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
         <commons.io.version>2.22.0</commons.io.version>
