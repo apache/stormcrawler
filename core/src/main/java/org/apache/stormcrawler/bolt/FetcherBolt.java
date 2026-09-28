@@ -49,8 +49,6 @@ import org.apache.stormcrawler.protocol.FetchTimeoutException;
 import org.apache.stormcrawler.protocol.Protocol;
 import org.apache.stormcrawler.protocol.ProtocolFactory;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
-import org.apache.stormcrawler.protocol.RobotRules;
-import org.apache.stormcrawler.protocol.RobotRulesParser;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
@@ -102,6 +100,8 @@ public class FetcherBolt extends StatusEmitterBolt {
 
     /** Runs protocol calls under fetcher.thread.timeout, see {@link FetchTimeoutHelpers}. */
     private FetchTimeoutHelpers fetchHelpers;
+
+    private RobotRulesLookup robotsLookup;
 
     /** Largest number of helper threads ever alive; for tests. */
     int helperPoolSize() {
@@ -211,35 +211,10 @@ public class FetcherBolt extends StatusEmitterBolt {
                                 "No protocol implementation found for " + fit.url);
                     }
 
-                    BaseRobotRules rules;
-                    try {
-                        rules =
-                                fetchHelpers.call(
-                                        () -> protocol.getRobotRules(fit.url),
-                                        protocol,
-                                        fit.url,
-                                        metadata);
-                    } catch (FetchTimeoutException e) {
-                        // same outcome as with okhttp, where HttpRobotRulesParser turns a
-                        // failed lookup into empty rules: the page is fetched without rules.
-                        // The protocol caches the failure so that the next URLs of the host
-                        // do not each occupy a helper for a full deadline
-                        LOG.info(
-                                "[Fetcher #{}] robots.txt lookup timed out for {}",
-                                taskId,
-                                fit.url);
-                        eventCounter.scope("robots.timeout").incrBy(1);
-                        protocol.robotRulesTimedOut(fit.url);
-                        rules = RobotRulesParser.EMPTY_RULES;
-                    }
-                    boolean fromCache = false;
-                    if (rules instanceof RobotRules
-                            && ((RobotRules) rules).getContentLengthFetched().length == 0) {
-                        fromCache = true;
-                        eventCounter.scope("robots.fromCache").incrBy(1);
-                    } else {
-                        eventCounter.scope("robots.fetched").incrBy(1);
-                    }
+                    RobotRulesLookup.Result robots =
+                            robotsLookup.lookup(protocol, fit.url, metadata);
+                    BaseRobotRules rules = robots.rules();
+                    boolean fromCache = robots.fromCache();
 
                     // autodiscovery of sitemaps
                     // the sitemaps will be sent down the topology
@@ -645,6 +620,7 @@ public class FetcherBolt extends StatusEmitterBolt {
         fetchHelpers =
                 new FetchTimeoutHelpers(conf, Math.max(1, threadCount * 2), "FetcherTimeout-");
         fetchHelpers.registerMetrics(context, stormConf, metricsTimeBucketSecs);
+        robotsLookup = new RobotRulesLookup(fetchHelpers, eventCounter, taskId);
 
         for (int i = 0; i < threadCount; i++) {
             if (startDelay > 0 && i > 0) {
