@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.storm.Config;
 import org.apache.storm.task.OutputCollector;
+import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.utils.Utils;
@@ -60,6 +61,9 @@ abstract class AbstractFetcherBoltTest {
 
     BaseRichBolt bolt;
 
+    /** The context the bolt was last prepared with by {@link #fetch}, to read its metrics. */
+    TopologyContext context;
+
     @AfterEach
     void cleanupParserBolt() throws ReflectiveOperationException {
         bolt.cleanup();
@@ -78,10 +82,8 @@ abstract class AbstractFetcherBoltTest {
         when(tuple.getStringByField("url")).thenReturn("ahahaha");
         when(tuple.getValueByField("metadata")).thenReturn(null);
         bolt.execute(tuple);
-        boolean acked = output.getAckedTuples().contains(tuple);
-        boolean failed = output.getAckedTuples().contains(tuple);
-        // should be acked or failed
-        Assertions.assertTrue(acked || failed);
+        Assertions.assertEquals(List.of(tuple), output.getAckedTuples());
+        Assertions.assertEquals(0, output.getFailedTuples().size());
         List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
         // we should get one tuple on the status stream
         // to notify that the URL is an error
@@ -106,14 +108,13 @@ abstract class AbstractFetcherBoltTest {
                         () ->
                                 output.getAckedTuples().size() > 0
                                         || output.getFailedTuples().size() > 0);
-        boolean acked = output.getAckedTuples().contains(tuple);
-        boolean failed = output.getFailedTuples().contains(tuple);
-        // should be acked or failed
-        Assertions.assertTrue(acked || failed);
+        Assertions.assertEquals(List.of(tuple), output.getAckedTuples());
+        Assertions.assertEquals(0, output.getFailedTuples().size());
         List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
         // we should get one tuple on the status stream
         // to notify that the URL has been fetched
         Assertions.assertEquals(1, statusTuples.size());
+        Assertions.assertEquals(Status.FETCHED, statusTuples.get(0).get(2));
         // and none on the default stream as there is nothing to parse and/or
         // index
         Assertions.assertEquals(0, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
@@ -457,7 +458,8 @@ abstract class AbstractFetcherBoltTest {
             throws ReflectiveOperationException {
         resetProtocolFactory();
         TestOutputCollector output = new TestOutputCollector();
-        bolt.prepare(config, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        context = TestUtil.getMockedTopologyContext();
+        bolt.prepare(config, context, new OutputCollector(output));
 
         Tuple tuple = mock(Tuple.class);
         when(tuple.getSourceComponent()).thenReturn("source");
@@ -467,12 +469,13 @@ abstract class AbstractFetcherBoltTest {
         when(tuple.getValueByField("metadata")).thenReturn(sourceMetadata);
         bolt.execute(tuple);
 
+        // the ack or fail comes last, after everything the bolt emits for the tuple
         await().atMost(30, TimeUnit.SECONDS)
                 .until(
                         () ->
-                                output.getEmitted(Utils.DEFAULT_STREAM_ID).size() > 0
-                                        || output.getEmitted(Constants.StatusStreamName).size()
-                                                > 0);
+                                output.getAckedTuples().contains(tuple)
+                                        || output.getFailedTuples().contains(tuple));
+        Assertions.assertFalse(output.getFailedTuples().contains(tuple), "tuple failed");
         return output;
     }
 
@@ -500,9 +503,9 @@ abstract class AbstractFetcherBoltTest {
     }
 
     /**
-     * Fetches a page that is expected to be rejected before any HTTP request is made (e.g. the
-     * crawl-delay-too-long guard): the fetcher emits directly on the status stream (url, metadata,
-     * status).
+     * Fetches a page whose only output is one tuple on the status stream (url, metadata, status): a
+     * rejection before any HTTP request (e.g. the crawl-delay-too-long guard), an error status or a
+     * redirect with no outlink.
      */
     List<Object> fetchAndGetStatusTuple(
             WireMockRuntimeInfo wmRuntimeInfo, Map<String, Object> config, String path)
