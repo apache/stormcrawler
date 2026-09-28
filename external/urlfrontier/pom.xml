@@ -45,7 +45,7 @@ under the License.
         <jacoco.branchRatio>0.42</jacoco.branchRatio>
         <jacoco.lineRatio>0.45</jacoco.lineRatio>
         <jacoco.complexityRatio>0.33</jacoco.complexityRatio>
-        <caffeine.version>3.2.4</caffeine.version>
+        <caffeine.version>3.3.0</caffeine.version>
     </properties>
 
     <build>
