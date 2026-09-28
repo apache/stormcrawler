@@ -214,50 +214,8 @@ public class FetcherBolt extends StatusEmitterBolt {
                     RobotRulesLookup.Result robots =
                             robotsLookup.lookup(protocol, fit.url, metadata);
                     BaseRobotRules rules = robots.rules();
-                    boolean fromCache = robots.fromCache();
 
-                    // autodiscovery of sitemaps
-                    // the sitemaps will be sent down the topology
-                    // if the robot file did not come from the cache
-                    // to avoid sending them unnecessarily
-
-                    // check in the metadata if discovery setting has been
-                    // overridden
-
-                    String localSitemapDiscoveryVal =
-                            metadata.getFirstValue(SITEMAP_DISCOVERY_PARAM_KEY);
-
-                    boolean smautodisco;
-
-                    if ("true".equalsIgnoreCase(localSitemapDiscoveryVal)) {
-                        smautodisco = true;
-                    } else if ("false".equalsIgnoreCase(localSitemapDiscoveryVal)) {
-                        smautodisco = false;
-                    } else {
-                        smautodisco = sitemapsAutoDiscovery;
-                    }
-
-                    if (!fromCache && smautodisco) {
-                        for (String sitemapUrl : rules.getSitemaps()) {
-                            if (rules.isAllowed(sitemapUrl)) {
-                                emitOutlink(
-                                        fit.tuple,
-                                        url,
-                                        sitemapUrl,
-                                        metadata,
-                                        SiteMapParserBolt.isSitemapKey,
-                                        "true");
-                            }
-                        }
-                    }
-
-                    // has found sitemaps
-                    // https://github.com/apache/stormcrawler/issues/710
-                    // note: we don't care if the sitemap URLs where actually
-                    // kept
-                    boolean foundSitemap = (rules.getSitemaps().size() > 0);
-                    metadata.setValue(
-                            SiteMapParserBolt.foundSitemapKey, Boolean.toString(foundSitemap));
+                    discoverSitemaps(fit.tuple, url, metadata, robots);
 
                     if (!rules.isAllowed(fit.url)) {
                         LOG.info("Denied by robots.txt: {}", fit.url);
@@ -542,6 +500,46 @@ public class FetcherBolt extends StatusEmitterBolt {
                 }
             }
         }
+    }
+
+    /**
+     * Sends the sitemaps of robots.txt which its rules allow as outlinks, when sitemap discovery is
+     * on for the URL (its metadata overrides the configuration) and the rules did not come from the
+     * cache. Sets foundSitemap in the metadata to whether robots.txt declares any sitemap, sent or
+     * not (#710).
+     */
+    private void discoverSitemaps(
+            Tuple tuple, URL url, Metadata metadata, RobotRulesLookup.Result robots) {
+        BaseRobotRules rules = robots.rules();
+
+        String localSitemapDiscoveryVal = metadata.getFirstValue(SITEMAP_DISCOVERY_PARAM_KEY);
+
+        boolean smautodisco;
+
+        if ("true".equalsIgnoreCase(localSitemapDiscoveryVal)) {
+            smautodisco = true;
+        } else if ("false".equalsIgnoreCase(localSitemapDiscoveryVal)) {
+            smautodisco = false;
+        } else {
+            smautodisco = sitemapsAutoDiscovery;
+        }
+
+        if (!robots.fromCache() && smautodisco) {
+            for (String sitemapUrl : rules.getSitemaps()) {
+                if (rules.isAllowed(sitemapUrl)) {
+                    emitOutlink(
+                            tuple,
+                            url,
+                            sitemapUrl,
+                            metadata,
+                            SiteMapParserBolt.isSitemapKey,
+                            "true");
+                }
+            }
+        }
+
+        boolean foundSitemap = (rules.getSitemaps().size() > 0);
+        metadata.setValue(SiteMapParserBolt.foundSitemapKey, Boolean.toString(foundSitemap));
     }
 
     private void checkConfiguration(Config stormConf) {
