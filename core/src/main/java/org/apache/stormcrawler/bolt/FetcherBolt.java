@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpHeaders;
 import org.apache.storm.Config;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -44,8 +43,6 @@ import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.metrics.ScopedReducedMetric;
 import org.apache.stormcrawler.persistence.Status;
-import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
-import org.apache.stormcrawler.protocol.FetchTimeoutException;
 import org.apache.stormcrawler.protocol.Protocol;
 import org.apache.stormcrawler.protocol.ProtocolFactory;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
@@ -105,6 +102,8 @@ public class FetcherBolt extends StatusEmitterBolt {
 
     private CrawlDelayPolicy crawlDelayPolicy;
 
+    private FetchOutcomes fetchOutcomes;
+
     /** Largest number of helper threads ever alive; for tests. */
     int helperPoolSize() {
         return fetchHelpers == null ? 0 : fetchHelpers.largestPoolSize();
@@ -125,20 +124,12 @@ public class FetcherBolt extends StatusEmitterBolt {
 
         private long timeoutInQueues = -1;
 
-        // by default remains as is-pre 1.17
-        private String protocolMetadataPrefix = "";
-
         public FetcherThread(Config conf, int num) {
             this.setDaemon(true); // don't hang JVM on exit
             this.setName("FetcherThread #" + num); // use an informative name
 
             this.threadNum = num;
             timeoutInQueues = ConfUtils.getLong(conf, QUEUED_TIMEOUT_PARAM_KEY, timeoutInQueues);
-            protocolMetadataPrefix =
-                    ConfUtils.getString(
-                            conf,
-                            ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM,
-                            protocolMetadataPrefix);
         }
 
         @Override
@@ -294,100 +285,36 @@ public class FetcherBolt extends StatusEmitterBolt {
                             response.getStatusCode(),
                             timeFetching);
 
-                    // merges the original MD and the ones returned by the
-                    // protocol
-                    Metadata mergedMetadata = new Metadata();
-                    mergedMetadata.putAll(metadata);
-
-                    // add a prefix to avoid confusion, preserve protocol
-                    // metadata persisted or transferred from previous fetches
-                    mergedMetadata.putAll(response.getMetadata(), protocolMetadataPrefix);
-
-                    // Only the locally parsed robots.txt value may populate this control signal.
-                    // A colliding protocol prefix/header must not pace an unrelated queue.
-                    mergedMetadata.remove(Constants.ROBOTS_CRAWL_DELAY_KEY);
-
-                    // Request shaping comes from the configuration, never from a fetched page: a
-                    // response header named set-header lands on exactly the key the protocols read
-                    // to add headers to an outgoing request. Any value configured for this URL is
-                    // put back after the response metadata has been dropped.
-                    final String setHeaderKey =
-                            protocolMetadataPrefix + AbstractHttpProtocol.SET_HEADER_BY_REQUEST;
-                    mergedMetadata.remove(setHeaderKey);
-                    mergedMetadata.setValues(setHeaderKey, metadata.getValues(setHeaderKey));
-                    if (robotsCrawlDelaySecs != null) {
-                        mergedMetadata.setValue(
-                                Constants.ROBOTS_CRAWL_DELAY_KEY, robotsCrawlDelaySecs);
-                    }
-
-                    mergedMetadata.setValue(
-                            "fetch.statusCode", Integer.toString(response.getStatusCode()));
-
-                    mergedMetadata.setValue("fetch.byteLength", Integer.toString(byteLength));
-
-                    mergedMetadata.setValue("fetch.loadingTime", Long.toString(timeFetching));
-
-                    mergedMetadata.setValue("fetch.timeInQueues", Long.toString(timeInQueues));
-
-                    // determine the status based on the status code
-                    final Status status = Status.fromHTTPCode(response.getStatusCode());
-
-                    eventCounter.scope("status_" + response.getStatusCode()).incrBy(1);
-
-                    final Values tupleToSend = new Values(fit.url, mergedMetadata, status);
-
-                    // if the status is OK emit on default stream
-                    if (status.equals(Status.FETCHED)) {
-                        if (response.getStatusCode() == 304) {
-                            // mark this URL as fetched so that it gets
-                            // rescheduled
-                            // but do not try to parse or index
-                            collector.emit(Constants.StatusStreamName, fit.tuple, tupleToSend);
-                        } else {
-                            // send content for parsing
-                            collector.emit(
-                                    Utils.DEFAULT_STREAM_ID,
-                                    fit.tuple,
-                                    new Values(fit.url, response.getContent(), mergedMetadata));
-                        }
-                    } else if (status.equals(Status.REDIRECTION)) {
-
-                        // find the URL it redirects to
-                        String redirection =
-                                response.getMetadata().getFirstValue(HttpHeaders.LOCATION);
-
-                        // stores the URL it redirects to
-                        // used for debugging mainly - do not resolve the target
-                        // URL
-                        if (StringUtils.isNotBlank(redirection)) {
-                            mergedMetadata.setValue("_redirTo", redirection);
-                        }
-
-                        // https://github.com/apache/stormcrawler/issues/954
-                        if (allowRedirs() && StringUtils.isNotBlank(redirection)) {
-                            // a sitemap which redirects (e.g. /sitemap.xml to
-                            // /sitemap_index.xml) must stay a sitemap: the key
-                            // is persisted, not transferred to outlinks by
-                            // default, so carry it onto the redirect target
-                            if (Boolean.parseBoolean(
-                                    mergedMetadata.getFirstValue(SiteMapParserBolt.isSitemapKey))) {
-                                emitOutlink(
-                                        fit.tuple,
-                                        url,
-                                        redirection,
-                                        mergedMetadata,
-                                        SiteMapParserBolt.isSitemapKey,
-                                        "true");
-                            } else {
-                                emitOutlink(fit.tuple, url, redirection, mergedMetadata);
-                            }
-                        }
-
-                        // mark this URL as redirected
-                        collector.emit(Constants.StatusStreamName, fit.tuple, tupleToSend);
+                    FetchOutcomes.Outcome outcome =
+                            fetchOutcomes.ofResponse(
+                                    response,
+                                    metadata,
+                                    robotsCrawlDelaySecs,
+                                    timeFetching,
+                                    timeInQueues);
+                    if (outcome.parse()) {
+                        // send content for parsing
+                        collector.emit(
+                                Utils.DEFAULT_STREAM_ID,
+                                fit.tuple,
+                                new Values(fit.url, response.getContent(), outcome.metadata()));
                     } else {
-                        // error
-                        collector.emit(Constants.StatusStreamName, fit.tuple, tupleToSend);
+                        // allowRedirs() can be overridden: it is asked for every redirect and
+                        // nothing else (#954)
+                        if (outcome.status() == Status.REDIRECTION
+                                && allowRedirs()
+                                && outcome.redirectTarget() != null) {
+                            emitOutlink(
+                                    fit.tuple,
+                                    url,
+                                    outcome.redirectTarget(),
+                                    outcome.metadata(),
+                                    outcome.redirectKeyValues());
+                        }
+                        collector.emit(
+                                Constants.StatusStreamName,
+                                fit.tuple,
+                                new Values(fit.url, outcome.metadata(), outcome.status()));
                     }
 
                 } catch (FetchTimeoutHelpers.SaturatedException e) {
@@ -405,47 +332,12 @@ public class FetcherBolt extends StatusEmitterBolt {
                             fetchHelpers.maxHelpers());
                     saturated = true;
                 } catch (Exception exece) {
-                    String message = exece.getMessage();
-                    if (message == null) {
-                        message = "";
-                    }
-
-                    // common exceptions for which we log only a short message
-                    if (exece instanceof java.io.InterruptedIOException
-                            || message.contains(" timed out")) {
-                        LOG.info("Socket timeout fetching {}", fit.url);
-                        message = "Socket timeout fetching";
-                        eventCounter.scope("fetch.timeout").incrBy(1);
-                        if (exece instanceof FetchTimeoutException) {
-                            // the hard deadline, as opposed to the protocol's socket timeouts
-                            eventCounter.scope("fetch.deadline").incrBy(1);
-                        }
-                    } else if (exece.getCause() instanceof java.net.UnknownHostException
-                            || exece instanceof java.net.UnknownHostException) {
-                        LOG.info("Unknown host {}", fit.url);
-                        message = "Unknown host";
-                    } else {
-                        message = exece.getClass().getName();
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Exception while fetching {}", fit.url, exece);
-                        } else {
-                            LOG.info("Exception while fetching {} -> {}", fit.url, message);
-                        }
-                    }
-
-                    if (metadata.size() == 0) {
-                        metadata = new Metadata();
-                    }
-                    // add the reason of the failure in the metadata
-                    metadata.setValue("fetch.exception", message);
-
-                    // send to status stream
+                    FetchOutcomes.Outcome outcome =
+                            fetchOutcomes.ofFailure(exece, fit.url, metadata);
                     collector.emit(
                             Constants.StatusStreamName,
                             fit.tuple,
-                            new Values(fit.url, metadata, Status.FETCH_ERROR));
-
-                    eventCounter.scope("exception").incrBy(1);
+                            new Values(fit.url, outcome.metadata(), outcome.status()));
                 } finally {
                     if (saturated) {
                         long delay = fetchQueues.backOffFetchItem(fit);
@@ -572,6 +464,11 @@ public class FetcherBolt extends StatusEmitterBolt {
         protocolFactory = ProtocolFactory.getInstance(conf);
 
         this.fetchQueues = new FetchItemQueues(conf);
+
+        // by default remains as is-pre 1.17
+        String protocolMetadataPrefix =
+                ConfUtils.getString(conf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "");
+        fetchOutcomes = new FetchOutcomes(protocolMetadataPrefix, eventCounter);
 
         crawlDelayPolicy =
                 new CrawlDelayPolicy(
