@@ -318,6 +318,53 @@ class BasicURLNormalizerTest {
         assertEquals(expectedURL, normalizedUrl, "Failed to filter query string");
     }
 
+    // https://github.com/apache/stormcrawler/issues/2197
+    @Test
+    void testQueryKeptWhenURLRebuilt() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        // rebuilt because of the uppercase scheme and host
+        assertEquals(
+                "http://a.example/p?b=2&a=1",
+                urlFilter.filter(testSourceUrl, new Metadata(), "HTTP://A.Example/p?b=2&a=1"));
+        // rebuilt because the path is unescaped
+        assertEquals(
+                "http://a.example/~user?x=1",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/%7euser?x=1"));
+        // rebuilt because an illegal character in the path is escaped
+        assertEquals(
+                "http://a.example/a%5Cb?x=1",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/a\\b?x=1"));
+        // port is kept too
+        assertEquals(
+                "http://a.example:8080/p?x=1",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://A.EXAMPLE:8080/p?x=1"));
+        // not rebuilt: unchanged
+        assertEquals(
+                "http://a.example/p?x=1",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/p?x=1"));
+    }
+
+    // https://github.com/apache/stormcrawler/issues/2197
+    @Test
+    void testEscapesNotDoubleEncodedWhenURLRebuilt() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        // existing escapes in the path and query must not become %25XX
+        assertEquals(
+                "http://a.example/a%20b?q=%21x%3Dy",
+                urlFilter.filter(
+                        testSourceUrl, new Metadata(), "http://A.example/a%20b?q=%21x%3Dy"));
+
+        urlFilter = createFilter(List.of("utm_source"));
+        assertEquals(
+                "http://a.example/r?t=%7E%21q&u=https%3A%2F%2Fb.example",
+                urlFilter.filter(
+                        testSourceUrl,
+                        new Metadata(),
+                        "http://A.example/r?u=https%3A%2F%2Fb.example&t=~!q&utm_source=x"));
+    }
+
     private JsonNode getArrayNode(List<String> queryElementsToRemove) {
         ObjectMapper mapper = new ObjectMapper();
         return mapper.valueToTree(queryElementsToRemove);
