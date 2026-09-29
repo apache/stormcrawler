@@ -103,6 +103,8 @@ public class FetcherBolt extends StatusEmitterBolt {
 
     private RobotRulesLookup robotsLookup;
 
+    private CrawlDelayPolicy crawlDelayPolicy;
+
     /** Largest number of helper threads ever alive; for tests. */
     int helperPoolSize() {
         return fetchHelpers == null ? 0 : fetchHelpers.largestPoolSize();
@@ -119,14 +121,6 @@ public class FetcherBolt extends StatusEmitterBolt {
     /** This class picks items from queues and fetches the pages. */
     private class FetcherThread extends Thread {
 
-        // max. delay accepted from robots.txt
-        private final long maxCrawlDelay;
-        // whether maxCrawlDelay overwrites the longer value in robots.txt
-        // (otherwise URLs in this queue are skipped)
-        private final boolean maxCrawlDelayForce;
-        // whether the default delay is used even if the robots.txt
-        // specifies a shorter crawl-delay
-        private final boolean crawlDelayForce;
         private final int threadNum;
 
         private long timeoutInQueues = -1;
@@ -138,10 +132,6 @@ public class FetcherBolt extends StatusEmitterBolt {
             this.setDaemon(true); // don't hang JVM on exit
             this.setName("FetcherThread #" + num); // use an informative name
 
-            this.maxCrawlDelay = ConfUtils.getInt(conf, "fetcher.max.crawl.delay", 30) * 1000L;
-            this.maxCrawlDelayForce =
-                    ConfUtils.getBoolean(conf, "fetcher.max.crawl.delay.force", false);
-            this.crawlDelayForce = ConfUtils.getBoolean(conf, "fetcher.server.delay.force", false);
             this.threadNum = num;
             timeoutInQueues = ConfUtils.getLong(conf, QUEUED_TIMEOUT_PARAM_KEY, timeoutInQueues);
             protocolMetadataPrefix =
@@ -231,56 +221,30 @@ public class FetcherBolt extends StatusEmitterBolt {
                         continue;
                     }
                     FetchItemQueue fiq = fetchQueues.getFetchItemQueue(fit.queueId, metadata);
-                    if (rules.getCrawlDelay() > 0
-                            && rules.getCrawlDelay() != fiq.crawlDelay.get()) {
-                        if (rules.getCrawlDelay() > maxCrawlDelay && maxCrawlDelay >= 0) {
-                            boolean force = false;
-                            String msg = "skipping";
-                            if (maxCrawlDelayForce) {
-                                force = true;
-                                msg = "using value of fetcher.max.crawl.delay instead";
-                            }
-                            LOG.info(
-                                    "Crawl-Delay for {} too long ({}), {}",
+                    CrawlDelayPolicy.Decision decision =
+                            crawlDelayPolicy.decide(
                                     fit.url,
-                                    rules.getCrawlDelay(),
-                                    msg);
-                            if (force) {
-                                fiq.crawlDelay.set(maxCrawlDelay);
-                                // report the delay the fetcher is not holding, so a frontier-side
-                                // consumer can enforce it at the source (#867)
-                                robotsCrawlDelaySecs =
-                                        Long.toString(1L + ((rules.getCrawlDelay() - 1L) / 1000L));
-                                metadata.setValue(
-                                        Constants.ROBOTS_CRAWL_DELAY_KEY, robotsCrawlDelaySecs);
-                            } else {
-                                // pass the info about crawl delay
-                                metadata.setValue(Constants.STATUS_ERROR_CAUSE, "crawl_delay");
-                                collector.emit(
-                                        org.apache.stormcrawler.Constants.StatusStreamName,
-                                        fit.tuple,
-                                        new Values(fit.url, metadata, Status.ERROR));
-                                // no need to wait next time as we won't request
-                                // from that site
-                                asap = true;
-                                continue;
-                            }
-                        } else if (rules.getCrawlDelay() < fetchQueues.crawlDelay
-                                && crawlDelayForce) {
-                            fiq.crawlDelay.set(fetchQueues.crawlDelay);
-                            LOG.info(
-                                    "Crawl delay for {} too short ({}), "
-                                            + "set to fetcher.server.delay",
-                                    fit.url,
-                                    rules.getCrawlDelay());
-                        } else {
-                            fiq.crawlDelay.set(rules.getCrawlDelay());
-                            LOG.info(
-                                    "Crawl delay for queue: {}  is set to {} "
-                                            + "as per robots.txt. url: {}",
                                     fit.queueId,
-                                    fiq.crawlDelay.get(),
-                                    fit.url);
+                                    rules.getCrawlDelay(),
+                                    fiq.crawlDelay.get());
+                    if (decision.action() == CrawlDelayPolicy.Action.SKIP) {
+                        // pass the info about crawl delay
+                        metadata.setValue(Constants.STATUS_ERROR_CAUSE, "crawl_delay");
+                        collector.emit(
+                                org.apache.stormcrawler.Constants.StatusStreamName,
+                                fit.tuple,
+                                new Values(fit.url, metadata, Status.ERROR));
+                        // no need to wait next time as we won't request
+                        // from that site
+                        asap = true;
+                        continue;
+                    }
+                    if (decision.action() == CrawlDelayPolicy.Action.APPLY) {
+                        fiq.crawlDelay.set(decision.delay());
+                        robotsCrawlDelaySecs = decision.robotsCrawlDelaySecs();
+                        if (robotsCrawlDelaySecs != null) {
+                            metadata.setValue(
+                                    Constants.ROBOTS_CRAWL_DELAY_KEY, robotsCrawlDelaySecs);
                         }
                     }
 
@@ -608,6 +572,13 @@ public class FetcherBolt extends StatusEmitterBolt {
         protocolFactory = ProtocolFactory.getInstance(conf);
 
         this.fetchQueues = new FetchItemQueues(conf);
+
+        crawlDelayPolicy =
+                new CrawlDelayPolicy(
+                        ConfUtils.getInt(conf, "fetcher.max.crawl.delay", 30) * 1000L,
+                        ConfUtils.getBoolean(conf, "fetcher.max.crawl.delay.force", false),
+                        fetchQueues.crawlDelay,
+                        ConfUtils.getBoolean(conf, "fetcher.server.delay.force", false));
 
         this.taskId = context.getThisTaskId();
 
