@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

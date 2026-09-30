@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.storm.Config;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
-import org.apache.stormcrawler.bolt.FetchItemQueues.FetchItemQueue;
+import org.apache.stormcrawler.fetcher.FetchItemQueues.FetchItemQueue;
 import org.apache.stormcrawler.util.URLUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -88,7 +88,7 @@ class FetchItemQueuesTest {
 
         FetchItem first = q.getFetchItem();
         Assertions.assertNotNull(first);
-        Assertions.assertEquals("http://a.net/1", first.url);
+        Assertions.assertEquals("http://a.net/1", first.url());
         Assertions.assertEquals(1, q.inQueues.get());
         // one thread per host: nothing else from a.net while the fetch is in progress
         Assertions.assertNull(q.getFetchItem());
@@ -98,7 +98,7 @@ class FetchItemQueuesTest {
         Assertions.assertNull(q.getFetchItem());
         FetchItem second = awaitItem(q, 2000);
         Assertions.assertNotNull(second);
-        Assertions.assertEquals("http://a.net/2", second.url);
+        Assertions.assertEquals("http://a.net/2", second.url());
         Assertions.assertEquals(0, q.inQueues.get());
     }
 
@@ -111,7 +111,7 @@ class FetchItemQueuesTest {
         q.finishFetchItem(first, true);
         FetchItem second = q.getFetchItem();
         Assertions.assertNotNull(second);
-        Assertions.assertEquals("http://a.net/2", second.url);
+        Assertions.assertEquals("http://a.net/2", second.url());
     }
 
     @Test
@@ -124,7 +124,7 @@ class FetchItemQueuesTest {
         for (int i = 0; i < 3; i++) {
             FetchItem it = q.getFetchItem();
             Assertions.assertNotNull(it);
-            got.add(it.queueId);
+            got.add(it.queueId());
         }
         Assertions.assertEquals(Set.of("a.net", "b.net", "c.net"), got);
         Assertions.assertNull(q.getFetchItem());
@@ -219,7 +219,7 @@ class FetchItemQueuesTest {
                                         Thread.yield();
                                         continue;
                                     }
-                                    if (!seen.add(it.url)) {
+                                    if (!seen.add(it.url())) {
                                         failed.set(true);
                                     }
                                     fetched.incrementAndGet();
@@ -286,7 +286,7 @@ class FetchItemQueuesTest {
         // whoever polls next must get the second URL
         FetchItem second = polled[0] != null ? polled[0] : awaitItem(q, 2000);
         Assertions.assertNotNull(second, "second URL lost: no ticket left for the queue");
-        Assertions.assertEquals("http://a.net/2", second.url);
+        Assertions.assertEquals("http://a.net/2", second.url());
     }
 
     /**
@@ -337,7 +337,7 @@ class FetchItemQueuesTest {
         poller.join();
 
         Assertions.assertNotNull(polled[0]);
-        Assertions.assertEquals("http://a.net/2", polled[0].url);
+        Assertions.assertEquals("http://a.net/2", polled[0].url());
         Assertions.assertEquals(1, hooked.getInProgressSize());
         // the dispatched item finishes on its own queue, which is then reaped
         q.finishFetchItem(polled[0], true);
@@ -472,7 +472,7 @@ class FetchItemQueuesTest {
         add(q, "http://b.net/1");
         FetchItem a1 = q.getFetchItem();
         Assertions.assertNotNull(a1);
-        Assertions.assertEquals("http://a.net/1", a1.url);
+        Assertions.assertEquals("http://a.net/1", a1.url());
         // a second URL for a.net issues a ticket at the queue's current (past) next fetch time
         add(q, "http://a.net/2");
         // finishing with the 10 s delay pushes a.net's next fetch time into the future: the
@@ -481,7 +481,7 @@ class FetchItemQueuesTest {
 
         FetchItem next = q.getFetchItem();
         Assertions.assertNotNull(next, "returned nothing while b.net was ready");
-        Assertions.assertEquals("http://b.net/1", next.url);
+        Assertions.assertEquals("http://b.net/1", next.url());
     }
 
     /** Asserts that the delay is the equal-jittered value: within [computed / 2, computed]. */
@@ -505,7 +505,7 @@ class FetchItemQueuesTest {
         }
         FetchItem it = q.getFetchItem();
         Assertions.assertNotNull(it);
-        FetchItemQueue fiq = q.queues.get(it.queueId);
+        FetchItemQueue fiq = q.queues.get(it.queueId());
 
         long[] expected = {2000, 4000, 5000, 5000};
         for (long computed : expected) {
@@ -540,7 +540,7 @@ class FetchItemQueuesTest {
         }
         FetchItem it = q.getFetchItem();
         Assertions.assertNotNull(it);
-        FetchItemQueue fiq = q.queues.get(it.queueId);
+        FetchItemQueue fiq = q.queues.get(it.queueId());
 
         long[] expected = {8000, 16000, 30000, 30000};
         for (long computed : expected) {
@@ -558,7 +558,7 @@ class FetchItemQueuesTest {
         }
         FetchItem it = q.getFetchItem();
         Assertions.assertNotNull(it);
-        FetchItemQueue fiq = q.queues.get(it.queueId);
+        FetchItemQueue fiq = q.queues.get(it.queueId());
 
         for (int i = 0; i < 3; i++) {
             assertJittered(10000, q.backOffFetchItem(it));

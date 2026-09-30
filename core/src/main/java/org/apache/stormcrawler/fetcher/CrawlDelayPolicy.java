@@ -15,8 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
+import org.apache.stormcrawler.bolt.FetcherBolt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,13 +25,15 @@ import org.slf4j.LoggerFactory;
  * Decides what the crawl delay of robots.txt does to the fetch queue of a URL, following
  * fetcher.max.crawl.delay, fetcher.max.crawl.delay.force, fetcher.server.delay and
  * fetcher.server.delay.force. Delays are in milliseconds.
+ *
+ * <p>For internal use only. Not part of StormCrawler's public API.
  */
-final class CrawlDelayPolicy {
+public final class CrawlDelayPolicy {
 
     // the bolt's category: log configurations for FetcherBolt keep covering these lines
     private static final Logger LOG = LoggerFactory.getLogger(FetcherBolt.class);
 
-    enum Action {
+    public enum Action {
         /**
          * Leave the fetch queue as it is: robots.txt has no delay, or the one the queue already
          * has, even above the cap. The caller must not write back the delay it read, which could
@@ -47,7 +50,7 @@ final class CrawlDelayPolicy {
      * @param robotsCrawlDelaySecs the robots.txt delay in seconds, rounded up, when it was longer
      *     than fetcher.max.crawl.delay and capped; null otherwise
      */
-    record Decision(Action action, long delay, String robotsCrawlDelaySecs) {
+    public record Decision(Action action, long delay, String robotsCrawlDelaySecs) {
         static final Decision UNCHANGED = new Decision(Action.UNCHANGED, 0, null);
         static final Decision SKIP = new Decision(Action.SKIP, 0, null);
     }
@@ -62,7 +65,7 @@ final class CrawlDelayPolicy {
     // specifies a shorter crawl-delay
     private final boolean serverDelayForce;
 
-    CrawlDelayPolicy(
+    public CrawlDelayPolicy(
             long maxCrawlDelay,
             boolean maxCrawlDelayForce,
             long serverDelay,
@@ -78,7 +81,7 @@ final class CrawlDelayPolicy {
      * @param queueId the ID of the fetch queue, for the log
      * @param robotsDelay the crawl delay of robots.txt, not positive when there is none
      */
-    Decision decide(String url, String queueId, long robotsDelay, long queueDelay) {
+    public Decision decide(String url, String queueId, long robotsDelay, long queueDelay) {
         if (robotsDelay <= 0 || robotsDelay == queueDelay) {
             return Decision.UNCHANGED;
         }

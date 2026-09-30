@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.stormcrawler.Metadata;
@@ -25,9 +25,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Copies the timings a protocol reports under {@value #METRICS_PREFIX} into the metric registry of
- * a fetcher bolt. Shared by {@link FetcherBolt} and {@link SimpleFetcherBolt}.
+ * a fetcher bolt. Shared by {@link org.apache.stormcrawler.bolt.FetcherBolt} and {@link
+ * org.apache.stormcrawler.bolt.SimpleFetcherBolt}.
+ *
+ * <p>For internal use only. Not part of StormCrawler's public API.
  */
-final class ProtocolMetrics {
+public final class ProtocolMetrics {
 
     private static final Logger LOG = LoggerFactory.getLogger(ProtocolMetrics.class);
 
@@ -43,7 +46,7 @@ final class ProtocolMetrics {
      * prefix can come from the fetched server rather than from the protocol itself. A value which
      * is not a number is skipped: it must not fail a fetch which otherwise completed.
      */
-    static void update(ScopedReducedMetric averagedMetrics, Metadata metadata) {
+    public static void update(ScopedReducedMetric averagedMetrics, Metadata metadata) {
         for (String key : metadata.keySet(METRICS_PREFIX)) {
             final String value = metadata.getFirstValue(key);
             final long parsed;

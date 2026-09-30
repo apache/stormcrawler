@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -59,11 +59,13 @@ import org.apache.stormcrawler.util.ConfUtils;
  *
  * <p>The deadline is the one of {@link FetchTimeout#secs(Map)}, clamped to the message timeout on
  * both paths.
+ *
+ * <p>For internal use only. Not part of StormCrawler's public API.
  */
-final class FetchTimeoutHelpers {
+public final class FetchTimeoutHelpers {
 
     /** Thrown when no helper thread is available to run a call with a timeout. */
-    static final class SaturatedException extends Exception {
+    public static final class SaturatedException extends Exception {
         SaturatedException(String url) {
             super("No fetch helper available for " + url);
         }
@@ -105,7 +107,8 @@ final class FetchTimeoutHelpers {
      * @param defaultMaxHelpers pool bound used unless {@code fetcher.thread.timeout.helpers} is set
      * @param threadNamePrefix prefix of the helper thread names
      */
-    FetchTimeoutHelpers(Map<String, Object> conf, int defaultMaxHelpers, String threadNamePrefix) {
+    public FetchTimeoutHelpers(
+            Map<String, Object> conf, int defaultMaxHelpers, String threadNamePrefix) {
         this.timeoutSecs = FetchTimeout.secs(conf);
         final int maxHelpers =
                 ConfUtils.getInt(
@@ -132,7 +135,7 @@ final class FetchTimeoutHelpers {
     }
 
     /** Registers the {@code fetchhelpers} gauge: number of helpers busy with a call. */
-    void registerMetrics(TopologyContext context, Map<String, Object> conf, int bucketSecs) {
+    public void registerMetrics(TopologyContext context, Map<String, Object> conf, int bucketSecs) {
         CrawlerMetrics.registerGauge(context, conf, "fetchhelpers", this::busy, bucketSecs);
     }
 
@@ -152,12 +155,12 @@ final class FetchTimeoutHelpers {
     }
 
     /** Pool bound. */
-    int maxHelpers() {
+    public int maxHelpers() {
         return helpers.getMaximumPoolSize();
     }
 
     /** Largest number of helper threads ever alive. */
-    int largestPoolSize() {
+    public int largestPoolSize() {
         return helpers.getLargestPoolSize();
     }
 
@@ -172,7 +175,7 @@ final class FetchTimeoutHelpers {
      * @throws FetchTimeoutException when the deadline passed
      * @throws Exception the protocol's own exception
      */
-    <T> T call(Callable<T> call, Protocol protocol, String url, Metadata metadata)
+    public <T> T call(Callable<T> call, Protocol protocol, String url, Metadata metadata)
             throws Exception {
         if (timeoutSecs <= 0 || protocol.supportsFetchTimeout(url, metadata)) {
             return call.call();
@@ -223,7 +226,7 @@ final class FetchTimeoutHelpers {
         }
     }
 
-    void shutdown() {
+    public void shutdown() {
         helpers.shutdownNow();
     }
 }
