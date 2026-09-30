@@ -15,10 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
 import crawlercommons.robots.BaseRobotRules;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.bolt.FetcherBolt;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.protocol.FetchTimeoutException;
 import org.apache.stormcrawler.protocol.Protocol;
@@ -31,8 +32,10 @@ import org.slf4j.LoggerFactory;
  * Looks up the robots.txt rules of a URL under fetcher.thread.timeout, for the fetcher threads of
  * {@link FetcherBolt}. A lookup which times out yields empty rules. Each lookup which returns rules
  * counts in robots.fetched or robots.fromCache, each timeout also in robots.timeout.
+ *
+ * <p>For internal use only. Not part of StormCrawler's public API.
  */
-final class RobotRulesLookup {
+public final class RobotRulesLookup {
 
     // the bolt's category: log configurations for FetcherBolt keep covering these lines
     private static final Logger LOG = LoggerFactory.getLogger(FetcherBolt.class);
@@ -42,13 +45,13 @@ final class RobotRulesLookup {
      * convention, cached rules carry no fetched content lengths. The empty rules of a timed-out
      * lookup are not from the cache.
      */
-    record Result(BaseRobotRules rules, boolean fromCache) {}
+    public record Result(BaseRobotRules rules, boolean fromCache) {}
 
     private final FetchTimeoutHelpers helpers;
     private final ScopedCounter eventCounter;
     private final int taskId;
 
-    RobotRulesLookup(FetchTimeoutHelpers helpers, ScopedCounter eventCounter, int taskId) {
+    public RobotRulesLookup(FetchTimeoutHelpers helpers, ScopedCounter eventCounter, int taskId) {
         this.helpers = helpers;
         this.eventCounter = eventCounter;
         this.taskId = taskId;
@@ -62,7 +65,7 @@ final class RobotRulesLookup {
      * @throws FetchTimeoutHelpers.SaturatedException when every helper thread is busy
      * @throws Exception the protocol's own exception
      */
-    Result lookup(Protocol protocol, String url, Metadata metadata) throws Exception {
+    public Result lookup(Protocol protocol, String url, Metadata metadata) throws Exception {
         BaseRobotRules rules;
         try {
             rules = helpers.call(() -> protocol.getRobotRules(url), protocol, url, metadata);

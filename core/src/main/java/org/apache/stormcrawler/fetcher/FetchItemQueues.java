@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
 import java.net.URL;
 import java.util.HashMap;
@@ -35,6 +35,7 @@ import java.util.regex.Pattern;
 import org.apache.storm.Config;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.bolt.FetcherBolt;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.LoggerFactory;
 
@@ -46,8 +47,10 @@ import org.slf4j.LoggerFactory;
  * referenced from a {@link DelayQueue} ordered by their next fetch time: taking an item is O(log n)
  * and does not require a global lock, so the executor thread adding URLs is never blocked by the
  * fetcher threads.
+ *
+ * <p>For internal use only. Not part of StormCrawler's public API.
  */
-class FetchItemQueues {
+public final class FetchItemQueues {
     // the bolt's category: log configurations for FetcherBolt keep covering these lines
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(FetcherBolt.class);
 
@@ -80,9 +83,9 @@ class FetchItemQueues {
 
     final Config conf;
 
-    public static final String QUEUE_MODE_HOST = "byHost";
-    public static final String QUEUE_MODE_DOMAIN = "byDomain";
-    public static final String QUEUE_MODE_IP = "byIP";
+    static final String QUEUE_MODE_HOST = "byHost";
+    static final String QUEUE_MODE_DOMAIN = "byDomain";
+    static final String QUEUE_MODE_IP = "byIP";
 
     String queueMode;
 
@@ -134,7 +137,7 @@ class FetchItemQueues {
         final FetchItem it = FetchItem.create(u, url, input, queueMode);
         final Metadata metadata = (Metadata) input.getValueByField("metadata");
         while (true) {
-            FetchItemQueue fiq = getFetchItemQueue(it.queueId, metadata);
+            FetchItemQueue fiq = getFetchItemQueue(it.queueId(), metadata);
             synchronized (fiq) {
                 if (fiq.removed) {
                     // reaped concurrently: get a fresh one
@@ -146,15 +149,15 @@ class FetchItemQueues {
             }
             inQueues.incrementAndGet();
             schedule(fiq, fiq.getNextFetchTime());
-            LOG.debug("{} added to queue {}", url, it.queueId);
+            LOG.debug("{} added to queue {}", url, it.queueId());
             return true;
         }
     }
 
     public void finishFetchItem(FetchItem it, boolean asap) {
-        FetchItemQueue fiq = queues.get(it.queueId);
+        FetchItemQueue fiq = queues.get(it.queueId());
         if (fiq == null) {
-            LOG.warn("Attempting to finish item from unknown queue: {}", it.queueId);
+            LOG.warn("Attempting to finish item from unknown queue: {}", it.queueId());
             return;
         }
         fiq.finish(asap);
@@ -168,9 +171,9 @@ class FetchItemQueues {
      * @return the delay applied to the queue in milliseconds, -1 if the queue is unknown
      */
     public long backOffFetchItem(FetchItem it) {
-        FetchItemQueue fiq = queues.get(it.queueId);
+        FetchItemQueue fiq = queues.get(it.queueId());
         if (fiq == null) {
-            LOG.warn("Attempting to back off item from unknown queue: {}", it.queueId);
+            LOG.warn("Attempting to back off item from unknown queue: {}", it.queueId());
             return -1;
         }
         long delay = fiq.finishSaturated(maxBackoff);
@@ -335,12 +338,44 @@ class FetchItemQueues {
         return null;
     }
 
+    public int numQueues() {
+        return queues.size();
+    }
+
+    public int numQueuedItems() {
+        return inQueues.get();
+    }
+
+    /** Default delay between two fetches from a queue, fetcher.server.delay in milliseconds. */
+    public long defaultCrawlDelay() {
+        return crawlDelay;
+    }
+
+    /**
+     * Describes every fetch queue: its ID, size, fetches in progress and the URLs waiting. The
+     * fetcher threads keep working meanwhile, so the figures may not add up exactly.
+     */
+    public String dump() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\nNum queues : ").append(queues.size());
+        for (Entry<String, FetchItemQueue> entry : queues.entrySet()) {
+            sb.append("\nQueue ID : ").append(entry.getKey());
+            FetchItemQueue fiq = entry.getValue();
+            sb.append("\t size : ").append(fiq.getQueueSize());
+            sb.append("\t in progress : ").append(fiq.getInProgressSize());
+            for (FetchItem fetchItem : fiq.queue) {
+                sb.append("\n\t").append(fetchItem.url());
+            }
+        }
+        return sb.toString();
+    }
+
     /**
      * This class handles FetchItems which come from the same host ID (be it a proto/hostname or
      * proto/IP pair). It also keeps track of requests in progress and elapsed time between
      * requests.
      */
-    static class FetchItemQueue {
+    public static class FetchItemQueue {
         final Queue<FetchItem> queue = new ConcurrentLinkedQueue<>();
 
         final String id;
@@ -372,7 +407,7 @@ class FetchItemQueues {
         /** Consecutive fetches of this queue rejected because every helper thread was busy. */
         private final AtomicInteger saturations = new AtomicInteger();
 
-        public FetchItemQueue(
+        FetchItemQueue(
                 String id, int maxThreads, long crawlDelay, long minCrawlDelay, int maxQueueSize) {
             this.id = id;
             this.maxThreads = maxThreads;
@@ -383,13 +418,29 @@ class FetchItemQueues {
             setNextFetchTime(System.currentTimeMillis(), true);
         }
 
-        public int getQueueSize() {
+        int getQueueSize() {
             // never negative for the metrics, even while a poll of an empty queue is in flight
             return Math.max(0, size.get());
         }
 
-        public int getInProgressSize() {
+        int getInProgressSize() {
             return inProgress.get();
+        }
+
+        /**
+         * The crawl delay of this queue, in milliseconds. A queue allowing more than one thread
+         * spaces its fetches by the min crawl delay instead.
+         */
+        public long getCrawlDelay() {
+            return crawlDelay.get();
+        }
+
+        /**
+         * Sets the crawl delay of this queue, in milliseconds. It overwrites the value: unlike the
+         * maximum taken when URLs are added, it can lower the delay.
+         */
+        public void setCrawlDelay(long delay) {
+            crawlDelay.set(delay);
         }
 
         long getNextFetchTime() {

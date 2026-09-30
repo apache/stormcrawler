@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.apache.stormcrawler.bolt.CrawlDelayPolicy.Action;
-import org.apache.stormcrawler.bolt.CrawlDelayPolicy.Decision;
+import org.apache.stormcrawler.fetcher.CrawlDelayPolicy.Action;
+import org.apache.stormcrawler.fetcher.CrawlDelayPolicy.Decision;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 

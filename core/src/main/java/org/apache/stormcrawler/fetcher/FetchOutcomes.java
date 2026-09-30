@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
 import java.io.InterruptedIOException;
 import java.net.UnknownHostException;
@@ -23,6 +23,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.bolt.FetcherBolt;
+import org.apache.stormcrawler.bolt.SiteMapParserBolt;
+import org.apache.stormcrawler.bolt.StatusEmitterBolt;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
@@ -36,8 +39,10 @@ import org.slf4j.LoggerFactory;
  * {@link FetcherBolt} reports for the URL. Counts each response in status_{code}, each failure in
  * exception, timeouts also in fetch.timeout and the fetcher.thread.timeout deadline also in
  * fetch.deadline. The bolt does the emitting.
+ *
+ * <p>For internal use only. Not part of StormCrawler's public API.
  */
-final class FetchOutcomes {
+public final class FetchOutcomes {
 
     // the bolt's category: log configurations for FetcherBolt keep covering these lines
     private static final Logger LOG = LoggerFactory.getLogger(FetcherBolt.class);
@@ -55,7 +60,7 @@ final class FetchOutcomes {
      * @param redirectKeyValues custom key/values for the outlink to the redirect target, as {@link
      *     StatusEmitterBolt#emitOutlink} takes them
      */
-    record Outcome(
+    public record Outcome(
             Status status,
             Metadata metadata,
             boolean parse,
@@ -65,7 +70,7 @@ final class FetchOutcomes {
     private final String protocolMetadataPrefix;
     private final ScopedCounter eventCounter;
 
-    FetchOutcomes(String protocolMetadataPrefix, ScopedCounter eventCounter) {
+    public FetchOutcomes(String protocolMetadataPrefix, ScopedCounter eventCounter) {
         this.protocolMetadataPrefix = protocolMetadataPrefix;
         this.eventCounter = eventCounter;
     }
@@ -76,7 +81,7 @@ final class FetchOutcomes {
      * @param timeFetching milliseconds spent fetching
      * @param timeInQueues milliseconds the URL waited in the fetch queues
      */
-    Outcome ofResponse(
+    public Outcome ofResponse(
             ProtocolResponse response,
             Metadata metadata,
             String robotsCrawlDelaySecs,
@@ -154,7 +159,7 @@ final class FetchOutcomes {
      * @param metadata the metadata the URL came with; the failure is written to it, or to a new
      *     instance when it is empty, since it may then be the read-only {@link Metadata#empty}
      */
-    Outcome ofFailure(Exception e, String url, Metadata metadata) {
+    public Outcome ofFailure(Exception e, String url, Metadata metadata) {
         String message = e.getMessage();
         if (message == null) {
             message = "";

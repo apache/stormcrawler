@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
 import crawlercommons.domains.PaidLevelDomain;
 import java.net.InetAddress;
@@ -24,18 +24,23 @@ import java.net.UnknownHostException;
 import java.util.Locale;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.tuple.Tuple;
+import org.apache.stormcrawler.bolt.FetcherBolt;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 
-/** This class described the item to be fetched. */
-class FetchItem {
+/**
+ * This class described the item to be fetched.
+ *
+ * <p>For internal use only. Not part of StormCrawler's public API.
+ */
+public final class FetchItem {
     // the bolt's category: log configurations for FetcherBolt keep covering these lines
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(FetcherBolt.class);
 
-    String queueId;
-    String url;
-    Tuple tuple;
-    long creationTime;
+    private final String queueId;
+    private final String url;
+    private final Tuple tuple;
+    private final long creationTime;
 
     private FetchItem(String url, Tuple t, String queueId) {
         this.url = url;
@@ -48,7 +53,7 @@ class FetchItem {
      * Create an item. Queue id will be created based on <code>queueMode</code> argument, either as
      * a protocol + hostname pair, protocol + IP address pair or protocol+domain pair.
      */
-    public static FetchItem create(URL u, String url, Tuple t, String queueMode) {
+    static FetchItem create(URL u, String url, Tuple t, String queueMode) {
 
         String queueId;
 
@@ -92,5 +97,22 @@ class FetchItem {
 
         queueId = key.toLowerCase(Locale.ROOT);
         return new FetchItem(url, t, queueId);
+    }
+
+    public String queueId() {
+        return queueId;
+    }
+
+    public String url() {
+        return url;
+    }
+
+    public Tuple tuple() {
+        return tuple;
+    }
+
+    /** When the item was created, in epoch milliseconds. */
+    public long creationTime() {
+        return creationTime;
     }
 }

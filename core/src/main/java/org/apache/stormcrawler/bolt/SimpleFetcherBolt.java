@@ -42,6 +42,8 @@ import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.Utils;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.fetcher.FetchTimeoutHelpers;
+import org.apache.stormcrawler.fetcher.ProtocolMetrics;
 import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.metrics.ScopedReducedMetric;
