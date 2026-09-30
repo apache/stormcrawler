@@ -722,8 +722,15 @@ public class ParserBolt extends BaseRichBolt {
 
         org.apache.tika.metadata.Metadata resultMetadata = result.getMetadata();
 
-        if (result.getStatus() == PipesResult.RESULT_STATUS.PARSE_SUCCESS_WITH_EXCEPTION
-                && !isWriteLimitReached(resultMetadata)) {
+        // once the deadline is reached Tika reports PARSE_SUCCESS_WITH_EXCEPTION as
+        // PARTIAL_TIMEOUT, the container exception stays in the metadata
+        boolean containerFailed =
+                result.getStatus() == PipesResult.RESULT_STATUS.PARSE_SUCCESS_WITH_EXCEPTION
+                        || (result.getStatus() == PipesResult.RESULT_STATUS.PARTIAL_TIMEOUT
+                                && resultMetadata != null
+                                && resultMetadata.get(TikaCoreProperties.CONTAINER_EXCEPTION)
+                                        != null);
+        if (containerFailed && !isWriteLimitReached(resultMetadata)) {
             // not a text.maxlength trim: match the direct path, which discards the whole
             // document rather than keep partial content
             throw new IOException(

@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Timeout;
  * {@code application/xml}. Without the declaration it falls back to text/plain.
  *
  * @see <a href="https://github.com/apache/stormcrawler/issues/2097">#2097</a>
- * @see <a href="https://github.com/apache/stormcrawler/pull/2182">#2182</a>
+ * @see <a href="https://github.com/apache/stormcrawler/pull/2183">#2183</a>
  */
 class ParserBoltPipesTimeoutTest extends ParsingTester {
 
@@ -210,6 +210,64 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
 
         List<List<Object>> status = output.getEmitted(Constants.StatusStreamName);
         Assertions.assertEquals(1, status.size());
+        Metadata md = (Metadata) status.get(0).get(1);
+        Assertions.assertEquals("parse error", md.getFirstValue(Constants.STATUS_ERROR_MESSAGE));
+    }
+
+    /**
+     * Mock container whose first embedded document outlasts the timeout while reporting progress,
+     * so the fork is not killed; the deadline then stops embedded parsing and the container
+     * finishes with {@code tail} (a mock action or empty).
+     */
+    private static byte[] containerPastDeadline(String tail) {
+        return (XML_DECLARATION
+                        + "<mock><write element=\"p\">container text</write>"
+                        + "<embedded filename=\"slow.xml\" content-type=\"application/mock+xml\">"
+                        + "<![CDATA["
+                        + XML_DECLARATION
+                        + "<mock><checkpointedSleep millis=\"6000\" intervalMillis=\"100\"/></mock>"
+                        + "]]></embedded>"
+                        + "<embedded filename=\"skipped.xml\" content-type=\"application/mock+xml\">"
+                        + "<![CDATA["
+                        + XML_DECLARATION
+                        + "<mock><write element=\"p\">skipped text</write></mock>"
+                        + "]]></embedded>"
+                        + tail
+                        + "</mock>")
+                .getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Deadline reached between embedded documents: the partial result is kept, trimmed. Tika
+     * reports a container failure the same way once the deadline is reached, that one is still a
+     * "parse error".
+     */
+    @Test
+    @Timeout(90)
+    void partialResultIsKeptUnlessTheContainerFailed() throws IOException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put("parser.extract.embedded", true);
+        prepare(conf);
+
+        parse("https://example.org/partial.xml", containerPastDeadline(""), new Metadata());
+        String brokenUrl = "https://example.org/broken.xml";
+        parse(
+                brokenUrl,
+                containerPastDeadline(
+                        "<throw class=\"java.io.IOException\">broken on purpose</throw>"),
+                new Metadata());
+
+        List<List<Object>> emitted = output.getEmitted();
+        Assertions.assertEquals(1, emitted.size());
+        String text = emitted.get(0).get(3).toString();
+        Assertions.assertTrue(text.contains("container text"));
+        Assertions.assertFalse(text.contains("skipped text"));
+        Metadata parseMetadata = (Metadata) emitted.get(0).get(2);
+        Assertions.assertEquals("true", parseMetadata.getFirstValue(ParserBolt.TEXT_TRIMMED_KEY));
+
+        List<List<Object>> status = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(1, status.size());
+        Assertions.assertEquals(brokenUrl, status.get(0).get(0));
         Metadata md = (Metadata) status.get(0).get(1);
         Assertions.assertEquals("parse error", md.getFirstValue(Constants.STATUS_ERROR_MESSAGE));
     }
