@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executors;
@@ -166,6 +167,7 @@ public class StatusUpdaterBenchmark {
                     long current = collector.acked.get();
                     long delta = current - lastAcked.getAndSet(current);
                     System.out.printf(
+                            Locale.ROOT,
                             "Acked: %d - OPS over the last %d sec: %.2f%n",
                             current,
                             Math.round(elapsed / 1000.0),
@@ -221,7 +223,8 @@ public class StatusUpdaterBenchmark {
         System.out.println("Acked: " + collector.acked.get());
         System.out.println("Failed: " + collector.failed.get());
         System.out.println("Total time: " + elapsed + " msec");
-        System.out.printf("Average OPS: %.2f%n", collector.acked.get() * 1000.0 / elapsed);
+        System.out.printf(
+                Locale.ROOT, "Average OPS: %.2f%n", collector.acked.get() * 1000.0 / elapsed);
 
         // some backends leave non-daemon threads behind
         System.exit(collector.acked.get() == sent ? 0 : 1);
