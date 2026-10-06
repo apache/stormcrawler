@@ -20,18 +20,16 @@ package org.apache.stormcrawler.opensearch;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
-import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.OpenSearchAsyncClient;
 import org.opensearch.client.opensearch.core.BulkRequest;
 import org.opensearch.client.opensearch.core.BulkResponse;
 import org.opensearch.client.opensearch.core.bulk.BulkOperation;
@@ -44,8 +42,10 @@ import org.slf4j.LoggerFactory;
  * OpenSearch either when the configured number of actions is reached or when a periodic timer
  * fires.
  *
- * <p>Concurrency is controlled via a {@link Semaphore}: each in-flight bulk request acquires a
- * permit, which provides natural back-pressure towards the Storm topology when the cluster slows
+ * <p>Bulk requests are sent with the {@link OpenSearchAsyncClient}, so the calling thread never
+ * waits for the HTTP round trip. Concurrency is controlled via a {@link Semaphore}: each in-flight
+ * bulk request acquires a permit, which is only released once the listener has processed the
+ * outcome. This provides natural back-pressure towards the Storm topology when the cluster slows
  * down.
  */
 public final class AsyncBulkProcessor implements AutoCloseable {
@@ -61,7 +61,7 @@ public final class AsyncBulkProcessor implements AutoCloseable {
         void afterBulk(long executionId, BulkRequest request, Throwable failure);
     }
 
-    private final OpenSearchClient client;
+    private final OpenSearchAsyncClient client;
     private final Listener listener;
     private final int bulkActions;
     private final int concurrentRequests;
@@ -74,9 +74,6 @@ public final class AsyncBulkProcessor implements AutoCloseable {
     private final ScheduledExecutorService scheduler;
     private final ScheduledFuture<?> flushTask;
 
-    /** Dedicated executor for bulk HTTP calls -- avoids starvation of ForkJoinPool.commonPool(). */
-    private final ExecutorService bulkExecutor;
-
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     private AsyncBulkProcessor(Builder builder) {
@@ -86,20 +83,6 @@ public final class AsyncBulkProcessor implements AutoCloseable {
         this.concurrentRequests = builder.concurrentRequests;
         this.concurrencyPermits = new Semaphore(this.concurrentRequests);
         this.buffer = new ArrayList<>(bulkActions);
-
-        this.bulkExecutor =
-                new ThreadPoolExecutor(
-                        1,
-                        this.concurrentRequests,
-                        60L,
-                        TimeUnit.SECONDS,
-                        new SynchronousQueue<>(),
-                        r -> {
-                            Thread t = new Thread(r, "AsyncBulkProcessor-bulk");
-                            t.setDaemon(true);
-                            return t;
-                        },
-                        new ThreadPoolExecutor.CallerRunsPolicy());
 
         this.scheduler =
                 Executors.newSingleThreadScheduledExecutor(
@@ -181,32 +164,34 @@ public final class AsyncBulkProcessor implements AutoCloseable {
             LOG.warn("beforeBulk callback threw exception", e);
         }
 
-        CompletableFuture.supplyAsync(
-                        () -> {
-                            try {
-                                return client.bulk(request);
-                            } catch (Exception e) {
-                                throw new BulkExecutionException(e);
-                            }
-                        },
-                        bulkExecutor)
-                .whenComplete(
-                        (response, throwable) -> {
-                            concurrencyPermits.release();
-                            try {
-                                if (throwable != null) {
-                                    Throwable cause =
-                                            throwable instanceof BulkExecutionException
-                                                    ? throwable.getCause()
-                                                    : throwable;
-                                    listener.afterBulk(executionId, request, cause);
-                                } else {
-                                    listener.afterBulk(executionId, request, response);
-                                }
-                            } catch (Exception e) {
-                                LOG.warn("afterBulk callback threw exception", e);
-                            }
-                        });
+        CompletableFuture<BulkResponse> future;
+        try {
+            future = client.bulk(request);
+        } catch (Exception e) {
+            future = CompletableFuture.failedFuture(e);
+        }
+
+        // the permit is released only after the listener has run, so that the caller can't
+        // start a new bulk request while the outcome of the previous one is still being processed
+        future.whenComplete(
+                (response, throwable) -> {
+                    try {
+                        if (throwable != null) {
+                            Throwable cause =
+                                    throwable instanceof CompletionException
+                                                    && throwable.getCause() != null
+                                            ? throwable.getCause()
+                                            : throwable;
+                            listener.afterBulk(executionId, request, cause);
+                        } else {
+                            listener.afterBulk(executionId, request, response);
+                        }
+                    } catch (Exception e) {
+                        LOG.warn("afterBulk callback threw exception", e);
+                    } finally {
+                        concurrencyPermits.release();
+                    }
+                });
     }
 
     /**
@@ -243,9 +228,6 @@ public final class AsyncBulkProcessor implements AutoCloseable {
             concurrencyPermits.release(concurrentRequests);
         }
 
-        bulkExecutor.shutdown();
-        bulkExecutor.awaitTermination(timeout, unit);
-
         return acquired;
     }
 
@@ -260,13 +242,13 @@ public final class AsyncBulkProcessor implements AutoCloseable {
 
     /** Builder for {@link AsyncBulkProcessor}. */
     public static final class Builder {
-        private final OpenSearchClient client;
+        private final OpenSearchAsyncClient client;
         private final Listener listener;
         private int bulkActions = 50;
         private long flushIntervalMillis = 5000;
         private int concurrentRequests = 1;
 
-        public Builder(OpenSearchClient client, Listener listener) {
+        public Builder(OpenSearchAsyncClient client, Listener listener) {
             this.client = client;
             this.listener = listener;
         }
@@ -288,13 +270,6 @@ public final class AsyncBulkProcessor implements AutoCloseable {
 
         public AsyncBulkProcessor build() {
             return new AsyncBulkProcessor(this);
-        }
-    }
-
-    /** Unchecked wrapper for checked exceptions thrown during bulk execution. */
-    private static final class BulkExecutionException extends RuntimeException {
-        BulkExecutionException(Throwable cause) {
-            super(cause);
         }
     }
 }
