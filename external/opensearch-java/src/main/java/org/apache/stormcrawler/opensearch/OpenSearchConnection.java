@@ -48,6 +48,7 @@ import org.apache.hc.core5.util.Timeout;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.jetbrains.annotations.NotNull;
 import org.opensearch.client.json.jackson.JacksonJsonpMapper;
+import org.opensearch.client.opensearch.OpenSearchAsyncClient;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch.core.bulk.BulkOperation;
 import org.opensearch.client.transport.OpenSearchTransport;
@@ -147,7 +148,8 @@ public final class OpenSearchConnection {
         AsyncBulkProcessor bulkProcessor = null;
         try {
             bulkProcessor =
-                    new AsyncBulkProcessor.Builder(cr.client(), listener)
+                    new AsyncBulkProcessor.Builder(
+                                    new OpenSearchAsyncClient(cr.transport()), listener)
                             .setBulkActions(bulkActions)
                             .setFlushIntervalMillis(flushIntervalMillis)
                             .setConcurrentRequests(concurrentRequests)

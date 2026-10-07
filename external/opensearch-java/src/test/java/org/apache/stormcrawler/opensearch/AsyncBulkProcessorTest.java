@@ -25,12 +25,13 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.OpenSearchAsyncClient;
 import org.opensearch.client.opensearch.core.BulkRequest;
 import org.opensearch.client.opensearch.core.BulkResponse;
 import org.opensearch.client.opensearch.core.bulk.BulkOperation;
@@ -49,9 +50,10 @@ class AsyncBulkProcessorTest {
                 .build();
     }
 
-    private static OpenSearchClient mockClient() throws IOException {
-        OpenSearchClient client = mock(OpenSearchClient.class);
-        when(client.bulk(any(BulkRequest.class))).thenReturn(emptyBulkResponse());
+    private static OpenSearchAsyncClient mockClient() throws IOException {
+        OpenSearchAsyncClient client = mock(OpenSearchAsyncClient.class);
+        when(client.bulk(any(BulkRequest.class)))
+                .thenAnswer(invocation -> CompletableFuture.supplyAsync(() -> emptyBulkResponse()));
         return client;
     }
 
@@ -79,7 +81,7 @@ class AsyncBulkProcessorTest {
                             long executionId, BulkRequest request, Throwable failure) {}
                 };
 
-        OpenSearchClient client = mockClient();
+        OpenSearchAsyncClient client = mockClient();
 
         // bulkActions = 3, long flush interval so only threshold triggers
         AsyncBulkProcessor processor =
@@ -122,7 +124,7 @@ class AsyncBulkProcessorTest {
                             long executionId, BulkRequest request, Throwable failure) {}
                 };
 
-        OpenSearchClient client = mockClient();
+        OpenSearchAsyncClient client = mockClient();
 
         // bulkActions very high, short flush interval
         AsyncBulkProcessor processor =
@@ -150,17 +152,24 @@ class AsyncBulkProcessorTest {
         AtomicInteger maxConcurrent = new AtomicInteger(0);
         CountDownLatch allDone = new CountDownLatch(3);
 
-        OpenSearchClient client = mock(OpenSearchClient.class);
+        OpenSearchAsyncClient client = mock(OpenSearchAsyncClient.class);
         when(client.bulk(any(BulkRequest.class)))
                 .thenAnswer(
                         invocation -> {
                             int current = concurrentCalls.incrementAndGet();
                             maxConcurrent.updateAndGet(prev -> Math.max(prev, current));
-                            // simulate some work
-                            Thread.sleep(200);
-                            concurrentCalls.decrementAndGet();
-                            allDone.countDown();
-                            return emptyBulkResponse();
+                            return CompletableFuture.supplyAsync(
+                                    () -> {
+                                        // simulate some work
+                                        try {
+                                            Thread.sleep(200);
+                                        } catch (InterruptedException e) {
+                                            Thread.currentThread().interrupt();
+                                        }
+                                        concurrentCalls.decrementAndGet();
+                                        allDone.countDown();
+                                        return emptyBulkResponse();
+                                    });
                         });
 
         AsyncBulkProcessor.Listener listener =
@@ -219,7 +228,7 @@ class AsyncBulkProcessorTest {
                             long executionId, BulkRequest request, Throwable failure) {}
                 };
 
-        OpenSearchClient client = mockClient();
+        OpenSearchAsyncClient client = mockClient();
 
         // bulkActions very high so nothing auto-flushes, long interval
         AsyncBulkProcessor processor =
@@ -237,5 +246,51 @@ class AsyncBulkProcessorTest {
         boolean closed = processor.awaitClose(5, TimeUnit.SECONDS);
         assertTrue(closed, "awaitClose should return true");
         assertEquals(1, totalBulkCalls.get(), "buffered operations should have been flushed");
+    }
+
+    /**
+     * Verify that the calling thread does not wait for the HTTP round trip: adding operations while
+     * a bulk request is in flight only blocks once all the permits are taken.
+     */
+    @Test
+    @Timeout(10)
+    void addDoesNotWaitForBulkResponse() throws Exception {
+        CompletableFuture<BulkResponse> pending = new CompletableFuture<>();
+        CountDownLatch afterBulkLatch = new CountDownLatch(1);
+
+        OpenSearchAsyncClient client = mock(OpenSearchAsyncClient.class);
+        when(client.bulk(any(BulkRequest.class))).thenReturn(pending);
+
+        AsyncBulkProcessor.Listener listener =
+                new AsyncBulkProcessor.Listener() {
+                    @Override
+                    public void beforeBulk(long executionId, BulkRequest request) {}
+
+                    @Override
+                    public void afterBulk(
+                            long executionId, BulkRequest request, BulkResponse response) {
+                        afterBulkLatch.countDown();
+                    }
+
+                    @Override
+                    public void afterBulk(
+                            long executionId, BulkRequest request, Throwable failure) {}
+                };
+
+        AsyncBulkProcessor processor =
+                new AsyncBulkProcessor.Builder(client, listener)
+                        .setBulkActions(1)
+                        .setFlushIntervalMillis(60_000)
+                        .setConcurrentRequests(1)
+                        .build();
+
+        // triggers a bulk request which never completes until we say so
+        processor.add(dummyOp());
+        assertEquals(1, afterBulkLatch.getCount(), "bulk response should still be pending");
+
+        pending.complete(emptyBulkResponse());
+        assertTrue(afterBulkLatch.await(5, TimeUnit.SECONDS));
+
+        processor.awaitClose(5, TimeUnit.SECONDS);
     }
 }
