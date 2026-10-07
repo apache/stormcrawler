@@ -67,7 +67,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
@@ -119,11 +118,12 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
     private volatile StreamObserver<DiscoveredBatch> batchRequestObserver;
     private volatile ClientCallStreamObserver<DiscoveredBatch> batchTransport;
 
+    /**
+     * tuples waiting for an ack, by URL; only modified through the atomic operations of its map
+     * view, so that adding a tuple to the list of a URL and detaching that list on its ack never
+     * interleave
+     */
     private Cache<String, List<Tuple>> waitAck;
-
-    // We have to prevent starving caused by the cache-timeout. Therefore, sophisticated lock with
-    // fairness.
-    private final ReentrantLock waitAckLock = new ReentrantLock(true);
 
     private int maxMessagesInFlight = 100000;
     private long throttleTimeMS;
@@ -196,10 +196,12 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         var expireAfterNMillisec =
                 ConfUtils.getLong(stormConf, URLFRONTIER_CACHE_EXPIREAFTER_SEC_KEY, 60);
 
+        // only the evictions matter: a removal listener would also be notified, asynchronously,
+        // of the removal of every URL acked
         waitAck =
                 Caffeine.newBuilder()
                         .expireAfterWrite(expireAfterNMillisec, TimeUnit.SECONDS)
-                        .removalListener(this)
+                        .evictionListener(this)
                         .build();
 
         maxMessagesInFlight =
@@ -454,14 +456,24 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
 
         // URLs without a status, e.g. on a protocol breach, are left to the waitAck eviction
         int numStatuses = Math.min(statuses.size(), items.size());
-        for (int i = 0; i < numStatuses; i++) {
-            final String url = items.get(i).getID();
-            final List<Tuple> values = detachWaitAck(url);
-            if (values == null) {
-                LOG.debug("Could not find unacked tuple for id `{}`.", url);
-                continue;
+        // the permits of the whole batch are released in one go, so that a send waiting for room
+        // is woken up once per batch instead of once per URL
+        int permits = 0;
+        try {
+            for (int i = 0; i < numStatuses; i++) {
+                final String url = items.get(i).getID();
+                final List<Tuple> values = detachWaitAck(url);
+                if (values == null) {
+                    LOG.debug("Could not find unacked tuple for id `{}`.", url);
+                    continue;
+                }
+                permits += values.size();
+                ackOrFailTuples(url, values, statuses.get(i));
             }
-            completeTuples(url, values, statuses.get(i));
+        } finally {
+            if (permits > 0) {
+                releasePermits(permits);
+            }
         }
     }
 
@@ -570,20 +582,10 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
     /** Detaches the tuples waiting for the given URL from the waitAck cache. */
     @Nullable
     private List<Tuple> detachWaitAck(final String url) {
-        List<Tuple> values;
-        waitAckLock.lock();
-        try {
-            values = waitAck.getIfPresent(url);
-            if (values != null) {
-                // Invalidate before releasing permits to protect from new entries for this URL
-                // until permits are handed out. Invalidate removes the key url from waitAck,
-                // therefore it is safe to use values without lock at this point.
-                waitAck.invalidate(url);
-            }
-        } finally {
-            waitAckLock.unlock();
-        }
-        return values;
+        // atomic with the compute in store(): a tuple added for this URL at the same time either
+        // makes it into the detached list or goes into a new entry. Null if the entry has
+        // expired, its tuples are then failed by the eviction listener.
+        return waitAck.asMap().remove(url);
     }
 
     /** Releases the permits and acks or fails the tuples of a completed URL. */
@@ -591,7 +593,12 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             final String url, @NotNull final List<Tuple> values, final AckMessage.Status status) {
         // We release all permits in one go before handling the ACK-status.
         releasePermits(values.size());
+        ackOrFailTuples(url, values, status);
+    }
 
+    /** Acks or fails the tuples of a completed URL, depending on the status received for it. */
+    private void ackOrFailTuples(
+            final String url, @NotNull final List<Tuple> values, final AckMessage.Status status) {
         final boolean hasFailed = status.equals(AckMessage.Status.FAIL);
         if (!hasFailed) {
             LOG.debug("Acked {} tuple(s) for ID {}", values.size(), url);
@@ -687,12 +694,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
                 // incoming URLs will after some time be all caught up in this loop without
                 // touching the cache, possibly leading to no eviction and thus leading to no
                 // release of inFlightSemaphore permits.
-                waitAckLock.lock();
-                try {
-                    waitAck.cleanUp();
-                } finally {
-                    waitAckLock.unlock();
-                }
+                waitAck.cleanUp();
             }
         }
 
@@ -701,34 +703,36 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             flushBatch();
         }
 
-        boolean urlIsNotBeingSentToTheFrontier;
+        // check that the same URL is not being sent to the frontier. A plain read rather than part
+        // of the compute below, which would count as a write and keep postponing the expiry of an
+        // entry whose ack got lost for as long as the URL keeps being discovered.
+        final boolean urlIsNotBeingSentToTheFrontier =
+                status.equals(Status.DISCOVERED) && waitAck.asMap().containsKey(url);
 
-        // only 1 thread at a time will access the store method
-        // but onNext() might try to access waitAck at the same time
-        waitAckLock.lock();
-        try {
+        if (!urlIsNotBeingSentToTheFrontier) {
             // tuples received for the same URL
             // could be the same URL discovered from different pages
             // at the same time
-            // or a page fetched linking to itself
-            List<Tuple> tt = waitAck.get(url, k -> new LinkedList<>());
-
-            // check that the same URL is not being sent to the frontier
-            urlIsNotBeingSentToTheFrontier = status.equals(Status.DISCOVERED) && !tt.isEmpty();
-
-            if (!urlIsNotBeingSentToTheFrontier) {
-                // Permit will be released in onNext
-                tt.add(t);
-                // This slows us down, but no normal user would trace. So that is fine.
-                LOG.trace(
-                        "Added to waitAck {} with ID {} total {} - sent to {}",
-                        url,
-                        url,
-                        tt.size(),
-                        channel.authority());
-            }
-        } finally {
-            waitAckLock.unlock();
+            // or a page fetched linking to itself.
+            // Only this thread adds tuples but onNext() removes them at the same time: the
+            // compute is atomic with the removal in detachWaitAck()
+            waitAck.asMap()
+                    .compute(
+                            url,
+                            (k, tt) -> {
+                                final List<Tuple> tuples = tt != null ? tt : new LinkedList<>();
+                                // Permit will be released in onNext
+                                tuples.add(t);
+                                if (LOG.isTraceEnabled()) {
+                                    LOG.trace(
+                                            "Added to waitAck {} with ID {} total {} - sent to {}",
+                                            url,
+                                            url,
+                                            tuples.size(),
+                                            channel.authority());
+                                }
+                                return tuples;
+                            });
         }
 
         if (urlIsNotBeingSentToTheFrontier) {
@@ -938,8 +942,9 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
     public void onRemoval(
             @Nullable String key, @Nullable List<Tuple> values, @NotNull RemovalCause cause) {
 
-        // explicit removal (like Replace), we expect the removing code to release the permit if
-        // necessary. (like cache.invalidate(url))
+        // registered as an eviction listener, so explicit removals (like the ones in
+        // detachWaitAck) are not notified: the removing code releases the permits itself.
+        // Kept as a safeguard.
         if (!cause.wasEvicted()) {
             if (values != null) {
                 LOG.trace(
