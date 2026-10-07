@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -35,11 +36,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.IntStream;
 import java.util.zip.GZIPInputStream;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -60,19 +64,31 @@ import org.apache.stormcrawler.util.ConfUtils;
 
 /**
  * Simple utility for measuring the performance of a status updater bolt and of the backend it
- * writes to, without running a topology. The bolt is instantiated from its class name, prepared
- * with the configuration and given the URLs from a file one by one, after which the utility waits
- * for all of them to be acked or failed. The number of URLs acked and the throughput are printed
- * every minute and at the end; only the warnings and errors are logged so that they stay readable.
+ * writes to, without running a topology. One or more instances of the bolt are created from its
+ * class name, prepared with the configuration and given the URLs from a file, after which the
+ * utility waits for all of them to be acked or failed. The number of URLs acked and the throughput
+ * are printed every minute and at the end; only the warnings and errors are logged so that they
+ * stay readable.
  *
  * <p>The URLs are passed directly to the {@code store} method of the bolt instead of {@code
  * execute}, so that only the storage is measured, without the effect of the cache of discovered
  * URLs, of the scheduling or of the filtering of the metadata done by {@link
  * AbstractStatusUpdaterBolt}. The cache is disabled whatever the configuration says.
  *
- * <p>The arguments are, in this order, the class name of the bolt, one or more configuration files,
- * which are loaded after crawler-default.yaml, and the file containing the URLs. They are
- * positional as the {@code storm} command would take options such as {@code -c} for its own.
+ * <p>Running several instances shows what a topology with a higher parallelism for the status
+ * updater would get. As Storm would give each of them its own executor, every instance has its own
+ * task and is called from its own thread. The URLs are routed to the instances based on their hash,
+ * as a fields grouping on the URL does, so that a given URL always goes to the same instance. The
+ * input is read and parsed by a separate thread, which caps the total throughput at what it can
+ * deliver; a run with the {@link MemoryStatusUpdater} on a sample of the input gives an idea of
+ * that limit.
+ *
+ * <p>The arguments are, in this order, the class name of the bolt, optionally the number of
+ * instances to run (1 by default), one or more configuration files, which are loaded after
+ * crawler-default.yaml, and the file containing the URLs. A single configuration file with the
+ * settings of the backend is usually all that is needed, whatever its name: the settings of the
+ * rest of a crawl don't apply to the bolt on its own. The arguments are positional as the {@code
+ * storm} command would take options such as {@code -c} for its own.
  *
  * <p>The input has the same format as the one used by the URLFrontier client: each line is either a
  * plain URL or the JSON representation of a URLFrontier URLItem, e.g. <code>
@@ -98,8 +114,8 @@ import org.apache.stormcrawler.util.ConfUtils;
  * <pre>
  * storm local target/crawler-1.0-SNAPSHOT.jar \
  *   org.apache.stormcrawler.persistence.StatusUpdaterBenchmark \
- *   org.apache.stormcrawler.opensearch.persistence.StatusUpdaterBolt \
- *   crawler-conf.yaml opensearch-conf.yaml urls.txt.gz
+ *   org.apache.stormcrawler.opensearch.persistence.StatusUpdaterBolt 4 \
+ *   backend.yaml urls.txt.gz
  * </pre>
  */
 public class StatusUpdaterBenchmark {
@@ -107,7 +123,13 @@ public class StatusUpdaterBenchmark {
     private static final String SOURCE = "benchmark";
     private static final int SOURCE_TASK = 0;
     private static final String BOLT = "status";
-    private static final int BOLT_TASK = 1;
+    private static final int FIRST_BOLT_TASK = 1;
+
+    /** number of URLs handed to an instance at a time, so that the threads rarely synchronize */
+    private static final int HANDOFF_BATCH_SIZE = 1000;
+
+    /** number of batches of URLs waiting for each instance */
+    private static final int HANDOFF_QUEUE_SIZE = 10;
 
     /** how long to wait for the acks once all the URLs have been sent */
     private static final long ACK_TIMEOUT_MSEC = 5 * 60 * 1000;
@@ -118,9 +140,17 @@ public class StatusUpdaterBenchmark {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static void main(String[] args) throws Exception {
-        if (args.length < 3) {
+        // the number of instances is optional
+        int instances = 1;
+        int firstConf = 1;
+        if (args.length > 1 && args[1].matches("\\d+")) {
+            instances = Integer.parseInt(args[1]);
+            firstConf = 2;
+        }
+        if (args.length - firstConf < 2 || instances < 1) {
             System.err.println(
-                    "Usage: StatusUpdaterBenchmark <bolt class> <conf file>... <URL file>");
+                    "Usage: StatusUpdaterBenchmark <bolt class> [<instances>] <conf file>..."
+                            + " <URL file>");
             System.exit(1);
         }
 
@@ -131,24 +161,43 @@ public class StatusUpdaterBenchmark {
         conf.putAll(
                 ConfUtils.extractConfigElement(
                         Utils.findAndReadConfigFile("crawler-default.yaml", false)));
-        for (int i = 1; i < args.length - 1; i++) {
+        for (int i = firstConf; i < args.length - 1; i++) {
             ConfUtils.loadConf(args[i], conf);
         }
         // store() bypasses the cache, the URLs would be added to it but never looked up
         conf.put(AbstractStatusUpdaterBolt.useCacheParamName, false);
 
-        AbstractStatusUpdaterBolt bolt =
-                Class.forName(args[0])
-                        .asSubclass(AbstractStatusUpdaterBolt.class)
-                        .getDeclaredConstructor()
-                        .newInstance();
-
-        TopologyContext context = createContext(conf);
         CountingCollector collector = new CountingCollector();
-        bolt.prepare(conf, context, new OutputCollector(collector));
+
+        // one task per instance, each called from its own thread as with Storm executors
+        List<Integer> tasks =
+                IntStream.range(FIRST_BOLT_TASK, FIRST_BOLT_TASK + instances).boxed().toList();
+        List<AbstractStatusUpdaterBolt> bolts = new ArrayList<>(instances);
+        List<BlockingQueue<List<Item>>> queues = new ArrayList<>(instances);
+        List<Thread> threads = new ArrayList<>(instances);
+        for (int task : tasks) {
+            AbstractStatusUpdaterBolt bolt =
+                    Class.forName(args[0])
+                            .asSubclass(AbstractStatusUpdaterBolt.class)
+                            .getDeclaredConstructor()
+                            .newInstance();
+            TopologyContext context = createContext(conf, task, tasks);
+            bolt.prepare(conf, context, new OutputCollector(collector));
+            BlockingQueue<List<Item>> queue = new ArrayBlockingQueue<>(HANDOFF_QUEUE_SIZE);
+            Thread thread =
+                    new Thread(
+                            () -> storeAll(bolt, context, queue, collector),
+                            "StatusUpdaterBenchmark-bolt-" + task);
+            // must not keep the JVM alive if reading the input fails
+            thread.setDaemon(true);
+            bolts.add(bolt);
+            queues.add(queue);
+            threads.add(thread);
+        }
 
         long start = System.currentTimeMillis();
         long sent = 0;
+        threads.forEach(Thread::start);
 
         // reports the throughput at regular intervals, as the URLFrontier client does
         ScheduledExecutorService reporter =
@@ -177,6 +226,11 @@ public class StatusUpdaterBenchmark {
                 REPORT_INTERVAL_SEC,
                 TimeUnit.SECONDS);
 
+        // the input is read and parsed by this thread, which hands the URLs to the instances
+        List<List<Item>> batches = new ArrayList<>(instances);
+        for (int i = 0; i < instances; i++) {
+            batches.add(new ArrayList<>(HANDOFF_BATCH_SIZE));
+        }
         try (BufferedReader reader = openInput(args[args.length - 1])) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -188,26 +242,30 @@ public class StatusUpdaterBenchmark {
                     System.err.println("Invalid input line: " + line);
                     continue;
                 }
-                // needed by the bolt to ack or fail
-                Tuple tuple =
-                        new TupleImpl(
-                                context,
-                                new Values(item.url(), item.metadata(), item.status()),
-                                SOURCE,
-                                SOURCE_TASK,
-                                Utils.DEFAULT_STREAM_ID);
-                sent++;
-                // store() is protected but accessible from this package
-                try {
-                    bolt.store(item.url(), item.status(), item.metadata(), item.nextFetch(), tuple);
-                } catch (Exception e) {
-                    System.err.println("Exception caught when storing " + item.url() + ": " + e);
-                    collector.fail(tuple);
+                // a URL always goes to the same instance, as with a fields grouping on the URL
+                int target = Math.floorMod(item.url().hashCode(), instances);
+                List<Item> batch = batches.get(target);
+                batch.add(item);
+                if (batch.size() == HANDOFF_BATCH_SIZE) {
+                    queues.get(target).put(batch);
+                    batches.set(target, new ArrayList<>(HANDOFF_BATCH_SIZE));
                 }
+                sent++;
             }
         }
 
-        // the acks can be done asynchronously by the bolt
+        // hand over what is left, then an empty batch to mark the end of the input
+        for (int i = 0; i < instances; i++) {
+            if (!batches.get(i).isEmpty()) {
+                queues.get(i).put(batches.get(i));
+            }
+            queues.get(i).put(List.of());
+        }
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        // the acks can be done asynchronously by the bolts
         long deadline = System.currentTimeMillis() + ACK_TIMEOUT_MSEC;
         while (collector.acked.get() + collector.failed.get() < sent
                 && System.currentTimeMillis() < deadline) {
@@ -217,8 +275,11 @@ public class StatusUpdaterBenchmark {
         long elapsed = Math.max(1, System.currentTimeMillis() - start);
         reporter.shutdownNow();
 
-        bolt.cleanup();
+        for (AbstractStatusUpdaterBolt bolt : bolts) {
+            bolt.cleanup();
+        }
 
+        System.out.println("Instances: " + instances);
         System.out.println("Sent: " + sent);
         System.out.println("Acked: " + collector.acked.get());
         System.out.println("Failed: " + collector.failed.get());
@@ -230,13 +291,63 @@ public class StatusUpdaterBenchmark {
         System.exit(collector.acked.get() == sent ? 0 : 1);
     }
 
-    /** Context in which the bolt is the only task of its component. */
-    private static TopologyContext createContext(Map<String, Object> conf) {
+    /**
+     * Passes the URLs handed over by the reading thread to one instance of the bolt, until an empty
+     * batch marks the end of the input.
+     */
+    private static void storeAll(
+            AbstractStatusUpdaterBolt bolt,
+            TopologyContext context,
+            BlockingQueue<List<Item>> queue,
+            CountingCollector collector) {
+        try {
+            while (true) {
+                List<Item> batch = queue.take();
+                if (batch.isEmpty()) {
+                    return;
+                }
+                for (Item item : batch) {
+                    // needed by the bolt to ack or fail
+                    Tuple tuple =
+                            new TupleImpl(
+                                    context,
+                                    new Values(item.url(), item.metadata(), item.status()),
+                                    SOURCE,
+                                    SOURCE_TASK,
+                                    Utils.DEFAULT_STREAM_ID);
+                    // store() is protected but accessible from this package
+                    try {
+                        bolt.store(
+                                item.url(),
+                                item.status(),
+                                item.metadata(),
+                                item.nextFetch(),
+                                tuple);
+                    } catch (Exception e) {
+                        System.err.println(
+                                "Exception caught when storing " + item.url() + ": " + e);
+                        collector.fail(tuple);
+                    }
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Context of one of the tasks of the bolt, all of them running in the same worker. */
+    private static TopologyContext createContext(
+            Map<String, Object> conf, int task, List<Integer> tasks) {
+        Map<Integer, String> taskToComponent = new HashMap<>();
+        taskToComponent.put(SOURCE_TASK, SOURCE);
+        for (int t : tasks) {
+            taskToComponent.put(t, BOLT);
+        }
         return new TopologyContext(
                 new StormTopology(),
                 conf,
-                Map.of(SOURCE_TASK, SOURCE, BOLT_TASK, BOLT),
-                Map.of(SOURCE, List.of(SOURCE_TASK), BOLT, List.of(BOLT_TASK)),
+                taskToComponent,
+                Map.of(SOURCE, List.of(SOURCE_TASK), BOLT, tasks),
                 Map.of(
                         SOURCE,
                         Map.of(Utils.DEFAULT_STREAM_ID, new Fields("url", "metadata", "status"))),
@@ -244,9 +355,9 @@ public class StatusUpdaterBenchmark {
                 "status-updater-benchmark",
                 null,
                 null,
-                BOLT_TASK,
+                task,
                 0,
-                List.of(BOLT_TASK),
+                tasks,
                 new HashMap<>(),
                 new HashMap<>(),
                 new HashMap<>(),
