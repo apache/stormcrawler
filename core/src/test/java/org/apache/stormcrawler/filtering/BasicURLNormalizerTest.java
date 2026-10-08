@@ -373,7 +373,7 @@ class BasicURLNormalizerTest {
         assertEquals(
                 "http://a.example/%C3%A9?q=%C3%A9",
                 urlFilter.filter(
-                        testSourceUrl, new Metadata(), "http://a.example/\u00e9?q=\u00e9"));
+                        testSourceUrl, new Metadata(), "http://a.example/\u00e9?q=\u00e9")); // é
         // hex digits of an escape are uppercased
         assertEquals(
                 "http://a.example/p?q=%E2%84%A2",
