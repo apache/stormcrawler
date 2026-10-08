@@ -358,11 +358,58 @@ class BasicURLNormalizerTest {
 
         urlFilter = createFilter(List.of("utm_source"));
         assertEquals(
-                "http://a.example/r?t=%7E%21q&u=https%3A%2F%2Fb.example",
+                "http://a.example/r?t=~%21q&u=https%3A%2F%2Fb.example",
                 urlFilter.filter(
                         testSourceUrl,
                         new Metadata(),
                         "http://A.example/r?u=https%3A%2F%2Fb.example&t=~!q&utm_source=x"));
+    }
+
+    @Test
+    void testQueryNormalizedLikePath() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        // non-ASCII is escaped in the path, so it should be in the query too
+        assertEquals(
+                "http://a.example/%C3%A9?q=%C3%A9",
+                urlFilter.filter(
+                        testSourceUrl, new Metadata(), "http://a.example/\u00e9?q=\u00e9"));
+        // hex digits of an escape are uppercased
+        assertEquals(
+                "http://a.example/p?q=%E2%84%A2",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/p?q=%e2%84%a2"));
+        // escaped unreserved characters are decoded
+        assertEquals(
+                "http://a.example/p?u=~user",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/p?u=%7Euser"));
+    }
+
+    @Test
+    void testHostWithUnderscoreWhenURLRebuilt() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        // not rebuilt: passes through
+        assertEquals(
+                "http://a_b.example/p",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a_b.example/p"));
+        // rebuilt because of the uppercase host: same result
+        assertEquals(
+                "http://a_b.example/p",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://A_b.example/p"));
+    }
+
+    @Test
+    void testAnchorKeptWhenURLRebuilt() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(false, false);
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        // not rebuilt: the anchor is kept
+        assertEquals(
+                "http://a.example/p?x=1#sec",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/p?x=1#sec"));
+        // rebuilt because of the uppercase host: the anchor should be kept too
+        assertEquals(
+                "http://a.example/p?x=1#sec",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://A.example/p?x=1#sec"));
     }
 
     private JsonNode getArrayNode(List<String> queryElementsToRemove) {

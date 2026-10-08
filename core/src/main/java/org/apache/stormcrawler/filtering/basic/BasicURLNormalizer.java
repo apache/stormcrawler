@@ -31,6 +31,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -152,12 +153,16 @@ public class BasicURLNormalizer extends URLFilter {
             }
 
             int port = theUrl.getPort();
-            // properly encode characters in the path using percent-encoding;
-            // the query is left untouched so that it is not folded into the
-            // path nor double-encoded when the URL is rebuilt
+            // properly encode characters in the path and query using
+            // percent-encoding; they are processed separately so that the
+            // query is not folded into the path when the URL is rebuilt
             String path2 = unescapePath(path);
             path2 = escapePath(path2);
             if (!path.equals(path2)) {
+                hasChanged = true;
+            }
+            String query2 = query == null ? null : escapePath(unescapePath(query));
+            if (!Objects.equals(query, query2)) {
                 hasChanged = true;
             }
             if (hasChanged) {
@@ -172,8 +177,11 @@ public class BasicURLNormalizer extends URLFilter {
                     }
                 }
                 rebuilt.append(path2);
-                if (query != null) {
-                    rebuilt.append('?').append(query);
+                if (query2 != null) {
+                    rebuilt.append('?').append(query2);
+                }
+                if (theUrl.getRef() != null) {
+                    rebuilt.append('#').append(theUrl.getRef());
                 }
                 urlToFilter = new URI(rebuilt.toString()).toString();
             }
