@@ -190,13 +190,8 @@ public class MultiProxyManager implements ProxyManager {
     }
 
     private SCProxy getRoundRobin() {
-        // ensure that last accessed does not exceed proxy list length
-        if (this.lastAccessedIndex.get() >= this.proxies.length) {
-            this.lastAccessedIndex.set(0);
-        }
-
-        // retrieve the current proxy, increment usage index, and return
-        return this.proxies[this.lastAccessedIndex.getAndIncrement()];
+        return this.proxies[
+                Math.floorMod(this.lastAccessedIndex.getAndIncrement(), this.proxies.length)];
     }
 
     private SCProxy getLeastUsed() {

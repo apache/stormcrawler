@@ -22,7 +22,16 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
@@ -128,6 +137,51 @@ class MultiProxyManagerTest {
         Assertions.assertEquals(proxy1.toString(), proxy4.toString());
         Assertions.assertEquals(proxy2.toString(), proxy5.toString());
         Assertions.assertEquals(proxy3.toString(), proxy6.toString());
+    }
+
+    @Test
+    void concurrentRoundRobinReturnsEveryProxyEqually() throws Exception {
+        String[] proxyStrings = {
+            "http://first.example.com:8080",
+            "http://second.example.com:8080",
+            "http://third.example.com:8080",
+        };
+        MultiProxyManager pm = new MultiProxyManager();
+        pm.configure(MultiProxyManager.ProxyRotation.ROUND_ROBIN, proxyStrings);
+
+        int threads = 8;
+        int callsPerThread = 30_000;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Set<SCProxy>>> futures = new ArrayList<>();
+        for (int t = 0; t < threads; t++) {
+            futures.add(
+                    executor.submit(
+                            () -> {
+                                Set<SCProxy> seen = new HashSet<>();
+                                start.await();
+                                for (int i = 0; i < callsPerThread; i++) {
+                                    seen.add(pm.getProxy(null).get());
+                                }
+                                return seen;
+                            }));
+        }
+        start.countDown();
+
+        Set<SCProxy> returned = new HashSet<>();
+        try {
+            for (Future<Set<SCProxy>> future : futures) {
+                returned.addAll(future.get(30, TimeUnit.SECONDS));
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        Assertions.assertEquals(proxyStrings.length, returned.size());
+        int expectedUsage = threads * callsPerThread / proxyStrings.length;
+        for (SCProxy proxy : returned) {
+            Assertions.assertEquals(expectedUsage, proxy.getUsage(), proxy.toString());
+        }
     }
 
     @Test
