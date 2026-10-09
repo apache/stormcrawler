@@ -279,7 +279,7 @@ public class ParserBolt extends BaseRichBolt {
         // Tika only accepts -1 or a positive number of pages
         int pdfMaxPages = ConfUtils.getInt(conf, PDF_MAX_PAGES_PARAM, -1);
         if (pdfMaxPages > 0) {
-            pdfParserConfig = pdfParserConfig(pdfMaxPages);
+            pdfParserConfig = generateJSONPDFConfig(pdfMaxPages);
         }
 
         if (parseTimeout > 0) {
@@ -844,7 +844,7 @@ public class ParserBolt extends BaseRichBolt {
      * Returns the settings of the PDF parser from the "parse-context" section of the Tika
      * configuration, if any, with maxPages set to the given value.
      */
-    private String pdfParserConfig(int maxPages) {
+    private String generateJSONPDFConfig(int maxPages) {
         try {
             ObjectNode node = JsonNodeFactory.instance.objectNode();
             JsonConfig configured = configuredParseContext.getJsonConfig(PDF_PARSER_CONFIG);
