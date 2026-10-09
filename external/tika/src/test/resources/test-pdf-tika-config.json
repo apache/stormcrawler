@@ -1,0 +1,15 @@
+{
+  "parsers": [
+    {
+      "default-parser": {
+        "exclude": ["tesseract-ocr-parser"]
+      }
+    }
+  ],
+  "parse-context": {
+    "pdf-parser": {
+      "maxPages": 1,
+      "extractInlineImages": false
+    }
+  }
+}

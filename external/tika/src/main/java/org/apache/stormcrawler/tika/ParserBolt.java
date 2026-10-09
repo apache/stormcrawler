@@ -19,6 +19,11 @@ package org.apache.stormcrawler.tika;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
@@ -65,6 +70,7 @@ import org.apache.stormcrawler.util.InitialisationUtil;
 import org.apache.stormcrawler.util.MetadataTransfer;
 import org.apache.stormcrawler.util.URLUtil;
 import org.apache.tika.Tika;
+import org.apache.tika.config.JsonConfig;
 import org.apache.tika.config.TimeoutLimits;
 import org.apache.tika.config.loader.TikaLoader;
 import org.apache.tika.exception.TikaConfigException;
@@ -115,6 +121,16 @@ public class ParserBolt extends BaseRichBolt {
     public static final String TEXT_TRIMMED_KEY = "parse.text.trimmed";
 
     /**
+     * Configuration key for the maximum number of pages of a PDF document to parse. The pages after
+     * it are skipped: their text and links are not extracted. 0 or less keeps the setting of the
+     * Tika configuration, no limit by default.
+     */
+    public static final String PDF_MAX_PAGES_PARAM = "parser.tika.pdf.maxpages";
+
+    /** Name of the PDF parser's settings in the "parse-context" section of the Tika config. */
+    private static final String PDF_PARSER_CONFIG = "pdf-parser";
+
+    /**
      * Configuration key for the maximum time in milliseconds a document may take to parse, 0 or
      * less for no limit. Runs the parse in a forked JVM (Tika Pipes) and kills it outright if
      * exceeded. Keep below {@code topology.message.timeout.secs}.
@@ -145,6 +161,8 @@ public class ParserBolt extends BaseRichBolt {
      * set. Tika counts text only, the markup around it comes on top.
      */
     private static final int PIPES_WRITE_LIMIT_CHARS = 20_000_000;
+
+    private static final ObjectMapper PDF_CONFIG_MAPPER = new ObjectMapper();
 
     private static final SAXParserFactory PIPES_CONTENT_PARSER_FACTORY =
             newHardenedSaxParserFactory();
@@ -191,6 +209,12 @@ public class ParserBolt extends BaseRichBolt {
     private String protocolMDprefix;
 
     private int textMaxLength = -1;
+
+    /**
+     * Settings of the PDF parser with {@link #PDF_MAX_PAGES_PARAM} applied, as JSON; null when the
+     * key is not set.
+     */
+    private String pdfParserConfig;
 
     private long parseTimeout = -1;
 
@@ -251,6 +275,12 @@ public class ParserBolt extends BaseRichBolt {
         parseTimeout = ConfUtils.getLong(conf, PARSE_TIMEOUT_PARAM, -1);
 
         tika = instantiateTika(conf);
+
+        // Tika only accepts -1 or a positive number of pages
+        int pdfMaxPages = ConfUtils.getInt(conf, PDF_MAX_PAGES_PARAM, -1);
+        if (pdfMaxPages > 0) {
+            pdfParserConfig = pdfParserConfig(pdfMaxPages);
+        }
 
         if (parseTimeout > 0) {
             pipesForkParser = buildPipesForkParser(conf);
@@ -698,7 +728,10 @@ public class ParserBolt extends BaseRichBolt {
                     SAXException {
         PipesForkResult result;
         try {
-            result = pipesForkParser.parse(tis, seedMetadata, new ParseContext());
+            // the fork loads the "parse-context" section of the Tika configuration itself
+            ParseContext parseContext = new ParseContext();
+            setPdfParserConfig(parseContext);
+            result = pipesForkParser.parse(tis, seedMetadata, parseContext);
         } catch (TikaException | PipesException e) {
             throw new ParsePipesInfraException("Tika Pipes error for " + url, e);
         } catch (InterruptedException e) {
@@ -792,12 +825,41 @@ public class ParserBolt extends BaseRichBolt {
 
     /**
      * Returns a ParseContext seeded with the components configured in the "parse-context" section
-     * of the Tika configuration.
+     * of the Tika configuration, and with {@link #PDF_MAX_PAGES_PARAM}.
      */
     ParseContext createParseContext() {
         ParseContext parseContext = new ParseContext();
         parseContext.copyFrom(configuredParseContext);
+        setPdfParserConfig(parseContext);
         return parseContext;
+    }
+
+    private void setPdfParserConfig(ParseContext parseContext) {
+        if (pdfParserConfig != null) {
+            parseContext.setJsonConfig(PDF_PARSER_CONFIG, pdfParserConfig);
+        }
+    }
+
+    /**
+     * Returns the settings of the PDF parser from the "parse-context" section of the Tika
+     * configuration, if any, with maxPages set to the given value.
+     */
+    private String pdfParserConfig(int maxPages) {
+        try {
+            ObjectNode node = JsonNodeFactory.instance.objectNode();
+            JsonConfig configured = configuredParseContext.getJsonConfig(PDF_PARSER_CONFIG);
+            if (configured != null && configured.json() != null) {
+                JsonNode parsed = PDF_CONFIG_MAPPER.readTree(configured.json());
+                if (parsed instanceof ObjectNode objectNode) {
+                    node = objectNode;
+                }
+            }
+            node.put("maxPages", maxPages);
+            return PDF_CONFIG_MAPPER.writeValueAsString(node);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(
+                    "Failed to apply " + PDF_MAX_PAGES_PARAM + " to the PDF parser settings", e);
+        }
     }
 
     /** Returns the Tika instance used by this bolt. Exposed for tests. */
