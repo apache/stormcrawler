@@ -31,6 +31,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -127,7 +128,8 @@ public class BasicURLNormalizer extends URLFilter {
             // illegal characters (pipes, backslashes, %uXXXX, etc.) that were
             // sanitized during toURL() are reflected in the string we work with
             urlToFilter = theUrl.toExternalForm();
-            String file = theUrl.getFile();
+            String path = theUrl.getPath();
+            String query = theUrl.getQuery();
             String protocol = theUrl.getProtocol();
             String host = theUrl.getHost();
             boolean hasChanged = !urlToFilter.startsWith(protocol); // lowercased protocol
@@ -151,24 +153,37 @@ public class BasicURLNormalizer extends URLFilter {
             }
 
             int port = theUrl.getPort();
-            // properly encode characters in path/file using percent-encoding
-            String file2 = unescapePath(file);
-            file2 = escapePath(file2);
-            if (!file.equals(file2)) {
+            // properly encode characters in the path and query using
+            // percent-encoding; they are processed separately so that the
+            // query is not folded into the path when the URL is rebuilt
+            String path2 = unescapePath(path);
+            path2 = escapePath(path2);
+            if (!path.equals(path2)) {
+                hasChanged = true;
+            }
+            String query2 = query == null ? null : escapePath(unescapePath(query));
+            if (!Objects.equals(query, query2)) {
                 hasChanged = true;
             }
             if (hasChanged) {
-                URI uri =
-                        new URI(
-                                protocol,
-                                null, // userInfo
-                                host,
-                                port,
-                                file2, // path
-                                null, // query
-                                null // fragment
-                                );
-                urlToFilter = uri.toString();
+                // the components are already percent-encoded: assemble them
+                // as is rather than using the multi-argument URI constructors,
+                // which would escape '?' and '%' again
+                StringBuilder rebuilt = new StringBuilder(protocol).append(':');
+                if (host != null) {
+                    rebuilt.append("//").append(host);
+                    if (port != -1) {
+                        rebuilt.append(':').append(port);
+                    }
+                }
+                rebuilt.append(path2);
+                if (query2 != null) {
+                    rebuilt.append('?').append(query2);
+                }
+                if (theUrl.getRef() != null) {
+                    rebuilt.append('#').append(theUrl.getRef());
+                }
+                urlToFilter = new URI(rebuilt.toString()).toString();
             }
         } catch (MalformedURLException | URISyntaxException e) {
             return null;
