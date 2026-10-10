@@ -213,6 +213,24 @@ class BasicURLNormalizerTest {
     }
 
     @Test
+    void testDoesNotMangleQueryWhenValueContainsSlashes() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        String inputUrl =
+                "http://a.example/article.pl?sid=01/10/23/1816257&mode=thread&tid=107";
+        assertEquals(
+                inputUrl,
+                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
+                "An existing query must not be unmangled because a value contains slashes");
+
+        inputUrl = "http://a.example/p?u=http://b.example/x&z=1";
+        assertEquals(
+                inputUrl,
+                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
+                "An embedded URL in a query value must remain intact");
+    }
+
+    @Test
     void testProperURLEncodingWithoutQueryParameter() throws MalformedURLException {
         URLFilter urlFilter = createFilter(queryParamsToFilter);
         String urlWithEscapedCharacters =
