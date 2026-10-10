@@ -340,6 +340,13 @@ public class BasicURLNormalizer extends URLFilter {
      * @return corrected url
      */
     private String unmangleQueryString(String urlToFilter) {
+        int fragmentStart = urlToFilter.indexOf('#');
+        String urlBeforeFragment =
+                fragmentStart == -1 ? urlToFilter : urlToFilter.substring(0, fragmentStart);
+        if (urlBeforeFragment.indexOf('?') != -1) {
+            return urlToFilter;
+        }
+
         String[] pathElements = urlToFilter.split("/");
         final String lastPathElement = pathElements[pathElements.length - 1];
         int firstAmp = lastPathElement.indexOf('&');
