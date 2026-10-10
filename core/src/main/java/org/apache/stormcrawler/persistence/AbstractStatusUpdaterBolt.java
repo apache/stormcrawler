@@ -37,6 +37,7 @@ import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.MetadataTransfer;
 import org.apache.stormcrawler.util.URLUtil;
@@ -101,8 +102,8 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
 
     private boolean normaliseHosts = false;
 
-    private long cacheHits = 0;
-    private long cacheMisses = 0;
+    private ScopedCounter.CountHandle cacheHits;
+    private ScopedCounter.CountHandle cacheMisses;
 
     private int roundDateUnit = Calendar.SECOND;
 
@@ -121,26 +122,12 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             String spec = ConfUtils.getString(stormConf, cacheConfigParamName);
             cache = Caffeine.from(spec).build();
 
-            CrawlerMetrics.registerGauge(
-                    context,
-                    stormConf,
-                    "cache.hits",
-                    () -> {
-                        long v = cacheHits;
-                        cacheHits = 0;
-                        return v;
-                    },
-                    30);
-            CrawlerMetrics.registerGauge(
-                    context,
-                    stormConf,
-                    "cache.misses",
-                    () -> {
-                        long v = cacheMisses;
-                        cacheMisses = 0;
-                        return v;
-                    },
-                    30);
+            // reported as cache.hits and cache.misses: per time bucket in V1,
+            // cumulative in V2 so that several reporters can read them
+            ScopedCounter cacheCounter =
+                    CrawlerMetrics.registerCounter(context, stormConf, "cache", 30);
+            cacheHits = cacheCounter.scope("hits");
+            cacheMisses = cacheCounter.scope("misses");
             CrawlerMetrics.registerGauge(
                     context, stormConf, "cache.size", cache::estimatedSize, 30);
         }
@@ -185,12 +172,12 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             if (cache.getIfPresent(url) != null) {
                 // no need to add it to the queue
                 LOG.debug("URL {} already in cache", url);
-                cacheHits++;
+                cacheHits.incr();
                 collector.ack(tuple);
                 return;
             } else {
                 LOG.debug("URL {} not in cache", url);
-                cacheMisses++;
+                cacheMisses.incr();
             }
         }
 

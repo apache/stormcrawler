@@ -20,20 +20,31 @@ package org.apache.stormcrawler.persistence;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.MetricRegistry;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
+import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestUtil;
+import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.util.MetadataTransfer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * The date passed in {@link AbstractStatusUpdaterBolt#AS_IS_NEXTFETCHDATE_METADATA} comes from the
@@ -124,8 +135,17 @@ class AbstractStatusUpdaterBoltTest {
 
     /** A bolt prepared with the given normalise-hosts and cache settings. */
     private static RecordingStatusUpdaterBolt newBolt(boolean normaliseHosts, boolean useCache) {
+        return newBolt(normaliseHosts, useCache, "v1", TestUtil.getMockedTopologyContext());
+    }
+
+    private static RecordingStatusUpdaterBolt newBolt(
+            boolean normaliseHosts,
+            boolean useCache,
+            String metricsVersion,
+            TopologyContext context) {
         RecordingStatusUpdaterBolt b = new RecordingStatusUpdaterBolt();
         Map<String, Object> conf = new HashMap<>();
+        conf.put(CrawlerMetrics.METRICS_VERSION_KEY, metricsVersion);
         conf.put(AbstractStatusUpdaterBolt.useCacheParamName, useCache);
         conf.put(AbstractStatusUpdaterBolt.normaliseHostsParamName, normaliseHosts);
         conf.put(
@@ -133,7 +153,7 @@ class AbstractStatusUpdaterBoltTest {
                 "maximumSize=100,expireAfterAccess=1h");
         conf.put(Scheduler.schedulerClassParamName, DefaultScheduler.class.getName());
         conf.put(MetadataTransfer.metadataTransferClassParamName, MetadataTransfer.class.getName());
-        b.prepare(conf, TestUtil.getMockedTopologyContext(), mock(OutputCollector.class));
+        b.prepare(conf, context, mock(OutputCollector.class));
         return b;
     }
 
@@ -182,5 +202,57 @@ class AbstractStatusUpdaterBoltTest {
                 "http://exampl%65.org/a",
                 b.storedUrl,
                 "a FETCHED update carries a URL read back from the store and is not rewritten");
+    }
+
+    /**
+     * V2 reporters (JMX, Prometheus scraped by several servers...) each read the metrics, so the
+     * cache hits and misses must be counters which reading does not reset.
+     */
+    @Test
+    void cacheCountsAreCumulativeUnderV2() {
+        MetricRegistry registry = new MetricRegistry();
+        TopologyContext context = mock(TopologyContext.class);
+        when(context.registerCounter(anyString()))
+                .thenAnswer(invocation -> registry.counter(invocation.getArgument(0)));
+        when(context.registerGauge(anyString(), any(Gauge.class)))
+                .thenAnswer(
+                        invocation ->
+                                registry.register(
+                                        invocation.getArgument(0), invocation.getArgument(1)));
+        RecordingStatusUpdaterBolt b = newBolt(false, true, "v2", context);
+
+        b.execute(discoveredTuple("http://example.org/a"));
+        b.execute(discoveredTuple("http://example.org/a"));
+        b.execute(discoveredTuple("http://example.org/a"));
+
+        assertEquals(Set.of("cache.size"), registry.getGauges().keySet());
+        // successive reads, e.g. by two reporters, see the same counts
+        for (int read = 0; read < 2; read++) {
+            assertEquals(2, registry.getCounters().get("cache.hits").getCount());
+            assertEquals(1, registry.getCounters().get("cache.misses").getCount());
+        }
+
+        b.execute(discoveredTuple("http://example.org/b"));
+        b.execute(discoveredTuple("http://example.org/b"));
+
+        assertEquals(3, registry.getCounters().get("cache.hits").getCount());
+        assertEquals(2, registry.getCounters().get("cache.misses").getCount());
+        assertEquals(2L, registry.getGauges().get("cache.size").getValue());
+    }
+
+    /** V1 consumers keep getting the counts of each time bucket, flattened to cache.hits etc. */
+    @Test
+    void cacheCountsArePerTimeBucketUnderV1() {
+        TopologyContext context = TestUtil.getMockedTopologyContext();
+        RecordingStatusUpdaterBolt b = newBolt(false, true, "v1", context);
+        ArgumentCaptor<MultiCountMetric> metric = ArgumentCaptor.forClass(MultiCountMetric.class);
+        verify(context).registerMetric(eq("cache"), metric.capture(), eq(30));
+
+        b.execute(discoveredTuple("http://example.org/a"));
+        b.execute(discoveredTuple("http://example.org/a"));
+        b.execute(discoveredTuple("http://example.org/a"));
+
+        assertEquals(Map.of("hits", 2L, "misses", 1L), metric.getValue().getValueAndReset());
+        assertEquals(Map.of("hits", 0L, "misses", 0L), metric.getValue().getValueAndReset());
     }
 }
