@@ -64,11 +64,13 @@ class CanonicalParamLearnerTest {
     }
 
     /** Simulates a page being parsed, its canonical tag already extracted into the metadata. */
-    private void parse(CanonicalParamLearner learner, String url, String canonicalValue) {
+    private void parse(CanonicalParamLearner learner, String url, String... canonicalValues) {
         ParseResult parse = new ParseResult();
         Metadata metadata = new Metadata();
-        if (canonicalValue != null) {
-            metadata.setValue("canonical", canonicalValue);
+        for (String canonicalValue : canonicalValues) {
+            if (canonicalValue != null) {
+                metadata.addValue("canonical", canonicalValue);
+            }
         }
         parse.set(url, metadata);
         learner.filter(url, new byte[0], null, parse);
@@ -101,11 +103,28 @@ class CanonicalParamLearnerTest {
         AdaptiveURLNormalizer filter = createFilter();
 
         for (int i = 0; i < 20; i++) {
-            parse(learner, "http://example.com/page" + i + "?pid=" + i + "&sid=abc" + i, null);
+            parse(learner, "http://example.com/page" + i + "?pid=" + i + "&sid=abc" + i);
         }
 
         assertEquals(
                 "http://example.com/other?pid=9&sid=zzz",
+                filter.filter(null, null, "http://example.com/other?pid=9&sid=zzz"));
+    }
+
+    @Test
+    void testTheLatestCanonicalIsTheOneLearntFrom() {
+        CanonicalParamLearner learner = createLearner();
+        AdaptiveURLNormalizer filter = createFilter();
+
+        // with the key in metadata.persist, the value of the previous fetch comes first and the
+        // one just extracted last: a stale value identical to the page would teach that sid matters
+        for (int i = 0; i < 5; i++) {
+            String page = "http://example.com/page" + i + "?pid=" + i + "&sid=abc" + i;
+            parse(learner, page, page, "http://example.com/page" + i + "?pid=" + i);
+        }
+
+        assertEquals(
+                "http://example.com/other?pid=9",
                 filter.filter(null, null, "http://example.com/other?pid=9&sid=zzz"));
     }
 

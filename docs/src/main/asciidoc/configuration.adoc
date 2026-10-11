@@ -332,13 +332,13 @@ differently. They have no effect unless both components are declared.
 | key | default value | description
 
 | adaptive.normalizer.canonical.key | canonical | Metadata key holding the value of the canonical tag, as extracted by the `XPathFilter`.
-| adaptive.normalizer.scope | host | Whether the rules are learnt per `host` or per `domain`.
+| adaptive.normalizer.scope | host | Whether the rules are learnt per `host` or per `domain`. The latter honours the private suffixes of the public suffix list: `alice.github.io` and `bob.github.io` are different domains.
 | adaptive.normalizer.min.observations | 5 | Number of distinct pages a parameter must have been seen on before it can be removed.
 | adaptive.normalizer.min.distinct.paths | 3 | Number of distinct paths whose canonical must have dropped the parameter. Guards against self-referencing canonicals on paginated listings, which are confined to a single path.
 | adaptive.normalizer.confidence | 0.9 | Proportion of the canonical tags which must have dropped the parameter.
 | adaptive.normalizer.max.scopes | 10000 | Maximum number of hosts or domains tracked.
-| adaptive.normalizer.max.params | 20 | Maximum number of parameters tracked per host or domain. When full, the parameter with the least evidence is discarded. Together with `adaptive.normalizer.max.scopes` this bounds the heap used by the evidence: up to `max.scopes × max.params` entries of roughly 150 bytes each, i.e. about 30 MB per worker with the defaults.
-| adaptive.normalizer.max.cached.sources | 50000 | Maximum number of source URLs remembered, so that a page counts as a single observation however many outlinks it has and however many times it is refetched.
+| adaptive.normalizer.max.params | 20 | Maximum number of parameters tracked per host or domain. When full, the parameter with the least evidence is discarded, established ones excepted. Names longer than 64 characters are not tracked at all. Together with `adaptive.normalizer.max.scopes` this bounds the heap used by the evidence: up to `max.scopes × max.params` entries of roughly 250 bytes each, i.e. about 50 MB per worker with the defaults, plus the cache of known sources below.
+| adaptive.normalizer.max.cached.sources | 50000 | Maximum number of source URLs remembered, as 64-bit fingerprints, so that a page counts as a single observation however many outlinks it has and however many times it is refetched. About 4 MB per worker with the default.
 | adaptive.normalizer.protected.params | see description | Parameters which are never removed, however consistently the canonical tags drop them, matched regardless of case. Defaults to `page`, `p`, `pg`, `pgno`, `pg_no`, `pageno`, `page_no`, `pagenum`, `page_num`, `pagenumber`, `page_number`, `pageindex`, `page_index`, `paged`, `pagina`, `seite`, `offset`, `start`, `from`, `limit`, `per_page`, `perpage`, `q`, `query`, `s`, `search`, `keyword`, `keywords`, `sort`, `order`, `orderby`, `order_by`, `dir`, `lang`, `language`, `hl`, `locale`, `id`, `category`, `cat`, `tag`, `year`, `month`, `day`, `view`, `format` and `type`. Extend it with the names used by the sites being crawled; set to an empty list to disable.
 |===
 

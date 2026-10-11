@@ -519,5 +519,8 @@ public class ParserBolt extends BaseRichBolt {
         if (parseFilters != null) {
             parseFilters.cleanup();
         }
+        if (urlFilters != null) {
+            urlFilters.cleanup();
+        }
     }
 }

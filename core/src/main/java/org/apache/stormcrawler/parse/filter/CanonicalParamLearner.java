@@ -69,7 +69,9 @@ public class CanonicalParamLearner extends ParseFilter {
         if (canonicals == null || canonicals.length == 0) {
             return;
         }
-        final String canonical = canonicals[0];
+        // the last value is the one just extracted: with the key in metadata.persist, the
+        // ones before it come from previous fetches
+        final String canonical = canonicals[canonicals.length - 1];
         if (StringUtils.isBlank(canonical)) {
             return;
         }

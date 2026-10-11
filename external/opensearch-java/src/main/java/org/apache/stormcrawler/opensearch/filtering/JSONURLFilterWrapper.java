@@ -77,6 +77,7 @@ public class JSONURLFilterWrapper extends URLFilter {
     @Override
     public void cleanup() {
         if (refresher != null) {
+            refresher.getDelegate().cleanup();
             refresher.cleanup();
         }
     }

@@ -101,9 +101,10 @@ config:
   # distinct paths required: guards against self-referencing canonicals on paginated listings
   adaptive.normalizer.min.distinct.paths: 3
   adaptive.normalizer.confidence: 0.9
-  # scopes x params bounds the heap used by the evidence: ~150 bytes per entry, ~30 MB with these
+  # scopes x params bounds the heap used by the evidence: ~250 bytes per entry, ~50 MB with these
   adaptive.normalizer.max.scopes: 10000
   adaptive.normalizer.max.params: 20
+  # fingerprints of the pages already learnt from, ~4 MB with this value
   adaptive.normalizer.max.cached.sources: 50000
   # overrides the built-in list of parameters which are never removed (page, offset, q, id, ...),
   # matched regardless of case

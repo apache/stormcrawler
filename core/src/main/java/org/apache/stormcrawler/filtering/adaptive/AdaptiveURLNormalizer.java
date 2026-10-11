@@ -23,6 +23,7 @@ import java.net.URL;
 import java.util.Map;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilter;
+import org.apache.stormcrawler.filtering.adaptive.CanonicalRules.QueryToken;
 import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -33,11 +34,16 @@ import org.jetbrains.annotations.Nullable;
  * robots protocol by Yandex, except that the rules are learnt instead of being declared by the
  * site.
  *
- * <p><b>Without {@link org.apache.stormcrawler.parse.filter.CanonicalParamLearner} this filter has
- * nothing to apply</b>: the parsing bolts filter the outlinks of a page before running the parse
- * filters which extract its canonical tag, so the canonical is never in the metadata given here.
- * The learner gathers the evidence into the {@link CanonicalRules} of the JVM, which also hold the
- * configuration common to both.
+ * <p><b>This filter does not learn anything itself</b>: the parsing bolts filter the outlinks of a
+ * page before running the parse filters which extract its canonical tag, so the metadata given here
+ * can at best hold the canonical of a previous fetch. The evidence is gathered by {@link
+ * org.apache.stormcrawler.parse.filter.CanonicalParamLearner} into the {@link CanonicalRules} of
+ * the JVM, which also hold the configuration common to both. Best declared after the <code>
+ * BasicURLNormalizer</code>, so that the query string it sees is already tidy.
+ *
+ * <p>A redirection whose target normalises back to its source, such as <code>/c</code> redirecting
+ * to <code>/c?sid=x</code>, is left as it is: normalised, it would be dropped as a link to itself
+ * and the content behind it never fetched.
  *
  * <p>Rules are learnt per JVM: a URL discovered before a rule was established keeps the form it was
  * stored with, and a worker running no parser executor never learns, hence never normalises. Rules
@@ -47,6 +53,9 @@ import org.jetbrains.annotations.Nullable;
  * @see <a href="https://github.com/apache/stormcrawler/issues/315">STORMCRAWLER-315</a>
  */
 public class AdaptiveURLNormalizer extends URLFilter {
+
+    /** Set on the metadata by the fetcher bolts before a redirection goes through the filters. */
+    private static final String REDIRECTION_KEY = "_redirTo";
 
     private CanonicalRules rules;
 
@@ -68,12 +77,19 @@ public class AdaptiveURLNormalizer extends URLFilter {
             @Nullable URL sourceUrl,
             @Nullable Metadata sourceMetadata,
             @NotNull String urlToFilter) {
-        // usually a no-op, but the canonical is there when the filters are called from a
-        // parse filter or when the key is in metadata.persist
-        if (sourceUrl != null && sourceMetadata != null) {
-            rules.learn(sourceUrl, sourceMetadata.getFirstValue(rules.getCanonicalKey()));
+        final String normalized = removeIrrelevantParams(urlToFilter);
+        if (normalized.equals(urlToFilter)) {
+            return urlToFilter;
         }
-        return removeIrrelevantParams(urlToFilter);
+        if (sourceUrl != null
+                && sourceMetadata != null
+                && sourceMetadata.containsKey(REDIRECTION_KEY)
+                && withoutFragment(normalized)
+                        .equals(withoutFragment(sourceUrl.toExternalForm()))) {
+            // the site sent us from /c to /c?sid=x: the only way to the content is with the param
+            return urlToFilter;
+        }
+        return normalized;
     }
 
     /**
@@ -105,18 +121,20 @@ public class AdaptiveURLNormalizer extends URLFilter {
         if (scopeKey == null) {
             return urlToFilter;
         }
+        final int pathHash = CanonicalRules.pathHash(url);
 
         final StringBuilder newQuery = new StringBuilder(query.length());
         boolean removedSomething = false;
-        for (String param : query.split("&", -1)) {
-            if (rules.isRemovable(scopeKey, CanonicalRules.parameterName(param))) {
+        for (QueryToken token : CanonicalRules.tokenize(query)) {
+            if (rules.isRemovable(scopeKey, pathHash, token.name())) {
                 removedSomething = true;
                 continue;
             }
+            // each surviving pair keeps the separator which preceded it, & or ;
             if (newQuery.length() > 0) {
-                newQuery.append('&');
+                newQuery.append(token.separator());
             }
-            newQuery.append(param);
+            newQuery.append(token.raw());
         }
 
         if (!removedSomething) {
@@ -135,5 +153,10 @@ public class AdaptiveURLNormalizer extends URLFilter {
         }
         normalized.append(urlToFilter, queryEnd, urlToFilter.length());
         return normalized.toString();
+    }
+
+    private static String withoutFragment(String url) {
+        final int fragment = url.indexOf('#');
+        return fragment == -1 ? url : url.substring(0, fragment);
     }
 }

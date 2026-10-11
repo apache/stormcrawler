@@ -128,4 +128,11 @@ public class LinkParseFilter extends XPathFilter {
         this.metadataTransfer = MetadataTransfer.getInstance(stormConf);
         this.urlFilters = URLFilters.fromConf(stormConf);
     }
+
+    @Override
+    public void cleanup() {
+        if (urlFilters != null) {
+            urlFilters.cleanup();
+        }
+    }
 }

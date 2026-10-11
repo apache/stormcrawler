@@ -645,5 +645,8 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         if (parseFilters != null) {
             parseFilters.cleanup();
         }
+        if (jsoupFilters != null) {
+            jsoupFilters.cleanup();
+        }
     }
 }

@@ -19,11 +19,12 @@ package org.apache.stormcrawler.filtering.adaptive;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import crawlercommons.domains.PaidLevelDomain;
+import crawlercommons.domains.EffectiveTldFinder;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -49,6 +50,11 @@ import org.slf4j.LoggerFactory;
  * single instance of this JVM, obtained with {@link #getInstance(Map)} and handed back with {@link
  * #release()}. Configured from the Storm configuration, see the <code>adaptive.normalizer.*</code>
  * options, so that both sides cannot disagree. Safe to use from several threads.
+ *
+ * <p>Rules are learnt per host or domain, but a canonical which keeps a parameter on a given path
+ * vetoes the rule on that path: a parameter dropped on product pages and kept on listings is
+ * removed from the former only. Kept on more than {@value #MAX_KEPT_PATHS} paths, it is not removed
+ * anywhere.
  */
 public class CanonicalRules {
 
@@ -71,6 +77,12 @@ public class CanonicalRules {
     public static final String MAX_CACHED_SOURCES_PARAM = "adaptive.normalizer.max.cached.sources";
 
     public static final String PROTECTED_PARAMS_PARAM = "adaptive.normalizer.protected.params";
+
+    /** Longer names are tokens rather than parameters and would only take up room. */
+    public static final int MAX_PARAM_NAME_LENGTH = 64;
+
+    /** Distinct paths on which a canonical may keep a parameter before it is never removed. */
+    public static final int MAX_KEPT_PATHS = 8;
 
     /**
      * Never removed, however consistently the canonical tags drop them, matched regardless of case:
@@ -208,8 +220,11 @@ public class CanonicalRules {
     /** Evidence per host or domain. */
     private final Cache<String, ConcurrentHashMap<String, ParamStats>> scopes;
 
-    /** Pages already learnt from, so that each counts as a single observation. */
-    private final Cache<String, Boolean> knownSources;
+    /**
+     * Fingerprints of the pages already learnt from, so that each counts as a single observation. A
+     * collision merely skips a page.
+     */
+    private final Cache<Long, Boolean> knownSources;
 
     private CanonicalRules(Settings settings) {
         this.settings = settings;
@@ -226,6 +241,12 @@ public class CanonicalRules {
     public long getTrackedScopes() {
         scopes.cleanUp();
         return scopes.estimatedSize();
+    }
+
+    /** Number of parameters tracked for that host or domain, <code>max.params</code> at most. */
+    public int getTrackedParams(@NotNull String scopeKey) {
+        final ConcurrentHashMap<String, ParamStats> scopeStats = scopes.getIfPresent(scopeKey);
+        return scopeStats == null ? 0 : scopeStats.size();
     }
 
     /**
@@ -250,7 +271,7 @@ public class CanonicalRules {
 
         // a page is a single observation, whether it has one outlink or a thousand
         final String sourceForm = sourceUrl.toExternalForm();
-        if (knownSources.asMap().putIfAbsent(sourceForm, Boolean.TRUE) != null) {
+        if (knownSources.asMap().putIfAbsent(fingerprint(sourceForm), Boolean.TRUE) != null) {
             return;
         }
 
@@ -275,10 +296,11 @@ public class CanonicalRules {
         final Set<String> canonicalParams = parameterNames(canonical.getQuery());
         final ConcurrentHashMap<String, ParamStats> scopeStats =
                 scopes.get(scopeKey, k -> new ConcurrentHashMap<>());
-        final int sourcePath = path(sourceUrl).hashCode();
+        final int sourcePath = pathHash(sourceUrl);
 
         for (String param : sourceParams) {
-            if (settings.protectedParams().contains(param.toLowerCase(Locale.ROOT))) {
+            if (param.length() > MAX_PARAM_NAME_LENGTH
+                    || settings.protectedParams().contains(param.toLowerCase(Locale.ROOT))) {
                 continue;
             }
             final ParamStats stats = statsFor(scopeStats, param, scopeKey);
@@ -286,7 +308,12 @@ public class CanonicalRules {
                 continue;
             }
             if (canonicalParams.contains(param)) {
-                stats.recordKept();
+                if (stats.recordKept(sourcePath)) {
+                    LOG.info(
+                            "Never removing param {} from the URLs of {}: kept on too many paths",
+                            param,
+                            scopeKey);
+                }
             } else {
                 stats.recordDropped(sourcePath);
             }
@@ -294,8 +321,15 @@ public class CanonicalRules {
         }
     }
 
-    /** Whether the parameter has been established as removable for that host or domain. */
-    public boolean isRemovable(@Nullable String scopeKey, @NotNull String param) {
+    /**
+     * Whether the parameter has been established as removable for that host or domain and has not
+     * been kept by a canonical on that path.
+     *
+     * @param scopeKey from {@link #scopeKey(URL)}
+     * @param pathHash from {@link #pathHash(URL)}
+     * @param param the decoded name of the parameter
+     */
+    public boolean isRemovable(@Nullable String scopeKey, int pathHash, @NotNull String param) {
         if (scopeKey == null) {
             return false;
         }
@@ -304,7 +338,7 @@ public class CanonicalRules {
             return false;
         }
         final ParamStats stats = scopeStats.get(param);
-        return stats != null && stats.established;
+        return stats != null && stats.established && !stats.keptOn(pathHash);
     }
 
     /** Key under which the evidence of a URL is gathered, i.e. its host or its domain. */
@@ -317,8 +351,15 @@ public class CanonicalRules {
         if (!settings.scopeByDomain()) {
             return lowerCasedHost;
         }
-        final String domain = PaidLevelDomain.getPLD(lowerCasedHost);
+        // unlike PaidLevelDomain.getPLD, this honours the private suffixes of the public suffix
+        // list: alice.github.io and bob.github.io are different sites
+        final String domain = EffectiveTldFinder.getAssignedDomain(lowerCasedHost, false, false);
         return domain == null ? lowerCasedHost : domain;
+    }
+
+    /** Hash of the path of a URL, the unit at which a kept parameter vetoes a rule. */
+    public static int pathHash(@NotNull URL url) {
+        return path(url).hashCode();
     }
 
     /**
@@ -421,15 +462,53 @@ public class CanonicalRules {
         return path == null ? "" : path;
     }
 
+    /** 64-bit fingerprint of a URL, cheaper to remember than the URL itself. */
+    private static long fingerprint(String url) {
+        long hash = 1125899906842597L;
+        for (int i = 0; i < url.length(); i++) {
+            hash = 31 * hash + url.charAt(i);
+        }
+        return hash;
+    }
+
+    /** A <code>name=value</code> pair of a query string, along with the separator preceding it. */
+    record QueryToken(String separator, String raw) {
+
+        /** Name of the pair, in its decoded form. */
+        String name() {
+            return parameterName(raw);
+        }
+    }
+
+    /**
+     * Splits a query string on <code>&amp;</code> and on <code>;</code>, which some sites still
+     * use, keeping the separators so that the query can be rebuilt as it was. Empty pairs are kept.
+     */
+    static List<QueryToken> tokenize(@NotNull String query) {
+        final List<QueryToken> tokens = new ArrayList<>();
+        String separator = "";
+        int start = 0;
+        for (int i = 0; i <= query.length(); i++) {
+            if (i == query.length() || query.charAt(i) == '&' || query.charAt(i) == ';') {
+                tokens.add(new QueryToken(separator, query.substring(start, i)));
+                if (i < query.length()) {
+                    separator = String.valueOf(query.charAt(i));
+                }
+                start = i + 1;
+            }
+        }
+        return tokens;
+    }
+
     /** Names of the parameters found in a query string, in their decoded form. */
     static Set<String> parameterNames(@Nullable String query) {
         if (StringUtils.isEmpty(query)) {
             return Collections.emptySet();
         }
         final Set<String> names = new HashSet<>();
-        for (String param : query.split("&")) {
-            if (!param.isEmpty()) {
-                names.add(parameterName(param));
+        for (QueryToken token : tokenize(query)) {
+            if (!token.raw().isEmpty()) {
+                names.add(token.name());
             }
         }
         return names;
@@ -450,9 +529,9 @@ public class CanonicalRules {
     /**
      * What the canonical tags said about a given parameter of a given host or domain. Kept small on
      * purpose, there can be up to <code>max.scopes * max.params</code> of them: the counters are
-     * guarded by the monitor of the object and the distinct paths are stored as hashes, as many as
-     * required to establish a rule. A collision between two paths merely makes the rule harder to
-     * establish.
+     * guarded by the monitor of the object and the paths are stored as hashes, as few as needed. A
+     * collision between two paths merely makes a rule harder to establish, or vetoes it on one more
+     * path.
      */
     private static final class ParamStats {
 
@@ -460,9 +539,18 @@ public class CanonicalRules {
 
         private int kept;
 
+        /** Distinct paths whose canonical dropped the parameter, as many as required by a rule. */
         private final int[] droppedPaths;
 
-        private int distinctPaths;
+        private int distinctDroppedPaths;
+
+        /** Distinct paths whose canonical kept the parameter, where a rule does not apply. */
+        private final int[] keptPaths = new int[MAX_KEPT_PATHS];
+
+        private int distinctKeptPaths;
+
+        /** Kept on more paths than remembered: too content-bearing to be removed anywhere. */
+        private boolean vetoed;
 
         /** Written with the lock on the enclosing map held, read without any lock. */
         private volatile boolean established;
@@ -471,21 +559,49 @@ public class CanonicalRules {
             droppedPaths = new int[pathsRequired];
         }
 
-        private synchronized void recordKept() {
+        /** Returns whether this observation vetoed the parameter for the whole site. */
+        private synchronized boolean recordKept(int pathHash) {
             kept++;
+            if (vetoed) {
+                return false;
+            }
+            for (int i = 0; i < distinctKeptPaths; i++) {
+                if (keptPaths[i] == pathHash) {
+                    return false;
+                }
+            }
+            if (distinctKeptPaths == keptPaths.length) {
+                vetoed = true;
+                return true;
+            }
+            keptPaths[distinctKeptPaths++] = pathHash;
+            return false;
         }
 
         private synchronized void recordDropped(int pathHash) {
             dropped++;
-            if (distinctPaths == droppedPaths.length) {
+            if (distinctDroppedPaths == droppedPaths.length) {
                 return;
             }
-            for (int i = 0; i < distinctPaths; i++) {
+            for (int i = 0; i < distinctDroppedPaths; i++) {
                 if (droppedPaths[i] == pathHash) {
                     return;
                 }
             }
-            droppedPaths[distinctPaths++] = pathHash;
+            droppedPaths[distinctDroppedPaths++] = pathHash;
+        }
+
+        /** Whether a canonical kept the parameter on that path, or on too many paths. */
+        private synchronized boolean keptOn(int pathHash) {
+            if (vetoed) {
+                return true;
+            }
+            for (int i = 0; i < distinctKeptPaths; i++) {
+                if (keptPaths[i] == pathHash) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private synchronized int total() {
@@ -496,7 +612,7 @@ public class CanonicalRules {
             final int total = dropped + kept;
             return total >= settings.minObservations()
                     && (double) dropped / total >= settings.confidence()
-                    && distinctPaths >= settings.minDistinctPaths();
+                    && distinctDroppedPaths >= settings.minDistinctPaths();
         }
 
         @Override
@@ -506,7 +622,7 @@ public class CanonicalRules {
                     + " of "
                     + (dropped + kept)
                     + " pages, "
-                    + distinctPaths
+                    + distinctDroppedPaths
                     + " paths";
         }
     }
