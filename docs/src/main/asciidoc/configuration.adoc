@@ -191,15 +191,18 @@ is defined.
 | fetcher.threads.number | 10 | Total concurrent threads fetching pages. Adjust carefully based on system capacity.
 | fetcher.threads.per.queue | 1 | Default number of threads per queue. Can be overridden.
 | fetcher.threads.start.delay | 10 | Delay (milliseconds) between starting next fetcher thread. Avoids overloading DNS or network resources during fetcher startup when all threads simultaneously start requesting pages.
-| fetcher.timeout.queue | -1 | Maximum wait time (seconds) for items in the queue. -1 disables timeout.
+| fetcher.timeout.queue | -1 | Maximum time (seconds) a URL can wait in the queue, checked after robots.txt processing. A URL which waited longer is acked without being fetched and without a status update for that URL, and the `queue.timeout` counter is incremented. -1 disables the check.
+| fetcher.thread.timeout | -1 | Hard deadline (seconds) for each protocol call made for a URL, independent of the protocol's own socket timeouts: the robots.txt lookup, each redirect it follows (up to 5, each a call of its own), and the page fetch, whose redirect chain shares a single deadline. Worst case for one URL is therefore several times the value. -1 disables it. The deadline never exceeds `topology.message.timeout.secs`. With the default okhttp protocol the deadline is applied to the HTTP call itself: on expiry the call is cancelled, the socket closed and the URL reported as `FETCH_ERROR` with `fetch.exception` "Socket timeout fetching"; if `http.content.partial.as.trimmed` is on, content already received is kept instead and flagged as trimmed for "time". One step escapes the cancellation: a DNS lookup is synchronous and cannot be interrupted, so a slow resolver holds the fetcher thread past the deadline until it returns, at which point the timeout is reported. Protocols which do not enforce the deadline themselves (see `Protocol.supportsFetchTimeout(url, metadata)`, resolved per URL by `DelegatorProtocol`) run the call on a helper thread which is abandoned on timeout. On both paths a robots.txt lookup which times out lets the page be fetched without rules and is cached in the robots error cache like any failed lookup (see `Protocol.robotRulesTimedOut(url)`), so later URLs of the host do not each wait for another deadline. The `fetch.timeout` counter counts every timeout, `fetch.deadline` only the ones where this deadline fired, `robots.timeout` the lookups abandoned on a helper thread.
+| fetcher.thread.timeout.helpers | 2 x fetcher.threads.number (2 for SimpleFetcherBolt) | Maximum number of helper threads per bolt instance for the abandoned fetches above. Threads are created on demand and released after a minute idle. When every helper is busy the URL never reaches the network: it is acked without a status, like a URL which waited too long in the queue, so that the spout retries it later, and the `fetch.helper.rejected` counter is incremented. In `FetcherBolt` the queue of the URL is backed off exponentially rather than made ready again at once: its own crawl delay (at least 1 s), doubled at each consecutive rejection, capped by `fetcher.max.crawl.delay` (30 s if negative) but never below the queue's own delay, spread with equal jitter (between half the value and the value), and reset by any fetch of the queue that runs. Helpers are shared by all hosts, so a host that never answers can make fetches of other hosts be deferred this way until its helpers time out; the `fetchhelpers` gauge shows how many are busy.
 | fetcherbolt.queue.debug.filepath | "" | Path to a debug log (e.g. /tmp/fetcher-dump-{port}).
 | http.agent.description | - | Description for the User-Agent header.
 | http.agent.email | - | Email address in User-Agent header.
 | http.agent.name | - | Name in User-Agent header.
 | http.agent.url | - | URL in User-Agent header.
 | http.agent.version | - | Version in User-Agent header.
+| http.basicauth.hosts | - | Hosts the Basic Authentication credentials of `http.basicauth.user` are sent to, as a list or a comma-separated string. Host names or IP addresses (IPv6 with or without brackets) without scheme, port, path or wildcard, matched exactly and case-insensitively against the host of each request, robots.txt fetches and redirect targets included; subdomains are not included and have to be listed separately. *Breaking change in 4.0.0:* the credentials used to be sent to every host; if this is empty they are not sent at all and a warning is logged at startup.
 | http.basicauth.password | - | Password for http.basicauth.user.
-| http.basicauth.user | - | Username for Basic Authentication.
+| http.basicauth.user | - | Username for Basic Authentication. Only sent to the hosts listed in `http.basicauth.hosts`.
 | http.content.limit | -1 | Maximum HTTP response body size (bytes). Default: no limit.
 | http.protocol.implementation | org.apache.stormcrawler.protocol.okhttp.HttpProtocol | HTTP Protocol
 implementation.
@@ -220,7 +223,7 @@ implementation.
 | http.robots.file.skip | false | Ignore robots.txt rules entirely.
 | http.robots.headers.skip | false | Ignore robots directives from HTTP headers.
 | http.robots.meta.skip | false | Ignore robots directives from HTML meta tags.
-| http.robots.redirect.crossorigin.allow | false | Follow a robots.txt redirect pointing at a different scheme, host or port than the URL it was reached from. Redirects to schemes other than http and https are never followed. A redirect which only replaces http with https while staying on the same host and port is always followed, whatever this is set to. When enabled, the robots.txt is re-fetched from the host named in the `Location` header, for up to 5 hops, and each of these requests carries the headers configured through `http.basicauth.*` and `http.custom.headers` as any other request does; see `http.filter.ipaddress.exclude` to restrict the addresses those fetches may reach.
+| http.robots.redirect.crossorigin.allow | false | Follow a robots.txt redirect pointing at a different scheme, host or port than the URL it was reached from. Redirects to schemes other than http and https are never followed. A redirect which only replaces http with https while staying on the same host and port is always followed, whatever this is set to. When enabled, the robots.txt is re-fetched from the host named in the `Location` header, for up to 5 hops, and each of these requests carries the headers configured through `http.custom.headers`, except for credential headers if the host is not listed in `http.custom.headers.hosts`, and those of `http.basicauth.*` if the host is listed in `http.basicauth.hosts`, as any other request does; see `http.filter.ipaddress.exclude` to restrict the addresses those fetches may reach.
 | http.robots.redirect.refused.allow | false | Allow crawling when a robots.txt redirect was not followed because of `http.robots.redirect.crossorigin.allow`. If false, nothing is crawled on that host until the redirect is followed or this is set to true.
 | http.skip.robots | false | Deprecated (replaced by http.robots.file.skip).
 | robots.noFollow.strict | true | If true, remove all outlinks from pages marked as noFollow.
@@ -232,7 +235,8 @@ implementation.
 | partition.url.mode | byHost | Defines how URLs are partitioned: byHost, byDomain, or byIP.
 | protocols | http,https | Supported protocols. The `file` scheme is not enabled by default; a crawl of a local corpus has to add it explicitly and confine reads with `file.protocol.root`.
 | redirections.allowed | true | If true, emit redirect target URLs as "outlinks" to the status stream. If false, do not follow redirects. See also `http.allow.redirects`.
-| http.allow.redirects | false | (OkHttp only) Follow HTTP redirects immediately in the HTTP protocol client. Note: if followed immediately, redirect target URLs are not emitted to the status stream, are not filtered, not deduplicated, and not checked against robots.txt.
+| http.allow.redirects | false | (OkHttp only) Follow HTTP redirects immediately in the HTTP protocol client. Note: if followed immediately, redirect target URLs are not emitted to the status stream, are not deduplicated and not checked against robots.txt, but each target runs through the URL filter chain before the hop is taken (up to `http.allow.redirects.max` hops; the final URL is recorded in the response metadata as `_redirectedTo`; credentials are not carried to another origin or to a server which is not authenticated, e.g. after an https to http downgrade).
+| http.allow.redirects.max | 5 | (OkHttp only) Maximum number of redirect hops followed when `http.allow.redirects` is enabled. A chain which does not end within this many hops returns its last redirect response, which is handled like a redirect that is not followed immediately.
 | sitemap.discovery | false | Enable automatic sitemap discovery.
 | urlbuffer.class | org.apache.stormcrawler.persistence.urlbuffer.SimpleURLBuffer | URL buffer implementation used by spouts.
 |===
@@ -253,17 +257,18 @@ implementation.
 | robots.error.cache.spec | maximumSize=10000,expireAfterWrite=1h | CacheBuilder configuration for error cache.
 | okhttp.protocol.connection.pool.max.idle.connections | 5 | OkHttp maximum number of idle connections.
 | okhttp.protocol.connection.pool.connection.keep.alive | 300 | OkHttp connection keep-alive time (seconds).
-| http.custom.headers | - | Custom HTTP headers.
+| http.custom.headers | - | Custom HTTP headers. Credential headers (see `http.credentials.headers`) are only sent to the hosts listed in `http.custom.headers.hosts`, the other headers to every host.
+| http.custom.headers.hosts | - | Hosts the credential headers of `http.custom.headers` are sent to, with the same syntax and matching as `http.basicauth.hosts` and independent of it. On a host listed in both, an `Authorization` header of `http.custom.headers` replaces the one of `http.basicauth.*`. *Breaking change in 4.0.0:* the credential headers used to be sent to every host; if this is empty they are not sent at all and a warning is logged at startup.
 | http.accept | text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8 | HTTP Accept
 header.
 | http.accept.language | en-us,en-gb,en;q=0.7,*;q=0.3 | HTTP Accept-Language
 header.
 | http.content.partial.as.trimmed | false | Accepts partially fetched content in OKHTTP.
-| http.filter.ipaddress.include | - | (OkHttp only) Comma-separated list (or YAML list) of allowed IP ranges. If empty, all addresses are allowed unless excluded. See <<IP Address Filtering>>.
-| http.filter.ipaddress.exclude | localhost, sitelocal, linklocal, anylocal, multicast, 100.64.0.0/10, 0.0.0.0/8, fc00::/7, ::/128 | (OkHttp only) Comma-separated list (or YAML list) of blocked IP ranges. Set to `""` to crawl private address space. See <<IP Address Filtering>>.
+| http.filter.ipaddress.include | - | (OkHttp and Playwright) Comma-separated list (or YAML list) of allowed IP ranges. If empty, all addresses are allowed unless excluded. See <<IP Address Filtering>>.
+| http.filter.ipaddress.exclude | localhost, sitelocal, linklocal, anylocal, multicast, 100.64.0.0/10, 0.0.0.0/8, fc00::/7, ::/128 | (OkHttp and Playwright) Comma-separated list (or YAML list) of blocked IP ranges. Set to `""` to crawl private address space. See <<IP Address Filtering>>.
 | http.trust.everything | false | (OkHttp only) If true, accept any TLS certificate, including self-signed, expired or otherwise invalid ones. The servers are then not authenticated: anyone able to answer for the host name receives everything sent to them. Credentials (basic auth, credential headers, cookies) are withheld from cleartext http:// requests and from https:// requests on such connections unless `http.credentials.allow.insecure` is set to true.
 | http.verify.hostnames | true | (OkHttp only) If true, check that the certificate presented by the server matches the host name contacted. Independent of `http.trust.everything`: a valid certificate for a different name is accepted when this is false. Credentials are then withheld unless `http.credentials.allow.insecure` is set to true.
-| http.credentials.allow.insecure | false | (OkHttp only) If true, send credentials (basic auth, credential headers, cookies) even on connections which do not authenticate the server: cleartext http:// urls and, when `http.trust.everything` is true or `http.verify.hostnames` is false, https:// urls as well.
+| http.credentials.allow.insecure | false | (OkHttp only) If true, send credentials (basic auth, credential headers, cookies) even on connections which do not authenticate the server: cleartext http:// urls and, when `http.trust.everything` is true or `http.verify.hostnames` is false, https:// urls as well. Redirect hops to another origin (scheme, host or port) never carry them.
 | http.credentials.headers | authorization, proxy-authorization, cookie, x-api-key | (OkHttp only) Header names (case-insensitive) which carry credentials and are therefore withheld from requests to servers which were not authenticated. Applies to the headers configured with `http.custom.headers` and to headers set by request. Names given here are added to the four defaults, which are always treated as credentials.
 | topology.message.timeout.secs | -1 | OKHTTP message timeout.
 |===
@@ -284,6 +289,13 @@ crawl an intranet, override `http.filter.ipaddress.exclude`; setting only
 Fetches through a proxy are not filtered. The proxy resolves the target host and connects to it, so
 the protocol only sees the address of the proxy, which may well be private. What the fetcher can
 reach through a proxy is then decided by the egress rules of the proxy.
+
+The Playwright protocol (`org.apache.stormcrawler.protocol.playwright.HttpProtocol`) applies the same
+rules to the requests of the page, its subresources and popups, and aborts the rejected ones.
+Service workers are blocked while the filter is active, as their requests cannot be intercepted.
+Redirect hops and WebSocket connections are not checked. The host is resolved separately from the
+browser, so short-lived DNS records or a remote browser using another resolver can lead to a
+different address.
 
 Two properties control the behaviour:
 
@@ -313,8 +325,9 @@ http.filter.ipaddress.include: "10.0.0.0/8"
 grade NAT (`100.64.0.0/10`) and IPv6 unique local addresses (`fd00::/8`) have no keyword and are added
 as CIDR blocks when they are also to be blocked.
 
-When a connection to a blocked address is attempted, the fetch fails with an `IOException` and a
-warning is logged. If neither property is set, no IP filtering is performed.
+When a connection to a blocked address is attempted, a warning is logged. With OkHttp the fetch
+fails with an `IOException`. With Playwright the request is aborted: a blocked page fails the fetch,
+a blocked subresource is missing from the rendered page. If neither property is set, no IP filtering is performed.
 
 NOTE: When a proxy is configured, the connection is established to the proxy and the filter sees the
 proxy's IP address rather than the target host's resolved address. IP filtering is therefore
@@ -386,6 +399,7 @@ that is being calculated by a link:https://github.com/apache/stormcrawler/blob/m
 | status.updater.cache.spec | maximumSize=10000, expireAfterAccess=1h | Cache specification for the status updater.
 | status.updater.unit.round.date | SECOND | Unit for rounding the next fetch date. Can also be MINUTE or HOUR.
 | status.updater.use.cache | true | Whether to use cache to avoid re-persisting URLs.
+| status.updater.normalise.hosts | false | Normalise the host component of discovered URLs (percent-decoded, lowercased, trailing dot removed) so that aliases of one server are stored once, share a politeness queue and a robots.txt fetch. Off by default: document ids are hashed from the URL, so enabling it re-discovers aliases already stored in raw form as a second, bounded record.
 |===
 
 ==== Parsing
@@ -406,6 +420,7 @@ Configures parsing of fetched text and the handling of discovered URIs
 | parsefilters.config.file | parsefilters.json | Path to JSON config defining ParseFilters. See link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/parsefilters.json[default parsefilters.json].
 | parser.emitOutlinks | true | Emit discovered links as DISCOVERED tuples.
 | parser.emitOutlinks.max.per.page | -1 | Limit number of emitted links per page.
+| sitemap.emitOutlinks.max | -1 | Limit the number of URLs emitted as DISCOVERED per sitemap, or child sitemaps per sitemap index. -1 disables the limit. A trimmed sitemap is still marked as FETCHED and a warning is logged. This is a partial mitigation: the URLs have already been parsed when the limit applies, so it bounds what reaches the status stream, not the memory used by the parse.
 | sitemap.filter.hours.since.modified | -1 | Filter URLs in sitemaps based on their modification date. -1 disables filtering.
 | sitemap.schedule.delay | -1 | Staggered scheduling delay for sitemaps (minutes). -1 disables staggering.
 | sitemap.extensions | - | Sitemap extensions to parse (IMAGE, LINKS, MOBILE, NEWS, VIDEO).
@@ -449,9 +464,11 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/opensearc
 |===
 | key | default value | description
 
-| opensearch.addresses | - | OpenSearch server address(es).
-| opensearch.user | - | Username for authentication (optional).
+| opensearch.addresses | - | OpenSearch server address(es). An address without a scheme is contacted over plain http, on port 9200 if none is given; use `https://` when credentials are configured.
+| opensearch.user | - | Username for Basic authentication (optional). The credentials are only sent to the addresses listed, matched on scheme, host and port, not to nodes discovered by sniffing under another address; list those nodes in the addresses or disable `opensearch.<type>.sniff`, which is on by default. A warning is logged when sniffing is enabled together with credentials, and if an address other than a loopback one uses plain http.
 | opensearch.password | - | Password for authentication (optional).
+| opensearch.<type>.sniff | true | Discover the other nodes of the cluster and send requests to them as well. The nodes found are contacted over https if one of the addresses uses https, over plain http otherwise.
+| opensearch.disable.tls.validation | false | Do not check the certificates and host names of the OpenSearch nodes. A warning is logged when this is enabled.
 | opensearch.concurrentRequests | 2 | Number of concurrent bulk requests.
 | opensearch.indexer.index.name | content | Index name for crawled documents.
 | opensearch.indexer.create | false | Auto-create index if it does not exist.
@@ -535,6 +552,11 @@ probe exercises only representative metadata.
 | urlfrontier.host | localhost | URLFrontier service hostname.
 | urlfrontier.port | 7071 | URLFrontier service port.
 | urlfrontier.address | - | URLFrontier service address (can be used instead of host and port).
+| urlfrontier.tls.enabled | false | Use TLS on the channels to URLFrontier. If false, the channels are plaintext.
+| urlfrontier.tls.trust.cert.collection | - | PEM file with the certificates trusted to sign the URLFrontier server certificate. The JVM trust store is used if not set.
+| urlfrontier.tls.client.cert.chain | - | PEM file with the client certificate chain sent for mutual TLS. Must be set together with `urlfrontier.tls.client.private.key`.
+| urlfrontier.tls.client.private.key | - | PKCS#8 PEM file with the private key of the client certificate. Must be set together with `urlfrontier.tls.client.cert.chain`.
+| urlfrontier.tls.client.private.key.password | - | Password of the client private key, if it is encrypted.
 | urlfrontier.max.buckets | 10 | Number of buckets to request from the frontier.
 | urlfrontier.max.urls.per.bucket | 10 | Maximum URLs per bucket. Must be 1 when robots crawl-delay pacing is enabled so one request cannot hand out several URLs from the same host.
 | urlfrontier.robots.crawl.delay.enabled | false | Enables forwarding long robots.txt Crawl-delays from the queue stream to URLFrontier. Also requires `fetcher.max.crawl.delay.force: true` and the validated configuration described above.
@@ -569,6 +591,12 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/tika[tika
 | parser.mimetype.whitelist | - | Regex list of allowed MIME types. If set, only matching types are parsed by the Tika ParserBolt. The pattern is matched against the byte-detected MIME type, not the server-declared HTTP `Content-Type` header.
 | parser.tika.config.file | tika-config.json | Name of the classpath resource holding the Tika configuration (JSON format since Tika 4).
 | parser.extract.embedded | false | Whether to parse embedded documents. Since Tika 4 embedded documents are no longer parsed unless this is set to `true`.
+| parser.tika.text.maxlength | -1 | Maximum number of characters of text extracted from a document, -1 (or any negative value) for no limit. When the limit is reached the parse stops, the text and outlinks extracted so far are kept and the metadata `parse.text.trimmed` is set to `true`.
+| parser.tika.pdf.maxpages | -1 | Maximum number of pages of a PDF document to parse, 0 or less to keep the `maxPages` of the Tika configuration (no limit by default). The pages after it are skipped, their text and outlinks are not extracted. Other settings of `pdf-parser` in the `parse-context` section of the Tika configuration are kept.
+| parser.tika.timeout | -1 | Maximum time in milliseconds a document may take to parse, 0 or less for no limit. When set, the parse runs in a forked JVM (Tika Pipes), one per bolt instance; a parse that exceeds this is killed outright and reported to the status stream as an `ERROR` with the message `parse timeout`. A partial result returned between embedded documents is kept and marked `parse.text.trimmed`. When `parser.tika.text.maxlength` is negative (the default), the text is limited to 20,000,000 characters in this mode. Keep it well below `topology.message.timeout.secs`: the time a tuple waits behind a slow parse or a fork restart counts against that too. `parser.htmlmapper.classname` is ignored in this mode, see the README of the module.
+| parser.tika.pipes.jvmargs | -Xmx512m | JVM arguments passed to each forked process under `parser.tika.timeout`. `-Xmx512m` is added when they set no maximum heap (`-Xmx`, `-XX:MaxHeapSize` or `-XX:MaxRAM*`).
+| parser.tika.pipes.maxfilesperprocess | - | Restart a forked process after this many documents under `parser.tika.timeout`, to bound slow leaks in parsing libraries. Unset uses Tika's default, 10000.
+| parser.tika.pipes.plugins.dir | - | Directory holding Tika Pipes plugin zips under `parser.tika.timeout`, not needed by default. Unset uses Tika's default plugin directory resolution.
 |===
 
 NOTE: When using the Tika `ParserBolt` alongside `JSoupParserBolt`, set `jsoup.treat.non.html.as.error` to `false` so that non-HTML content is passed through to the Tika parser rather than being treated as an error.
@@ -611,7 +639,7 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/ai[ai mod
 | textextractor.llm.url | - | LLM API endpoint URL (e.g., OpenAI or Ollama endpoint).
 | textextractor.llm.model | - | Model name to use (e.g., "gpt-4", "llama2").
 | textextractor.system.prompt | - | System prompt for the LLM (optional).
-| textextractor.llm.prompt | - | User prompt template. Use `\{HTML}` and `\{REQUEST}` as placeholders (optional).
+| textextractor.llm.prompt | - | User prompt template. Use `\{HTML}` and `\{REQUEST}` as placeholders (optional). `<\|` in the page HTML is written as `< \|` before it is substituted, so the page cannot contain a marker token of the form `<\|NAME\|>`. The text returned is the content of the `<content>` envelope of the reply if there is one, without the markup outside fenced code blocks; `textextractor.skip.after` limits its length.
 | textextractor.llm.user_request | - | Extra user request passed to the prompt template (optional).
 | textextractor.llm.listener.clazz | - | Listener class for tracking LLM response metrics (optional).
 |===
@@ -629,6 +657,7 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/playwrigh
 | playwright.remote.ws | - | Remote WebSocket URL for Playwright (alternative to CDP, e.g. `ws://localhost:3000/`).
 | playwright.skip.download | false | Skip automatic browser download. Implicitly forced to `true` when `playwright.cdp.url` or `playwright.remote.ws` is set.
 | playwright.load.event | load | Page load event to wait for. One of `load`, `domcontentloaded`, `networkidle`.
+| playwright.ignore.https.errors | false | If `true`, the browser context accepts any TLS certificate, including self-signed, expired or otherwise invalid ones, for every page, navigation and subresource. The servers are then not authenticated: anyone able to answer for the host name can serve content that the browser renders and whose JavaScript it executes. Independent of `http.proxy`: deployments behind a TLS-intercepting proxy, which previously relied on certificate validation being disabled whenever a proxy was set, now need this key or the proxy CA installed in the browser image.
 | playwright.skip.resource.types | - | List of resource types aborted during navigation (`document`, `stylesheet`, `image`, `media`, `font`, `script`, `texttrack`, `xhr`, `fetch`, `eventsource`, `websocket`, `manifest`, `other`).
 | playwright.evaluations | - | List of JavaScript expressions evaluated after load; each JSON-serialised result is stored in response metadata under the expression itself.
 | playwright.capture.content.on.error | false | If `true`, also capture `page.content()` for non-2xx responses — useful for SPAs that return a stub then hydrate via JS.

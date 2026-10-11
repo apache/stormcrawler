@@ -29,9 +29,26 @@ config:
   fetcher.max.urls.in.queues: -1
   fetcher.max.queue.size: -1
   fetcher.timeout.queue: -1
-  # hard timeout in seconds for a single protocol fetch at the bolt level;
-  # -1 disables (relies on protocol-level socket timeouts only)
+  # hard deadline in seconds for each protocol call of a URL: the robots.txt
+  # lookup (and each redirect it follows) and the page fetch (its redirect
+  # chain shares one deadline), independent of the protocol's socket
+  # timeouts; -1 disables it. Never exceeds topology.message.timeout.secs.
+  # With okhttp the HTTP call itself is cancelled when the deadline passes
+  # (socket closed, URL reported as FETCH_ERROR), except that a DNS lookup
+  # cannot be interrupted and holds the thread until the resolver returns;
+  # other protocols run on a helper thread and are abandoned there on
+  # timeout. A robots.txt lookup which times out lets the page be fetched
+  # without rules on both paths and is cached in the robots error cache like
+  # any failed lookup
   fetcher.thread.timeout: -1
+  # max helper threads per bolt for the abandoned fetches above; default is
+  # 2 x fetcher.threads.number (2 for SimpleFetcherBolt). When all are busy
+  # the URL is acked without a status, like one which waited too long in
+  # the queue, and the spout retries it later; its queue is backed off
+  # exponentially (its crawl delay, doubled at each consecutive rejection,
+  # up to fetcher.max.crawl.delay, or 30s if negative, but never below the queue's
+  # own delay, with equal jitter) instead of being retried at once
+  # fetcher.thread.timeout.helpers: 100
   # max. crawl-delay accepted in robots.txt (in seconds)
   fetcher.max.crawl.delay: 30
   # behavior of fetcher when the crawl-delay in the robots.txt
@@ -207,7 +224,47 @@ config:
   # http.credentials.headers:
   # - "x-auth-token"
 
-  # IP address filtering (okhttp protocol only). Optionally limit or block
+  # Basic authentication for the sites which require it. The Authorization
+  # header built from http.basicauth.user and http.basicauth.password is only
+  # sent to the hosts listed in http.basicauth.hosts (a list or a
+  # comma-separated string): host names or IP addresses without scheme, port,
+  # path or wildcard, matched exactly and case-insensitively; other entries are
+  # ignored with a warning. Subdomains are not included, list each host
+  # separately. The host of every request is checked, robots.txt fetches and
+  # redirect targets included; a redirect followed with http.allow.redirects
+  # never carries the header to another scheme, host or port. The header is
+  # also withheld from servers which were not authenticated, see
+  # http.credentials.allow.insecure.
+  # Breaking change in 4.0.0: the credentials used to be sent to every host
+  # crawled. If http.basicauth.hosts is empty they are not sent at all and a
+  # warning is logged at startup.
+  # http.basicauth.user:
+  # http.basicauth.password:
+  # http.basicauth.hosts:
+  # - "intranet.example.com"
+
+  # The headers of http.custom.headers which carry credentials (see
+  # http.credentials.headers) are only sent to the hosts listed in
+  # http.custom.headers.hosts, which takes the same entries and is matched in
+  # the same way as http.basicauth.hosts; the other custom headers are sent to
+  # every host. The two host lists are independent. On a host listed in both,
+  # an Authorization header of http.custom.headers replaces the one built from
+  # http.basicauth.*.
+  # Breaking change in 4.0.0: the credential headers used to be sent to every
+  # host crawled. If http.custom.headers.hosts is empty they are not sent at
+  # all and a warning is logged at startup.
+  # http.custom.headers:
+  # - "X-Api-Key=secret"
+  # http.custom.headers.hosts:
+  # - "api.example.com"
+
+  # Maximum number of redirect hops followed when http.allow.redirects is
+  # enabled (okhttp protocol only). A chain which does not end within this
+  # many hops returns its last redirect response, which the caller handles
+  # like it does when redirects are not followed at all.
+  http.allow.redirects.max: 5
+
+  # IP address filtering (okhttp and playwright protocols). Optionally limit or block
   # connections to IP address ranges once the host name has been resolved. This
   # prevents information leakage to a public index when a DNS entry points to a
   # private or loopback address. Rules can be given as a comma-separated string
@@ -233,6 +290,9 @@ config:
   # Fetches through a proxy are not filtered: the proxy resolves and connects
   # to the target, so only its address is known here and a proxy on a private
   # address is fine. The proxy's own egress rules decide what it may reach.
+  # Playwright checks the page, its subresources and popups against an address
+  # resolved separately from the browser and blocks service workers; redirect
+  # hops and WebSockets are not checked.
   http.filter.ipaddress.exclude: "localhost,sitelocal,linklocal,anylocal,multicast,100.64.0.0/10,0.0.0.0/8,fc00::/7,::/128"
 
   # Allow all if robots.txt cannot be parsed due to code 403 (Forbidden):
@@ -247,8 +307,10 @@ config:
   # while staying on the same host and port is always followed, whatever this is
   # set to. When this is enabled, the robots.txt is re-fetched from the host
   # named in the Location header, for up to 5 hops, and each of these requests
-  # carries the headers configured through http.basicauth.* and
-  # http.custom.headers as any other request does; http.filter.ipaddress.exclude
+  # carries the headers configured through http.custom.headers, the credential
+  # ones only if the host is listed in http.custom.headers.hosts, and those of
+  # http.basicauth.* if the host is listed in http.basicauth.hosts, as any other
+  # request does; http.filter.ipaddress.exclude
   # can be used to restrict the addresses those fetches may reach.
   http.robots.redirect.crossorigin.allow: false
 
@@ -355,6 +417,32 @@ config:
   # filters URLs in sitemaps based on their modified Date (if any)
   sitemap.filter.hours.since.modified: -1
 
+  # maximum number of URLs emitted as DISCOVERED per sitemap, -1 for no
+  # limit. For a sitemap index this caps the child sitemaps it lists. The
+  # sitemap is still marked as FETCHED when its URLs are trimmed.
+  # A partial mitigation only: the URLs have already been parsed when the
+  # cap applies, so it bounds what reaches the status stream, not the memory
+  # used by the parse.
+  sitemap.emitOutlinks.max: -1
+
+  # whether a document without the isSitemap key is classified as a sitemap
+  # by searching the first bytes of its content for the sitemaps.org
+  # namespace. Off by default: any page carrying the namespace string early
+  # enough would be reclassified as a sitemap and never reach the parser
+  # bolt. When enabled, a content type which rules a sitemap out (a page
+  # served as HTML) stops the sniffing.
+  sitemap.sniffContent: false
+
+  # whether the sitemap parser applies strict URL checking: a sitemap then
+  # only yields URLs below its own host and path (strict URL checking of
+  # crawler-commons, not its namespace check), so a sitemap cannot enrol URLs
+  # on hosts it has nothing to do with. Applied to <urlset> entries by the
+  # parser and to the <loc> entries of a sitemap index by this bolt. Off by
+  # default: a sitemap living at example.com while listing URLs under
+  # www.example.com violates the sitemap spec but is common, and strict
+  # checking would silently shrink such a crawl. Recommended for open crawls.
+  sitemap.strict: false
+
   # staggered scheduling of sitemaps
   sitemap.schedule.delay: -1
 
@@ -399,6 +487,14 @@ config:
   # Guava cache use by AbstractStatusUpdaterBolt for DISCOVERED URLs
   status.updater.use.cache: true
   status.updater.cache.spec: "expireAfterAccess=1h,softValues"
+
+  # Normalise the host component of DISCOVERED URLs before they are stored,
+  # so that aliases of one server (percent-escaping, case, trailing dot)
+  # become a single record, a single politeness queue and a single robots.txt
+  # fetch. Off by default: document ids are hashed from the URL, so turning
+  # this on makes servers whose aliases were already stored in raw form be
+  # re-discovered under the normalised form as a second, bounded record.
+  status.updater.normalise.hosts: false
 
   # Can also take "MINUTE" or "HOUR"
   status.updater.unit.round.date: "SECOND"

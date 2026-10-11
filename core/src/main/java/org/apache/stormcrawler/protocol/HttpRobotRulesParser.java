@@ -87,11 +87,16 @@ public class HttpRobotRulesParser extends RobotRulesParser {
      */
     private static void logForwardedRequestHeaders(Config conf) {
         List<String> sources = new ArrayList<>();
-        if (StringUtils.isNotBlank(ConfUtils.getString(conf, "http.basicauth.user", null))) {
-            sources.add("http.basicauth.user");
+        if (StringUtils.isNotBlank(ConfUtils.getString(conf, "http.basicauth.user", null))
+                && !ConfUtils.loadListFromConf("http.basicauth.hosts", conf).isEmpty()) {
+            // only reaches a target whose host is listed in http.basicauth.hosts
+            sources.add("http.basicauth.* (if the target is listed in http.basicauth.hosts)");
         }
         if (!ConfUtils.loadListFromConf("http.custom.headers", conf).isEmpty()) {
-            sources.add("http.custom.headers");
+            // credential headers only reach a target listed in http.custom.headers.hosts
+            sources.add(
+                    "http.custom.headers (credential headers if the target is listed in "
+                            + "http.custom.headers.hosts)");
         }
         if (!sources.isEmpty()) {
             LOG.warn(
@@ -105,7 +110,12 @@ public class HttpRobotRulesParser extends RobotRulesParser {
     /** Compose unique key to store and access robot rules in cache for given URL. */
     protected static String getCacheKey(URL url) {
         String protocol = url.getProtocol().toLowerCase(Locale.ROOT);
-        String host = url.getHost().toLowerCase(Locale.ROOT);
+        // canonicalise the host so aliases of one server (percent-escaping,
+        // case, trailing dot) share one cache entry and one robots.txt fetch
+        String host = URLUtil.getCanonicalHost(url);
+        if (host == null) {
+            host = "";
+        }
 
         int port = url.getPort();
         if (port == -1) {
@@ -195,6 +205,35 @@ public class HttpRobotRulesParser extends RobotRulesParser {
             return robotRules;
         }
         return EMPTY_RULES;
+    }
+
+    /**
+     * Caches empty rules for the host of the URL in the error cache, as for any lookup which fails
+     * with an exception, unless rules for the host are already cached: a lookup abandoned at the
+     * deadline may have completed on its helper thread in the meantime, before or after this call,
+     * and its rules must win either way.
+     */
+    @Override
+    public void cacheLookupFailure(String url) {
+        URL u;
+        try {
+            u = URLUtil.toURL(url);
+        } catch (Exception e) {
+            return;
+        }
+        String cacheKey = getCacheKey(u);
+        if (ERRORCACHE.getIfPresent(cacheKey) != null || CACHE.getIfPresent(cacheKey) != null) {
+            return;
+        }
+        LOG.debug("Caching robots lookup failure for {} under key {}", url, cacheKey);
+        // the lookup may also have completed with an error of its own (e.g. a 5xx) since the
+        // check above: keep its rules rather than replacing them with empty ones
+        ERRORCACHE.asMap().putIfAbsent(cacheKey, new RobotRules(EMPTY_RULES));
+        // the lookup may have completed between the check above and the put: it invalidated an
+        // entry which was not there yet, so check again now that the entry is visible to it
+        if (CACHE.getIfPresent(cacheKey) != null) {
+            ERRORCACHE.invalidate(cacheKey);
+        }
     }
 
     /**
@@ -288,6 +327,7 @@ public class HttpRobotRulesParser extends RobotRulesParser {
                                     keyredir,
                                     cacheKey);
                             CACHE.put(cacheKey, cachedRediRobotRules);
+                            ERRORCACHE.invalidate(cacheKey);
                             return cachedRediRobotRules;
                         } else {
                             // Remember the target host/authority, we can cache the rules, too.
@@ -357,6 +397,12 @@ public class HttpRobotRulesParser extends RobotRulesParser {
 
         LOG.debug("Caching robots for {} under key {} in cache {}", url, cacheKey, cacheName);
         cacheToUse.put(cacheKey, cached);
+        if (cacheRule) {
+            // a lookup abandoned at the deadline and completed here on its helper thread may have
+            // been recorded as a failure in the meantime: the error cache is read first, so its
+            // entry would hide the rules for the whole error TTL
+            ERRORCACHE.invalidate(cacheKey);
+        }
 
         // cache robot rules for redirections
         // get here only if the target has not been found in the cache
@@ -372,6 +418,9 @@ public class HttpRobotRulesParser extends RobotRulesParser {
                         keyredir,
                         cacheName);
                 cacheToUse.put(keyredir, cached);
+                if (cacheRule) {
+                    ERRORCACHE.invalidate(keyredir);
+                }
             }
         }
 

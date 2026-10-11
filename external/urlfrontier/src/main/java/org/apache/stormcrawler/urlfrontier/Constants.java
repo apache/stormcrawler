@@ -27,6 +27,39 @@ public final class Constants {
     public static final String URLFRONTIER_DEFAULT_HOST = "localhost";
     public static final int URLFRONTIER_DEFAULT_PORT = 7071;
 
+    // Transport security (#2098)
+
+    /**
+     * Whether the channels to URLFrontier use TLS. Defaults to false, in which case they are
+     * plaintext.
+     */
+    public static final String URLFRONTIER_TLS_ENABLED_KEY = "urlfrontier.tls.enabled";
+
+    /**
+     * Path to a PEM file with the certificates trusted to sign the URLFrontier server certificate.
+     * If not set, the JVM trust store is used.
+     */
+    public static final String URLFRONTIER_TLS_TRUST_CERT_COLLECTION_KEY =
+            "urlfrontier.tls.trust.cert.collection";
+
+    /**
+     * Path to a PEM file with the client certificate chain sent for mutual TLS. Must be set
+     * together with {@link #URLFRONTIER_TLS_CLIENT_PRIVATE_KEY_KEY}.
+     */
+    public static final String URLFRONTIER_TLS_CLIENT_CERT_CHAIN_KEY =
+            "urlfrontier.tls.client.cert.chain";
+
+    /**
+     * Path to the PKCS#8 PEM file with the private key of the client certificate. Must be set
+     * together with {@link #URLFRONTIER_TLS_CLIENT_CERT_CHAIN_KEY}.
+     */
+    public static final String URLFRONTIER_TLS_CLIENT_PRIVATE_KEY_KEY =
+            "urlfrontier.tls.client.private.key";
+
+    /** Password of the client private key, if it is encrypted. */
+    public static final String URLFRONTIER_TLS_CLIENT_PRIVATE_KEY_PASSWORD_KEY =
+            "urlfrontier.tls.client.private.key.password";
+
     // Spout
     public static final String URLFRONTIER_MAX_URLS_PER_BUCKET_KEY =
             "urlfrontier.max.urls.per.bucket";

@@ -22,6 +22,8 @@ config:
   # also accepts a list or multiple values in a single line
   # separated by a semi-colon e.g. "opensearch1:9200; opensearch2:9200"
   opensearch.addresses: "http://localhost:9200"
+  # credentials are only sent to the hosts and ports listed in the addresses,
+  # use https:// addresses for any host other than localhost
   #opensearch.user: "USERNAME"
   #opensearch.password: "PASSWORD"
   opensearch.concurrentRequests: 2
@@ -29,7 +31,8 @@ config:
   # Sets the response buffer to the specified value in MB.
   # opensearch.responseBufferSize: 100
 
-  # Disable TLS validation for connection to OpenSearch
+  # Disable TLS validation for connection to OpenSearch, a warning is logged
+  # when this is enabled
   # opensearch.disable.tls.validation: false
 
   # Indexer bolt

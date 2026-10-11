@@ -33,6 +33,7 @@ import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.parse.ParsingTester;
+import org.apache.stormcrawler.persistence.Status;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -254,6 +255,102 @@ class SiteMapParserBoltTest extends ParsingTester {
         // do not specify that it is a sitemap file
         parse("https://stormcrawler.apache.org", "stormcrawler.apache.org.html", new Metadata());
         Assertions.assertEquals(1, output.getEmitted().size());
+    }
+
+    /**
+     * The fetcher stores the response headers under protocol.md.prefix, so the content type has to
+     * be read with that prefix. Without it the value is never found and every sitemap is identified
+     * by guessing: a page served as text/html is then promoted by the sniffing, see issue #2100.
+     */
+    @Test
+    void prefixedContentTypeStopsHtmlBeingSniffedAsSitemap() throws IOException {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("sitemap.sniffContent", true);
+        parserConfig.put("sitemap.offset.guess", 1024);
+        parserConfig.put("protocol.md.prefix", "protocol.");
+        parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
+        bolt.prepare(
+                parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        Metadata metadata = new Metadata();
+        metadata.setValue("protocol." + HttpHeaders.CONTENT_TYPE, "text/html");
+        parse("https://stormcrawler.apache.org/sitemap.xml", "stormcrawler.sitemap.xml", metadata);
+        Assertions.assertEquals(0, output.getEmitted(Constants.StatusStreamName).size());
+        Assertions.assertEquals(1, output.getEmitted().size());
+    }
+
+    /** A sitemap content type stored under the prefix is found and lets the sniffing promote. */
+    @Test
+    void prefixedContentTypeIsFound() throws IOException {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("sitemap.sniffContent", true);
+        parserConfig.put("sitemap.offset.guess", 1024);
+        parserConfig.put("protocol.md.prefix", "protocol.");
+        parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
+        bolt.prepare(
+                parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        Metadata metadata = new Metadata();
+        metadata.setValue("protocol." + HttpHeaders.CONTENT_TYPE, "application/xml");
+        parse("https://stormcrawler.apache.org/sitemap.xml", "stormcrawler.sitemap.xml", metadata);
+        Assertions.assertEquals(7, output.getEmitted(Constants.StatusStreamName).size());
+    }
+
+    /**
+     * The declared content type only gates the sniffing and is not passed on to crawler-commons,
+     * which would trust it instead of detecting the format: a gzipped sitemap served as XML with a
+     * Content-Encoding the protocol does not decode (x-gzip) still parses.
+     */
+    @Test
+    void gzipSitemapDeclaredAsXmlStillParses() throws IOException {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("protocol.md.prefix", "protocol.");
+        parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
+        bolt.prepare(
+                parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        Metadata metadata = new Metadata();
+        metadata.setValue(SiteMapParserBolt.isSitemapKey, "true");
+        metadata.setValue("protocol." + HttpHeaders.CONTENT_TYPE, "application/xml");
+        metadata.setValue("protocol.Content-Encoding", "x-gzip");
+        parse(
+                "https://stormcrawler.apache.org/sitemap.xml.gz",
+                "stormcrawler.sitemap.xml.gz",
+                metadata);
+        Assertions.assertEquals(7, output.getEmitted(Constants.StatusStreamName).size());
+    }
+
+    /** A cap below the number of URLs trims the emitted URLs, the sitemap is still FETCHED. */
+    @Test
+    void outlinksAreTrimmedToTheCap() throws IOException {
+        List<List<Object>> emitted = parseWithOutlinksCap(3);
+        // 3 discovered + the sitemap itself
+        Assertions.assertEquals(4, emitted.size());
+        for (int i = 0; i < 3; i++) {
+            Assertions.assertEquals(Status.DISCOVERED, emitted.get(i).get(2));
+        }
+        Assertions.assertEquals(
+                "https://stormcrawler.apache.org/sitemap.xml", emitted.get(3).get(0));
+        Assertions.assertEquals(Status.FETCHED, emitted.get(3).get(2));
+    }
+
+    @Test
+    void outlinksAreNotTrimmedWithoutCap() throws IOException {
+        Assertions.assertEquals(7, parseWithOutlinksCap(-1).size());
+    }
+
+    @Test
+    void outlinksAreNotTrimmedBelowTheCap() throws IOException {
+        Assertions.assertEquals(7, parseWithOutlinksCap(100).size());
+    }
+
+    private List<List<Object>> parseWithOutlinksCap(int max) throws IOException {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("sitemap.emitOutlinks.max", max);
+        parserConfig.put("parsefilters.config.file", "test.parsefilters.json");
+        bolt.prepare(
+                parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        Metadata metadata = new Metadata();
+        metadata.setValue(SiteMapParserBolt.isSitemapKey, "true");
+        parse("https://stormcrawler.apache.org/sitemap.xml", "stormcrawler.sitemap.xml", metadata);
+        return output.getEmitted(Constants.StatusStreamName);
     }
 
     private void assertNewsAttributes(Metadata metadata) {

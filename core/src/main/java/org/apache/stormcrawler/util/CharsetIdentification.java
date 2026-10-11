@@ -45,6 +45,12 @@ public class CharsetIdentification {
             Pattern.compile("(?i)\\bcharset=\\s*(?:[\"'])?([^\\s,;\"']*)");
 
     /**
+     * Bytes read beyond the detection window when a {@code <meta charset="} declaration is cut by
+     * it: room for any registered charset name and its closing quote.
+     */
+    private static final int META_CHARSET_LOOKAHEAD = 64;
+
+    /**
      * Identifies the charset of a document based on the following logic: guess from the
      * ByteOrderMark - else return any charset specified in the http headers if any, otherwise
      * return the one from the html metadata; finally use ICU's charset detector to make an educated
@@ -190,9 +196,11 @@ public class CharsetIdentification {
         if (start != -1) {
             int end = html.indexOf('"', start + 15);
             // https://github.com/apache/stormcrawler/issues/870
-            // try on a slightly larger section of text if it is trimmed
-            if (end == -1 && ((maxlength + 10) < buffer.length)) {
-                return getCharsetFromMeta(buffer, maxlength + 10);
+            // the declaration may be cut by the window: look a bounded distance further
+            if (end == -1 && len < buffer.length) {
+                int extended = Math.min(buffer.length, len + META_CHARSET_LOOKAHEAD);
+                html = new String(buffer, 0, extended, DEFAULT_CHARSET);
+                end = html.indexOf('"', start + 15);
             }
             if (end == -1) {
                 // there is an open tag meta but not closed = we have broken content!

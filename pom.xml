@@ -25,7 +25,7 @@ under the License.
     <parent>
         <groupId>org.apache</groupId>
         <artifactId>apache</artifactId>
-        <version>39</version>
+        <version>40</version>
     </parent>
 
     <groupId>org.apache.stormcrawler</groupId>
@@ -65,24 +65,24 @@ under the License.
         <additionalparam>-Xdoclint:none</additionalparam>
         <!-- dependency versions -->
         <junit.version>6.1.3</junit.version>
-        <storm-client.version>3.0.0</storm-client.version>
+        <storm-client.version>3.1.0</storm-client.version>
         <!-- Jackson's version should be in-line with the one in Storm -->
         <jackson-annotations.version>2.22</jackson-annotations.version>
         <jackson.version>2.22.0</jackson.version>
-        <tika.version>4.0.0</tika.version>
-        <mockito.version>5.23.0</mockito.version>
-        <slf4j-simple.version>2.0.18</slf4j-simple.version>
+        <tika.version>4.1.0</tika.version>
+        <mockito.version>5.24.0</mockito.version>
+        <slf4j-simple.version>2.0.20</slf4j-simple.version>
         <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
         <commons.io.version>2.22.0</commons.io.version>
         <commons.compress.version>1.28.0</commons.compress.version>
         <commons.codec.version>1.22.1</commons.codec.version>
-        <guava.version>33.7.1-jre</guava.version>
-        <git-code-format-maven-plugin.version>6.0</git-code-format-maven-plugin.version>
+        <guava.version>33.7.2-jre</guava.version>
+        <git-code-format-maven-plugin.version>6.2</git-code-format-maven-plugin.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <awaitility.version>4.3.0</awaitility.version>
         <maven.mojo.license.plugin>2.7.1</maven.mojo.license.plugin>
         <checkstyle-maven-plugin.version>3.6.0</checkstyle-maven-plugin.version>
-        <checkstyle.version>14.1.0</checkstyle.version>
+        <checkstyle.version>14.3.0</checkstyle.version>
         <jacoco.maven.plugin>0.8.15</jacoco.maven.plugin>
         <jacoco.haltOnFailure>false</jacoco.haltOnFailure>
         <jacoco.classRatio>1.00</jacoco.classRatio>
@@ -95,8 +95,8 @@ under the License.
 
         <skip.format.code>true</skip.format.code>
 
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
 
         <apache-jar-resource-bundle.version>1.7</apache-jar-resource-bundle.version>
     </properties>
@@ -117,9 +117,9 @@ under the License.
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.16.0</version>
                     <configuration>
-                        <source>17</source>
-                        <target>17</target>
-                        <release>17</release>
+                        <source>25</source>
+                        <target>25</target>
+                        <release>25</release>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -128,7 +128,7 @@ under the License.
                     <version>3.12.0</version>
                     <configuration>
                         <doclint>none</doclint>
-                        <release>17</release>
+                        <release>25</release>
                         <sourcepath>src/main/java</sourcepath>
                     </configuration>
                     <executions>
@@ -431,7 +431,7 @@ under the License.
             <plugin>
                 <groupId>de.thetaphi</groupId>
                 <artifactId>forbiddenapis</artifactId>
-                <version>3.10</version>
+                <version>3.11</version>
                 <configuration>
                     <targetVersion>17</targetVersion>
                     <ignoreSignaturesOfMissingClasses>true</ignoreSignaturesOfMissingClasses>
@@ -674,6 +674,31 @@ under the License.
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-core</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+
+            <!-- keep the dataformat/datatype modules on the same line as jackson-core -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-smile</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.fasterxml.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-cbor</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.fasterxml.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-yaml</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
 

@@ -23,8 +23,6 @@ TASK DETAILS:
 - DON'T: Fragment related content
 - DON'T: Duplicate information
 
-IMPORTANT: If user specific instruction is provided, ignore above guideline and prioritize those requirements over these general guidelines.
-
 OUTPUT FORMAT:
 Wrap your response in <content> tags. Use proper markdown throughout.
 <content>

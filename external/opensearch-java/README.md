@@ -16,7 +16,10 @@ uses the typed `OpenSearchClient` and the `ApacheHttpClient5TransportBuilder`
 transport. Unlike the legacy client, the Java Client 3.x no longer ships a
 sniffer nor a built-in `BulkProcessor`; this module provides an internal
 `AsyncBulkProcessor` that preserves the same semantics (size/count/time based
-flushing, back-pressure, listener callbacks).
+flushing, back-pressure, listener callbacks). Like the legacy `BulkProcessor`,
+it sends the bulk requests asynchronously (via the `OpenSearchAsyncClient`), so
+the bolts never wait for the HTTP round trip unless the maximum number of
+concurrent requests is reached.
 
 Getting started
 ---------------------

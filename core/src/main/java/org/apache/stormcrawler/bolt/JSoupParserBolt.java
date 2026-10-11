@@ -269,22 +269,6 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
         long start = System.currentTimeMillis();
 
-        String charset;
-
-        if (fastCharsetDetection) {
-            charset =
-                    CharsetIdentification.getCharsetFast(
-                            metadata, content, maxLengthCharsetDetection);
-        } else {
-            charset =
-                    CharsetIdentification.getCharset(metadata, content, maxLengthCharsetDetection);
-        }
-
-        LOG.debug(
-                "Charset identified as {} in {} msec",
-                charset,
-                (System.currentTimeMillis() - start));
-
         RobotsTags robotsTags = new RobotsTags();
 
         // get the robots tags from the fetch metadata
@@ -295,8 +279,25 @@ public class JSoupParserBolt extends StatusEmitterBolt {
         Map<String, List<String>> slinks;
         String text;
         final org.jsoup.nodes.Document jsoupDoc;
+        String charset;
 
         try {
+            // inside the try: a failure here is a parse error of this URL, not a dead worker
+            if (fastCharsetDetection) {
+                charset =
+                        CharsetIdentification.getCharsetFast(
+                                metadata, content, maxLengthCharsetDetection);
+            } else {
+                charset =
+                        CharsetIdentification.getCharset(
+                                metadata, content, maxLengthCharsetDetection);
+            }
+
+            LOG.debug(
+                    "Charset identified as {} in {} msec",
+                    charset,
+                    (System.currentTimeMillis() - start));
+
             String html = Charset.forName(charset).decode(ByteBuffer.wrap(content)).toString();
 
             if (isPlainText) {

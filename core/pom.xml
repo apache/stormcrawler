@@ -43,12 +43,12 @@ under the License.
         <xerces.version>2.12.2</xerces.version>
         <httpclient.version>4.5.14</httpclient.version>
         <snakeyaml.version>2.7</snakeyaml.version>
-        <commons.lang.version>3.20.0</commons.lang.version>
+        <commons.lang.version>3.21.0</commons.lang.version>
         <wiremock.version>3.13.2</wiremock.version>
         <rometools.version>2.1.0</rometools.version>
         <cli.version>1.11.0</cli.version>
         <okhttp.version>5.5.0</okhttp.version>
-        <caffeine.version>3.2.4</caffeine.version>
+        <caffeine.version>3.3.0</caffeine.version>
 
         <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
         <jacoco.classRatio>0.72</jacoco.classRatio>
@@ -86,6 +86,16 @@ under the License.
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <configuration>
+                    <!-- benchmark utilities, run manually against a live backend -->
+                    <excludes>
+                        <exclude>org/apache/stormcrawler/persistence/*Benchmark*</exclude>
+                    </excludes>
+                </configuration>
             </plugin>
         </plugins>
     </build>

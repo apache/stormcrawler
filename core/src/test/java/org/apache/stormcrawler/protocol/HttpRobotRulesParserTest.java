@@ -21,10 +21,13 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static org.awaitility.Awaitility.await;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import crawlercommons.robots.BaseRobotRules;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.apache.storm.Config;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,5 +118,62 @@ class HttpRobotRulesParserTest {
         modifiedConf.put("http.robots.5xx.allow", true);
         allowNone(403, modifiedConf, wmRuntimeInfo);
         allowAll(500, modifiedConf, wmRuntimeInfo);
+    }
+
+    /**
+     * A lookup failure reported from outside, as when the fetcher abandons the lookup at the
+     * deadline, is cached in the error cache like any other failure: the next lookup for the host
+     * is served from the cache, allows all, and sends no request.
+     */
+    @Test
+    void reportedLookupFailureIsCachedAsEmptyRules(WireMockRuntimeInfo wmRuntimeInfo) {
+        stubFor(
+                get(urlPathEqualTo("/robots.txt"))
+                        .willReturn(aResponse().withBody(body).withStatus(200)));
+        HttpRobotRulesParser parser = new HttpRobotRulesParser();
+        parser.setConf(conf);
+        String base = wmRuntimeInfo.getHttpBaseUrl();
+        parser.cacheLookupFailure(base + "/some/page");
+        BaseRobotRules rules = parser.getRobotRulesSet(protocol, base + "/other");
+        Assertions.assertTrue(rules.isAllowAll(), "the real robots.txt was not fetched");
+        Assertions.assertInstanceOf(RobotRules.class, rules);
+        Assertions.assertEquals(0, ((RobotRules) rules).getContentLengthFetched().length);
+        Assertions.assertEquals(
+                0,
+                wmRuntimeInfo.getWireMock().getServeEvents().size(),
+                "no request was sent to the server");
+    }
+
+    /**
+     * A lookup abandoned at the deadline keeps running on its helper thread and completes after the
+     * failure was reported: the rules it obtained must win over the failure entry, as the
+     * robots.txt of the host was actually fetched.
+     */
+    @Test
+    void rulesObtainedAfterReportedFailureReplaceIt(WireMockRuntimeInfo wmRuntimeInfo) {
+        stubFor(
+                get(urlPathEqualTo("/robots.txt"))
+                        .willReturn(
+                                aResponse().withBody(body).withStatus(200).withFixedDelay(1000)));
+        HttpRobotRulesParser parser = new HttpRobotRulesParser();
+        parser.setConf(conf);
+        String base = wmRuntimeInfo.getHttpBaseUrl();
+        // the lookup the fetcher abandons: it goes on while the failure is reported
+        CompletableFuture<BaseRobotRules> abandoned =
+                CompletableFuture.supplyAsync(
+                        () -> parser.getRobotRulesSet(protocol, base + "/some/page"));
+        await().atMost(5, TimeUnit.SECONDS)
+                .until(() -> !wmRuntimeInfo.getWireMock().getServeEvents().isEmpty());
+        Assertions.assertFalse(abandoned.isDone(), "the lookup is still in flight");
+        parser.cacheLookupFailure(base + "/some/page");
+        BaseRobotRules obtained = abandoned.join();
+        Assertions.assertFalse(obtained.isAllowed(base + "/restricted/page"));
+        BaseRobotRules rules = parser.getRobotRulesSet(protocol, base + "/other");
+        Assertions.assertFalse(rules.isAllowAll(), "the failure entry hides the fetched rules");
+        Assertions.assertFalse(rules.isAllowed(base + "/restricted/page"));
+        Assertions.assertEquals(
+                1,
+                wmRuntimeInfo.getWireMock().getServeEvents().size(),
+                "the rules were served from the cache");
     }
 }

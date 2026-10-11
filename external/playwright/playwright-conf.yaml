@@ -24,6 +24,15 @@ config:
   # com.microsoft.playwright.options.WaitUntilState
   # playwright.load.event: "domcontentloaded"
 
+  # If true, the browser context accepts any TLS certificate, including
+  # self-signed, expired or otherwise invalid ones, for every page, navigation
+  # and subresource. The servers are then not authenticated. This is
+  # independent of http.proxy: configuring a proxy no longer disables
+  # certificate validation. Deployments behind a TLS-intercepting proxy need
+  # either this key or the proxy CA installed in the browser image.
+  # A warning is logged when enabled.
+  # playwright.ignore.https.errors: false
+
   # By default the rendered DOM is only captured when the origin returns a 2xx
   # status. Enable this to also capture page.content() for non-2xx responses
   # (useful for SPAs that return e.g. a 404 stub and then hydrate via JS).

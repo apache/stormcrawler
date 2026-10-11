@@ -24,17 +24,21 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.TrustAllStrategy;
-import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.jetbrains.annotations.NotNull;
@@ -49,6 +53,7 @@ import org.opensearch.client.RequestOptions;
 import org.opensearch.client.RestClient;
 import org.opensearch.client.RestClientBuilder;
 import org.opensearch.client.RestHighLevelClient;
+import org.opensearch.client.sniff.OpenSearchNodesSniffer;
 import org.opensearch.client.sniff.Sniffer;
 import org.opensearch.common.unit.TimeValue;
 import org.slf4j.Logger;
@@ -139,18 +144,27 @@ public final class OpenSearchConnection {
                 ConfUtils.getBoolean(
                         stormConf, Constants.PARAMPREFIX, "", "disable.tls.validation", false);
 
-        final boolean needsUser = StringUtils.isNotBlank(user) && StringUtils.isNotBlank(password);
+        final boolean needsUser = hasCredentials(user, password);
         final boolean needsProxy = StringUtils.isNotBlank(proxyhost) && proxyport != -1;
+
+        if (needsUser) {
+            warnAboutPlainHttp(boltType, hosts);
+        }
+        if (disableTlsValidation) {
+            LOG.warn(
+                    "opensearch.disable.tls.validation is set: the certificates and host names of "
+                            + "the OpenSearch nodes used for {} are not checked",
+                    boltType);
+        }
 
         if (needsUser || needsProxy || disableTlsValidation) {
             builder.setHttpClientConfigCallback(
                     httpClientBuilder -> {
                         if (needsUser) {
-                            final CredentialsProvider credentialsProvider =
-                                    new BasicCredentialsProvider();
-                            credentialsProvider.setCredentials(
-                                    AuthScope.ANY, new UsernamePasswordCredentials(user, password));
-                            httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+                            httpClientBuilder.setDefaultCredentialsProvider(
+                                    new OriginCredentialsProvider(
+                                            hosts,
+                                            new UsernamePasswordCredentials(user, password)));
                         }
                         if (needsProxy) {
                             httpClientBuilder.setProxy(
@@ -230,6 +244,106 @@ public final class OpenSearchConnection {
         return new RestHighLevelClient(builder);
     }
 
+    /** Basic authentication is only set up when both the user and the password are given. */
+    static boolean hasCredentials(String user, String password) {
+        return StringUtils.isNotBlank(user) && StringUtils.isNotBlank(password);
+    }
+
+    /**
+     * Gives the Basic credentials only to requests for one of the configured addresses, matched on
+     * scheme, host and port. A node reached under any other address, such as one found by the
+     * sniffer under the address it publishes, does not receive them.
+     */
+    static final class OriginCredentialsProvider implements CredentialsProvider {
+
+        private final Set<String> origins = new LinkedHashSet<>();
+        private final Credentials credentials;
+
+        OriginCredentialsProvider(List<HttpHost> hosts, Credentials credentials) {
+            for (HttpHost host : hosts) {
+                origins.add(origin(host));
+            }
+            this.credentials = credentials;
+        }
+
+        private static String origin(HttpHost host) {
+            final String scheme = host.getSchemeName().toLowerCase(Locale.ROOT);
+            int port = host.getPort();
+            if (port < 0) {
+                port = "https".equals(scheme) ? 443 : 80;
+            }
+            return scheme + "://" + host.getHostName().toLowerCase(Locale.ROOT) + ":" + port;
+        }
+
+        @Override
+        public Credentials getCredentials(AuthScope scope) {
+            final HttpHost origin = scope.getOrigin();
+            if (origin != null && origins.contains(origin(origin))) {
+                return credentials;
+            }
+            return null;
+        }
+
+        @Override
+        public void setCredentials(AuthScope scope, Credentials credentials) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void clear() {}
+    }
+
+    /**
+     * Returns the addresses which use plain http and are not a loopback address, i.e. those the
+     * Basic credentials would be sent to in the clear over the network.
+     */
+    static List<HttpHost> plainHttpHosts(List<HttpHost> hosts) {
+        final List<HttpHost> plain = new ArrayList<>();
+        for (HttpHost host : hosts) {
+            if ("http".equalsIgnoreCase(host.getSchemeName()) && !isLoopback(host.getHostName())) {
+                plain.add(host);
+            }
+        }
+        return plain;
+    }
+
+    /**
+     * Returns the scheme under which the sniffer registers the nodes it finds. The nodes publish no
+     * scheme, so https is used as soon as one configured address uses it; otherwise sniffing would
+     * move the requests to plain http after the first round.
+     */
+    static OpenSearchNodesSniffer.Scheme sniffScheme(List<HttpHost> hosts) {
+        for (HttpHost host : hosts) {
+            if ("https".equalsIgnoreCase(host.getSchemeName())) {
+                return OpenSearchNodesSniffer.Scheme.HTTPS;
+            }
+        }
+        return OpenSearchNodesSniffer.Scheme.HTTP;
+    }
+
+    private static final Pattern IPV4_LOOPBACK = Pattern.compile("127(\\.\\d{1,3}){3}");
+
+    /** Whether the host is localhost or a loopback IP literal. No name is resolved. */
+    static boolean isLoopback(String hostname) {
+        String host = StringUtils.strip(hostname.toLowerCase(Locale.ROOT), "[]");
+        return host.equals("localhost")
+                || IPV4_LOOPBACK.matcher(host).matches()
+                || host.equals("::1")
+                || host.equals("0:0:0:0:0:0:0:1");
+    }
+
+    private static void warnAboutPlainHttp(String boltType, List<HttpHost> hosts) {
+        final List<HttpHost> plain = plainHttpHosts(hosts);
+        if (!plain.isEmpty()) {
+            LOG.warn(
+                    "OpenSearch credentials are configured for {} but the addresses {} use plain "
+                            + "http, the credentials are sent unencrypted. Give the addresses an "
+                            + "https:// scheme.",
+                    boltType,
+                    plain);
+        }
+    }
+
     public void addToProcessor(final DocWriteRequest<?> request) {
         processor.add(request);
     }
@@ -306,7 +420,35 @@ public final class OpenSearchConnection {
                     ConfUtils.getBoolean(
                             stormConf, Constants.PARAMPREFIX, dottedType, "sniff", true);
             if (sniff) {
-                sniffer = Sniffer.builder(client.getLowLevelClient()).build();
+                if (hasCredentials(
+                        ConfUtils.getString(stormConf, Constants.PARAMPREFIX, dottedType, "user"),
+                        ConfUtils.getString(
+                                stormConf, Constants.PARAMPREFIX, dottedType, "password"))) {
+                    LOG.warn(
+                            "Sniffing is enabled for {} and OpenSearch credentials are configured. "
+                                    + "The credentials are only sent to the configured addresses: "
+                                    + "requests to a node the sniffer finds under another host or "
+                                    + "port are sent without them and fail if the cluster requires "
+                                    + "authentication. List every node in opensearch.{}.addresses "
+                                    + "or set opensearch.{}.sniff: false.",
+                            boltType,
+                            boltType,
+                            boltType);
+                }
+                final RestClient lowLevelClient = client.getLowLevelClient();
+                final List<HttpHost> configured = new ArrayList<>();
+                for (Node node : lowLevelClient.getNodes()) {
+                    configured.add(node.getHost());
+                }
+                sniffer =
+                        Sniffer.builder(lowLevelClient)
+                                .setNodesSniffer(
+                                        new OpenSearchNodesSniffer(
+                                                lowLevelClient,
+                                                OpenSearchNodesSniffer
+                                                        .DEFAULT_SNIFF_REQUEST_TIMEOUT,
+                                                sniffScheme(configured)))
+                                .build();
             }
 
             return new OpenSearchConnection(client, bulkProcessor, sniffer);

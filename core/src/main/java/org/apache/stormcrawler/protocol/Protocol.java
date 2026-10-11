@@ -53,7 +53,33 @@ public interface Protocol {
      */
     ProtocolResponse getProtocolOutput(String url, Metadata metadata) throws Exception;
 
+    /**
+     * Whether this protocol enforces {@code fetcher.thread.timeout} itself for the given URL, by
+     * cancelling the request when the deadline passes and throwing a {@link FetchTimeoutException}.
+     * When true the fetcher bolts call {@link #getProtocolOutput(String, Metadata)} and {@link
+     * #getRobotRules(String)} directly instead of running them on a helper thread that they abandon
+     * on timeout. Defaults to false.
+     *
+     * @param url the URL about to be fetched, or whose robots.txt is about to be looked up
+     * @param metadata the metadata of that URL, possibly null
+     */
+    default boolean supportsFetchTimeout(String url, Metadata metadata) {
+        return false;
+    }
+
     BaseRobotRules getRobotRules(String url);
+
+    /**
+     * Called by the fetcher bolts when a {@link #getRobotRules(String)} call for the URL was
+     * abandoned on a helper thread because {@code fetcher.thread.timeout} passed. A protocol which
+     * caches robots.txt lookups should record the failure, so that later URLs of the same host do
+     * not each start a lookup of their own and wait a full deadline: the HTTP protocols cache the
+     * timeout like any other failed lookup, as empty rules in the robots error cache. Does nothing
+     * by default.
+     *
+     * @param url the URL whose robots.txt lookup timed out
+     */
+    default void robotRulesTimedOut(String url) {}
 
     void cleanup();
 

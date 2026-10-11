@@ -70,8 +70,7 @@ public class SCProxy {
         if (!matcher.matches()) {
             throw new IllegalArgumentException(
                     "passed connection string is not of valid proxy format "
-                            + "(<PROTO>://(<USER>:<PASS>@)<HOST>:<PORT>) : "
-                            + connectionString);
+                            + "(<PROTO>://(<USER>:<PASS>@)<HOST>:<PORT>)");
         }
 
         // load required parameters
@@ -129,15 +128,15 @@ public class SCProxy {
         }
     }
 
-    /** Formats the proxy information into a URL compatible connection string. */
+    /** Formats the proxy information into a redacted URL compatible connection string. */
     public String toString() {
-        // assemble base string with address and password
+        // assemble base string with address and port
         String proxyString = this.address + ":" + this.port;
 
         // conditionally add authentication details
         if (this.username != null && this.password != null) {
             // re-assemble url with auth details prepended
-            proxyString = this.username + ":" + this.password + "@" + proxyString;
+            proxyString = this.username + ":***@" + proxyString;
         }
 
         // prepend protocol string to url and return

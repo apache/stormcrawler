@@ -65,6 +65,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import okhttp3.Route;
+import okhttp3.TlsVersion;
 import okhttp3.brotli.Brotli;
 import okhttp3.zstd.Zstd;
 import okio.BufferedSource;
@@ -75,7 +76,10 @@ import org.apache.http.cookie.Cookie;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.filtering.URLFilters;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
+import org.apache.stormcrawler.protocol.FetchTimeout;
+import org.apache.stormcrawler.protocol.FetchTimeoutException;
 import org.apache.stormcrawler.protocol.IPFilterRules;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.ProtocolResponse.TrimmedContentReason;
@@ -90,6 +94,13 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(HttpProtocol.class);
 
+    /**
+     * Default maximum number of redirect hops followed when {@code http.allow.redirects} is
+     * enabled. A chain which does not end within this many hops returns its last redirect response,
+     * which the caller handles like it does when redirect following is off.
+     */
+    private static final int DEFAULT_MAX_REDIRECT_HOPS = 5;
+
     private final MediaType json = MediaType.parse("application/json; charset=utf-8");
 
     private OkHttpClient client;
@@ -98,8 +109,20 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
     private int completionTimeout = -1;
 
+    /** Per-call deadline in seconds from fetcher.thread.timeout, -1 when disabled. */
+    private long fetchTimeout = -1;
+
     /** Accept partially fetched content as trimmed content */
     private boolean partialContentAsTrimmed = false;
+
+    /** Redirect targets run through the URL filters before a hop is taken. */
+    private URLFilters urlFilters = URLFilters.emptyURLFilters;
+
+    /** Whether redirect responses are followed, from {@code http.allow.redirects}. */
+    private boolean followRedirects = false;
+
+    /** Maximum number of redirect hops followed, from {@code http.allow.redirects.max}. */
+    private int maxRedirectHops = DEFAULT_MAX_REDIRECT_HOPS;
 
     private final List<KeyValue> customRequestHeaders = new LinkedList<>();
 
@@ -127,8 +150,19 @@ public class HttpProtocol extends AbstractHttpProtocol {
     // lower case header names considered to carry credentials
     private Set<String> credentialHeaders = DEFAULT_CREDENTIAL_HEADERS;
 
-    // request headers withheld from servers which were not authenticated
+    // credential headers of http.custom.headers, only sent to customCredentialHosts and withheld
+    // from servers which were not authenticated
     private final List<KeyValue> credentialRequestHeaders = new LinkedList<>();
+
+    // http.custom.headers.hosts: hosts (canonical form, see HttpUrl#host) the
+    // credentialRequestHeaders are sent to
+    private final Set<String> customCredentialHosts = new HashSet<>();
+
+    // value of the Authorization header built from http.basicauth.*, null when not sent at all
+    private String basicAuthorization;
+
+    // http.basicauth.hosts: hosts (canonical form, see HttpUrl#host) basicAuthorization is sent to
+    private final Set<String> basicAuthHosts = new HashSet<>();
 
     // http.trust.everything: accept any certificate chain
     private boolean trustEverything = false;
@@ -192,6 +226,10 @@ public class HttpProtocol extends AbstractHttpProtocol {
         this.completionTimeout =
                 ConfUtils.getInt(conf, "topology.message.timeout.secs", completionTimeout);
 
+        // clamped to the message timeout: the per-call deadline replaces the client-level
+        // callTimeout derived from it and must not loosen it
+        this.fetchTimeout = FetchTimeout.secs(conf);
+
         this.partialContentAsTrimmed =
                 ConfUtils.getBoolean(conf, "http.content.partial.as.trimmed", false);
 
@@ -225,12 +263,28 @@ public class HttpProtocol extends AbstractHttpProtocol {
                             + "the host name either, the identity of the servers is not authenticated.");
         }
 
+        /*
+         * Redirects are followed in getProtocolOutput and not by the client:
+         * every target has to pass through the URL filters first, so that the
+         * scheme exclusions, host confinement and depth rules configured for
+         * the crawl also apply to the hops a fetched page steers the fetcher
+         * to. The client must therefore never follow them on its own.
+         */
+        final boolean allowRedirects = ConfUtils.getBoolean(conf, "http.allow.redirects", false);
+        this.followRedirects = allowRedirects;
+        this.maxRedirectHops =
+                Math.max(
+                        1,
+                        ConfUtils.getInt(
+                                conf, "http.allow.redirects.max", DEFAULT_MAX_REDIRECT_HOPS));
+        // the filter chain is only needed to vet redirect hops
+        urlFilters = allowRedirects ? URLFilters.fromConf(conf) : URLFilters.emptyURLFilters;
         builder =
                 new OkHttpClient.Builder()
                         .retryOnConnectionFailure(
                                 ConfUtils.getBoolean(
                                         conf, "http.retry.on.connection.failure", true))
-                        .followRedirects(ConfUtils.getBoolean(conf, "http.allow.redirects", false))
+                        .followRedirects(false)
                         .connectTimeout(timeout, TimeUnit.MILLISECONDS)
                         .writeTimeout(timeout, TimeUnit.MILLISECONDS)
                         .readTimeout(timeout, TimeUnit.MILLISECONDS);
@@ -287,27 +341,56 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         final String basicAuthUser = ConfUtils.getString(conf, "http.basicauth.user", null);
 
-        // use a basic auth? the header is withheld unless the server was authenticated
+        // use a basic auth? the header is only sent to the hosts listed in http.basicauth.hosts
+        // and withheld unless the server was authenticated
         if (StringUtils.isNotBlank(basicAuthUser)) {
-            final String basicAuthPass = ConfUtils.getString(conf, "http.basicauth.password", "");
-            final String encoding =
-                    Base64.getEncoder()
-                            .encodeToString(
-                                    (basicAuthUser + ":" + basicAuthPass)
-                                            .getBytes(StandardCharsets.UTF_8));
-            credentialRequestHeaders.add(
-                    new KeyValue(HttpHeaders.AUTHORIZATION, "Basic " + encoding));
+            addHosts(conf, "http.basicauth.hosts", basicAuthHosts);
+            if (basicAuthHosts.isEmpty()) {
+                // fail closed: before 4.0.0 the credentials went to every host crawled
+                LOG.warn(
+                        "http.basicauth.user is set but http.basicauth.hosts lists no host, the "
+                                + "credentials are not sent to any server. Since 4.0.0 they are "
+                                + "only sent to the hosts listed in http.basicauth.hosts; add the "
+                                + "host names of the sites which require them there.");
+            } else {
+                final String basicAuthPass =
+                        ConfUtils.getString(conf, "http.basicauth.password", "");
+                final String encoding =
+                        Base64.getEncoder()
+                                .encodeToString(
+                                        (basicAuthUser + ":" + basicAuthPass)
+                                                .getBytes(StandardCharsets.UTF_8));
+                basicAuthorization = "Basic " + encoding;
+            }
         }
 
+        // credential headers are only sent to the hosts listed in http.custom.headers.hosts, the
+        // other custom headers to every host
+        final List<KeyValue> credentialCustomHeaders = new ArrayList<>();
         for (KeyValue customHeader : customHeaders) {
             if (isCredentialHeader(customHeader.getKey())) {
-                credentialRequestHeaders.add(customHeader);
+                credentialCustomHeaders.add(customHeader);
             } else {
                 customRequestHeaders.add(customHeader);
             }
         }
+        if (!credentialCustomHeaders.isEmpty()) {
+            addHosts(conf, "http.custom.headers.hosts", customCredentialHosts);
+            if (customCredentialHosts.isEmpty()) {
+                // fail closed: before 4.0.0 the credential headers went to every host crawled
+                LOG.warn(
+                        "http.custom.headers sets the credential headers {} but "
+                                + "http.custom.headers.hosts lists no host, they are not sent to "
+                                + "any server. Since 4.0.0 they are only sent to the hosts listed "
+                                + "in http.custom.headers.hosts; add the host names of the sites "
+                                + "which require them there.",
+                        credentialCustomHeaders.stream().map(KeyValue::getKey).toList());
+            } else {
+                credentialRequestHeaders.addAll(credentialCustomHeaders);
+            }
+        }
 
-        if (!credentialRequestHeaders.isEmpty() || useCookies) {
+        if (basicAuthorization != null || !credentialRequestHeaders.isEmpty() || useCookies) {
             if (trustEverything && !insecureCredentialsAllowed) {
                 LOG.warn(
                         "Credentials configured with http.basicauth.*, credential headers in "
@@ -465,6 +548,63 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
     }
 
+    /**
+     * Adds the hosts configured under the key, a list or a comma-separated string, to the set of
+     * hosts a credential is sent to.
+     */
+    private void addHosts(Config conf, String key, Set<String> hosts) {
+        for (String entry : ConfUtils.loadListFromConf(key, conf)) {
+            for (String host : entry.split(",")) {
+                addHost(key, host, hosts);
+            }
+        }
+    }
+
+    /**
+     * Adds a host configured under the key in the canonical form OkHttp reports for the host of a
+     * request, i.e. lower case and IDNs in punycode. An IPv6 address may be given with or without
+     * brackets. An entry with a scheme, port, user info, path, query or wildcard is not a plain
+     * host and is ignored.
+     */
+    private void addHost(String key, String entry, Set<String> hosts) {
+        if (StringUtils.isBlank(entry)) {
+            return;
+        }
+        String host = entry.trim();
+        if (!host.startsWith("[") && StringUtils.countMatches(host, ':') > 1) {
+            // an IPv6 address without brackets
+            host = "[" + host + "]";
+        }
+        // checked on the entry itself: HttpUrl keeps '*' as part of the host name and drops the
+        // default port 80, so neither would be noticed on the parsed url
+        final String afterAddress =
+                host.startsWith("[") ? StringUtils.substringAfter(host, "]") : host;
+        final HttpUrl parsed =
+                host.contains("*") || afterAddress.contains(":")
+                        ? null
+                        : HttpUrl.parse("http://" + host + "/");
+        if (parsed == null
+                || !parsed.equals(
+                        new HttpUrl.Builder().scheme("http").host(parsed.host()).build())) {
+            // the entry is not logged: a URL pasted with its user info would leak the credentials
+            LOG.warn(
+                    "Ignoring an entry of {}, expected a host name or IP address "
+                            + "without scheme, port, user info, path or wildcard",
+                    key);
+            return;
+        }
+        hosts.add(parsed.host());
+    }
+
+    /**
+     * Whether the host of the url is one of the hosts. Hosts match exactly, ignoring case:
+     * subdomains of a listed host are not included.
+     */
+    private boolean isListedHost(Set<String> hosts, String url) {
+        final HttpUrl parsed = HttpUrl.parse(url);
+        return parsed != null && hosts.contains(parsed.host());
+    }
+
     /** Whether the header carries credentials, see http.credentials.headers. */
     private boolean isCredentialHeader(String name) {
         if (name == null) {
@@ -511,6 +651,23 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 rb.addHeader(h.getKey(), h.getValue());
             }
         }
+    }
+
+    /** Removes every credential header except Proxy-Authorization (which is for the proxy). */
+    private void stripCredentialHeaders(Request.Builder builder) {
+        for (String name : new HashSet<>(builder.build().headers().names())) {
+            if (HttpHeaders.PROXY_AUTHORIZATION.equalsIgnoreCase(name)) {
+                continue;
+            }
+            if (isCredentialHeader(name)) {
+                builder.removeHeader(name);
+            }
+        }
+    }
+
+    @Override
+    public boolean supportsFetchTimeout(String url, Metadata metadata) {
+        return fetchTimeout > 0;
     }
 
     @Override
@@ -572,11 +729,16 @@ public class HttpProtocol extends AbstractHttpProtocol {
                             System.currentTimeMillis() - buildStart);
                 }
 
-                LOG.debug("fetching with proxy {} - {} ", url, prox.toString());
+                LOG.debug(
+                        "fetching with proxy {} - {}:{} ", url, prox.getAddress(), prox.getPort());
             }
         }
 
         final boolean sendCredentials = credentialsAllowed(url);
+        final boolean basicAuthForHost =
+                basicAuthorization != null && isListedHost(basicAuthHosts, url);
+        final boolean customCredentialsForHost =
+                !credentialRequestHeaders.isEmpty() && isListedHost(customCredentialHosts, url);
 
         final Builder rb = new Request.Builder().url(url);
         customRequestHeaders.forEach(
@@ -584,11 +746,18 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     rb.header(k.getKey(), k.getValue());
                 });
         if (sendCredentials) {
-            credentialRequestHeaders.forEach(
-                    (k) -> {
-                        rb.header(k.getKey(), k.getValue());
-                    });
-        } else if (!credentialRequestHeaders.isEmpty()
+            if (basicAuthForHost) {
+                // set first so that an Authorization in http.custom.headers still replaces it on
+                // the hosts listed in http.custom.headers.hosts
+                rb.header(HttpHeaders.AUTHORIZATION, basicAuthorization);
+            }
+            if (customCredentialsForHost) {
+                credentialRequestHeaders.forEach(
+                        (k) -> {
+                            rb.header(k.getKey(), k.getValue());
+                        });
+            }
+        } else if ((basicAuthForHost || customCredentialsForHost)
                 && withheldRequestHeadersLogged.compareAndSet(false, true)) {
             LOG.warn(
                     "Configured credential headers (http.basicauth.*, http.custom.headers) are "
@@ -656,9 +825,136 @@ public class HttpProtocol extends AbstractHttpProtocol {
 
         final Request request = rb.build();
 
-        final Call call = localClient.newCall(request);
+        /*
+         * Follow redirect responses manually: every target runs through the
+         * URL filters before the hop is taken, and a target which is rejected
+         * ends the chain - the redirect response is then returned as is and
+         * the caller handles it like it does when http.allow.redirects is
+         * off. The final URL is recorded in the response metadata so that
+         * callers can tell that the content is not from the URL they asked
+         * for.
+         */
+        Response lastResponse = null;
+        Call call = null;
+        Request currentRequest = request;
+        String currentUrl = url;
+        // the proxy is chosen per fetch above, so the chain has to use the
+        // same client the first request went out on
+        final OkHttpClient fetchClient = localClient;
+        // every hop creates its own Call and DNS timing entry: track them all
+        // so intermediate entries are cleaned up too, including on exceptions
+        final List<Call> hopCalls = new ArrayList<>();
+        // fetcher.thread.timeout, shared by all the hops of the chain
+        final long deadlineNanos =
+                fetchTimeout > 0 ? System.nanoTime() + TimeUnit.SECONDS.toNanos(fetchTimeout) : 0;
 
-        try (Response response = call.execute()) {
+        try {
+            for (int hops = 0; hops <= maxRedirectHops; hops++) {
+                if (lastResponse != null) {
+                    // release the connection before issuing the next request
+                    lastResponse.close();
+                    lastResponse = null;
+                }
+                call = fetchClient.newCall(currentRequest);
+                hopCalls.add(call);
+                if (deadlineNanos != 0) {
+                    // hard deadline for the whole chain, enforced by okio's watchdog: on
+                    // expiry the call is cancelled, the socket closed and execute() or the
+                    // body read throw immediately. Every hop gets the time that is left.
+                    // DNS can still hold the fetcher thread past this deadline: cancellation
+                    // cannot release the synchronous lookup until the resolver returns
+                    final long remaining = deadlineNanos - System.nanoTime();
+                    if (remaining <= 0) {
+                        throw new FetchTimeoutException(url, fetchTimeout);
+                    }
+                    call.timeout().timeout(remaining, TimeUnit.NANOSECONDS);
+                }
+                try {
+                    lastResponse = call.execute();
+                } catch (IOException | RuntimeException e) {
+                    DNStimes.remove(call.toString());
+                    throw e;
+                }
+
+                if (hops == maxRedirectHops) {
+                    if (isRedirect(lastResponse)) {
+                        LOG.warn("More than {} redirect hops for {}", maxRedirectHops, url);
+                    }
+                    break;
+                }
+                if (!followRedirects || !isRedirect(lastResponse)) {
+                    break;
+                }
+
+                final String location = lastResponse.header(HttpHeaders.LOCATION);
+                if (StringUtils.isBlank(location)) {
+                    LOG.debug(
+                            "Got redirect response {} for {} without location",
+                            lastResponse.code(),
+                            url);
+                    break;
+                }
+
+                final HttpUrl target = currentRequest.url().resolve(location);
+                if (target == null) {
+                    LOG.warn(
+                            "Redirect target {} could not be resolved against {}",
+                            location,
+                            currentUrl);
+                    break;
+                }
+
+                final Metadata sourceMetadata = metadata != null ? metadata : new Metadata();
+                final String filtered =
+                        urlFilters.filter(
+                                currentRequest.url().url(), sourceMetadata, target.toString());
+                if (filtered == null) {
+                    LOG.info("Redirect target {} rejected by the URL filters", target);
+                    break;
+                }
+
+                final HttpUrl accepted = HttpUrl.parse(filtered);
+                if (accepted == null) {
+                    LOG.warn("Filtered redirect target {} is not a URL", filtered);
+                    break;
+                }
+
+                // an https to http downgrade is followed like the client does, the
+                // credential headers are stripped below unless
+                // http.credentials.allow.insecure is set
+                if (currentRequest.url().isHttps() && !accepted.isHttps()) {
+                    LOG.warn("Redirect target {} downgrades https to http", accepted);
+                }
+
+                final Request.Builder followBuilder = currentRequest.newBuilder().url(accepted);
+                final HttpUrl from = currentRequest.url();
+                final boolean originChanged =
+                        !from.scheme().equals(accepted.scheme())
+                                || !from.host().equals(accepted.host())
+                                || from.port() != accepted.port();
+                if (originChanged || !credentialsAllowed(accepted)) {
+                    // a redirect must not hand the credentials of one origin
+                    // (scheme, host and port) to another, even between two
+                    // validated HTTPS origins, and must
+                    // not send them to a server which is not authenticated
+                    // (cleartext http://, trust-all or unverified host unless
+                    // opted in)
+                    stripCredentialHeaders(followBuilder);
+                }
+                // for 303, and for 301 or 302 after a POST, the request is
+                // repeated as a GET, like the client would do
+                final int code = lastResponse.code();
+                if (code == 303
+                        || ((code == 301 || code == 302)
+                                && !"GET".equals(currentRequest.method()))) {
+                    followBuilder.method("GET", null);
+                }
+                currentRequest = followBuilder.build();
+                currentUrl = filtered;
+            }
+
+            final Response response = lastResponse;
+            final Call executedCall = call;
 
             final Metadata responsemetadata = new Metadata();
             final Headers headers = response.headers();
@@ -667,14 +963,50 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 final String key = headers.name(i);
                 String value = headers.value(i);
 
-                if (key.equals(ProtocolResponse.REQUEST_HEADERS_KEY)
-                        || key.equals(ProtocolResponse.RESPONSE_HEADERS_KEY)) {
-                    value =
-                            new String(
-                                    Base64.getDecoder().decode(value), StandardCharsets.ISO_8859_1);
+                if (ProtocolResponse.isReservedMetadataKey(key)) {
+                    // HTTPHeadersInterceptor passes the crawler's own record of the
+                    // fetch through the response headers, so a reserved key is only
+                    // trustworthy when that interceptor ran. It is installed with
+                    // http.store.headers; without it a value under one of these names
+                    // can only have come from the server, and the WARC writer would
+                    // record it as what the crawler sent and received. The keys the
+                    // interceptor does not carry are written into the metadata further
+                    // down and are never accepted from the wire.
+                    if (!storeHttpHeaders || !INTERCEPTOR_METADATA_KEYS.contains(key)) {
+                        LOG.warn(
+                                "Ignoring response header {} from {}: it names crawler metadata",
+                                key,
+                                url);
+                        continue;
+                    }
+                    if (key.equals(ProtocolResponse.REQUEST_HEADERS_KEY)
+                            || key.equals(ProtocolResponse.RESPONSE_HEADERS_KEY)) {
+                        value =
+                                new String(
+                                        Base64.getDecoder().decode(value),
+                                        StandardCharsets.ISO_8859_1);
+                    }
                 }
 
                 responsemetadata.addValue(key.toLowerCase(Locale.ROOT), value);
+            }
+
+            if (isRedirect(response)) {
+                // a chain stopped after an intermediate hop returns a redirect
+                // whose Location is relative to the last request, not the
+                // original URL: resolve it there so callers (FetcherBolt)
+                // resolve the same target instead of one level too high
+                final String location = responsemetadata.getFirstValue("location");
+                if (StringUtils.isNotBlank(location)) {
+                    final HttpUrl resolved = response.request().url().resolve(location);
+                    if (resolved != null) {
+                        responsemetadata.setValue("location", resolved.toString());
+                    }
+                }
+            }
+
+            if (!currentUrl.equals(url)) {
+                responsemetadata.setValue(ProtocolResponse.REDIRECTED_TO_KEY, currentUrl);
             }
 
             // the Set-Cookie header does not say which host sent it: record the url of this
@@ -691,8 +1023,8 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     new MutableObject<>(TrimmedContentReason.NOT_TRIMMED);
             final byte[] bytes = toByteArray(response.body(), pageMaxContent, trimmed);
             if (trimmed.get() != TrimmedContentReason.NOT_TRIMMED) {
-                if (!call.isCanceled()) {
-                    call.cancel();
+                if (!executedCall.isCanceled()) {
+                    executedCall.cancel();
                 }
                 responsemetadata.setValue(ProtocolResponse.TRIMMED_RESPONSE_KEY, "true");
                 responsemetadata.setValue(
@@ -701,13 +1033,41 @@ public class HttpProtocol extends AbstractHttpProtocol {
                 LOG.warn("HTTP content trimmed to {} (reason: {})", bytes.length, trimmed.get());
             }
 
-            final Long dnsResolution = DNStimes.remove(call.toString());
+            final Long dnsResolution = DNStimes.remove(executedCall.toString());
             if (dnsResolution != null) {
                 responsemetadata.setValue("metrics.dns.resolution.msec", dnsResolution.toString());
             }
+            // drop intermediate hops' timing entries: only the final hop is reported
+            for (Call hopCall : hopCalls) {
+                if (hopCall != executedCall) {
+                    DNStimes.remove(hopCall.toString());
+                }
+            }
 
             return new ProtocolResponse(bytes, response.code(), responsemetadata);
+        } catch (InterruptedIOException e) {
+            if (deadlineNanos != 0 && call != null && call.isCanceled()) {
+                // cancelled by the watchdog at the deadline: tell it apart from the socket
+                // timeouts of http.timeout, which are SocketTimeoutExceptions
+                throw new FetchTimeoutException(url, fetchTimeout, e);
+            }
+            throw e;
+        } finally {
+            if (lastResponse != null) {
+                lastResponse.close();
+            }
+            // exception paths: no response to report from, but the hops'
+            // DNS entries must not accumulate over a long crawl
+            for (Call hopCall : hopCalls) {
+                DNStimes.remove(hopCall.toString());
+            }
         }
+    }
+
+    /** Checks whether the response is a redirect whose Location must be resolved. */
+    private static boolean isRedirect(Response response) {
+        final int code = response.code();
+        return code == 301 || code == 302 || code == 303 || code == 307 || code == 308;
     }
 
     private byte[] toByteArray(
@@ -828,15 +1188,53 @@ public class HttpProtocol extends AbstractHttpProtocol {
         }
     }
 
+    /**
+     * The metadata keys {@link HTTPHeadersInterceptor} passes to {@link #getProtocolOutput} as
+     * response headers. Only these may be read back off a response, and only when the interceptor
+     * is installed, see http.store.headers.
+     */
+    private static final Set<String> INTERCEPTOR_METADATA_KEYS =
+            Set.of(
+                    ProtocolResponse.REQUEST_HEADERS_KEY,
+                    ProtocolResponse.RESPONSE_HEADERS_KEY,
+                    ProtocolResponse.RESPONSE_IP_KEY,
+                    ProtocolResponse.REQUEST_TIME_KEY,
+                    ProtocolResponse.PROTOCOL_VERSIONS_KEY,
+                    ProtocolResponse.CIPHER_SUITE_KEY);
+
     static class HTTPHeadersInterceptor implements Interceptor {
 
-        private String getNormalizedProtocolName(Protocol protocol) {
+        private static String getNormalizedProtocolName(Protocol protocol) {
             String name = protocol.toString().toUpperCase(Locale.ROOT);
             if ("H2".equals(name)) {
                 // back-ward compatible protocol version name
                 name = "HTTP/2";
             }
             return name;
+        }
+
+        /**
+         * Maps a {@link TlsVersion} to the protocol identifier used in the <code>WARC-Protocol
+         * </code> header, see the <a
+         * href="https://github.com/iipc/warc-specifications/issues/42">WARC field proposal</a>. The
+         * enum names of {@link TlsVersion} (e.g. <code>TLS_1_3</code>) are not part of the
+         * registered values (e.g. <code>tls/1.3</code>).
+         */
+        private static String getProtocolIdentifier(TlsVersion tlsVersion) {
+            switch (tlsVersion) {
+                case SSL_3_0:
+                    return "ssl/3.0";
+                case TLS_1_0:
+                    return "tls/1.0";
+                case TLS_1_1:
+                    return "tls/1.1";
+                case TLS_1_2:
+                    return "tls/1.2";
+                case TLS_1_3:
+                    return "tls/1.3";
+                default:
+                    return tlsVersion.javaName().toLowerCase(Locale.ROOT);
+            }
         }
 
         @NotNull
@@ -914,25 +1312,37 @@ public class HttpProtocol extends AbstractHttpProtocol {
                                             .toString()
                                             .getBytes(StandardCharsets.ISO_8859_1));
 
+            Response.Builder respBuilder =
+                    response.newBuilder()
+                            .header(
+                                    ProtocolResponse.REQUEST_HEADERS_KEY,
+                                    new String(encodedBytesRequest, StandardCharsets.ISO_8859_1))
+                            .header(
+                                    ProtocolResponse.RESPONSE_HEADERS_KEY,
+                                    new String(encodedBytesResponse, StandardCharsets.ISO_8859_1))
+                            .header(ProtocolResponse.RESPONSE_IP_KEY, ipAddress)
+                            .header(
+                                    ProtocolResponse.REQUEST_TIME_KEY,
+                                    Long.toString(startFetchTime));
+
             final StringBuilder protocols = new StringBuilder(response.protocol().toString());
+            String cipherSuite = null;
             final Handshake handshake = connection.handshake();
             if (handshake != null) {
-                protocols.append(',').append(handshake.tlsVersion());
-                protocols.append(',').append(handshake.cipherSuite());
+                protocols.append(',').append(getProtocolIdentifier(handshake.tlsVersion()));
+                cipherSuite = handshake.cipherSuite().toString();
+                respBuilder = respBuilder.header(ProtocolResponse.CIPHER_SUITE_KEY, cipherSuite);
+            } else {
+                // no handshake over http://, so nothing overwrites a header the server
+                // may have sent under this name
+                respBuilder = respBuilder.removeHeader(ProtocolResponse.CIPHER_SUITE_KEY);
             }
+            respBuilder =
+                    respBuilder.header(
+                            ProtocolResponse.PROTOCOL_VERSIONS_KEY, protocols.toString());
 
             // returns a modified version of the response
-            return response.newBuilder()
-                    .header(
-                            ProtocolResponse.REQUEST_HEADERS_KEY,
-                            new String(encodedBytesRequest, StandardCharsets.ISO_8859_1))
-                    .header(
-                            ProtocolResponse.RESPONSE_HEADERS_KEY,
-                            new String(encodedBytesResponse, StandardCharsets.ISO_8859_1))
-                    .header(ProtocolResponse.RESPONSE_IP_KEY, ipAddress)
-                    .header(ProtocolResponse.REQUEST_TIME_KEY, Long.toString(startFetchTime))
-                    .header(ProtocolResponse.PROTOCOL_VERSIONS_KEY, protocols.toString())
-                    .build();
+            return respBuilder.build();
         }
     }
 

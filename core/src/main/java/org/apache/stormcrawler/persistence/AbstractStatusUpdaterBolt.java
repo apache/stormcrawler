@@ -37,8 +37,10 @@ import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.MetadataTransfer;
+import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +74,15 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
     public static String roundDateParamName = "status.updater.unit.round.date";
 
     /**
+     * Parameter name for normalising the host component of discovered URLs before they are stored.
+     * Aliases of one server (percent-escaping, case, trailing dot) end up as one record in the
+     * store, one politeness queue and one robots.txt cache entry. False by default: the document id
+     * is a hash of the URL, so enabling this after URLs have been stored in raw form makes those
+     * servers re-discover their aliases under the normalised form as a second, bounded record.
+     */
+    public static String normaliseHostsParamName = "status.updater.normalise.hosts";
+
+    /**
      * Key used to pass a preset Date to use as nextFetchDate. The value must represent a valid
      * instant in UTC and be parsable using {@link DateTimeFormatter#ISO_INSTANT}. This also
      * indicates that the storage can be done directly on the metadata as-is.
@@ -89,8 +100,10 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
 
     private int maxFetchErrors = 3;
 
-    private long cacheHits = 0;
-    private long cacheMisses = 0;
+    private boolean normaliseHosts = false;
+
+    private ScopedCounter.CountHandle cacheHits;
+    private ScopedCounter.CountHandle cacheMisses;
 
     private int roundDateUnit = Calendar.SECOND;
 
@@ -109,31 +122,19 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             String spec = ConfUtils.getString(stormConf, cacheConfigParamName);
             cache = Caffeine.from(spec).build();
 
-            CrawlerMetrics.registerGauge(
-                    context,
-                    stormConf,
-                    "cache.hits",
-                    () -> {
-                        long v = cacheHits;
-                        cacheHits = 0;
-                        return v;
-                    },
-                    30);
-            CrawlerMetrics.registerGauge(
-                    context,
-                    stormConf,
-                    "cache.misses",
-                    () -> {
-                        long v = cacheMisses;
-                        cacheMisses = 0;
-                        return v;
-                    },
-                    30);
+            // reported as cache.hits and cache.misses: per time bucket in V1,
+            // cumulative in V2 so that several reporters can read them
+            ScopedCounter cacheCounter =
+                    CrawlerMetrics.registerCounter(context, stormConf, "cache", 30);
+            cacheHits = cacheCounter.scope("hits");
+            cacheMisses = cacheCounter.scope("misses");
             CrawlerMetrics.registerGauge(
                     context, stormConf, "cache.size", cache::estimatedSize, 30);
         }
 
         maxFetchErrors = ConfUtils.getInt(stormConf, maxFetchErrorsParamName, 3);
+
+        normaliseHosts = ConfUtils.getBoolean(stormConf, normaliseHostsParamName, false);
 
         String tmpdateround = ConfUtils.getString(stormConf, roundDateParamName, "SECOND");
         if (tmpdateround.equalsIgnoreCase("MINUTE")) {
@@ -151,6 +152,18 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
 
         boolean potentiallyNew = status.equals(Status.DISCOVERED);
 
+        // the one write path into the store: normalise the host of
+        // discovered URLs so that aliases of one server reach the backend,
+        // the dedup cache below and the politeness queues as one record.
+        // Only done for DISCOVERED: the other statuses carry URLs which
+        // came out of the store already normalised (when the flag is on),
+        // so re-normalising them would be wasted work on the hot path.
+        // Before the cache lookup and the as-is early return, so those see
+        // the same key the store will be written under.
+        if (potentiallyNew && normaliseHosts) {
+            url = URLUtil.normaliseHost(url);
+        }
+
         // if the URL is a freshly discovered one
         // check whether it is already known in the cache
         // if so we've already seen it and don't need to
@@ -159,12 +172,12 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             if (cache.getIfPresent(url) != null) {
                 // no need to add it to the queue
                 LOG.debug("URL {} already in cache", url);
-                cacheHits++;
+                cacheHits.incr();
                 collector.ack(tuple);
                 return;
             } else {
                 LOG.debug("URL {} not in cache", url);
-                cacheMisses++;
+                cacheMisses.incr();
             }
         }
 

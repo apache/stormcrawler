@@ -17,12 +17,12 @@
 
 package org.apache.stormcrawler;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.storm.spout.ISpoutOutputCollector;
 import org.apache.storm.task.IOutputCollector;
 import org.apache.storm.tuple.Tuple;
@@ -32,9 +32,10 @@ import org.slf4j.LoggerFactory;
 public class TestOutputCollector implements IOutputCollector, ISpoutOutputCollector {
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(TestOutputCollector.class);
 
-    private List<Tuple> acked = new ArrayList<>();
-    private List<Tuple> failed = new ArrayList<>();
-    private Map<String, List<List<Object>>> emitted = new HashMap<>();
+    // bolts with their own threads (FetcherBolt) write while the test thread reads
+    private List<Tuple> acked = new CopyOnWriteArrayList<>();
+    private List<Tuple> failed = new CopyOnWriteArrayList<>();
+    private Map<String, List<List<Object>>> emitted = new ConcurrentHashMap<>();
 
     @Override
     public void reportError(Throwable error) {
@@ -90,7 +91,7 @@ public class TestOutputCollector implements IOutputCollector, ISpoutOutputCollec
     }
 
     private void addEmittedTuple(String streamId, List<Object> tuple) {
-        emitted.computeIfAbsent(streamId, k -> new ArrayList<>()).add(tuple);
+        emitted.computeIfAbsent(streamId, k -> new CopyOnWriteArrayList<>()).add(tuple);
     }
 
     @Override

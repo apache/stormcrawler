@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.bolt;
+package org.apache.stormcrawler.fetcher;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -33,9 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.storm.Config;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
-import org.apache.stormcrawler.bolt.FetcherBolt.FetchItem;
-import org.apache.stormcrawler.bolt.FetcherBolt.FetchItemQueue;
-import org.apache.stormcrawler.bolt.FetcherBolt.FetchItemQueues;
+import org.apache.stormcrawler.fetcher.FetchItemQueues.FetchItemQueue;
 import org.apache.stormcrawler.util.URLUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -90,7 +88,7 @@ class FetchItemQueuesTest {
 
         FetchItem first = q.getFetchItem();
         Assertions.assertNotNull(first);
-        Assertions.assertEquals("http://a.net/1", first.url);
+        Assertions.assertEquals("http://a.net/1", first.url());
         Assertions.assertEquals(1, q.inQueues.get());
         // one thread per host: nothing else from a.net while the fetch is in progress
         Assertions.assertNull(q.getFetchItem());
@@ -100,7 +98,7 @@ class FetchItemQueuesTest {
         Assertions.assertNull(q.getFetchItem());
         FetchItem second = awaitItem(q, 2000);
         Assertions.assertNotNull(second);
-        Assertions.assertEquals("http://a.net/2", second.url);
+        Assertions.assertEquals("http://a.net/2", second.url());
         Assertions.assertEquals(0, q.inQueues.get());
     }
 
@@ -113,7 +111,7 @@ class FetchItemQueuesTest {
         q.finishFetchItem(first, true);
         FetchItem second = q.getFetchItem();
         Assertions.assertNotNull(second);
-        Assertions.assertEquals("http://a.net/2", second.url);
+        Assertions.assertEquals("http://a.net/2", second.url());
     }
 
     @Test
@@ -126,7 +124,7 @@ class FetchItemQueuesTest {
         for (int i = 0; i < 3; i++) {
             FetchItem it = q.getFetchItem();
             Assertions.assertNotNull(it);
-            got.add(it.queueId);
+            got.add(it.queueId());
         }
         Assertions.assertEquals(Set.of("a.net", "b.net", "c.net"), got);
         Assertions.assertNull(q.getFetchItem());
@@ -221,7 +219,7 @@ class FetchItemQueuesTest {
                                         Thread.yield();
                                         continue;
                                     }
-                                    if (!seen.add(it.url)) {
+                                    if (!seen.add(it.url())) {
                                         failed.set(true);
                                     }
                                     fetched.incrementAndGet();
@@ -288,7 +286,7 @@ class FetchItemQueuesTest {
         // whoever polls next must get the second URL
         FetchItem second = polled[0] != null ? polled[0] : awaitItem(q, 2000);
         Assertions.assertNotNull(second, "second URL lost: no ticket left for the queue");
-        Assertions.assertEquals("http://a.net/2", second.url);
+        Assertions.assertEquals("http://a.net/2", second.url());
     }
 
     /**
@@ -339,7 +337,7 @@ class FetchItemQueuesTest {
         poller.join();
 
         Assertions.assertNotNull(polled[0]);
-        Assertions.assertEquals("http://a.net/2", polled[0].url);
+        Assertions.assertEquals("http://a.net/2", polled[0].url());
         Assertions.assertEquals(1, hooked.getInProgressSize());
         // the dispatched item finishes on its own queue, which is then reaped
         q.finishFetchItem(polled[0], true);
@@ -474,7 +472,7 @@ class FetchItemQueuesTest {
         add(q, "http://b.net/1");
         FetchItem a1 = q.getFetchItem();
         Assertions.assertNotNull(a1);
-        Assertions.assertEquals("http://a.net/1", a1.url);
+        Assertions.assertEquals("http://a.net/1", a1.url());
         // a second URL for a.net issues a ticket at the queue's current (past) next fetch time
         add(q, "http://a.net/2");
         // finishing with the 10 s delay pushes a.net's next fetch time into the future: the
@@ -483,6 +481,110 @@ class FetchItemQueuesTest {
 
         FetchItem next = q.getFetchItem();
         Assertions.assertNotNull(next, "returned nothing while b.net was ready");
-        Assertions.assertEquals("http://b.net/1", next.url);
+        Assertions.assertEquals("http://b.net/1", next.url());
+    }
+
+    /** Asserts that the delay is the equal-jittered value: within [computed / 2, computed]. */
+    private static void assertJittered(long computed, long delay) {
+        Assertions.assertTrue(
+                delay >= computed / 2 && delay <= computed,
+                "delay " + delay + " not within [" + computed / 2 + ", " + computed + "]");
+    }
+
+    /**
+     * A fetch rejected because every helper thread is busy backs its queue off exponentially from
+     * the crawl delay up to fetcher.max.crawl.delay, with equal jitter, and a fetch which runs
+     * resets the backoff.
+     */
+    @Test
+    void saturatedFetchBacksTheQueueOffExponentially() throws Exception {
+        FetchItemQueues q = queues("fetcher.server.delay", 2.0f, "fetcher.max.crawl.delay", 5);
+        // enough items for the queue to stay alive while the slot is retaken below
+        for (int i = 0; i < 8; i++) {
+            add(q, "http://a.net/" + i);
+        }
+        FetchItem it = q.getFetchItem();
+        Assertions.assertNotNull(it);
+        FetchItemQueue fiq = q.queues.get(it.queueId());
+
+        long[] expected = {2000, 4000, 5000, 5000};
+        for (long computed : expected) {
+            long before = System.currentTimeMillis();
+            long delay = q.backOffFetchItem(it);
+            assertJittered(computed, delay);
+            long next = fiq.getNextFetchTime();
+            Assertions.assertTrue(next >= before + delay, "next fetch time reflects the backoff");
+            Assertions.assertTrue(next <= System.currentTimeMillis() + delay);
+            Assertions.assertEquals(0, fiq.getInProgressSize(), "slot released");
+            Assertions.assertNull(q.getFetchItem(), "queue not ready while backed off");
+            // take the slot back for the next rejection
+            fiq.poll();
+            Assertions.assertEquals(1, fiq.getInProgressSize());
+        }
+
+        // a fetch which runs resets the backoff: the next rejection starts again from the delay
+        q.finishFetchItem(it, true);
+        fiq.poll();
+        assertJittered(2000, q.backOffFetchItem(it));
+    }
+
+    /**
+     * A negative fetcher.max.crawl.delay accepts any crawl delay: the backoff falls back to the
+     * default cap of 30 s instead of a negative one.
+     */
+    @Test
+    void saturatedFetchBackoffWithUnboundedMaxCrawlDelay() throws Exception {
+        FetchItemQueues q = queues("fetcher.server.delay", 8.0f, "fetcher.max.crawl.delay", -1);
+        for (int i = 0; i < 8; i++) {
+            add(q, "http://a.net/" + i);
+        }
+        FetchItem it = q.getFetchItem();
+        Assertions.assertNotNull(it);
+        FetchItemQueue fiq = q.queues.get(it.queueId());
+
+        long[] expected = {8000, 16000, 30000, 30000};
+        for (long computed : expected) {
+            assertJittered(computed, q.backOffFetchItem(it));
+            fiq.poll();
+        }
+    }
+
+    /** A cap below the queue's own delay does not make a rejected queue retry sooner. */
+    @Test
+    void saturatedFetchBackoffNeverBelowTheQueueDelay() throws Exception {
+        FetchItemQueues q = queues("fetcher.server.delay", 10.0f, "fetcher.max.crawl.delay", 5);
+        for (int i = 0; i < 8; i++) {
+            add(q, "http://a.net/" + i);
+        }
+        FetchItem it = q.getFetchItem();
+        Assertions.assertNotNull(it);
+        FetchItemQueue fiq = q.queues.get(it.queueId());
+
+        for (int i = 0; i < 3; i++) {
+            assertJittered(10000, q.backOffFetchItem(it));
+            fiq.poll();
+        }
+    }
+
+    /** The backoff never starts below one second, even for a queue with no delay at all. */
+    @Test
+    void saturatedFetchBackoffHasAOneSecondFloor() throws Exception {
+        FetchItemQueues q = queues("fetcher.server.delay", 0.0f);
+        add(q, "http://a.net/1");
+        FetchItem it = q.getFetchItem();
+        Assertions.assertNotNull(it);
+        assertJittered(1000, q.backOffFetchItem(it));
+    }
+
+    /** The jitter actually spreads the delays: repeated rejections do not all get the same one. */
+    @Test
+    void saturatedFetchBackoffIsJittered() {
+        Set<Long> delays = ConcurrentHashMap.newKeySet();
+        for (int i = 0; i < 50; i++) {
+            FetchItemQueue fiq = new FetchItemQueue("h" + i, 1, 10000, 0, Integer.MAX_VALUE);
+            fiq.poll();
+            delays.add(fiq.finishSaturated(30000));
+        }
+        Assertions.assertTrue(delays.size() > 1, "every delay identical: " + delays);
     }
 }

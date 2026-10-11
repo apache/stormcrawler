@@ -1,4 +1,4 @@
-[![StormCrawler](https://stormcrawler.apache.org/img/logo-dark.png)](https://stormcrawler.apache.org/)
+[![StormCrawler](https://www.apache.org/logos/res/stormcrawler/stormcrawler.png)](https://stormcrawler.apache.org/)
 =============
 
 [![license](https://img.shields.io/github/license/apache/stormcrawler.svg?maxAge=2592000?style=plastic)](http://www.apache.org/licenses/LICENSE-2.0)
@@ -9,7 +9,7 @@ Apache StormCrawler is an open source collection of resources for building low-l
 
 ## Quickstart
 
-NOTE: These instructions assume that you have [Apache Maven](https://maven.apache.org/install.html) installed. You will need to install [Apache Storm 3.0.0](http://storm.apache.org/) to run the crawler.
+NOTE: These instructions assume that you have [Apache Maven](https://maven.apache.org/install.html) installed. You will need to install [Apache Storm 3.1.0](http://storm.apache.org/) to run the crawler.
 
 StormCrawler requires Java 25 or above. To execute tests, it requires you to have a locally installed and working Docker environment.
 

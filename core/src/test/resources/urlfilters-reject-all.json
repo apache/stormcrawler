@@ -1,0 +1,8 @@
+{
+	"org.apache.stormcrawler.filtering.URLFilters": [
+		{
+			"class": "org.apache.stormcrawler.protocol.OkHttpFollowRedirectsTest$RejectAllURLFilter",
+			"name": "RejectAllURLFilter"
+		}
+	]
+}

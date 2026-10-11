@@ -85,7 +85,9 @@ public class URLPartitionerBolt extends BaseRichBolt {
             URL u;
             try {
                 u = URLUtil.toURL(url);
-                host = u.getHost();
+                // canonical host so that aliases of one server (percent-escaping, case, trailing
+                // dot) get the same partition key as the one the fetcher will queue them under
+                host = URLUtil.getCanonicalHost(u);
             } catch (MalformedURLException e1) {
                 eventCounter.scope("Invalid URL").incrBy(1);
                 LOG.warn("Invalid URL: {}", url);

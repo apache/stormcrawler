@@ -131,6 +131,11 @@ public class SQLSpout extends AbstractQueryingSpout {
     @Override
     public void declareOutputFields(OutputFieldsDeclarer declarer) {
         declarer.declare(new Fields("url", "metadata"));
+        // rows the spout refuses to emit are reported on the status stream so
+        // that the status updater marks them as ERROR
+        declarer.declareStream(
+                org.apache.stormcrawler.Constants.StatusStreamName,
+                new Fields("url", "metadata", "status"));
     }
 
     @Override
