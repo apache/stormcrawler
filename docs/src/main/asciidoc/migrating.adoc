@@ -1,0 +1,18 @@
+////
+Licensed under the Apache License, Version 2.0 (the "License");
+You may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+https://www.apache.org/licenses/LICENSE-2.0
+////
+== Migrating to 4.0.0
+
+Both overloads of `CookieConverter.getCookies(...)` now return immutable
+`org.apache.stormcrawler.util.CookieConverter.Cookie` records instead of
+HttpClient cookies. Update the cookie type import and use the record accessors
+`name()`, `value()`, `domain()`, `path()`, `secure()` and `expiry()`.
+The expiry is a `java.time.Instant`, or `null` for a session cookie.
+
+Core now depends only on HttpCore 5, not HttpClient. Applications using
+HttpClient classes through core's former transitive dependency must declare
+their own HttpClient dependency. The legacy OpenSearch module still uses
+HttpClient 4 through its REST client.
