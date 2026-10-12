@@ -208,11 +208,12 @@ public class Spout extends AbstractQueryingSpout {
 
                     @Override
                     public void onCompleted() {
-                        final long end = System.currentTimeMillis();
+                        final long timeTaken = System.currentTimeMillis() - start;
                         LOG.debug(
                                 "Got {} URLs from the frontier in {} msec",
                                 counter.get(),
-                                (end - start));
+                                timeTaken);
+                        queryTimes.accept(timeTaken);
                         markQueryReceivedNow();
                     }
                 };
