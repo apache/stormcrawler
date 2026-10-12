@@ -423,5 +423,10 @@ public class AggregationSpout extends AbstractSpout {
         markQueryReceivedNow();
     }
 
+    /**
+     * Receives the sort values of the last hit returned for a bucket, as the {@link FieldValue}
+     * instances of the client. Subclasses can pass them to {@code search_after} to read the bucket
+     * from that position.
+     */
     protected void sortValuesForKey(String key, Object[] sortValues) {}
 }
