@@ -75,6 +75,7 @@ public class JSONResourceWrapper extends ParseFilter {
 
     @Override
     public void cleanup() {
+        refresher.getDelegate().cleanup();
         refresher.cleanup();
     }
 }

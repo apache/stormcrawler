@@ -38,4 +38,12 @@ public interface JSoupFilter extends Configurable {
             byte[] content,
             @NotNull org.jsoup.nodes.Document doc,
             @NotNull ParseResult parse);
+
+    /**
+     * Might be used to clean any resources associated with this filter. See {@link
+     * org.apache.storm.task.IBolt#cleanup()} for more details.
+     */
+    default void cleanup() {
+        // nothing to do here
+    }
 }
