@@ -37,8 +37,8 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.net.URLEncodedUtils;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilter;
 import org.apache.stormcrawler.util.URLUtil;
@@ -289,7 +289,10 @@ public class BasicURLNormalizer extends URLFilter {
                 return urlToFilter;
             }
 
-            List<NameValuePair> pairs = URLEncodedUtils.parse(query, StandardCharsets.UTF_8);
+            // Keep parse and format: WWWFormCodec changes semicolon splitting and tilde/star
+            // encoding.
+            List<NameValuePair> pairs =
+                    URLEncodedUtils.parse(query, StandardCharsets.UTF_8, '&', ';');
             Iterator<NameValuePair> pairsIterator = pairs.iterator();
             while (pairsIterator.hasNext()) {
                 NameValuePair param = pairsIterator.next();

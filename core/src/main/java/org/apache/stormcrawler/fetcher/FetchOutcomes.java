@@ -20,7 +20,7 @@ package org.apache.stormcrawler.fetcher;
 import java.io.InterruptedIOException;
 import java.net.UnknownHostException;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.bolt.FetcherBolt;

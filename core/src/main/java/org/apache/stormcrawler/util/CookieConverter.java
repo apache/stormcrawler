@@ -20,21 +20,51 @@ package org.apache.stormcrawler.util;
 import crawlercommons.domains.EffectiveTldFinder;
 import java.net.IDN;
 import java.net.URL;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import org.apache.http.cookie.Cookie;
-import org.apache.http.impl.cookie.BasicClientCookie;
+import java.util.TimeZone;
 
 /** Helper to extract cookies from cookies string. */
 public class CookieConverter {
+
+    /** An immutable cookie accepted for a target URL. */
+    public record Cookie(
+            String name,
+            String value,
+            String domain,
+            String path,
+            boolean secure,
+            Instant expiry) {}
 
     private static final org.slf4j.Logger LOG =
             org.slf4j.LoggerFactory.getLogger(CookieConverter.class);
 
     /** Maximum length of a domain name in ASCII characters, see RFC 1034. */
     private static final int MAX_DOMAIN_LENGTH = 253;
+
+    private static final String[] COOKIE_DATE_PATTERNS = {
+        "EEE, dd MMM yyyy HH:mm:ss zzz", "EEE, dd-MMM-yy HH:mm:ss zzz", "EEE MMM d HH:mm:ss yyyy"
+    };
+
+    private static final Date COOKIE_DATE_PIVOT = Date.from(Instant.parse("2000-01-01T00:00:00Z"));
+
+    private static final ThreadLocal<SimpleDateFormat[]> COOKIE_DATE_FORMATS =
+            ThreadLocal.withInitial(
+                    () -> {
+                        SimpleDateFormat[] formats =
+                                new SimpleDateFormat[COOKIE_DATE_PATTERNS.length];
+                        for (int i = 0; i < COOKIE_DATE_PATTERNS.length; i++) {
+                            formats[i] = new SimpleDateFormat(COOKIE_DATE_PATTERNS[i], Locale.US);
+                            formats[i].setTimeZone(TimeZone.getTimeZone("GMT"));
+                            formats[i].set2DigitYearStart(COOKIE_DATE_PIVOT);
+                        }
+                        return formats;
+                    });
 
     /**
      * Get a list of cookies based on the cookies string taken from response header and the target
@@ -115,8 +145,6 @@ public class CookieConverter {
                 }
             }
 
-            BasicClientCookie cookie = new BasicClientCookie(name, value);
-
             // check domain
             if (domain != null && !domain.isBlank()) {
                 final String scope = normaliseDomain(domain);
@@ -124,8 +152,6 @@ public class CookieConverter {
                     LOG.debug("Skipping cookie {}: malformed domain {}", name, domain);
                     continue;
                 }
-
-                cookie.setDomain(domain);
 
                 // a domain which can not own subdomains, i.e. a public suffix such as
                 // "com" or "co.uk" or a single label, binds the cookie to the host itself
@@ -167,8 +193,6 @@ public class CookieConverter {
 
             // check path
             if (path != null) {
-                cookie.setPath(path);
-
                 if (!path.equals("")
                         && !path.equals("/")
                         && !targetURL.getPath().startsWith(path)) {
@@ -183,8 +207,6 @@ public class CookieConverter {
 
             // check secure
             if (secure) {
-                cookie.setSecure(secure);
-
                 if (!targetURL.getProtocol().equalsIgnoreCase("https")) {
                     LOG.debug("Skipping cookie {}: secure and {} is not https", name, targetURL);
                     continue;
@@ -192,14 +214,13 @@ public class CookieConverter {
             }
 
             // check expiration
+            Instant expirationDate = null;
             if (expires != null) {
                 try {
-                    Date expirationDate = org.apache.http.client.utils.DateUtils.parseDate(expires);
+                    expirationDate = parseCookieExpiry(expires);
                     if (expirationDate != null) {
-                        cookie.setExpiryDate(expirationDate);
-
                         // check that it hasn't expired?
-                        if (cookie.isExpired(new Date())) {
+                        if (!expirationDate.isAfter(Instant.now())) {
                             LOG.debug("Skipping cookie {}: expired on {}", name, expires);
                             continue;
                         }
@@ -210,10 +231,34 @@ public class CookieConverter {
             }
 
             // attach additional infos to cookie
-            list.add(cookie);
+            list.add(
+                    new Cookie(
+                            name,
+                            value,
+                            domain == null || domain.isBlank()
+                                    ? null
+                                    : domain.toLowerCase(Locale.ROOT),
+                            path,
+                            secure,
+                            expirationDate));
         }
 
         return list;
+    }
+
+    static Instant parseCookieExpiry(String expires) {
+        // Preserve legacy date parsing so expired cookies do not become session cookies.
+        String value = expires;
+        if (value.length() > 1 && value.startsWith("'") && value.endsWith("'")) {
+            value = value.substring(1, value.length() - 1);
+        }
+        for (SimpleDateFormat format : COOKIE_DATE_FORMATS.get()) {
+            Date legacyDate = format.parse(value, new ParsePosition(0));
+            if (legacyDate != null) {
+                return legacyDate.toInstant();
+            }
+        }
+        return null;
     }
 
     /**
