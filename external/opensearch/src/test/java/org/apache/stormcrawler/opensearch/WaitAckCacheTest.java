@@ -333,4 +333,20 @@ class WaitAckCacheTest {
         assertEquals(1, failed.size());
         assertSame(t2, failed.get(0));
     }
+
+    @Test
+    void shutdown_failsAllRemainingTuples() {
+        Tuple t1 = mockTuple("http://example.com/1");
+        Tuple t2 = mockTuple("http://example.com/2");
+        cache.addTuple("doc1", t1);
+        cache.addTuple("doc2", t2);
+
+        cache.shutdown();
+
+        assertEquals(2, evicted.size());
+        assertTrue(evicted.contains(t1));
+        assertTrue(evicted.contains(t2));
+        assertFalse(cache.contains("doc1"));
+        assertFalse(cache.contains("doc2"));
+    }
 }

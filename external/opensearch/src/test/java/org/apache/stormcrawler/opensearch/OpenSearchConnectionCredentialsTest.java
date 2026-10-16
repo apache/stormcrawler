@@ -23,12 +23,30 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.IntFunction;
 import org.apache.hc.client5.http.auth.AuthScope;
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
 import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.core5.http.HttpHost;
 import org.junit.jupiter.api.Test;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.generic.Requests;
+import org.opensearch.client.opensearch.generic.Response;
+import org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder;
 
 class OpenSearchConnectionCredentialsTest {
 
@@ -96,6 +114,106 @@ class OpenSearchConnectionCredentialsTest {
     /** The scope HttpClient looks the credentials up with for a request to the given node. */
     private static AuthScope request(String scheme, String host, int port) {
         return new AuthScope(new HttpHost(scheme, host, port), null, "Basic");
+    }
+
+    @Test
+    void credentialsAreGivenToTheConfiguredAddresses() {
+        final BasicCredentialsProvider provider =
+                providerFor(
+                        List.of(
+                                new HttpHost("https", "opensearch1.example.org", 9200),
+                                new HttpHost("https", "OpenSearch2.example.org", 9201)));
+        assertNotNull(
+                provider.getCredentials(request("https", "opensearch1.example.org", 9200), null));
+        assertNotNull(
+                provider.getCredentials(request("HTTPS", "opensearch2.example.org", 9201), null));
+    }
+
+    /**
+     * Sends a request with the client built for the port of a local server and returns the
+     * Authorization header the server received, if any.
+     */
+    private static String authorizationSentTo(IntFunction<OpenSearchClient> clientForPort)
+            throws Exception {
+        try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            final CompletableFuture<String> authorization =
+                    CompletableFuture.supplyAsync(
+                            () -> {
+                                try (Socket socket = server.accept()) {
+                                    final BufferedReader in =
+                                            new BufferedReader(
+                                                    new InputStreamReader(
+                                                            socket.getInputStream(),
+                                                            StandardCharsets.US_ASCII));
+                                    String header = null;
+                                    for (String line = in.readLine();
+                                            line != null && !line.isEmpty();
+                                            line = in.readLine()) {
+                                        if (line.regionMatches(true, 0, "Authorization:", 0, 14)) {
+                                            header = line.substring(14).trim();
+                                        }
+                                    }
+                                    socket.getOutputStream()
+                                            .write(
+                                                    "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                                                            .getBytes(StandardCharsets.US_ASCII));
+                                    return header;
+                                } catch (IOException e) {
+                                    throw new UncheckedIOException(e);
+                                }
+                            });
+            final OpenSearchClient client = clientForPort.apply(server.getLocalPort());
+            try (Response response =
+                    client.generic()
+                            .execute(Requests.builder().endpoint("/").method("GET").build())) {
+                return authorization.get(10, TimeUnit.SECONDS);
+            } finally {
+                client._transport().close();
+            }
+        }
+    }
+
+    private static OpenSearchClient connectionClient(int port, String user, String password) {
+        final Map<String, Object> conf = new HashMap<>();
+        conf.put("opensearch.test.addresses", "http://127.0.0.1:" + port);
+        conf.put("opensearch.test.user", user);
+        conf.put("opensearch.test.password", password);
+        return OpenSearchConnection.getClient(conf, "test");
+    }
+
+    @Test
+    void clientSendsTheCredentialsToAConfiguredAddress() throws Exception {
+        assertEquals(
+                "Basic "
+                        + Base64.getEncoder()
+                                .encodeToString("crawler:s3cret".getBytes(StandardCharsets.UTF_8)),
+                authorizationSentTo(port -> connectionClient(port, "crawler", "s3cret")));
+    }
+
+    @Test
+    void clientSendsNoCredentialsToAnotherAddress() throws Exception {
+        assertNull(
+                authorizationSentTo(
+                        port ->
+                                new OpenSearchClient(
+                                        ApacheHttpClient5TransportBuilder.builder(
+                                                        new HttpHost("http", "127.0.0.1", port))
+                                                .setHttpClientConfigCallback(
+                                                        b ->
+                                                                b.setDefaultCredentialsProvider(
+                                                                        providerFor(
+                                                                                List.of(
+                                                                                        new HttpHost(
+                                                                                                "https",
+                                                                                                "127.0.0.1",
+                                                                                                port)))))
+                                                .build())));
+    }
+
+    @Test
+    void credentialsNeedUserAndPassword() throws Exception {
+        assertNull(authorizationSentTo(port -> connectionClient(port, "crawler", " ")));
+        assertNull(authorizationSentTo(port -> connectionClient(port, null, "s3cret")));
     }
 
     @Test
