@@ -28,9 +28,6 @@ config:
   #opensearch.password: "PASSWORD"
   opensearch.concurrentRequests: 2
 
-  # Sets the response buffer to the specified value in MB.
-  # opensearch.responseBufferSize: 100
-
   # Disable TLS validation for connection to OpenSearch, a warning is logged
   # when this is enabled
   # opensearch.disable.tls.validation: false
@@ -45,22 +42,15 @@ config:
   opensearch.indexer.bulkActions: 100
   opensearch.indexer.flushInterval: "2s"
   opensearch.indexer.concurrentRequests: 1
-  opensearch.indexer.sniff: true
-  # Sets the response buffer to the specified value in MB.
-  # opensearch.indexer.responseBufferSize: 100
 
   # MetricsConsumer
   # opensearch.metrics.addresses: "http://localhost:9200"
   opensearch.metrics.index.name: "metrics"
-  opensearch.metrics.sniff: true
-  # Sets the response buffer to the specified value in MB.
-  # opensearch.metrics.responseBufferSize: 100
 
 
   # Queues index
   opensearch.queues.addresses: "http://localhost:9200"
   opensearch.queues.index.name: "queues"
-  opensearch.queues.sniff: true
   # cache of known queues, see https://github.com/ben-manes/caffeine/wiki/Specification
   # opensearch.queues.cache.spec: "maximumSize=10000"
 
@@ -78,9 +68,6 @@ config:
   opensearch.status.bulkActions: 500
   opensearch.status.flushInterval: "5s"
   opensearch.status.concurrentRequests: 1
-  opensearch.status.sniff: true
-  # Sets the response buffer to the specified value in MB.
-  # opensearch.status.responseBufferSize: 100
 
     # spout config #
 
