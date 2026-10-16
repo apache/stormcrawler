@@ -30,7 +30,7 @@ under the License.
     </parent>
 
     <properties>
-        <opensearch.server.version>3.5.0</opensearch.server.version>
+        <opensearch.server.version>3.9.0</opensearch.server.version>
         <opensearch.java.version>3.10.0</opensearch.java.version>
         <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
         <jacoco.classRatio>0.27</jacoco.classRatio>
