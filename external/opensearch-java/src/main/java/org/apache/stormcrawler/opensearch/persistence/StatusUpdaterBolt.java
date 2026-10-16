@@ -18,9 +18,9 @@
 package org.apache.stormcrawler.opensearch.persistence;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -231,7 +231,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             String[] values = metadata.getValues(mdKey);
             // periods are not allowed - replace with %2E
             mdKey = mdKey.replaceAll("\\.", "%2E");
-            metadataMap.put(mdKey, List.of(values));
+            metadataMap.put(mdKey, Arrays.asList(values));
         }
 
         String partitionKey = partitioner.getPartition(url, metadata);
