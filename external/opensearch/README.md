@@ -1,7 +1,9 @@
 stormcrawler-opensearch
 ===========================
 
-A collection of resources for [OpenSearch](https://opensearch.org/):
+A collection of resources for [OpenSearch](https://opensearch.org/) built on the
+[OpenSearch Java Client 3.x](https://opensearch.org/docs/latest/clients/java/) and
+Apache HttpClient 5:
 * [IndexerBolt](https://github.com/apache/stormcrawler/blob/master/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/bolt/IndexerBolt.java) for indexing documents crawled with StormCrawler
 * [Spouts](https://github.com/apache/stormcrawler/blob/master/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/persistence/AggregationSpout.java) and [StatusUpdaterBolt](https://github.com/apache/stormcrawler/blob/master/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/persistence/StatusUpdaterBolt.java) for persisting URL information in recursive crawls
 * [MetricsConsumer](https://github.com/apache/stormcrawler/blob/master/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/metrics/MetricsConsumer.java)
@@ -10,6 +12,29 @@ A collection of resources for [OpenSearch](https://opensearch.org/):
 as well as resources for building basic real-time monitoring dashboards for the crawls, see below.
 
 This module is ported from the Elasticsearch one.
+
+The bolts and metrics consumers that write to OpenSearch send their operations
+through `AsyncBulkProcessor`, which groups them into bulk requests. In the
+configuration keys below, `<type>` is `indexer`, `status`, `metrics` or
+`queues`. `AsyncBulkProcessor`:
+
+* sends a bulk request when the number of buffered operations reaches
+  `opensearch.<type>.bulkActions`, when the buffered operations reach 5 MiB of
+  JSON (counted before compression), or when `opensearch.<type>.flushInterval`
+  elapses.
+* resends the items rejected with status 429 (too many requests) in the bulk
+  response up to 8 times, after 50, 60, 80, 150, 280, 580, 1250 and 2740 ms.
+  A request that OpenSearch rejects as a whole, with status 429 or any other
+  error, is not resent. `IndexerBolt`, `DeletionBolt` and `StatusUpdaterBolt`
+  fail the tuple of an item still rejected after the last retry.
+* fails the whole bulk when a retry fails as a whole, for example on a
+  connection error: `IndexerBolt`, `DeletionBolt` and `StatusUpdaterBolt` fail
+  the tuples of all its items, including those stored by an earlier attempt.
+* sends the requests without blocking the bolt. The bolt waits only when
+  `opensearch.<type>.concurrentRequests` bulks are in flight, including bulks
+  waiting for a retry.
+* reports the outcome of a bulk to the bolt once, after its last attempt, with
+  the items in request order.
 
 Getting started
 ---------------------
@@ -22,7 +47,7 @@ Be sure to replace <CURRENT_VERSION> with the latest released version, which you
 
 You'll be asked to enter a groupId (e.g. com.mycompany.crawler), an artefactId (e.g. stormcrawler), a version, a package name and details about the user agent to use.
 
-This will not only create a fully formed project containing a POM with the dependency above but also a set of resources, configuration files and a topology class. Enter the directory you just created (should be the same as the artefactId you specified earlier) and follow the instructions on the README file.
+This will not only create a fully formed project containing a POM with a dependency on this module but also a set of resources, configuration files and a topology class. Enter the directory you just created (should be the same as the artefactId you specified earlier) and follow the instructions on the README file.
 
 You will of course need to have both Storm and OpenSearch installed. For the latter, the [OpenSearch documentation](https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/) contains resources for Docker.
 
@@ -63,10 +88,87 @@ The crawler config YAML must be updated to use an optional argument as shown bel
            argument: "yyyy-MM-dd"
 ```
 
+Upgrading from versions before 4.0
+---------------------
 
+From 4.0, this module uses the OpenSearch Java Client instead of
+`RestHighLevelClient` and `BulkProcessor`.
 
+`stormcrawler-opensearch-java`, released in 3.6.0 and 3.7.0, has the same
+packages, classes and configuration keys. Its users replace that dependency with
+`stormcrawler-opensearch`. For them, the 429 retries and the 5 MiB limit
+described above are new, and `AsyncBulkProcessor.Builder` takes an
+`OpenSearchAsyncClient`. The other changes below apply to users of
+`stormcrawler-opensearch`.
 
+### Configuration
 
+* Earlier versions discovered the cluster nodes by sniffing, which was on by
+  default. This module sends requests only to the nodes in
+  `opensearch.<type>.addresses`. List all nodes there, or put a load balancer in
+  front of the cluster. `opensearch.sniff` and `opensearch.<type>.sniff` are
+  ignored.
+* `opensearch.responseBufferSize` and `opensearch.<type>.responseBufferSize` are
+  no longer read.
+* The bolts and metrics consumers that write through `AsyncBulkProcessor` log a
+  WARN at startup when `opensearch.<type>.sniff` or
+  `opensearch.<type>.responseBufferSize` is set.
+  Remove these keys, and their global forms, from the configuration.
+* `opensearch.<type>.flushInterval` accepts a number followed by `ms`, `s` or
+  `m`, or a number of milliseconds without a unit. Any other value, for example
+  `1h`, logs a WARN and the interval falls back to 5 seconds.
+* `opensearch.<type>.concurrentRequests: 0` behaves as `1`. Earlier versions
+  sent bulk requests synchronously with `0`. This module always sends them
+  asynchronously.
 
+### Behaviour
 
+* If a mapping resource (`status.mapping`, `indexer.mapping`, `metrics.mapping`
+  or `queues.mapping`) is missing from the classpath, the component logs a WARN
+  and starts without creating its index or template. Earlier versions failed at
+  startup. The archetype generates these files under `src/main/resources`.
+* Items rejected with status 429 are resent even when other items of the same
+  bulk failed with another status, for example a 409 from the `create` of a URL
+  that is already in the status index. The `BulkProcessor` of earlier versions
+  retried a bulk only when every failed item had status 429.
+* The 5 MiB limit counts the bytes of JSON sent to OpenSearch. Earlier versions
+  estimated the size from the document sources.
+* `IndexerBolt` fails the tuple when building or sending a document throws any
+  exception. Earlier versions caught only `IOException`, and other exceptions
+  escaped `execute`.
+* When a metadata value indexed by `IndexerBolt` is a single null, the field is
+  left out of the document. Earlier versions wrote it as `null`.
+* `HybridSpout` sends the queries that refill its emptied queues one at a time,
+  on the thread that also runs the aggregation query. Earlier versions sent them
+  in parallel.
+* The dates `nextFetchDate` in the status index and `timestamp` in the metrics
+  index are written with `Instant#toString()`, which leaves out the milliseconds
+  when they are zero (`2026-01-01T00:00:00Z`). Earlier versions always wrote
+  them (`2026-01-01T00:00:00.000Z`). The `date_optional_time` format of the
+  provided mappings accepts both.
 
+### Custom Java code
+
+Custom code that calls or extends these classes must switch to the OpenSearch
+Java Client types:
+
+* `OpenSearchConnection.getClient(conf, type)` returns an `OpenSearchClient`.
+  Close it with `client._transport().close()`.
+* `OpenSearchConnection.getConnection` takes an `AsyncBulkProcessor.Listener`,
+  and `addToProcessor` takes a `BulkOperation`. The listener receives
+  `org.opensearch.client.opensearch.core.BulkRequest` and `BulkResponse`.
+* `AbstractSpout.client` is an `OpenSearchClient`, and `addHitToBuffer` takes
+  the source of a hit as a `Map<String, Object>`.
+* `AggregationSpout` handles the search results in
+  `handleResponse(SearchResponse<JsonData>)`. The sort values passed to
+  `sortValuesForKey` are `FieldValue` objects.
+* `IndexCreation.checkOrCreateIndex` and `checkOrCreateIndexTemplate` take an
+  `OpenSearchClient`. `WaitAckCache.processBulkResponse` and `processFailedBulk`
+  take the client's `BulkResponse` and `BulkRequest`.
+* `BulkItemResponseToFailedFlag` is a record. Read `failed()`, `id()` and
+  `response()` instead of the public fields. `getFailure()` returns a `String`.
+  `status()` and the other `BulkItemResponse` methods are removed. Use
+  `getStatus()`, which returns an `int`, or `response()`.
+* The module no longer depends on the OpenSearch server jar. Code that uses
+  classes such as `QueryBuilders` or `XContentBuilder` must declare that
+  dependency itself or use the Java client equivalents.
