@@ -62,10 +62,7 @@ public class JSONResourceWrapper extends ParseFilter {
     public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode filterParams) {
         refresher =
                 new DelegateRefresher<>(
-                        ParseFilter.class,
-                        stormConf,
-                        filterParams,
-                        (delegate, conf, params) -> delegate.configure(conf, params));
+                        ParseFilter.class, stormConf, filterParams, ParseFilter::configure);
     }
 
     @Override
@@ -75,6 +72,8 @@ public class JSONResourceWrapper extends ParseFilter {
 
     @Override
     public void cleanup() {
-        refresher.cleanup();
+        if (refresher != null) {
+            refresher.cleanup();
+        }
     }
 }

@@ -17,31 +17,28 @@
 
 package org.apache.stormcrawler.opensearch.persistence;
 
-import static org.opensearch.index.query.QueryBuilders.boolQuery;
-
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import java.io.IOException;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.stormcrawler.opensearch.Constants;
 import org.apache.stormcrawler.persistence.EmptyQueueListener;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.joda.time.format.ISODateTimeFormat;
-import org.opensearch.action.search.SearchRequest;
-import org.opensearch.action.search.SearchResponse;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.core.action.ActionListener;
-import org.opensearch.index.query.BoolQueryBuilder;
-import org.opensearch.index.query.QueryBuilders;
-import org.opensearch.search.SearchHit;
-import org.opensearch.search.builder.SearchSourceBuilder;
-import org.opensearch.search.sort.FieldSortBuilder;
-import org.opensearch.search.sort.SortBuilders;
-import org.opensearch.search.sort.SortOrder;
+import org.opensearch.client.json.JsonData;
+import org.opensearch.client.opensearch._types.FieldValue;
+import org.opensearch.client.opensearch._types.SortOrder;
+import org.opensearch.client.opensearch.core.SearchRequest;
+import org.opensearch.client.opensearch.core.SearchResponse;
+import org.opensearch.client.opensearch.core.search.Hit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,7 +87,7 @@ public class HybridSpout extends AggregationSpout implements EmptyQueueListener 
         // would just overload OpenSearch and yield
         // mainly duplicates
         if (isInQuery.get()) {
-            LOG.trace("{} isInquery true", logIdprefix, queueName);
+            LOG.trace("{} isInquery true for {}", logIdprefix, queueName);
             return;
         }
 
@@ -101,57 +98,89 @@ public class HybridSpout extends AggregationSpout implements EmptyQueueListener 
             lastTimeResetToNow = Instant.now();
         }
 
-        String formattedQueryDate = ISODateTimeFormat.dateTimeNoMillis().print(queryDate.getTime());
+        String formattedQueryDate =
+                Instant.ofEpochMilli(queryDate.getTime())
+                        .atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
 
-        BoolQueryBuilder queryBuilder =
-                boolQuery()
-                        .filter(QueryBuilders.rangeQuery("nextFetchDate").lte(formattedQueryDate));
-
-        queryBuilder.filter(QueryBuilders.termQuery(partitionField, queueName));
-
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
-        sourceBuilder.query(queryBuilder);
-        sourceBuilder.from(0);
-        sourceBuilder.size(bufferReloadSize);
-        sourceBuilder.explain(false);
-        sourceBuilder.trackTotalHits(false);
+        SearchRequest.Builder requestBuilder =
+                new SearchRequest.Builder()
+                        .index(indexName)
+                        .size(bufferReloadSize)
+                        .trackTotalHits(t -> t.enabled(false))
+                        .query(
+                                q ->
+                                        q.bool(
+                                                b ->
+                                                        b.filter(
+                                                                        f ->
+                                                                                f.range(
+                                                                                        r ->
+                                                                                                r.field(
+                                                                                                                "nextFetchDate")
+                                                                                                        .lte(
+                                                                                                                JsonData
+                                                                                                                        .of(
+                                                                                                                                formattedQueryDate))))
+                                                                .filter(
+                                                                        f ->
+                                                                                f.term(
+                                                                                        t ->
+                                                                                                t.field(
+                                                                                                                partitionField)
+                                                                                                        .value(
+                                                                                                                FieldValue
+                                                                                                                        .of(
+                                                                                                                                queueName))))));
 
         // sort within a bucket
         for (String bsf : bucketSortField) {
-            FieldSortBuilder sorter = SortBuilders.fieldSort(bsf).order(SortOrder.ASC);
-            sourceBuilder.sort(sorter);
+            requestBuilder.sort(s -> s.field(fs -> fs.field(bsf).order(SortOrder.Asc)));
         }
 
         // do we have a search after for this one?
         Object[] searchAfterValues = searchAfterCache.getIfPresent(queueName);
         if (searchAfterValues != null) {
-            sourceBuilder.searchAfter(searchAfterValues);
+            for (Object sav : searchAfterValues) {
+                requestBuilder.searchAfter((FieldValue) sav);
+            }
         }
 
-        SearchRequest request = new SearchRequest(indexName);
-
-        request.source(sourceBuilder);
-
-        // https://www.elastic.co/guide/en/opensearch/reference/current/search-request-preference.html
-        // _shards:2,3
-        // specific shard but ideally a local copy of it
+        // shard preference for routing
         if (shardID != -1) {
-            request.preference("_shards:" + shardID + "|_local");
+            requestBuilder.preference("_shards:" + shardID + "|_local");
         }
+
+        SearchRequest request = requestBuilder.build();
 
         // dump query to log
-        LOG.debug("{} OpenSearch query {} - {}", logIdprefix, queueName, request.toString());
+        LOG.debug("{} OpenSearch query {} - {}", logIdprefix, queueName, request);
 
-        client.searchAsync(request, RequestOptions.DEFAULT, hrl);
+        CompletableFuture.supplyAsync(
+                        () -> {
+                            try {
+                                return client.search(request, JsonData.class);
+                            } catch (IOException e) {
+                                throw new CompletionException(e);
+                            }
+                        },
+                        queryExecutor)
+                .thenAccept(hrl::handleResponse)
+                .exceptionally(
+                        e -> {
+                            Throwable cause = e instanceof CompletionException ? e.getCause() : e;
+                            LOG.error("Exception with OpenSearch query", cause);
+                            return null;
+                        });
     }
 
     /** Overrides the handling of responses for aggregations. */
     @Override
-    public void onResponse(SearchResponse response) {
+    protected void handleResponse(SearchResponse<JsonData> response) {
         // delete all entries from the searchAfterCache when
         // we get the results from the aggregation spouts
         searchAfterCache.invalidateAll();
-        super.onResponse(response);
+        super.handleResponse(response);
     }
 
     /** The aggregation kindly told us where to start from. */
@@ -163,40 +192,52 @@ public class HybridSpout extends AggregationSpout implements EmptyQueueListener 
     }
 
     /** Handling of results for a specific queue. */
-    class HostResultListener implements ActionListener<SearchResponse> {
+    class HostResultListener {
 
-        @Override
-        public void onResponse(SearchResponse response) {
+        /**
+         * Handles the search response for a host-specific query, extracting hits and adding them to
+         * the buffer.
+         *
+         * @param response the search response containing document hits
+         */
+        void handleResponse(SearchResponse<JsonData> response) {
 
             int alreadyprocessed = 0;
             int numDocs = 0;
 
-            SearchHit[] hits = response.getHits().getHits();
+            List<Hit<JsonData>> hits = response.hits().hits();
 
             Object[] sortValues = null;
 
             // retrieve the key for these results
             String key = null;
 
-            for (SearchHit hit : hits) {
+            for (Hit<JsonData> hit : hits) {
                 numDocs++;
+
+                Map<String, Object> source = sourceAsMap(hit.source());
+
                 String pfield = partitionField;
-                Map<String, Object> sourceAsMap = hit.getSourceAsMap();
+                Map<String, Object> fieldSource = source;
                 if (pfield.startsWith("metadata.")) {
-                    sourceAsMap = (Map<String, Object>) sourceAsMap.get("metadata");
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> metadataMap = (Map<String, Object>) source.get("metadata");
+                    fieldSource = metadataMap;
                     pfield = pfield.substring(9);
                 }
-                Object key_as_object = sourceAsMap.get(pfield);
+                Object key_as_object = fieldSource.get(pfield);
                 if (key_as_object instanceof List) {
-                    if (((List<String>) (key_as_object)).size() == 1) {
-                        key = ((List<String>) key_as_object).get(0);
+                    @SuppressWarnings("unchecked")
+                    List<String> keyList = (List<String>) key_as_object;
+                    if (keyList.size() == 1) {
+                        key = keyList.get(0);
                     }
                 } else {
                     key = key_as_object.toString();
                 }
 
-                sortValues = hit.getSortValues();
-                if (!addHitToBuffer(hit)) {
+                sortValues = hit.sort().toArray();
+                if (!addHitToBuffer(source)) {
                     alreadyprocessed++;
                 }
             }
@@ -214,14 +255,9 @@ public class HybridSpout extends AggregationSpout implements EmptyQueueListener 
                     "{} OpenSearch term query returned {} hits  in {} msec with {} already being processed for {}",
                     logIdprefix,
                     numDocs,
-                    response.getTook().getMillis(),
+                    response.took(),
                     alreadyprocessed,
                     key);
-        }
-
-        @Override
-        public void onFailure(Exception e) {
-            LOG.error("Exception with OpenSearch query", e);
         }
     }
 }

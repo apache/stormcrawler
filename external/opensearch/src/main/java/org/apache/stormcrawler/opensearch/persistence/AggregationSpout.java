@@ -17,45 +17,38 @@
 
 package org.apache.stormcrawler.opensearch.persistence;
 
-import static org.opensearch.index.query.QueryBuilders.boolQuery;
-
+import java.io.IOException;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.opensearch.Constants;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.joda.time.format.ISODateTimeFormat;
-import org.opensearch.action.search.SearchRequest;
-import org.opensearch.action.search.SearchResponse;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.core.action.ActionListener;
-import org.opensearch.index.query.BoolQueryBuilder;
-import org.opensearch.index.query.QueryBuilders;
-import org.opensearch.search.SearchHit;
-import org.opensearch.search.aggregations.AggregationBuilders;
-import org.opensearch.search.aggregations.Aggregations;
-import org.opensearch.search.aggregations.BucketOrder;
-import org.opensearch.search.aggregations.bucket.SingleBucketAggregation;
-import org.opensearch.search.aggregations.bucket.sampler.DiversifiedAggregationBuilder;
-import org.opensearch.search.aggregations.bucket.terms.Terms;
-import org.opensearch.search.aggregations.bucket.terms.Terms.Bucket;
-import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
-import org.opensearch.search.aggregations.metrics.TopHits;
-import org.opensearch.search.builder.SearchSourceBuilder;
-import org.opensearch.search.sort.FieldSortBuilder;
-import org.opensearch.search.sort.SortBuilders;
-import org.opensearch.search.sort.SortOrder;
+import org.opensearch.client.json.JsonData;
+import org.opensearch.client.opensearch._types.FieldValue;
+import org.opensearch.client.opensearch._types.SortOrder;
+import org.opensearch.client.opensearch._types.aggregations.Aggregate;
+import org.opensearch.client.opensearch._types.aggregations.Aggregation;
+import org.opensearch.client.opensearch._types.aggregations.StringTermsBucket;
+import org.opensearch.client.opensearch._types.aggregations.TopHitsAggregate;
+import org.opensearch.client.opensearch.core.SearchRequest;
+import org.opensearch.client.opensearch.core.SearchResponse;
+import org.opensearch.client.opensearch.core.search.Hit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +58,7 @@ import org.slf4j.LoggerFactory;
  * the same number of spout instances as OpenSearch shards. Guarantees a good mix of URLs by
  * aggregating them by an arbitrary field e.g. key.
  */
-public class AggregationSpout extends AbstractSpout implements ActionListener<SearchResponse> {
+public class AggregationSpout extends AbstractSpout {
 
     private static final Logger LOG = LoggerFactory.getLogger(AggregationSpout.class);
 
@@ -104,106 +97,171 @@ public class AggregationSpout extends AbstractSpout implements ActionListener<Se
             lastTimeResetToNow = Instant.now();
         }
 
-        String formattedQueryDate = ISODateTimeFormat.dateTimeNoMillis().print(queryDate.getTime());
+        String formattedQueryDate =
+                Instant.ofEpochMilli(queryDate.getTime())
+                        .atOffset(ZoneOffset.UTC)
+                        .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
 
         LOG.info("{} Populating buffer with nextFetchDate <= {}", logIdprefix, formattedQueryDate);
 
-        BoolQueryBuilder queryBuilder =
-                boolQuery()
-                        .filter(QueryBuilders.rangeQuery("nextFetchDate").lte(formattedQueryDate));
+        // Build the top_hits sub-aggregation
+        Aggregation topHitsAgg =
+                Aggregation.of(
+                        a ->
+                                a.topHits(
+                                        th -> {
+                                            th.size(maxURLsPerBucket).explain(false);
+                                            for (String bsf : bucketSortField) {
+                                                th.sort(
+                                                        s ->
+                                                                s.field(
+                                                                        fs ->
+                                                                                fs.field(bsf)
+                                                                                        .order(
+                                                                                                SortOrder
+                                                                                                        .Asc)));
+                                            }
+                                            return th;
+                                        }));
 
-        if (filterQueries != null) {
-            for (String filterQuery : filterQueries) {
-                queryBuilder.filter(QueryBuilders.queryStringQuery(filterQuery));
-            }
+        // Build the terms (partition) aggregation with top_hits sub-agg
+        Aggregation.Builder.ContainerBuilder partitionAggBuilder =
+                new Aggregation.Builder()
+                        .terms(
+                                t -> {
+                                    t.field(partitionField).size(maxBucketNum);
+                                    // sort between buckets by the min sub-aggregation
+                                    if (StringUtils.isNotBlank(totalSortField)) {
+                                        t.order(
+                                                Collections.singletonList(
+                                                        Collections.singletonMap(
+                                                                "top_hit", SortOrder.Asc)));
+                                    }
+                                    return t;
+                                })
+                        .aggregations("docs", topHitsAgg);
+
+        // add the min sub-aggregation used for sorting between buckets
+        if (StringUtils.isNotBlank(totalSortField)) {
+            partitionAggBuilder.aggregations(
+                    "top_hit", Aggregation.of(minAgg -> minAgg.min(m -> m.field(totalSortField))));
         }
 
-        SearchRequest request = new SearchRequest(indexName);
+        Aggregation partitionAgg = partitionAggBuilder.build();
 
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
-        sourceBuilder.query(queryBuilder);
-        sourceBuilder.from(0);
-        sourceBuilder.size(0);
-        sourceBuilder.explain(false);
-        sourceBuilder.trackTotalHits(false);
+        // Build the search request
+        SearchRequest.Builder requestBuilder =
+                new SearchRequest.Builder()
+                        .index(indexName)
+                        .size(0)
+                        .trackTotalHits(t -> t.enabled(false))
+                        .query(
+                                q ->
+                                        q.bool(
+                                                b -> {
+                                                    b.filter(
+                                                            f ->
+                                                                    f.range(
+                                                                            r ->
+                                                                                    r.field(
+                                                                                                    "nextFetchDate")
+                                                                                            .lte(
+                                                                                                    JsonData
+                                                                                                            .of(
+                                                                                                                    formattedQueryDate))));
+                                                    if (filterQueries != null) {
+                                                        for (String fq : filterQueries) {
+                                                            b.filter(
+                                                                    f ->
+                                                                            f.queryString(
+                                                                                    qs ->
+                                                                                            qs
+                                                                                                    .query(
+                                                                                                            fq)));
+                                                        }
+                                                    }
+                                                    return b;
+                                                }));
 
         if (queryTimeout != -1) {
-            sourceBuilder.timeout(
-                    new org.opensearch.common.unit.TimeValue(queryTimeout, TimeUnit.SECONDS));
-        }
-
-        TermsAggregationBuilder aggregations =
-                AggregationBuilders.terms("partition").field(partitionField).size(maxBucketNum);
-
-        org.opensearch.search.aggregations.metrics.TopHitsAggregationBuilder tophits =
-                AggregationBuilders.topHits("docs").size(maxURLsPerBucket).explain(false);
-
-        // sort within a bucket
-        for (String bsf : bucketSortField) {
-            FieldSortBuilder sorter = SortBuilders.fieldSort(bsf).order(SortOrder.ASC);
-            tophits.sort(sorter);
-        }
-
-        aggregations.subAggregation(tophits);
-
-        // sort between buckets
-        if (StringUtils.isNotBlank(totalSortField)) {
-            org.opensearch.search.aggregations.metrics.MinAggregationBuilder minBuilder =
-                    AggregationBuilders.min("top_hit").field(totalSortField);
-            aggregations.subAggregation(minBuilder);
-            aggregations.order(BucketOrder.aggregation("top_hit", true));
+            requestBuilder.timeout(queryTimeout + "s");
         }
 
         if (sample) {
-            DiversifiedAggregationBuilder sab = new DiversifiedAggregationBuilder("sample");
-            sab.field(partitionField).maxDocsPerValue(maxURLsPerBucket);
-            sab.shardSize(maxURLsPerBucket * maxBucketNum);
-            sab.subAggregation(aggregations);
-            sourceBuilder.aggregation(sab);
+            // Wrap in a diversified sampler aggregation
+            requestBuilder.aggregations(
+                    "sample",
+                    Aggregation.of(
+                            a ->
+                                    a.diversifiedSampler(
+                                                    ds ->
+                                                            ds.field(partitionField)
+                                                                    .maxDocsPerValue(
+                                                                            maxURLsPerBucket)
+                                                                    .shardSize(
+                                                                            maxURLsPerBucket
+                                                                                    * maxBucketNum))
+                                            .aggregations("partition", partitionAgg)));
         } else {
-            sourceBuilder.aggregation(aggregations);
+            requestBuilder.aggregations("partition", partitionAgg);
         }
 
-        request.source(sourceBuilder);
-
-        // https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-preference.html
-        // _shards:2,3
-        // specific shard but ideally a local copy of it
+        // shard preference for routing
         if (shardID != -1) {
-            request.preference("_shards:" + shardID + "|_local");
+            requestBuilder.preference("_shards:" + shardID + "|_local");
         }
+
+        SearchRequest request = requestBuilder.build();
 
         // dump query to log
         LOG.debug("{} OpenSearch query {}", logIdprefix, request);
 
         LOG.trace("{} isInQuery set to true", logIdprefix);
         isInQuery.set(true);
-        client.searchAsync(request, RequestOptions.DEFAULT, this);
+
+        CompletableFuture.supplyAsync(
+                        () -> {
+                            try {
+                                return client.search(request, JsonData.class);
+                            } catch (IOException e) {
+                                throw new CompletionException(e);
+                            }
+                        },
+                        queryExecutor)
+                .thenAccept(this::handleResponse)
+                .exceptionally(
+                        e -> {
+                            Throwable cause = e instanceof CompletionException ? e.getCause() : e;
+                            LOG.error("{} Exception with OpenSearch query", logIdprefix, cause);
+                            markQueryReceivedNow();
+                            return null;
+                        });
     }
 
-    @Override
-    public void onFailure(Exception arg0) {
-        LOG.error("{} Exception with OpenSearch query", logIdprefix, arg0);
-        markQueryReceivedNow();
-    }
-
-    @Override
-    public void onResponse(SearchResponse response) {
+    /**
+     * Handles the search response from an asynchronous aggregation query, extracting URLs from term
+     * buckets and adding them to the buffer.
+     *
+     * @param response the search response containing aggregation results
+     */
+    protected void handleResponse(SearchResponse<JsonData> response) {
         long timeTaken = System.currentTimeMillis() - getTimeLastQuerySent();
 
-        Aggregations aggregs = response.getAggregations();
+        Map<String, Aggregate> aggregs = response.aggregations();
 
-        if (aggregs == null) {
+        if (aggregs == null || aggregs.isEmpty()) {
             markQueryReceivedNow();
             return;
         }
 
-        SingleBucketAggregation sample = aggregs.get("sample");
-        if (sample != null) {
-            aggregs = sample.getAggregations();
+        // Unwrap the sample aggregation if present
+        Aggregate sampleAgg = aggregs.get("sample");
+        if (sampleAgg != null) {
+            aggregs = sampleAgg.sampler().aggregations();
         }
 
-        Terms agg = aggregs.get("partition");
+        Aggregate partitionAgg = aggregs.get("partition");
+        List<StringTermsBucket> buckets = partitionAgg.sterms().buckets().array();
 
         int numhits = 0;
         int numBuckets = 0;
@@ -214,35 +272,31 @@ public class AggregationSpout extends AbstractSpout implements ActionListener<Se
         currentBuckets.clear();
 
         // For each entry
-        Iterator<Terms.Bucket> iterator = (Iterator<Bucket>) agg.getBuckets().iterator();
+        Iterator<StringTermsBucket> iterator = buckets.iterator();
         while (iterator.hasNext()) {
-            Terms.Bucket entry = iterator.next();
-            String key = (String) entry.getKey(); // bucket key
+            StringTermsBucket entry = iterator.next();
+            String key = entry.key(); // bucket key
 
             currentBuckets.add(key);
 
-            long docCount = entry.getDocCount(); // Doc count
+            long docCount = entry.docCount(); // Doc count
 
             int hitsForThisBucket = 0;
 
-            SearchHit lastHit = null;
-
+            List<FieldValue> lastSortValues = null;
             // filter results so that we don't include URLs we are already
             // being processed
-            TopHits topHits = entry.getAggregations().get("docs");
-            for (SearchHit hit : topHits.getHits().getHits()) {
+            TopHitsAggregate topHits = entry.aggregations().get("docs").topHits();
+            for (Hit<JsonData> hit : topHits.hits().hits()) {
 
-                LOG.debug(
-                        "{} -> id [{}], _source [{}]",
-                        logIdprefix,
-                        hit.getId(),
-                        hit.getSourceAsString());
+                Map<String, Object> keyValues = sourceAsMap(hit.source());
+
+                LOG.debug("{} -> id [{}], _source [{}]", logIdprefix, hit.id(), keyValues);
 
                 hitsForThisBucket++;
 
-                lastHit = hit;
+                lastSortValues = hit.sort();
 
-                Map<String, Object> keyValues = hit.getSourceAsMap();
                 String url = (String) keyValues.get("url");
 
                 // consider only the first document of the last bucket
@@ -273,8 +327,8 @@ public class AggregationSpout extends AbstractSpout implements ActionListener<Se
                 LOG.debug("{} -> added to buffer : {}", logIdprefix, url);
             }
 
-            if (lastHit != null) {
-                sortValuesForKey(key, lastHit.getSortValues());
+            if (lastSortValues != null && !lastSortValues.isEmpty()) {
+                sortValuesForKey(key, lastSortValues.toArray());
             }
 
             if (hitsForThisBucket > 0) {
@@ -369,5 +423,10 @@ public class AggregationSpout extends AbstractSpout implements ActionListener<Se
         markQueryReceivedNow();
     }
 
+    /**
+     * Receives the sort values of the last hit returned for a bucket, as the {@link FieldValue}
+     * instances of the client. Subclasses can pass them to {@code search_after} to read the bucket
+     * from that position.
+     */
     protected void sortValuesForKey(String key, Object[] sortValues) {}
 }

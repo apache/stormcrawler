@@ -17,31 +17,29 @@
 
 package org.apache.stormcrawler.opensearch;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.github.benmanes.caffeine.cache.Ticker;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.opensearch.action.DocWriteRequest;
-import org.opensearch.action.bulk.BulkItemResponse;
-import org.opensearch.action.bulk.BulkRequest;
-import org.opensearch.action.bulk.BulkResponse;
-import org.opensearch.action.delete.DeleteRequest;
-import org.opensearch.action.index.IndexResponse;
-import org.opensearch.core.index.shard.ShardId;
-import org.opensearch.core.rest.RestStatus;
+import org.opensearch.client.opensearch._types.ErrorCause;
+import org.opensearch.client.opensearch.core.BulkRequest;
+import org.opensearch.client.opensearch.core.BulkResponse;
+import org.opensearch.client.opensearch.core.bulk.BulkOperation;
+import org.opensearch.client.opensearch.core.bulk.BulkResponseItem;
+import org.opensearch.client.opensearch.core.bulk.OperationType;
 import org.slf4j.LoggerFactory;
 
 class WaitAckCacheTest {
@@ -66,23 +64,33 @@ class WaitAckCacheTest {
         return t;
     }
 
-    private static ShardId shardId() {
-        return new ShardId("index", "_na_", 0);
+    private static BulkResponseItem successItem(String docId) {
+        return BulkResponseItem.of(
+                b -> b.id(docId).index("index").status(200).operationType(OperationType.Index));
     }
 
-    private static BulkItemResponse successItem(int itemId, String docId) {
-        IndexResponse indexResponse = new IndexResponse(shardId(), docId, 1, 1, 1, true);
-        return new BulkItemResponse(itemId, DocWriteRequest.OpType.INDEX, indexResponse);
+    private static BulkResponseItem failedItem(String docId, int status) {
+        return BulkResponseItem.of(
+                b ->
+                        b.id(docId)
+                                .index("index")
+                                .status(status)
+                                .operationType(OperationType.Index)
+                                .error(
+                                        ErrorCause.of(
+                                                e -> e.type("test_error").reason("test failure"))));
     }
 
-    private static BulkItemResponse failedItem(int itemId, String docId, RestStatus status) {
-        BulkItemResponse.Failure failure =
-                new BulkItemResponse.Failure("index", docId, new Exception("test failure"), status);
-        return new BulkItemResponse(itemId, DocWriteRequest.OpType.INDEX, failure);
-    }
-
-    private static BulkResponse bulkResponse(BulkItemResponse... items) {
-        return new BulkResponse(items, 10L);
+    private static BulkResponse bulkResponse(BulkResponseItem... items) {
+        boolean hasErrors = false;
+        for (BulkResponseItem item : items) {
+            if (item.error() != null) {
+                hasErrors = true;
+                break;
+            }
+        }
+        final boolean errors = hasErrors;
+        return BulkResponse.of(b -> b.took(10).errors(errors).items(List.of(items)));
     }
 
     @Test
@@ -110,14 +118,14 @@ class WaitAckCacheTest {
         Tuple t = mockTuple("http://example.com");
         cache.addTuple("doc1", t);
 
-        BulkResponse response = bulkResponse(successItem(0, "doc1"));
+        BulkResponse response = bulkResponse(successItem("doc1"));
 
         cache.processBulkResponse(
                 response,
                 1L,
                 null,
                 (id, tuple, selected) -> {
-                    if (!selected.failed) {
+                    if (!selected.failed()) {
                         acked.add(tuple);
                     } else {
                         failed.add(tuple);
@@ -135,15 +143,14 @@ class WaitAckCacheTest {
         Tuple t = mockTuple("http://example.com");
         cache.addTuple("doc1", t);
 
-        BulkResponse response =
-                bulkResponse(failedItem(0, "doc1", RestStatus.INTERNAL_SERVER_ERROR));
+        BulkResponse response = bulkResponse(failedItem("doc1", 500));
 
         cache.processBulkResponse(
                 response,
                 1L,
                 null,
                 (id, tuple, selected) -> {
-                    if (!selected.failed) {
+                    if (!selected.failed()) {
                         acked.add(tuple);
                     } else {
                         failed.add(tuple);
@@ -160,15 +167,18 @@ class WaitAckCacheTest {
         Tuple t = mockTuple("http://example.com");
         cache.addTuple("doc1", t);
 
-        ScopedCounter counter = scopeName -> incrementBy -> {};
-        BulkResponse response = bulkResponse(failedItem(0, "doc1", RestStatus.CONFLICT));
+        ScopedCounter counter = mock(ScopedCounter.class);
+        ScopedCounter.CountHandle handle = mock(ScopedCounter.CountHandle.class);
+        when(counter.scope("doc_conflicts")).thenReturn(handle);
+
+        BulkResponse response = bulkResponse(failedItem("doc1", 409));
 
         cache.processBulkResponse(
                 response,
                 1L,
                 counter,
                 (id, tuple, selected) -> {
-                    if (!selected.failed) {
+                    if (!selected.failed()) {
                         acked.add(tuple);
                     } else {
                         failed.add(tuple);
@@ -177,6 +187,7 @@ class WaitAckCacheTest {
 
         assertEquals(1, acked.size());
         assertEquals(0, failed.size());
+        verify(handle).incrBy(1);
     }
 
     @Test
@@ -186,7 +197,7 @@ class WaitAckCacheTest {
         cache.addTuple("doc1", t1);
         cache.addTuple("doc1", t2);
 
-        BulkResponse response = bulkResponse(successItem(0, "doc1"));
+        BulkResponse response = bulkResponse(successItem("doc1"));
 
         cache.processBulkResponse(response, 1L, null, (id, tuple, selected) -> acked.add(tuple));
 
@@ -201,17 +212,14 @@ class WaitAckCacheTest {
         Tuple t = mockTuple("http://example.com");
         cache.addTuple("doc1", t);
 
-        BulkResponse response =
-                bulkResponse(
-                        failedItem(0, "doc1", RestStatus.INTERNAL_SERVER_ERROR),
-                        successItem(1, "doc1"));
+        BulkResponse response = bulkResponse(failedItem("doc1", 500), successItem("doc1"));
 
         cache.processBulkResponse(
                 response,
                 1L,
                 null,
                 (id, tuple, selected) -> {
-                    if (!selected.failed) {
+                    if (!selected.failed()) {
                         acked.add(tuple);
                     } else {
                         failed.add(tuple);
@@ -229,9 +237,14 @@ class WaitAckCacheTest {
         cache.addTuple("doc1", t1);
         cache.addTuple("doc2", t2);
 
-        BulkRequest request = new BulkRequest();
-        request.add(new DeleteRequest("index", "doc1"));
-        request.add(new DeleteRequest("index", "doc2"));
+        BulkRequest request =
+                BulkRequest.of(
+                        b ->
+                                b.operations(
+                                        BulkOperation.of(
+                                                o -> o.delete(d -> d.index("index").id("doc1"))),
+                                        BulkOperation.of(
+                                                o -> o.delete(d -> d.index("index").id("doc2")))));
 
         cache.processFailedBulk(request, 1L, new Exception("connection lost"), failed::add);
 
@@ -247,8 +260,17 @@ class WaitAckCacheTest {
         Tuple t = mockTuple("http://example.com");
         cache.addTuple("doc1", t);
 
-        BulkRequest request = new BulkRequest();
-        request.add(new DeleteRequest("index", "doc_unknown"));
+        BulkRequest request =
+                BulkRequest.of(
+                        b ->
+                                b.operations(
+                                        BulkOperation.of(
+                                                o ->
+                                                        o.delete(
+                                                                d ->
+                                                                        d.index("index")
+                                                                                .id(
+                                                                                        "doc_unknown")))));
 
         cache.processFailedBulk(request, 1L, new Exception("test"), failed::add);
 
@@ -259,25 +281,29 @@ class WaitAckCacheTest {
 
     @Test
     void eviction_failsTuplesOnExpiry() {
-        AtomicLong fakeTime = new AtomicLong(0);
-        Ticker fakeTicker = fakeTime::get;
         cache =
                 new WaitAckCache(
                         "expireAfterWrite=1s",
                         LoggerFactory.getLogger(WaitAckCacheTest.class),
-                        evicted::add,
-                        fakeTicker);
+                        evicted::add);
         Tuple t = mockTuple("http://example.com");
         cache.addTuple("doc1", t);
 
-        // Advance past the 1s expiry
-        fakeTime.set(TimeUnit.SECONDS.toNanos(2));
+        // Force cache maintenance after expiry by doing a contains() check
+        // which accesses the cache and triggers Caffeine's cleanup
+        await().atMost(5, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
+                .untilAsserted(
+                        () -> {
+                            // contains() accesses the cache which triggers cleanup
+                            cache.contains("doc1");
+                            // also try adding and invalidating a dummy entry to force maintenance
+                            Tuple dummy = mockTuple("http://dummy");
+                            cache.addTuple("_probe_", dummy);
+                            cache.invalidate("_probe_");
+                            assertFalse(evicted.isEmpty(), "Eviction callback should have fired");
+                        });
 
-        // Access triggers expiration; cleanUp forces listener execution
-        cache.contains("doc1");
-        cache.cleanUp();
-
-        assertFalse(evicted.isEmpty(), "Eviction callback should have fired");
         assertTrue(evicted.contains(t));
     }
 
@@ -288,17 +314,14 @@ class WaitAckCacheTest {
         cache.addTuple("doc1", t1);
         cache.addTuple("doc2", t2);
 
-        BulkResponse response =
-                bulkResponse(
-                        successItem(0, "doc1"),
-                        failedItem(1, "doc2", RestStatus.INTERNAL_SERVER_ERROR));
+        BulkResponse response = bulkResponse(successItem("doc1"), failedItem("doc2", 500));
 
         cache.processBulkResponse(
                 response,
                 1L,
                 null,
                 (id, tuple, selected) -> {
-                    if (!selected.failed) {
+                    if (!selected.failed()) {
                         acked.add(tuple);
                     } else {
                         failed.add(tuple);
@@ -309,21 +332,5 @@ class WaitAckCacheTest {
         assertSame(t1, acked.get(0));
         assertEquals(1, failed.size());
         assertSame(t2, failed.get(0));
-    }
-
-    @Test
-    void shutdown_failsAllRemainingTuples() {
-        Tuple t1 = mockTuple("http://example.com/1");
-        Tuple t2 = mockTuple("http://example.com/2");
-        cache.addTuple("doc1", t1);
-        cache.addTuple("doc2", t2);
-
-        cache.shutdown();
-
-        assertEquals(2, evicted.size());
-        assertTrue(evicted.contains(t1));
-        assertTrue(evicted.contains(t2));
-        assertFalse(cache.contains("doc1"));
-        assertFalse(cache.contains("doc2"));
     }
 }

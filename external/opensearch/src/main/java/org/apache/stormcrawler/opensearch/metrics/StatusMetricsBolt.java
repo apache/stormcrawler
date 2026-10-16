@@ -17,8 +17,11 @@
 
 package org.apache.stormcrawler.opensearch.metrics;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.storm.Config;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -30,12 +33,8 @@ import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.opensearch.Constants;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.core.CountRequest;
-import org.opensearch.client.core.CountResponse;
-import org.opensearch.core.action.ActionListener;
-import org.opensearch.index.query.QueryBuilders;
-import org.opensearch.search.builder.SearchSourceBuilder;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch._types.FieldValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,45 +52,22 @@ public class StatusMetricsBolt extends BaseRichBolt {
 
     private String indexName;
 
-    private OpenSearchConnection connection;
+    private OpenSearchClient client;
 
-    private Map<String, Long> latestStatusCounts = new HashMap<>(6);
+    private Map<String, Long> latestStatusCounts = new ConcurrentHashMap<>(6);
 
     private int freqStats = 60;
 
     private OutputCollector _collector;
 
-    private transient StatusActionListener[] listeners;
+    private transient StatusCounter[] counters;
 
-    private class StatusActionListener implements ActionListener<CountResponse> {
+    private static final class StatusCounter {
+        final String name;
+        final AtomicBoolean ready = new AtomicBoolean(true);
 
-        private final String name;
-
-        private boolean ready = true;
-
-        public boolean isReady() {
-            return ready;
-        }
-
-        public void busy() {
-            this.ready = false;
-        }
-
-        StatusActionListener(String statusName) {
-            name = statusName;
-        }
-
-        @Override
-        public void onResponse(CountResponse response) {
-            ready = true;
-            LOG.debug("Got {} counts for status:{}", response.getCount(), name);
-            latestStatusCounts.put(name, response.getCount());
-        }
-
-        @Override
-        public void onFailure(Exception e) {
-            ready = true;
-            LOG.error("Failure when getting counts for status:{}", name, e);
+        StatusCounter(String name) {
+            this.name = name;
         }
     }
 
@@ -101,7 +77,7 @@ public class StatusMetricsBolt extends BaseRichBolt {
         _collector = collector;
         indexName = ConfUtils.getString(stormConf, OSStatusIndexNameParamName, "status");
         try {
-            connection = OpenSearchConnection.getConnection(stormConf, OSBoltType);
+            client = OpenSearchConnection.getClient(stormConf, OSBoltType);
         } catch (Exception e1) {
             LOG.error("Can't connect to OpenSearch", e1);
             throw new RuntimeException(e1);
@@ -110,14 +86,14 @@ public class StatusMetricsBolt extends BaseRichBolt {
         CrawlerMetrics.registerGauge(
                 context, stormConf, "status.count", () -> latestStatusCounts, freqStats);
 
-        listeners = new StatusActionListener[6];
+        counters = new StatusCounter[6];
 
-        listeners[0] = new StatusActionListener("DISCOVERED");
-        listeners[1] = new StatusActionListener("FETCHED");
-        listeners[2] = new StatusActionListener("FETCH_ERROR");
-        listeners[3] = new StatusActionListener("REDIRECTION");
-        listeners[4] = new StatusActionListener("ERROR");
-        listeners[5] = new StatusActionListener("TOTAL");
+        counters[0] = new StatusCounter("DISCOVERED");
+        counters[1] = new StatusCounter("FETCHED");
+        counters[2] = new StatusCounter("FETCH_ERROR");
+        counters[3] = new StatusCounter("REDIRECTION");
+        counters[4] = new StatusCounter("ERROR");
+        counters[5] = new StatusCounter("TOTAL");
     }
 
     @Override
@@ -137,26 +113,69 @@ public class StatusMetricsBolt extends BaseRichBolt {
             return;
         }
 
-        for (StatusActionListener listener : listeners) {
+        for (StatusCounter counter : counters) {
             // still waiting for results from previous request
-            if (!listener.isReady()) {
-                LOG.debug("Not ready to get counts for status {}", listener.name);
+            if (!counter.ready.compareAndSet(true, false)) {
+                LOG.debug("Not ready to get counts for status {}", counter.name);
                 continue;
             }
-            CountRequest request = new CountRequest(indexName);
-            if (!listener.name.equalsIgnoreCase("TOTAL")) {
-                SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
-                sourceBuilder.query(QueryBuilders.termQuery("status", listener.name));
-                request.source(sourceBuilder);
-            }
-            listener.busy();
-            connection.getClient().countAsync(request, RequestOptions.DEFAULT, listener);
+            final String statusName = counter.name;
+            CompletableFuture.supplyAsync(
+                            () -> {
+                                try {
+                                    if (statusName.equalsIgnoreCase("TOTAL")) {
+                                        return client.count(c -> c.index(indexName));
+                                    } else {
+                                        return client.count(
+                                                c ->
+                                                        c.index(indexName)
+                                                                .query(
+                                                                        q ->
+                                                                                q.term(
+                                                                                        t ->
+                                                                                                t.field(
+                                                                                                                "status")
+                                                                                                        .value(
+                                                                                                                FieldValue
+                                                                                                                        .of(
+                                                                                                                                statusName)))));
+                                    }
+                                } catch (Exception e) {
+                                    throw new CompletionException(e);
+                                }
+                            })
+                    .thenAccept(
+                            response -> {
+                                counter.ready.set(true);
+                                LOG.debug(
+                                        "Got {} counts for status:{}",
+                                        response.count(),
+                                        statusName);
+                                latestStatusCounts.put(statusName, response.count());
+                            })
+                    .exceptionally(
+                            e -> {
+                                counter.ready.set(true);
+                                Throwable cause =
+                                        e instanceof CompletionException ? e.getCause() : e;
+                                LOG.error(
+                                        "Failure when getting counts for status:{}",
+                                        statusName,
+                                        cause);
+                                return null;
+                            });
         }
     }
 
     @Override
     public void cleanup() {
-        connection.close();
+        if (client != null) {
+            try {
+                client._transport().close();
+            } catch (Exception e) {
+                LOG.error("Exception closing client transport", e);
+            }
+        }
     }
 
     @Override

@@ -20,14 +20,14 @@ package org.apache.stormcrawler.opensearch;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import org.apache.stormcrawler.JSONResource;
-import org.opensearch.action.get.GetRequest;
-import org.opensearch.action.get.GetResponse;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.RestHighLevelClient;
+import org.opensearch.client.json.JsonData;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.core.GetResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +38,10 @@ import org.slf4j.LoggerFactory;
  * org.apache.stormcrawler.opensearch.parse.filter.JSONResourceWrapper} to eliminate duplicated
  * setup/refresh/cleanup logic.
  *
+ * <p>This is the opensearch-java (OpenSearch Java Client 3.x / HC5) counterpart of the class with
+ * the same name in the {@code external/opensearch} module. It uses the typed {@link
+ * OpenSearchClient} instead of the deprecated {@code RestHighLevelClient}.
+ *
  * @param <T> the base type that the delegate must extend (e.g. URLFilter or ParseFilter)
  */
 public class DelegateRefresher<T> {
@@ -46,7 +50,7 @@ public class DelegateRefresher<T> {
 
     private final T delegate;
     private Timer refreshTimer;
-    private RestHighLevelClient osClient;
+    private OpenSearchClient osClient;
 
     /**
      * Creates a refresher by loading the delegate class from the JSON configuration.
@@ -127,13 +131,18 @@ public class DelegateRefresher<T> {
                         if (osClient != null) {
                             LOG.info("Reloading json resources from OpenSearch");
                             try {
-                                GetResponse response =
+                                GetResponse<JsonData> response =
                                         osClient.get(
-                                                new GetRequest(
-                                                        "config", resource.getResourceFile()),
-                                                RequestOptions.DEFAULT);
-                                resource.loadJSONResources(
-                                        new ByteArrayInputStream(response.getSourceAsBytes()));
+                                                g ->
+                                                        g.index("config")
+                                                                .id(resource.getResourceFile()),
+                                                JsonData.class);
+                                if (response.found() && response.source() != null) {
+                                    String json = response.source().toJson().toString();
+                                    resource.loadJSONResources(
+                                            new ByteArrayInputStream(
+                                                    json.getBytes(StandardCharsets.UTF_8)));
+                                }
                             } catch (Exception e) {
                                 LOG.error("Can't load config from OpenSearch", e);
                             }
@@ -156,7 +165,7 @@ public class DelegateRefresher<T> {
         }
         if (osClient != null) {
             try {
-                osClient.close();
+                osClient._transport().close();
             } catch (IOException e) {
                 LOG.error("Exception when closing OpenSearch client", e);
             }
