@@ -29,17 +29,15 @@ import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseRichBolt;
 import org.apache.storm.tuple.Tuple;
+import org.apache.stormcrawler.opensearch.AsyncBulkProcessor;
 import org.apache.stormcrawler.opensearch.Constants;
 import org.apache.stormcrawler.opensearch.IndexCreation;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.opensearch.action.DocWriteRequest;
-import org.opensearch.action.bulk.BulkItemResponse;
-import org.opensearch.action.bulk.BulkProcessor;
-import org.opensearch.action.bulk.BulkRequest;
-import org.opensearch.action.bulk.BulkResponse;
-import org.opensearch.action.index.IndexRequest;
-import org.opensearch.core.rest.RestStatus;
+import org.opensearch.client.opensearch.core.BulkRequest;
+import org.opensearch.client.opensearch.core.BulkResponse;
+import org.opensearch.client.opensearch.core.bulk.BulkOperation;
+import org.opensearch.client.opensearch.core.bulk.BulkResponseItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +45,7 @@ import org.slf4j.LoggerFactory;
  * Sends information about the queues into an OpenSearch index. This has to be connected to a status
  * updater bolt.
  */
-public class QueueBolt extends BaseRichBolt implements BulkProcessor.Listener {
+public class QueueBolt extends BaseRichBolt implements AsyncBulkProcessor.Listener {
 
     private static final Logger LOG = LoggerFactory.getLogger(QueueBolt.class);
 
@@ -140,36 +138,39 @@ public class QueueBolt extends BaseRichBolt implements BulkProcessor.Listener {
         fields.put("key", key);
         fields.put("lastUpdated", Instant.now().toString());
 
-        final IndexRequest indexRequest =
-                new IndexRequest(indexName).source(fields).id(docID).create(true);
+        final BulkOperation op =
+                BulkOperation.of(b -> b.create(c -> c.index(indexName).id(docID).document(fields)));
 
-        connection.addToProcessor(indexRequest);
+        connection.addToProcessor(op);
     }
 
     @Override
     public void beforeBulk(long executionId, BulkRequest request) {
-        LOG.debug("beforeBulk {} with {} actions", executionId, request.numberOfActions());
+        LOG.debug("beforeBulk {} with {} actions", executionId, request.operations().size());
     }
 
     @Override
     public void afterBulk(long executionId, BulkRequest request, BulkResponse response) {
-        LOG.debug("afterBulk [{}] with {} responses", executionId, request.numberOfActions());
-        for (BulkItemResponse item : response.getItems()) {
-            final String key = inFlight.remove(item.getId());
+        LOG.debug("afterBulk [{}] with {} responses", executionId, response.items().size());
+        for (BulkResponseItem item : response.items()) {
+            final String key = inFlight.remove(item.id());
             if (key == null) {
                 continue;
             }
-            if (!item.isFailed()) {
+            if (item.error() == null) {
                 knownQueue.put(key, Boolean.TRUE);
-            } else if (RestStatus.CONFLICT.equals(item.getFailure().getStatus())) {
+            } else if (item.status() == 409) {
                 // entry already exists in the index, e.g. written before a worker
                 // restart or evicted from the cache - not an error
                 knownQueue.put(key, Boolean.TRUE);
             } else {
                 // do not cache the key so that the write is retried
                 // when the key is next seen
+                final var error = item.error();
                 LOG.error(
-                        "Failed to index queue entry {}: {}", key, item.getFailure().getMessage());
+                        "Failed to index queue entry {}: {}",
+                        key,
+                        error.reason() != null ? error.reason() : error.type());
             }
         }
     }
@@ -177,9 +178,9 @@ public class QueueBolt extends BaseRichBolt implements BulkProcessor.Listener {
     @Override
     public void afterBulk(long executionId, BulkRequest request, Throwable failure) {
         LOG.error("Exception with bulk {} - failing the whole lot ", executionId, failure);
-        for (DocWriteRequest<?> docWriteRequest : request.requests()) {
+        for (BulkOperation op : request.operations()) {
             // not cached - the writes are retried when the keys are next seen
-            inFlight.remove(docWriteRequest.id());
+            inFlight.remove(OpenSearchConnection.getBulkOperationId(op));
         }
     }
 

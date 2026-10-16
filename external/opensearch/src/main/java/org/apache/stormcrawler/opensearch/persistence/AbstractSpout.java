@@ -19,10 +19,15 @@ package org.apache.stormcrawler.opensearch.persistence;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.stormcrawler.Metadata;
@@ -31,8 +36,8 @@ import org.apache.stormcrawler.opensearch.IndexCreation;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.persistence.AbstractQueryingSpout;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.opensearch.client.RestHighLevelClient;
-import org.opensearch.search.SearchHit;
+import org.opensearch.client.json.JsonData;
+import org.opensearch.client.opensearch.OpenSearchClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +77,7 @@ public abstract class AbstractSpout extends AbstractQueryingSpout {
 
     protected String indexName;
 
-    protected static RestHighLevelClient client;
+    protected static OpenSearchClient client;
 
     /**
      * when using multiple instances - each one is in charge of a specific shard useful when
@@ -98,6 +103,15 @@ public abstract class AbstractSpout extends AbstractQueryingSpout {
 
     protected int queryTimeout = -1;
 
+    /**
+     * Single-threaded executor dedicated to running the asynchronous OpenSearch queries triggered
+     * from this spout. Using a dedicated, named, daemon executor avoids polluting the JVM-wide
+     * {@link java.util.concurrent.ForkJoinPool#commonPool() common pool} (which is shared with all
+     * other Storm tasks running in the same worker) and allows clean shutdown when the topology is
+     * stopped.
+     */
+    protected ExecutorService queryExecutor;
+
     @Override
     public void open(
             Map<String, Object> stormConf,
@@ -105,6 +119,19 @@ public abstract class AbstractSpout extends AbstractQueryingSpout {
             SpoutOutputCollector collector) {
 
         super.open(stormConf, context, collector);
+
+        final String executorName =
+                "OpenSearchSpout-"
+                        + context.getThisComponentId()
+                        + "-"
+                        + context.getThisTaskIndex();
+        queryExecutor =
+                Executors.newSingleThreadExecutor(
+                        r -> {
+                            Thread t = new Thread(r, executorName);
+                            t.setDaemon(true);
+                            return t;
+                        });
 
         indexName = ConfUtils.getString(stormConf, OSStatusIndexNameParamName, "status");
 
@@ -180,14 +207,59 @@ public abstract class AbstractSpout extends AbstractQueryingSpout {
     /** Builds a query and use it retrieve the results from OS * */
     protected abstract void populateBuffer();
 
-    protected final boolean addHitToBuffer(SearchHit hit) {
-        Map<String, Object> keyValues = hit.getSourceAsMap();
-        String url = (String) keyValues.get("url");
+    /**
+     * Converts the {@link JsonData} carried by a search hit into a plain {@code Map<String,
+     * Object>} populated with native Java types (strings, numbers, lists, nested maps).
+     *
+     * <p>This helper exists to work around a subtle short-circuit inside {@code JsonDataImpl#to}:
+     *
+     * <pre>{@code
+     * if (clazz.isAssignableFrom(value.getClass())) {
+     *     return (T) value;
+     * }
+     * }</pre>
+     *
+     * <p>When {@link JsonData} is produced via {@code JsonData._DESERIALIZER} (as opposed to a raw
+     * Jackson {@code TreeNode}), its internal {@code value} is a Jakarta JSON-P {@code JsonObject}
+     * — typically a Parsson {@code JsonObjectImpl}. Crucially, {@code jakarta.json.JsonObject
+     * extends Map<String, JsonValue>}, so calling {@code source.to(Map.class)} or {@code
+     * source.to(Object.class)} matches the {@code isAssignableFrom} guard and returns the raw
+     * {@code JsonObject} <em>without ever consulting the configured {@link
+     * org.opensearch.client.json.jackson.JacksonJsonpMapper}</em>. The resulting map values are
+     * still {@code JsonString}/{@code JsonStringImpl} instances and any downstream {@code (String)
+     * value} cast blows up with a {@link ClassCastException}.
+     *
+     * <p>Passing a concrete subclass that {@code JsonObject} does <em>not</em> implement (here
+     * {@link LinkedHashMap}) bypasses the short-circuit and forces the round-trip through {@code
+     * JacksonJsonpGenerator -> JacksonJsonpParser -> Jackson ObjectMapper.readValue}, which yields
+     * native Java values (String, Long, Double, ArrayList, LinkedHashMap…).
+     *
+     * @param source the document source carried by an OpenSearch hit; may be {@code null}
+     * @return a (possibly empty) map of native Java values, never {@code null}
+     */
+    static Map<String, Object> sourceAsMap(JsonData source) {
+        if (source == null) {
+            return Collections.emptyMap();
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> map = source.to(LinkedHashMap.class);
+        return map == null ? Collections.emptyMap() : map;
+    }
+
+    /**
+     * Adds a document source to the URL buffer unless it is already being processed.
+     *
+     * @param source the document source as a key-value map (must contain a "url" entry)
+     * @return {@code true} if the URL was added to the buffer, {@code false} if it was already
+     *     being processed or already present
+     */
+    protected final boolean addHitToBuffer(Map<String, Object> source) {
+        String url = (String) source.get("url");
         // is already being processed - skip it!
         if (beingProcessed.containsKey(url)) {
             return false;
         }
-        return buffer.add(url, fromKeyValues(keyValues));
+        return buffer.add(url, fromKeyValues(source));
     }
 
     protected final Metadata fromKeyValues(Map<String, Object> keyValues) {
@@ -225,10 +297,29 @@ public abstract class AbstractSpout extends AbstractQueryingSpout {
 
     @Override
     public void close() {
+        // Shut the dedicated query executor down first so no more requests can be enqueued
+        // against the client while we are tearing it down. We give in-flight queries a short
+        // grace period to drain to keep shutdown reasonably graceful.
+        if (queryExecutor != null) {
+            queryExecutor.shutdown();
+            try {
+                if (!queryExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+                    LOG.warn(
+                            "{} Query executor did not terminate within 30s, forcing shutdown",
+                            logIdprefix);
+                    queryExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                queryExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+            queryExecutor = null;
+        }
+
         synchronized (AbstractSpout.class) {
             if (client != null) {
                 try {
-                    client.close();
+                    client._transport().close();
                 } catch (IOException e) {
                     LOG.error("Exception caught when closing client", e);
                 }

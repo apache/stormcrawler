@@ -21,23 +21,22 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.Ticker;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.jetbrains.annotations.Nullable;
-import org.opensearch.action.DocWriteRequest;
-import org.opensearch.action.bulk.BulkItemResponse;
-import org.opensearch.action.bulk.BulkRequest;
-import org.opensearch.action.bulk.BulkResponse;
-import org.opensearch.core.rest.RestStatus;
+// opensearch-java: uses typed BulkRequest/BulkResponse, not legacy REST equivalents
+import org.opensearch.client.opensearch.core.BulkRequest;
+import org.opensearch.client.opensearch.core.BulkResponse;
 import org.slf4j.Logger;
 
 /**
@@ -54,8 +53,7 @@ public class WaitAckCache {
     }
 
     private final Cache<String, List<Tuple>> cache;
-    private final java.util.concurrent.locks.ReentrantLock lock =
-            new java.util.concurrent.locks.ReentrantLock(true);
+    private final ReentrantLock lock = new ReentrantLock(true);
     private final Logger log;
     private final Consumer<Tuple> onEviction;
 
@@ -64,7 +62,10 @@ public class WaitAckCache {
         this(Caffeine.newBuilder().expireAfterWrite(60, TimeUnit.SECONDS), log, onEviction);
     }
 
-    /** Creates a cache from a Caffeine spec string (e.g. "expireAfterWrite=300s"). */
+    /**
+     * Creates a cache using a {@link Caffeine} spec string (e.g. {@code "expireAfterWrite=300s"}),
+     * typically driven by {@code topology.message.timeout.secs}.
+     */
     public WaitAckCache(String cacheSpec, Logger log, Consumer<Tuple> onEviction) {
         this(Caffeine.from(cacheSpec), log, onEviction);
     }
@@ -98,6 +99,7 @@ public class WaitAckCache {
                         .build();
     }
 
+    /** Returns the approximate number of entries in this cache. */
     public long estimatedSize() {
         return cache.estimatedSize();
     }
@@ -176,21 +178,27 @@ public class WaitAckCache {
             @Nullable ScopedCounter conflictCounter,
             TupleAction action) {
 
+        // opensearch-java: items() returns List<BulkResponseItem>; status() returns int
         var idsToBulkItems =
-                Arrays.stream(response.getItems())
+                response.items().stream()
                         .map(
                                 bir -> {
-                                    BulkItemResponse.Failure f = bir.getFailure();
+                                    var error = bir.error();
                                     boolean failed = false;
-                                    if (f != null) {
-                                        if (f.getStatus().equals(RestStatus.CONFLICT)) {
+                                    if (error != null) {
+                                        // opensearch-java: int status code, not RestStatus enum
+                                        if (bir.status() == 409) {
                                             if (conflictCounter != null) {
                                                 conflictCounter.scope("doc_conflicts").incrBy(1);
                                             }
-                                            log.debug("Doc conflict ID {}", bir.getId());
+                                            log.debug("Doc conflict ID {}", bir.id());
                                         } else {
                                             log.error(
-                                                    "Bulk item failure ID {}: {}", bir.getId(), f);
+                                                    "Bulk item failure ID {}: {}",
+                                                    bir.id(),
+                                                    error.reason() != null
+                                                            ? error.reason()
+                                                            : error.type());
                                             failed = true;
                                         }
                                     }
@@ -198,7 +206,9 @@ public class WaitAckCache {
                                 })
                         .collect(
                                 // https://github.com/apache/stormcrawler/issues/832
-                                Collectors.groupingBy(b -> b.id, Collectors.toUnmodifiableList()));
+                                Collectors.groupingBy(
+                                        BulkItemResponseToFailedFlag::id,
+                                        Collectors.toUnmodifiableList()));
 
         Map<String, List<Tuple>> presentTuples;
         long estimatedSize;
@@ -230,7 +240,7 @@ public class WaitAckCache {
             if (tuples != null) {
                 log.debug("Found {} tuple(s) for ID {}", tuples.size(), id);
                 for (Tuple t : tuples) {
-                    if (selected.failed) {
+                    if (selected.failed()) {
                         failureCount++;
                     } else {
                         ackCount++;
@@ -257,15 +267,22 @@ public class WaitAckCache {
         }
     }
 
-    /** Processes a failed bulk request by failing all associated tuples. */
+    /**
+     * Processes a failed bulk request by failing all associated tuples.
+     *
+     * @param failAction callback applied to each tuple that must be failed
+     */
     public void processFailedBulk(
             BulkRequest request, long executionId, Throwable failure, Consumer<Tuple> failAction) {
 
         log.error("Exception with bulk {} - failing the whole lot ", executionId, failure);
 
+        // opensearch-java: operations() + getBulkOperationId replaces
+        //   legacy requests() + DocWriteRequest::id
         final var failedIds =
-                request.requests().stream()
-                        .map(DocWriteRequest::id)
+                request.operations().stream()
+                        .map(OpenSearchConnection::getBulkOperationId)
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toUnmodifiableSet());
 
         Map<String, List<Tuple>> failedTupleLists;
@@ -306,7 +323,7 @@ public class WaitAckCache {
         BulkItemResponseToFailedFlag best = items.get(0);
         int failedCount = 0;
         for (var item : items) {
-            if (item.failed) {
+            if (item.failed()) {
                 failedCount++;
             } else {
                 best = item;
