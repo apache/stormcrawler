@@ -283,6 +283,38 @@ public class URLUtil {
     }
 
     /**
+     * Returns {@link #getCanonicalHost(URL)} with Unicode labels converted to punycode, as okhttp
+     * does before it connects. Use it for keys (politeness queues, partitions, the robots.txt
+     * cache) so that the Unicode and punycode spellings of a host share one key; the URL itself is
+     * left alone, rewriting it is up to the URL normalizer.
+     *
+     * @param url The url to check.
+     * @return String The ASCII canonical host for the url, or null if the url is not well formed or
+     *     has no host.
+     */
+    public static String getASCIICanonicalHost(URL url) {
+        String host = getCanonicalHost(url);
+        if (host == null || isAscii(host)) {
+            return host;
+        }
+        // a host which is not a valid IDN keeps its Unicode spelling
+        try {
+            return IDN.toASCII(host);
+        } catch (IllegalArgumentException e) {
+            return host;
+        }
+    }
+
+    private static boolean isAscii(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) > 127) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Percent-decodes a host string, leaving {@code +} alone and keeping malformed escapes as
      * literal characters. The decoded octets are interpreted as UTF-8, so a multi-byte sequence
      * like {@code %C3%BC} becomes one character ({@code ü}) rather than one character per octet.
