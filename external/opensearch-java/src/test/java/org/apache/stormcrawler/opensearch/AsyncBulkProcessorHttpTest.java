@@ -17,7 +17,9 @@
 
 package org.apache.stormcrawler.opensearch;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -27,6 +29,9 @@ import static org.mockito.Mockito.verify;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -45,8 +50,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
+import org.opensearch.client.json.JsonData;
 import org.opensearch.client.json.jackson.JacksonJsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchAsyncClient;
+import org.opensearch.client.opensearch._types.Script;
 import org.opensearch.client.opensearch.core.BulkResponse;
 import org.opensearch.client.opensearch.core.bulk.BulkOperation;
 import org.opensearch.client.transport.OpenSearchTransport;
@@ -150,5 +157,77 @@ class AsyncBulkProcessorHttpTest {
         assertEquals(
                 List.of("a:200", "b:200"),
                 response.getValue().items().stream().map(i -> i.id() + ":" + i.status()).toList());
+    }
+
+    @Test
+    @Timeout(30)
+    void countedSizeEqualsTheBytesTheTransportSends() {
+        AsyncBulkProcessor p = processor(1);
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("list", Arrays.asList(null, "ünïcödé 日本語 😀"));
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("content", "line1\nline2\t\u0001   </script> \"q\" \\");
+        doc.put("metadata", metadata);
+        Script script =
+                Script.of(
+                        s ->
+                                s.inline(
+                                        in ->
+                                                in.source("ctx._source.n += params.n")
+                                                        .params("n", JsonData.of(5))));
+        List<BulkOperation> operations =
+                List.of(
+                        BulkOperation.of(b -> b.index(i -> i.index("idx").id("é").document(doc))),
+                        BulkOperation.of(b -> b.create(c -> c.index("idx").id("c").document(doc))),
+                        BulkOperation.of(b -> b.update(u -> u.index("idx").id("v").document(doc))),
+                        BulkOperation.of(
+                                b ->
+                                        b.update(
+                                                u ->
+                                                        u.index("idx")
+                                                                .id("u")
+                                                                .document(doc)
+                                                                .upsert(doc))),
+                        BulkOperation.of(
+                                b ->
+                                        b.update(
+                                                u ->
+                                                        u.index("idx")
+                                                                .id("s")
+                                                                .script(script)
+                                                                .upsert(doc))),
+                        BulkOperation.of(b -> b.delete(d -> d.index("idx").id("d"))));
+
+        for (int i = 0; i < operations.size(); i++) {
+            p.add(operations.get(i));
+            final int sent = i + 1;
+            await().atMost(Duration.ofSeconds(5)).until(() -> bodies.size() == sent);
+            assertEquals(
+                    bodies.get(i).length,
+                    AsyncBulkProcessor.serializedSize(new JacksonJsonpMapper(), operations.get(i)));
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void flushesWhenTheBufferedBytesReachTheThreshold() {
+        AsyncBulkProcessor p = processor(1000);
+        Map<String, Object> doc = Map.of("content", "x".repeat(1_000_000));
+        for (int i = 0; i < 12; i++) {
+            final String id = Integer.toString(i);
+            p.add(BulkOperation.of(b -> b.index(x -> x.index("idx").id(id).document(doc))));
+            // five documents of 1 MB stay below 5 MiB, the sixth crosses it
+            if (i == 4) {
+                assertTrue(bodies.isEmpty(), "flushed before reaching 5 MiB");
+            }
+            if (i == 5) {
+                await().atMost(Duration.ofSeconds(10)).until(() -> bodies.size() == 1);
+            }
+        }
+        await().atMost(Duration.ofSeconds(10)).until(() -> bodies.size() == 2);
+        for (byte[] body : bodies) {
+            assertEquals(12, new String(body, StandardCharsets.UTF_8).lines().count());
+            assertTrue(body.length >= AsyncBulkProcessor.BULK_SIZE_BYTES);
+        }
     }
 }

@@ -17,7 +17,11 @@
 
 package org.apache.stormcrawler.opensearch;
 
+import com.google.common.io.CountingOutputStream;
+import jakarta.json.stream.JsonGenerator;
+import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -30,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.IntStream;
+import org.opensearch.client.json.JsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchAsyncClient;
 import org.opensearch.client.opensearch.core.BulkRequest;
 import org.opensearch.client.opensearch.core.BulkResponse;
@@ -41,8 +46,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Replacement for the legacy {@code org.opensearch.action.bulk.BulkProcessor} that works with the
  * new opensearch-java client. Accumulates {@link BulkOperation} instances and flushes them to
- * OpenSearch either when the configured number of actions is reached or when a periodic timer
- * fires.
+ * OpenSearch when the configured number of actions is reached, when the buffered operations reach 5
+ * MiB, or when a periodic timer fires.
  *
  * <p>Bulk requests are sent with the {@link OpenSearchAsyncClient}, so the calling thread never
  * waits for the HTTP round trip. Concurrency is controlled via a {@link Semaphore}: each in-flight
@@ -60,6 +65,9 @@ public final class AsyncBulkProcessor implements AutoCloseable {
 
     private static final long[] RETRY_DELAYS_MILLIS = {50, 60, 80, 150, 280, 580, 1250, 2740};
 
+    /** Flush threshold, in bytes of the serialized operations before compression. */
+    static final long BULK_SIZE_BYTES = 5L * 1024 * 1024;
+
     /** Listener interface equivalent to the legacy {@code BulkProcessor.Listener}. */
     public interface Listener {
         void beforeBulk(long executionId, BulkRequest request);
@@ -70,6 +78,7 @@ public final class AsyncBulkProcessor implements AutoCloseable {
     }
 
     private final OpenSearchAsyncClient client;
+    private final JsonpMapper mapper;
     private final Listener listener;
     private final int bulkActions;
     private final int concurrentRequests;
@@ -78,6 +87,7 @@ public final class AsyncBulkProcessor implements AutoCloseable {
 
     private final ReentrantLock lock = new ReentrantLock();
     private List<BulkOperation> buffer;
+    private long bufferedBytes;
 
     private final ScheduledExecutorService scheduler;
     private final ScheduledFuture<?> flushTask;
@@ -89,6 +99,7 @@ public final class AsyncBulkProcessor implements AutoCloseable {
 
     private AsyncBulkProcessor(Builder builder) {
         this.client = builder.client;
+        this.mapper = client._transport().jsonpMapper();
         this.listener = builder.listener;
         this.bulkActions = builder.bulkActions;
         this.concurrentRequests = builder.concurrentRequests;
@@ -117,16 +128,22 @@ public final class AsyncBulkProcessor implements AutoCloseable {
                 });
     }
 
-    /** Adds a single bulk operation. Triggers a flush when {@code bulkActions} is reached. */
+    /**
+     * Adds a single bulk operation. Triggers a flush when {@code bulkActions} or 5 MiB of buffered
+     * operations is reached. The operation is serialized on the calling thread to count its size,
+     * so a serialization error is thrown from this method.
+     */
     public void add(BulkOperation operation) {
         if (closed.get()) {
             throw new IllegalStateException("BulkProcessor is closed");
         }
+        final long size = serializedSize(mapper, operation);
         List<BulkOperation> toFlush = null;
         lock.lock();
         try {
             buffer.add(operation);
-            if (buffer.size() >= bulkActions) {
+            bufferedBytes += size;
+            if (buffer.size() >= bulkActions || bufferedBytes >= BULK_SIZE_BYTES) {
                 toFlush = swapBuffer();
             }
         } finally {
@@ -160,7 +177,25 @@ public final class AsyncBulkProcessor implements AutoCloseable {
     private List<BulkOperation> swapBuffer() {
         List<BulkOperation> old = buffer;
         buffer = new ArrayList<>(bulkActions);
+        bufferedBytes = 0;
         return old;
+    }
+
+    /**
+     * Bytes the transport writes for the operation: each NDJSON line (action, then document or
+     * update body) serialized with the transport's mapper, plus a newline.
+     */
+    static long serializedSize(JsonpMapper mapper, BulkOperation operation) {
+        long size = 0;
+        for (Iterator<?> it = operation._serializables(); it.hasNext(); ) {
+            final CountingOutputStream line =
+                    new CountingOutputStream(OutputStream.nullOutputStream());
+            try (JsonGenerator generator = mapper.jsonProvider().createGenerator(line)) {
+                mapper.serialize(it.next(), generator);
+            }
+            size += line.getCount() + 1;
+        }
+        return size;
     }
 
     /** Builds the request, acquires a concurrency permit, and executes asynchronously. */

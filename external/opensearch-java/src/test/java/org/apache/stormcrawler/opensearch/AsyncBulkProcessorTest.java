@@ -31,10 +31,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.opensearch.client.json.jackson.JacksonJsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchAsyncClient;
 import org.opensearch.client.opensearch.core.BulkRequest;
 import org.opensearch.client.opensearch.core.BulkResponse;
 import org.opensearch.client.opensearch.core.bulk.BulkOperation;
+import org.opensearch.client.transport.OpenSearchTransport;
 
 class AsyncBulkProcessorTest {
 
@@ -50,8 +52,16 @@ class AsyncBulkProcessorTest {
                 .build();
     }
 
+    /** The processor takes the JSON mapper from the client's transport. */
+    static void stubMapper(OpenSearchAsyncClient client) {
+        OpenSearchTransport transport = mock(OpenSearchTransport.class);
+        when(transport.jsonpMapper()).thenReturn(new JacksonJsonpMapper());
+        when(client._transport()).thenReturn(transport);
+    }
+
     private static OpenSearchAsyncClient mockClient() throws IOException {
         OpenSearchAsyncClient client = mock(OpenSearchAsyncClient.class);
+        stubMapper(client);
         when(client.bulk(any(BulkRequest.class)))
                 .thenAnswer(invocation -> CompletableFuture.supplyAsync(() -> emptyBulkResponse()));
         return client;
@@ -153,6 +163,7 @@ class AsyncBulkProcessorTest {
         CountDownLatch allDone = new CountDownLatch(3);
 
         OpenSearchAsyncClient client = mock(OpenSearchAsyncClient.class);
+        stubMapper(client);
         when(client.bulk(any(BulkRequest.class)))
                 .thenAnswer(
                         invocation -> {
@@ -259,6 +270,7 @@ class AsyncBulkProcessorTest {
         CountDownLatch afterBulkLatch = new CountDownLatch(1);
 
         OpenSearchAsyncClient client = mock(OpenSearchAsyncClient.class);
+        stubMapper(client);
         when(client.bulk(any(BulkRequest.class))).thenReturn(pending);
 
         AsyncBulkProcessor.Listener listener =
