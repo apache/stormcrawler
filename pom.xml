@@ -747,7 +747,6 @@ under the License.
         <module>external/aws</module>
         <module>external/langid</module>
         <module>external/opensearch</module>
-        <module>external/opensearch-java</module>
         <module>external/playwright</module>
         <module>external/solr</module>
         <module>external/sql</module>

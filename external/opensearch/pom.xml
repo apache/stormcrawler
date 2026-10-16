@@ -30,7 +30,8 @@ under the License.
     </parent>
 
     <properties>
-        <opensearch.version>2.19.6</opensearch.version>
+        <opensearch.server.version>3.9.0</opensearch.server.version>
+        <opensearch.java.version>3.10.0</opensearch.java.version>
         <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
         <jacoco.classRatio>0.27</jacoco.classRatio>
         <jacoco.instructionRatio>0.27</jacoco.instructionRatio>
@@ -63,7 +64,7 @@ under the License.
                 </executions>
                 <configuration>
                     <systemPropertyVariables>
-                        <opensearch-version>${opensearch.version}</opensearch-version>
+                        <opensearch-version>${opensearch.server.version}</opensearch-version>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
@@ -73,22 +74,14 @@ under the License.
     <dependencies>
         <dependency>
             <groupId>org.opensearch.client</groupId>
-            <artifactId>opensearch-rest-high-level-client</artifactId>
-            <version>${opensearch.version}</version>
+            <artifactId>opensearch-java</artifactId>
+            <version>${opensearch.java.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
             <scope>test</scope>
-        </dependency>
-
-        <!--
-        https://mvnrepository.com/artifact/org.opensearch.client/opensearch-rest-client-sniffer -->
-        <dependency>
-            <groupId>org.opensearch.client</groupId>
-            <artifactId>opensearch-rest-client-sniffer</artifactId>
-            <version>${opensearch.version}</version>
         </dependency>
 
         <dependency>

@@ -18,9 +18,10 @@
 package org.apache.stormcrawler.opensearch.bolt;
 
 import static org.apache.stormcrawler.Constants.StatusStreamName;
-import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.commons.lang3.StringUtils;
@@ -34,17 +35,15 @@ import org.apache.stormcrawler.indexing.AbstractIndexerBolt;
 import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.metrics.ScopedReducedMetric;
+import org.apache.stormcrawler.opensearch.AsyncBulkProcessor;
 import org.apache.stormcrawler.opensearch.IndexCreation;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.opensearch.WaitAckCache;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.opensearch.action.bulk.BulkProcessor;
-import org.opensearch.action.bulk.BulkRequest;
-import org.opensearch.action.bulk.BulkResponse;
-import org.opensearch.action.index.IndexRequest;
-import org.opensearch.core.rest.RestStatus;
-import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.client.opensearch.core.BulkRequest;
+import org.opensearch.client.opensearch.core.BulkResponse;
+import org.opensearch.client.opensearch.core.bulk.BulkOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * Sends documents to opensearch. Indexes all the fields from the tuples or a Map
  * &lt;String,Object&gt; from a named field.
  */
-public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Listener {
+public class IndexerBolt extends AbstractIndexerBolt implements AsyncBulkProcessor.Listener {
 
     private static final Logger LOG = LoggerFactory.getLogger(IndexerBolt.class);
 
@@ -105,7 +104,7 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
         try {
             connection = OpenSearchConnection.getConnection(conf, OSBoltType, this);
         } catch (Exception e1) {
-            LOG.error("Can't connect to opensearch", e1);
+            LOG.error("Can't connect to OpenSearch", e1);
             throw new RuntimeException(e1);
         }
 
@@ -159,19 +158,19 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
         final String docID = getDocumentID(metadata, normalisedurl);
 
         try {
-            final XContentBuilder builder = jsonBuilder().startObject();
+            final Map<String, Object> source = new HashMap<>();
 
             // display text of the document?
             if (StringUtils.isNotBlank(fieldNameForText())) {
                 final String text = trimText(tuple.getStringByField("text"));
                 if (!ignoreEmptyFields() || StringUtils.isNotBlank(text)) {
-                    builder.field(fieldNameForText(), trimText(text));
+                    source.put(fieldNameForText(), trimText(text));
                 }
             }
 
             // send URL as field?
             if (StringUtils.isNotBlank(fieldNameForURL())) {
-                builder.field(fieldNameForURL(), normalisedurl);
+                source.put(fieldNameForURL(), normalisedurl);
             }
 
             // which metadata to display?
@@ -181,35 +180,54 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
                 if (entry.getValue().length == 1) {
                     final String value = entry.getValue()[0];
                     if (!ignoreEmptyFields() || StringUtils.isNotBlank(value)) {
-                        builder.field(entry.getKey(), value);
+                        source.put(entry.getKey(), value);
                     }
                 } else if (entry.getValue().length > 1) {
-                    builder.array(entry.getKey(), entry.getValue());
+                    source.put(entry.getKey(), Arrays.asList(entry.getValue()));
                 }
             }
 
-            builder.endObject();
-
-            final IndexRequest indexRequest =
-                    new IndexRequest(getIndexName(metadata))
-                            .source(builder)
-                            .id(docID)
-                            .create(create);
-
-            if (pipeline != null) {
-                indexRequest.setPipeline(pipeline);
+            final String targetIndex = getIndexName(metadata);
+            final BulkOperation op;
+            if (create) {
+                op =
+                        BulkOperation.of(
+                                b ->
+                                        b.create(
+                                                c -> {
+                                                    c.index(targetIndex).id(docID).document(source);
+                                                    if (pipeline != null) {
+                                                        c.pipeline(pipeline);
+                                                    }
+                                                    return c;
+                                                }));
+            } else {
+                op =
+                        BulkOperation.of(
+                                b ->
+                                        b.index(
+                                                idx -> {
+                                                    idx.index(targetIndex)
+                                                            .id(docID)
+                                                            .document(source);
+                                                    if (pipeline != null) {
+                                                        idx.pipeline(pipeline);
+                                                    }
+                                                    return idx;
+                                                }));
             }
 
-            connection.addToProcessor(indexRequest);
+            waitAck.addTuple(docID, tuple);
+
+            connection.addToProcessor(op);
 
             eventCounter.scope("Indexed").incrBy(1);
             perSecMetrics.scope("Indexed").update(1);
-
-            waitAck.addTuple(docID, tuple);
-        } catch (IOException e) {
+        } catch (Exception e) {
             LOG.error("Error building document for OpenSearch", e);
             // do not send to status stream so that it gets replayed
             _collector.fail(tuple);
+
             waitAck.invalidate(docID);
         }
     }
@@ -230,7 +248,7 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
     @Override
     public void afterBulk(long executionId, BulkRequest request, BulkResponse response) {
         eventCounter.scope("bulks_received").incrBy(1);
-        eventCounter.scope("bulk_msec").incrBy(response.getTook().getMillis());
+        eventCounter.scope("bulk_msec").incrBy(response.took());
 
         waitAck.processBulkResponse(
                 response,
@@ -240,7 +258,7 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
                     String url = (String) t.getValueByField("url");
                     Metadata metadata = (Metadata) t.getValueByField("metadata");
 
-                    if (!selected.failed) {
+                    if (!selected.failed()) {
                         _collector.emit(
                                 StatusStreamName, t, new Values(url, metadata, Status.FETCHED));
                         _collector.ack(t);
@@ -249,14 +267,16 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
                         LOG.error("update ID {}, URL {}, failure: {}", id, url, failure);
                         // there is something wrong with the content we should
                         // treat it as an ERROR
-                        if (failure.getStatus().equals(RestStatus.BAD_REQUEST)) {
+                        if (selected.getStatus() == 400) {
                             metadata.setValue(Constants.STATUS_ERROR_SOURCE, "OpenSearch indexing");
                             metadata.setValue(Constants.STATUS_ERROR_MESSAGE, "invalid content");
                             _collector.emit(
                                     StatusStreamName, t, new Values(url, metadata, Status.ERROR));
                             _collector.ack(t);
+                            LOG.debug("Acked {} with ID {}", url, id);
                         } else {
                             _collector.fail(t);
+                            LOG.debug("Failed {} with ID {}", url, id);
                         }
                     }
                 });
@@ -265,7 +285,6 @@ public class IndexerBolt extends AbstractIndexerBolt implements BulkProcessor.Li
     @Override
     public void afterBulk(long executionId, BulkRequest request, Throwable failure) {
         eventCounter.scope("bulks_received").incrBy(1);
-
         waitAck.processFailedBulk(
                 request,
                 executionId,

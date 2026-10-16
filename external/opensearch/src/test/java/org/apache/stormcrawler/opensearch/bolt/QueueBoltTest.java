@@ -31,7 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.http.HttpHost;
+import org.apache.hc.core5.http.HttpHost;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
@@ -44,12 +44,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.opensearch.action.get.GetRequest;
-import org.opensearch.action.get.GetResponse;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.RestClient;
-import org.opensearch.client.RestClientBuilder;
-import org.opensearch.client.RestHighLevelClient;
+import org.opensearch.client.json.jackson.JacksonJsonpMapper;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.core.GetResponse;
+import org.opensearch.client.transport.OpenSearchTransport;
+import org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +58,9 @@ class QueueBoltTest extends AbstractOpenSearchTest {
 
     protected TestOutputCollector output;
 
-    protected org.opensearch.client.RestHighLevelClient client;
+    protected OpenSearchClient client;
+
+    private OpenSearchTransport transport;
 
     private static final Logger LOG = LoggerFactory.getLogger(QueueBoltTest.class);
 
@@ -78,12 +79,15 @@ class QueueBoltTest extends AbstractOpenSearchTest {
 
     @BeforeEach
     void setupQueueBolt() throws IOException {
-        RestClientBuilder builder =
-                RestClient.builder(
-                        new HttpHost(
-                                opensearchContainer.getHost(),
-                                opensearchContainer.getMappedPort(9200)));
-        client = new RestHighLevelClient(builder);
+        transport =
+                ApacheHttpClient5TransportBuilder.builder(
+                                new HttpHost(
+                                        "http",
+                                        opensearchContainer.getHost(),
+                                        opensearchContainer.getMappedPort(9200)))
+                        .setMapper(new JacksonJsonpMapper())
+                        .build();
+        client = new OpenSearchClient(transport);
         output = new TestOutputCollector();
         bolt = prepareQueueBolt();
     }
@@ -105,7 +109,7 @@ class QueueBoltTest extends AbstractOpenSearchTest {
         bolt.cleanup();
         output = null;
         try {
-            client.close();
+            transport.close();
         } catch (IOException e) {
         }
     }
@@ -129,20 +133,19 @@ class QueueBoltTest extends AbstractOpenSearchTest {
                 .until(
                         () -> {
                             try {
-                                GetResponse result =
-                                        client.get(
-                                                new GetRequest("queues", id),
-                                                RequestOptions.DEFAULT);
-                                return result.isExists();
+                                GetResponse<Map> result =
+                                        client.get(g -> g.index("queues").id(id), Map.class);
+                                return result.found();
                             } catch (IOException e) {
                                 return false;
                             }
                         });
     }
 
+    @SuppressWarnings("unchecked")
     private Map<String, Object> getSource(String key) throws IOException {
         String id = org.apache.commons.codec.digest.DigestUtils.sha256Hex(key);
-        return client.get(new GetRequest("queues", id), RequestOptions.DEFAULT).getSourceAsMap();
+        return client.get(g -> g.index("queues").id(id), Map.class).source();
     }
 
     @Test

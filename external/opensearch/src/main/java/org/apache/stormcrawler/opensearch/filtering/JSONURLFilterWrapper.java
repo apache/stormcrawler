@@ -63,10 +63,7 @@ public class JSONURLFilterWrapper extends URLFilter {
     public void configure(@NotNull Map<String, Object> stormConf, @NotNull JsonNode filterParams) {
         refresher =
                 new DelegateRefresher<>(
-                        URLFilter.class,
-                        stormConf,
-                        filterParams,
-                        (delegate, conf, params) -> delegate.configure(conf, params));
+                        URLFilter.class, stormConf, filterParams, URLFilter::configure);
     }
 
     @Override
@@ -79,6 +76,8 @@ public class JSONURLFilterWrapper extends URLFilter {
 
     @Override
     public void cleanup() {
-        refresher.cleanup();
+        if (refresher != null) {
+            refresher.cleanup();
+        }
     }
 }
