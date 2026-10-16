@@ -20,8 +20,8 @@ package org.apache.stormcrawler.opensearch.bolt;
 import static org.apache.stormcrawler.Constants.StatusStreamName;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.commons.lang3.StringUtils;
@@ -183,7 +183,7 @@ public class IndexerBolt extends AbstractIndexerBolt implements AsyncBulkProcess
                         source.put(entry.getKey(), value);
                     }
                 } else if (entry.getValue().length > 1) {
-                    source.put(entry.getKey(), List.of(entry.getValue()));
+                    source.put(entry.getKey(), Arrays.asList(entry.getValue()));
                 }
             }
 
