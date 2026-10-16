@@ -38,10 +38,6 @@ import org.slf4j.LoggerFactory;
  * org.apache.stormcrawler.opensearch.parse.filter.JSONResourceWrapper} to eliminate duplicated
  * setup/refresh/cleanup logic.
  *
- * <p>This is the opensearch-java (OpenSearch Java Client 3.x / HC5) counterpart of the class with
- * the same name in the {@code external/opensearch} module. It uses the typed {@link
- * OpenSearchClient} instead of the deprecated {@code RestHighLevelClient}.
- *
  * @param <T> the base type that the delegate must extend (e.g. URLFilter or ParseFilter)
  */
 public class DelegateRefresher<T> {
