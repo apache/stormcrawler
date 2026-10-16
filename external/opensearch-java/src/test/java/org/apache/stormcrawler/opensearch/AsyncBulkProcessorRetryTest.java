@@ -121,6 +121,7 @@ class AsyncBulkProcessorRetryTest {
     private AsyncBulkProcessor processor(int bulkActions, long flushMillis, boolean manualRetries)
             throws IOException {
         OpenSearchAsyncClient client = mock(OpenSearchAsyncClient.class);
+        AsyncBulkProcessorTest.stubMapper(client);
         when(client.bulk(any(BulkRequest.class)))
                 .thenAnswer(
                         inv -> {
