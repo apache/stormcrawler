@@ -18,6 +18,8 @@
 package org.apache.stormcrawler.opensearch;
 
 import static org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder.DEFAULT_CONNECT_TIMEOUT_MILLIS;
+import static org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder.DEFAULT_MAX_CONN_PER_ROUTE;
+import static org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder.DEFAULT_MAX_CONN_TOTAL;
 import static org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder.DEFAULT_RESPONSE_TIMEOUT_MILLIS;
 
 import java.io.IOException;
@@ -435,7 +437,7 @@ public final class OpenSearchConnection {
                                     new HttpHost(proxyscheme, proxyhost, proxyport));
                         }
                         // Custom connection manager overrides the builder's internal one,
-                        // so timeouts and TlsDetailsFactory must be replicated here
+                        // so pool limits, timeouts and TlsDetailsFactory must be replicated here
                         if (disableTlsValidation) {
                             try {
                                 final SSLContext sslContext =
@@ -444,6 +446,8 @@ public final class OpenSearchConnection {
                                                 .build();
                                 httpClientBuilder.setConnectionManager(
                                         PoolingAsyncClientConnectionManagerBuilder.create()
+                                                .setMaxConnPerRoute(DEFAULT_MAX_CONN_PER_ROUTE)
+                                                .setMaxConnTotal(DEFAULT_MAX_CONN_TOTAL)
                                                 .setTlsStrategy(
                                                         ClientTlsStrategyBuilder.create()
                                                                 .setSslContext(sslContext)
