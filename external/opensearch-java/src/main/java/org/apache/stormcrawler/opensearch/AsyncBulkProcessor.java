@@ -29,10 +29,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.IntStream;
 import org.opensearch.client.opensearch.OpenSearchAsyncClient;
 import org.opensearch.client.opensearch.core.BulkRequest;
 import org.opensearch.client.opensearch.core.BulkResponse;
 import org.opensearch.client.opensearch.core.bulk.BulkOperation;
+import org.opensearch.client.opensearch.core.bulk.BulkResponseItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,10 +49,16 @@ import org.slf4j.LoggerFactory;
  * bulk request acquires a permit, which is only released once the listener has processed the
  * outcome. This provides natural back-pressure towards the Storm topology when the cluster slows
  * down.
+ *
+ * <p>Items rejected with status 429 are sent again up to 8 times, while the bulk keeps its permit.
+ * The listener's {@code afterBulk} is called once per bulk, with the items of all attempts in
+ * request order.
  */
 public final class AsyncBulkProcessor implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(AsyncBulkProcessor.class);
+
+    private static final long[] RETRY_DELAYS_MILLIS = {50, 60, 80, 150, 280, 580, 1250, 2740};
 
     /** Listener interface equivalent to the legacy {@code BulkProcessor.Listener}. */
     public interface Listener {
@@ -74,6 +82,9 @@ public final class AsyncBulkProcessor implements AutoCloseable {
     private final ScheduledExecutorService scheduler;
     private final ScheduledFuture<?> flushTask;
 
+    // separate from the flush thread, which can block on a permit that a retrying bulk holds
+    private final ScheduledExecutorService retryScheduler;
+
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     private AsyncBulkProcessor(Builder builder) {
@@ -84,19 +95,26 @@ public final class AsyncBulkProcessor implements AutoCloseable {
         this.concurrencyPermits = new Semaphore(this.concurrentRequests);
         this.buffer = new ArrayList<>(bulkActions);
 
-        this.scheduler =
-                Executors.newSingleThreadScheduledExecutor(
-                        r -> {
-                            Thread t = new Thread(r, "AsyncBulkProcessor-flush");
-                            t.setDaemon(true);
-                            return t;
-                        });
+        this.scheduler = daemonScheduler("AsyncBulkProcessor-flush");
+        this.retryScheduler =
+                builder.retryScheduler != null
+                        ? builder.retryScheduler
+                        : daemonScheduler("AsyncBulkProcessor-retry");
         this.flushTask =
                 scheduler.scheduleWithFixedDelay(
                         this::flushIfNeeded,
                         builder.flushIntervalMillis,
                         builder.flushIntervalMillis,
                         TimeUnit.MILLISECONDS);
+    }
+
+    private static ScheduledExecutorService daemonScheduler(String name) {
+        return Executors.newSingleThreadScheduledExecutor(
+                r -> {
+                    Thread t = new Thread(r, name);
+                    t.setDaemon(true);
+                    return t;
+                });
     }
 
     /** Adds a single bulk operation. Triggers a flush when {@code bulkActions} is reached. */
@@ -164,34 +182,75 @@ public final class AsyncBulkProcessor implements AutoCloseable {
             LOG.warn("beforeBulk callback threw exception", e);
         }
 
+        send(
+                new Bulk(executionId, request),
+                request,
+                IntStream.range(0, operations.size()).toArray());
+    }
+
+    /**
+     * Sends one attempt of the bulk. {@code positions[i]} is the position in the original request
+     * of the i-th operation of {@code attempt}.
+     */
+    private void send(Bulk bulk, BulkRequest attempt, int[] positions) {
         CompletableFuture<BulkResponse> future;
         try {
-            future = client.bulk(request);
+            future = client.bulk(attempt);
         } catch (Exception e) {
             future = CompletableFuture.failedFuture(e);
         }
-
-        // the permit is released only after the listener has run, so that the caller can't
-        // start a new bulk request while the outcome of the previous one is still being processed
         future.whenComplete(
                 (response, throwable) -> {
-                    try {
-                        if (throwable != null) {
-                            Throwable cause =
-                                    throwable instanceof CompletionException
-                                                    && throwable.getCause() != null
-                                            ? throwable.getCause()
-                                            : throwable;
-                            listener.afterBulk(executionId, request, cause);
-                        } else {
-                            listener.afterBulk(executionId, request, response);
+                    Throwable failure =
+                            throwable instanceof CompletionException && throwable.getCause() != null
+                                    ? throwable.getCause()
+                                    : throwable;
+                    BulkResponse result = null;
+                    if (failure == null) {
+                        try {
+                            final int[] rejected = bulk.merge(response, positions);
+                            if (rejected.length > 0 && bulk.retries < RETRY_DELAYS_MILLIS.length) {
+                                retry(bulk, rejected);
+                                return;
+                            }
+                            result = bulk.result(response);
+                        } catch (RuntimeException e) {
+                            failure = e;
                         }
-                    } catch (Exception e) {
-                        LOG.warn("afterBulk callback threw exception", e);
-                    } finally {
-                        concurrencyPermits.release();
                     }
+                    finish(bulk, result, failure);
                 });
+    }
+
+    private void retry(Bulk bulk, int[] positions) {
+        final long delay = RETRY_DELAYS_MILLIS[bulk.retries++];
+        LOG.debug(
+                "Bulk [{}]: retrying {} items rejected with status 429 in {} ms",
+                bulk.executionId,
+                positions.length,
+                delay);
+        final List<BulkOperation> operations = new ArrayList<>(positions.length);
+        for (int position : positions) {
+            operations.add(bulk.request.operations().get(position));
+        }
+        final BulkRequest attempt = new BulkRequest.Builder().operations(operations).build();
+        retryScheduler.schedule(() -> send(bulk, attempt, positions), delay, TimeUnit.MILLISECONDS);
+    }
+
+    // the permit is released only after the listener has run, so that the caller can't
+    // start a new bulk request while the outcome of the previous one is still being processed
+    private void finish(Bulk bulk, BulkResponse response, Throwable failure) {
+        try {
+            if (failure != null) {
+                listener.afterBulk(bulk.executionId, bulk.request, failure);
+            } else {
+                listener.afterBulk(bulk.executionId, bulk.request, response);
+            }
+        } catch (Exception e) {
+            LOG.warn("afterBulk callback threw exception", e);
+        } finally {
+            concurrencyPermits.release();
+        }
     }
 
     /**
@@ -222,13 +281,17 @@ public final class AsyncBulkProcessor implements AutoCloseable {
             executeBulk(remaining);
         }
 
-        // Wait for all in-flight requests to finish by acquiring all permits
-        boolean acquired = concurrencyPermits.tryAcquire(concurrentRequests, timeout, unit);
-        if (acquired) {
-            concurrencyPermits.release(concurrentRequests);
+        // Wait for all in-flight requests to finish, retries included, by acquiring all permits
+        try {
+            boolean acquired = concurrencyPermits.tryAcquire(concurrentRequests, timeout, unit);
+            if (acquired) {
+                concurrencyPermits.release(concurrentRequests);
+            }
+            return acquired;
+        } finally {
+            // retries still waiting after the timeout are dropped
+            retryScheduler.shutdownNow();
         }
-
-        return acquired;
     }
 
     @Override
@@ -240,6 +303,54 @@ public final class AsyncBulkProcessor implements AutoCloseable {
         }
     }
 
+    /** One bulk and the merged items of its attempts. */
+    private static final class Bulk {
+        final long executionId;
+        final BulkRequest request;
+
+        // items is set once a response has items to retry. The attempts of a bulk run one after
+        // the other, so these fields need no lock.
+        List<BulkResponseItem> items;
+        long took;
+        int retries;
+
+        Bulk(long executionId, BulkRequest request) {
+            this.executionId = executionId;
+            this.request = request;
+        }
+
+        /** Merges the items of an attempt and returns the positions still rejected with 429. */
+        int[] merge(BulkResponse response, int[] positions) {
+            final List<BulkResponseItem> received = response.items();
+            if (items == null && received.stream().noneMatch(i -> i.status() == 429)) {
+                return new int[0];
+            }
+            if (received.size() != positions.length) {
+                throw new IllegalStateException("Bulk response items do not match the request");
+            }
+            if (items == null) {
+                items = new ArrayList<>(received);
+            } else {
+                for (int i = 0; i < positions.length; i++) {
+                    items.set(positions[i], received.get(i));
+                }
+            }
+            took += response.took();
+            return IntStream.range(0, items.size())
+                    .filter(i -> items.get(i).status() == 429)
+                    .toArray();
+        }
+
+        /** The response for the listener: the last one, or the merged items after retries. */
+        BulkResponse result(BulkResponse last) {
+            if (items == null) {
+                return last;
+            }
+            final boolean errors = items.stream().anyMatch(i -> i.error() != null);
+            return BulkResponse.of(b -> b.took(took).errors(errors).items(items));
+        }
+    }
+
     /** Builder for {@link AsyncBulkProcessor}. */
     public static final class Builder {
         private final OpenSearchAsyncClient client;
@@ -247,6 +358,7 @@ public final class AsyncBulkProcessor implements AutoCloseable {
         private int bulkActions = 50;
         private long flushIntervalMillis = 5000;
         private int concurrentRequests = 1;
+        private ScheduledExecutorService retryScheduler;
 
         public Builder(OpenSearchAsyncClient client, Listener listener) {
             this.client = client;
@@ -265,6 +377,12 @@ public final class AsyncBulkProcessor implements AutoCloseable {
 
         public Builder setConcurrentRequests(int concurrentRequests) {
             this.concurrentRequests = Math.max(1, concurrentRequests);
+            return this;
+        }
+
+        /** Test hook: schedules the retries on the given executor. */
+        Builder retryScheduler(ScheduledExecutorService retryScheduler) {
+            this.retryScheduler = retryScheduler;
             return this;
         }
 
