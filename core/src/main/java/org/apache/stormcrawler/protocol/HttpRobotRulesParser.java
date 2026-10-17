@@ -111,8 +111,9 @@ public class HttpRobotRulesParser extends RobotRulesParser {
     protected static String getCacheKey(URL url) {
         String protocol = url.getProtocol().toLowerCase(Locale.ROOT);
         // canonicalise the host so aliases of one server (percent-escaping,
-        // case, trailing dot) share one cache entry and one robots.txt fetch
-        String host = URLUtil.getCanonicalHost(url);
+        // case, trailing dot, punycode) share one cache entry and one
+        // robots.txt fetch
+        String host = URLUtil.getASCIICanonicalHost(url);
         if (host == null) {
             host = "";
         }

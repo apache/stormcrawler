@@ -69,8 +69,8 @@ public final class FetchItem {
         }
 
         // one canonical host for all queue modes: aliases of one server
-        // (percent-escaping, case, trailing dot) must share a queue
-        final String canonicalHost = URLUtil.getCanonicalHost(u);
+        // (percent-escaping, case, trailing dot, punycode) must share a queue
+        final String canonicalHost = URLUtil.getASCIICanonicalHost(u);
 
         if (FetchItemQueues.QUEUE_MODE_IP.equalsIgnoreCase(queueMode)) {
             try {
