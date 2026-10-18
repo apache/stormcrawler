@@ -72,9 +72,11 @@ class HostAliasCacheKeyTest {
                 HttpUrl.parse("http://examplé.org/a").host(),
                 URLUtil.getASCIICanonicalHost(new URL("http://examplé.org/a")));
         Assertions.assertEquals(
-                "xn--exampl-gva.org", URLUtil.getASCIICanonicalHost(new URL("http://examplé.org/a")));
+                "xn--exampl-gva.org",
+                URLUtil.getASCIICanonicalHost(new URL("http://examplé.org/a")));
         Assertions.assertEquals(
-                "xn--exampl-gva.org", URLUtil.getASCIICanonicalHost(new URL("http://ExAmplé.org/a")));
+                "xn--exampl-gva.org",
+                URLUtil.getASCIICanonicalHost(new URL("http://ExAmplé.org/a")));
         Assertions.assertEquals(
                 "xn--exampl-gva.org",
                 URLUtil.getASCIICanonicalHost(new URL("http://xn--exampl-gva.org/a")));
