@@ -394,7 +394,10 @@ class AsyncBulkProcessorRetryTest {
         assertEquals(List.of(next), output.getAckedTuples());
     }
 
-    /** Two tuples for one URL in one bulk: WaitAckCache acks both when one write succeeded. */
+    /**
+     * Two tuples for one URL in one bulk: WaitAckCache acks both when one write succeeded, although
+     * the second write was never stored.
+     */
     @Test
     void duplicateIdIsAckedWhenOneWriteSucceeds() throws IOException {
         StatusUpdaterBolt bolt = bolt(2);

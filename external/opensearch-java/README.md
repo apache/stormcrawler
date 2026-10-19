@@ -17,10 +17,14 @@ operations into bulk requests and:
   `opensearch.<bolt>.bulkActions`, when the buffered operations reach 5 MiB of
   JSON (counted before compression), or when `opensearch.<bolt>.flushInterval`
   elapses.
-* resends the items that OpenSearch rejects with status 429 (too many requests)
-  up to 8 times, after 50, 60, 80, 150, 280, 580, 1250 and 2740 ms.
-  `IndexerBolt`, `DeletionBolt` and `StatusUpdaterBolt` fail the tuple of an
-  item still rejected after the last retry.
+* resends the items rejected with status 429 (too many requests) in the bulk
+  response up to 8 times, after 50, 60, 80, 150, 280, 580, 1250 and 2740 ms.
+  A request that OpenSearch rejects as a whole, with status 429 or any other
+  error, is not resent. `IndexerBolt`, `DeletionBolt` and `StatusUpdaterBolt`
+  fail the tuple of an item still rejected after the last retry.
+* fails the whole bulk when a retry fails as a whole, for example on a
+  connection error: `IndexerBolt`, `DeletionBolt` and `StatusUpdaterBolt` fail
+  the tuples of all its items, including those stored by an earlier attempt.
 * sends the requests without blocking the bolt. The bolt waits only when
   `opensearch.<bolt>.concurrentRequests` bulks are in flight, including bulks
   waiting for a retry.
