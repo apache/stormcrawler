@@ -298,7 +298,13 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
 
         LOG.debug("Sending to OpenSearch buffer {} with ID {}", url, documentID);
 
-        connection.addToProcessor(op);
+        try {
+            connection.addToProcessor(op);
+        } catch (Exception e) {
+            // the caller fails the tuple, so no bulk response may ack or fail it again
+            waitAck.invalidate(documentID);
+            throw e;
+        }
     }
 
     @Override

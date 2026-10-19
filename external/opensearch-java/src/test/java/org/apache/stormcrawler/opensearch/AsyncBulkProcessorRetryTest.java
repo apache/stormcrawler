@@ -111,6 +111,12 @@ class AsyncBulkProcessorRetryTest {
 
     private final TestOutputCollector output = new TestOutputCollector();
 
+    /**
+     * Thrown by the next addToProcessor() of the bolt connection, the way a serialization error
+     * would be.
+     */
+    private RuntimeException addFailure;
+
     @AfterEach
     void close() throws Exception {
         for (AsyncBulkProcessor p : processors) {
@@ -308,6 +314,11 @@ class AsyncBulkProcessorRetryTest {
         OpenSearchConnection connection = mock(OpenSearchConnection.class);
         doAnswer(
                         inv -> {
+                            if (addFailure != null) {
+                                RuntimeException e = addFailure;
+                                addFailure = null;
+                                throw e;
+                            }
                             p.add(inv.getArgument(0));
                             return null;
                         })
@@ -366,6 +377,21 @@ class AsyncBulkProcessorRetryTest {
 
         assertEquals(List.of(50L, 60L, 80L, 150L, 280L, 580L, 1250L, 2740L), delays);
         assertEquals(List.of(t), output.getFailedTuples());
+    }
+
+    @Test
+    void tupleFailedWhileAddingIsNotAckedByALaterWrite() throws IOException {
+        StatusUpdaterBolt bolt = bolt(1);
+        Tuple failed = tuple("https://a/");
+        addFailure = new IllegalStateException("cannot serialize");
+        bolt.execute(failed);
+        Tuple next = tuple("https://a/");
+        bolt.execute(next);
+
+        reply(0, 200);
+
+        assertEquals(List.of(failed), output.getFailedTuples());
+        assertEquals(List.of(next), output.getAckedTuples());
     }
 
     /** Two tuples for one URL in one bulk: WaitAckCache acks both when one write succeeded. */
