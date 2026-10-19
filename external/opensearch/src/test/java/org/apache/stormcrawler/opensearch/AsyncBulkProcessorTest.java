@@ -25,7 +25,9 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -110,6 +112,48 @@ class AsyncBulkProcessorTest {
         assertEquals(1, afterBulkCount.get());
 
         processor.awaitClose(5, TimeUnit.SECONDS);
+    }
+
+    /** Adds three operations to a processor with the given bulkActions, then closes it. */
+    private static List<Integer> bulkSizes(int bulkActions) throws Exception {
+        List<Integer> sizes = new CopyOnWriteArrayList<>();
+        AsyncBulkProcessor.Listener listener =
+                new AsyncBulkProcessor.Listener() {
+                    @Override
+                    public void beforeBulk(long executionId, BulkRequest request) {}
+
+                    @Override
+                    public void afterBulk(
+                            long executionId, BulkRequest request, BulkResponse response) {
+                        sizes.add(request.operations().size());
+                    }
+
+                    @Override
+                    public void afterBulk(
+                            long executionId, BulkRequest request, Throwable failure) {}
+                };
+        AsyncBulkProcessor processor =
+                new AsyncBulkProcessor.Builder(mockClient(), listener)
+                        .setBulkActions(bulkActions)
+                        .setFlushIntervalMillis(60_000)
+                        .build();
+        processor.add(dummyOp());
+        processor.add(dummyOp());
+        processor.add(dummyOp());
+        assertTrue(processor.awaitClose(5, TimeUnit.SECONDS));
+        return sizes;
+    }
+
+    @Test
+    @Timeout(10)
+    void negativeBulkActionsTurnsOffTheCountLimit() throws Exception {
+        assertEquals(List.of(3), bulkSizes(-1));
+    }
+
+    @Test
+    @Timeout(10)
+    void zeroBulkActionsSendsEachOperationInItsOwnBulk() throws Exception {
+        assertEquals(List.of(1, 1, 1), bulkSizes(0));
     }
 
     /** Verify that the timer-based flush fires even when bulkActions threshold is not reached. */

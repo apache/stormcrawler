@@ -104,7 +104,7 @@ public final class AsyncBulkProcessor implements AutoCloseable {
         this.bulkActions = builder.bulkActions;
         this.concurrentRequests = builder.concurrentRequests;
         this.concurrencyPermits = new Semaphore(this.concurrentRequests);
-        this.buffer = new ArrayList<>(bulkActions);
+        this.buffer = new ArrayList<>();
 
         this.scheduler = daemonScheduler("AsyncBulkProcessor-flush");
         this.retryScheduler =
@@ -143,7 +143,8 @@ public final class AsyncBulkProcessor implements AutoCloseable {
         try {
             buffer.add(operation);
             bufferedBytes += size;
-            if (buffer.size() >= bulkActions || bufferedBytes >= BULK_SIZE_BYTES) {
+            if ((bulkActions >= 0 && buffer.size() >= bulkActions)
+                    || bufferedBytes >= BULK_SIZE_BYTES) {
                 toFlush = swapBuffer();
             }
         } finally {
@@ -176,7 +177,7 @@ public final class AsyncBulkProcessor implements AutoCloseable {
      */
     private List<BulkOperation> swapBuffer() {
         List<BulkOperation> old = buffer;
-        buffer = new ArrayList<>(bulkActions);
+        buffer = new ArrayList<>();
         bufferedBytes = 0;
         return old;
     }
@@ -400,6 +401,10 @@ public final class AsyncBulkProcessor implements AutoCloseable {
             this.listener = listener;
         }
 
+        /**
+         * Sets the number of buffered operations that triggers a bulk request. A negative value
+         * turns off this limit; the size limit and the flush interval still apply.
+         */
         public Builder setBulkActions(int bulkActions) {
             this.bulkActions = bulkActions;
             return this;

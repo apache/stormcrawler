@@ -21,7 +21,8 @@ configuration keys below, `<type>` is `indexer`, `status`, `metrics` or
 * sends a bulk request when the number of buffered operations reaches
   `opensearch.<type>.bulkActions`, when the buffered operations reach 5 MiB of
   JSON (counted before compression), or when `opensearch.<type>.flushInterval`
-  elapses.
+  elapses. A negative `bulkActions` turns off the limit on the number of
+  operations.
 * resends the items rejected with status 429 (too many requests) in the bulk
   response up to 8 times, after 50, 60, 80, 150, 280, 580, 1250 and 2740 ms.
   A request that OpenSearch rejects as a whole, with status 429 or any other
