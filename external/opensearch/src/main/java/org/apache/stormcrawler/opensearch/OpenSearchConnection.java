@@ -278,30 +278,31 @@ public final class OpenSearchConnection {
     private record ClientResources(OpenSearchClient client, OpenSearchTransport transport) {}
 
     /**
-     * Logs a WARN for configuration keys that earlier releases of this module read and this one
-     * ignores, so that users upgrading notice silently-dropped tuning. See the module README for
-     * the full list of differences.
+     * Logs a WARN for configuration keys, per type or global, that earlier releases of this module
+     * read and this one ignores. See the module README for the full list of differences.
      */
     private static void warnOnRemovedKeys(Map<String, Object> stormConf, String dottedType) {
-        final String responseBufferKey = Constants.PARAMPREFIX + dottedType + "responseBufferSize";
-        if (stormConf.containsKey(responseBufferKey)) {
-            LOG.warn(
-                    "Configuration key '{}' is set but no longer supported. "
-                            + "The HC5-based async transport does not expose an equivalent per-request "
-                            + "heap-buffer override. The setting is ignored — remove it from your "
-                            + "configuration. See external/opensearch/README.md for details.",
-                    responseBufferKey);
-        }
+        for (String prefix : List.of(Constants.PARAMPREFIX + dottedType, Constants.PARAMPREFIX)) {
+            final String responseBufferKey = prefix + "responseBufferSize";
+            if (stormConf.containsKey(responseBufferKey)) {
+                LOG.warn(
+                        "Configuration key '{}' is set but no longer supported. "
+                                + "The HC5-based async transport does not expose an equivalent per-request "
+                                + "heap-buffer override. The setting is ignored — remove it from your "
+                                + "configuration. See external/opensearch/README.md for details.",
+                        responseBufferKey);
+            }
 
-        final String sniffKey = Constants.PARAMPREFIX + dottedType + "sniff";
-        if (stormConf.containsKey(sniffKey)) {
-            LOG.warn(
-                    "Configuration key '{}' is set but no longer supported. "
-                            + "The OpenSearch Java Client 3.x does not ship a Sniffer equivalent, so "
-                            + "automatic node discovery is not available. Keep the 'addresses' list up to "
-                            + "date manually or put a load balancer in front of the cluster. "
-                            + "See external/opensearch/README.md for details.",
-                    sniffKey);
+            final String sniffKey = prefix + "sniff";
+            if (stormConf.containsKey(sniffKey)) {
+                LOG.warn(
+                        "Configuration key '{}' is set but no longer supported. "
+                                + "The OpenSearch Java Client 3.x does not ship a Sniffer equivalent, so "
+                                + "automatic node discovery is not available. Keep the 'addresses' list up to "
+                                + "date manually or put a load balancer in front of the cluster. "
+                                + "See external/opensearch/README.md for details.",
+                        sniffKey);
+            }
         }
     }
 
