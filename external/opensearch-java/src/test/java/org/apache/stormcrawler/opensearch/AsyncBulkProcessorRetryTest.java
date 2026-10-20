@@ -43,11 +43,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import org.apache.storm.task.IBolt;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
 import org.apache.stormcrawler.TestUtil;
+import org.apache.stormcrawler.opensearch.bolt.DeletionBolt;
 import org.apache.stormcrawler.opensearch.persistence.StatusUpdaterBolt;
 import org.apache.stormcrawler.persistence.AbstractStatusUpdaterBolt;
 import org.apache.stormcrawler.persistence.DefaultScheduler;
@@ -304,12 +306,16 @@ class AsyncBulkProcessorRetryTest {
         assertEquals(List.of("a:200"), statuses(outcomes.get(0)));
     }
 
+    private StatusUpdaterBolt bolt(int bulkActions) throws IOException {
+        return prepared(new StatusUpdaterBolt(), bulkActions);
+    }
+
     /**
-     * StatusUpdaterBolt with the real processor and WaitAckCache. OpenSearchConnection is mocked
+     * The bolt prepared with the real processor and WaitAckCache. OpenSearchConnection is mocked
      * statically so that prepare() gets a connection which feeds the processor, and the listener
      * the bolt passes to it is captured as {@code delegate}, so that the outcomes reach the bolt.
      */
-    private StatusUpdaterBolt bolt(int bulkActions) throws IOException {
+    private <B extends IBolt> B prepared(B bolt, int bulkActions) throws IOException {
         AsyncBulkProcessor p = processor(bulkActions, 60_000, true);
         OpenSearchConnection connection = mock(OpenSearchConnection.class);
         doAnswer(
@@ -329,7 +335,6 @@ class AsyncBulkProcessorRetryTest {
         conf.put(
                 AbstractStatusUpdaterBolt.cacheConfigParamName,
                 "maximumSize=10000,expireAfterAccess=1h");
-        StatusUpdaterBolt bolt = new StatusUpdaterBolt();
         try (MockedStatic<OpenSearchConnection> factory = mockStatic(OpenSearchConnection.class);
                 MockedStatic<IndexCreation> ignored = mockStatic(IndexCreation.class)) {
             factory.when(() -> OpenSearchConnection.getBulkOperationId(any())).thenCallRealMethod();
@@ -382,6 +387,21 @@ class AsyncBulkProcessorRetryTest {
     @Test
     void tupleFailedWhileAddingIsNotAckedByALaterWrite() throws IOException {
         StatusUpdaterBolt bolt = bolt(1);
+        Tuple failed = tuple("https://a/");
+        addFailure = new IllegalStateException("cannot serialize");
+        bolt.execute(failed);
+        Tuple next = tuple("https://a/");
+        bolt.execute(next);
+
+        reply(0, 200);
+
+        assertEquals(List.of(failed), output.getFailedTuples());
+        assertEquals(List.of(next), output.getAckedTuples());
+    }
+
+    @Test
+    void deletionFailedWhileAddingIsNotAckedByALaterDeletion() throws IOException {
+        DeletionBolt bolt = prepared(new DeletionBolt(), 1);
         Tuple failed = tuple("https://a/");
         addFailure = new IllegalStateException("cannot serialize");
         bolt.execute(failed);
