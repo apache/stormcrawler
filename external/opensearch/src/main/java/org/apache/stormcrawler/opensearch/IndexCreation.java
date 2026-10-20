@@ -29,6 +29,12 @@ import org.slf4j.Logger;
 
 public class IndexCreation {
 
+    /**
+     * Creates the index with the {@code <boltType>.mapping} resource if it does not exist.
+     *
+     * @throws IllegalArgumentException if the index does not exist and the resource is not on the
+     *     classpath
+     */
     public static synchronized void checkOrCreateIndex(
             OpenSearchClient client, String indexName, String boltType, Logger log)
             throws IOException {
@@ -43,6 +49,13 @@ public class IndexCreation {
         }
     }
 
+    /**
+     * Creates the template {@code <boltType>-template} with the {@code <boltType>.mapping} resource
+     * if it does not exist.
+     *
+     * @throws IllegalArgumentException if the template does not exist and the resource is not on
+     *     the classpath
+     */
     public static synchronized void checkOrCreateIndexTemplate(
             OpenSearchClient client, String boltType, Logger log) throws IOException {
         final String templateName = boltType + "-template";
@@ -63,10 +76,9 @@ public class IndexCreation {
     private static boolean createTemplate(
             OpenSearchClient client, String templateName, String resourceName, Logger log) {
 
-        try {
-            final URL mapping =
-                    Thread.currentThread().getContextClassLoader().getResource(resourceName);
+        final URL mapping = Resources.getResource(resourceName);
 
+        try {
             final String jsonIndexConfiguration =
                     Resources.toString(mapping, StandardCharsets.UTF_8);
 
@@ -90,10 +102,9 @@ public class IndexCreation {
     private static boolean createIndex(
             OpenSearchClient client, String indexName, String resourceName, Logger log) {
 
-        try {
-            final URL mapping =
-                    Thread.currentThread().getContextClassLoader().getResource(resourceName);
+        final URL mapping = Resources.getResource(resourceName);
 
+        try {
             final String jsonIndexConfiguration =
                     Resources.toString(mapping, StandardCharsets.UTF_8);
 

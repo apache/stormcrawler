@@ -123,10 +123,6 @@ described above are new, and `AsyncBulkProcessor.Builder` takes an
 
 ### Behaviour
 
-* If a mapping resource (`status.mapping`, `indexer.mapping`, `metrics.mapping`
-  or `queues.mapping`) is missing from the classpath, the component logs a WARN
-  and starts without creating its index or template. Earlier versions failed at
-  startup. The archetype generates these files under `src/main/resources`.
 * Items rejected with status 429 are resent even when other items of the same
   bulk failed with another status, for example a 409 from the `create` of a URL
   that is already in the status index. The `BulkProcessor` of earlier versions
