@@ -64,4 +64,49 @@ class HostAliasCacheKeyTest {
         Assertions.assertEquals(
                 canonical, HttpRobotRulesParser.getCacheKey(new URL("http://EXAMPLE.org/a")));
     }
+
+    @Test
+    void unicodeAndPunycodeHostsShareOneKey() throws Exception {
+        // okhttp connects to the punycode form
+        Assertions.assertEquals(
+                HttpUrl.parse("http://examplé.org/a").host(),
+                URLUtil.getASCIICanonicalHost(new URL("http://examplé.org/a")));
+        Assertions.assertEquals(
+                "xn--exampl-gva.org",
+                URLUtil.getASCIICanonicalHost(new URL("http://examplé.org/a")));
+        Assertions.assertEquals(
+                "xn--exampl-gva.org",
+                URLUtil.getASCIICanonicalHost(new URL("http://ExAmplé.org/a")));
+        Assertions.assertEquals(
+                "xn--exampl-gva.org",
+                URLUtil.getASCIICanonicalHost(new URL("http://xn--exampl-gva.org/a")));
+        Assertions.assertEquals(
+                "xn--exampl-gva.org",
+                URLUtil.getASCIICanonicalHost(new URL("http://exampl%C3%A9.org./a")));
+        Assertions.assertEquals(
+                HttpRobotRulesParser.getCacheKey(new URL("http://xn--exampl-gva.org/a")),
+                HttpRobotRulesParser.getCacheKey(new URL("http://ExAmplé.org/a")));
+    }
+
+    @Test
+    void asciiHostIsUnchanged() throws Exception {
+        Assertions.assertEquals(
+                "example.com", URLUtil.getASCIICanonicalHost(new URL("http://example.com/a")));
+    }
+
+    @Test
+    void canonicalHostKeepsUnicode() throws Exception {
+        // the punycode step is only for keys, the canonical host stays decoded
+        Assertions.assertEquals(
+                "examplé.org", URLUtil.getCanonicalHost(new URL("http://ExAmplé.org/a")));
+    }
+
+    @Test
+    void invalidIdnKeepsRawSpelling() throws Exception {
+        // a label over 63 characters cannot be converted
+        String label = "é".repeat(70);
+        Assertions.assertEquals(
+                label + ".org",
+                URLUtil.getASCIICanonicalHost(new URL("http://" + label + ".org/")));
+    }
 }

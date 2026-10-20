@@ -60,8 +60,9 @@ public class URLPartitioner {
             try {
                 u = URLUtil.toURL(url);
                 // canonical host so that aliases of one server (percent-escaping, case, trailing
-                // dot) get the same partition key as the one the fetcher will queue them under
-                host = URLUtil.getCanonicalHost(u);
+                // dot, punycode) get the same partition key as the one the fetcher will queue
+                // them under
+                host = URLUtil.getASCIICanonicalHost(u);
             } catch (MalformedURLException e) {
                 LOG.warn("Invalid URL: {}", url);
                 return null;
