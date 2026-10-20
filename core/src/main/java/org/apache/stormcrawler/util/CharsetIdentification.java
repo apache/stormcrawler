@@ -61,6 +61,18 @@ public class CharsetIdentification {
      */
     public static String getCharsetFast(
             final Metadata metadata, final byte[] content, final int maxLengthCharsetDetection) {
+        return getCharsetFast(metadata, content, maxLengthCharsetDetection, "");
+    }
+
+    /**
+     * Same as {@link #getCharsetFast(Metadata, byte[], int)}, reading the HTTP Content-Type under
+     * the prefix the fetcher stores the response headers with (protocol.md.prefix).
+     */
+    public static String getCharsetFast(
+            final Metadata metadata,
+            final byte[] content,
+            final int maxLengthCharsetDetection,
+            final String protocolMetadataPrefix) {
 
         // let's look at the BOM first
         String charset = getCharsetFromBOM(content);
@@ -69,7 +81,7 @@ public class CharsetIdentification {
         }
 
         // then look at what we get from HTTP headers
-        charset = getCharsetFromHTTP(metadata);
+        charset = getCharsetFromHTTP(metadata, protocolMetadataPrefix);
         if (charset != null) {
             return charset;
         }
@@ -97,6 +109,18 @@ public class CharsetIdentification {
      */
     public static String getCharset(
             Metadata metadata, byte[] content, int maxLengthCharsetDetection) {
+        return getCharset(metadata, content, maxLengthCharsetDetection, "");
+    }
+
+    /**
+     * Same as {@link #getCharset(Metadata, byte[], int)}, reading the HTTP Content-Type under the
+     * prefix the fetcher stores the response headers with (protocol.md.prefix).
+     */
+    public static String getCharset(
+            Metadata metadata,
+            byte[] content,
+            int maxLengthCharsetDetection,
+            String protocolMetadataPrefix) {
 
         // let's look at the BOM first
         String BOMCharset = getCharsetFromBOM(content);
@@ -105,7 +129,7 @@ public class CharsetIdentification {
         }
 
         // then look at what we get from HTTP headers and HTML content
-        String httpCharset = getCharsetFromHTTP(metadata);
+        String httpCharset = getCharsetFromHTTP(metadata, protocolMetadataPrefix);
         String htmlCharset = getCharsetFromMeta(content, maxLengthCharsetDetection);
 
         // both exist and agree
@@ -133,8 +157,9 @@ public class CharsetIdentification {
     }
 
     /** Returns the charset declared by the server if any. */
-    private static String getCharsetFromHTTP(Metadata metadata) {
-        return getCharsetFromContentType(metadata.getFirstValue(HttpHeaders.CONTENT_TYPE));
+    private static String getCharsetFromHTTP(Metadata metadata, String protocolMetadataPrefix) {
+        return getCharsetFromContentType(
+                metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix));
     }
 
     /** Detects any BOMs and returns the corresponding charset. */

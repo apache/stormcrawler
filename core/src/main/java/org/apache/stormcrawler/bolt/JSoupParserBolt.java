@@ -286,11 +286,17 @@ public class JSoupParserBolt extends StatusEmitterBolt {
             if (fastCharsetDetection) {
                 charset =
                         CharsetIdentification.getCharsetFast(
-                                metadata, content, maxLengthCharsetDetection);
+                                metadata,
+                                content,
+                                maxLengthCharsetDetection,
+                                protocolMetadataPrefix);
             } else {
                 charset =
                         CharsetIdentification.getCharset(
-                                metadata, content, maxLengthCharsetDetection);
+                                metadata,
+                                content,
+                                maxLengthCharsetDetection,
+                                protocolMetadataPrefix);
             }
 
             LOG.debug(
