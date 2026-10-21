@@ -57,7 +57,7 @@ class CharsetIdentificationTest {
                         () -> {
                             try {
                                 CharsetIdentification.getCharset(
-                                        new Metadata(), content, maxlength);
+                                        new Metadata(), content, maxlength, "");
                             } catch (Throwable t) {
                                 thrown.set(t);
                             }
@@ -107,7 +107,7 @@ class CharsetIdentificationTest {
         page.append("<meta charset=\"").append(DECLARED).append("\">").append(BODY);
         byte[] content = page.toString().getBytes(StandardCharsets.US_ASCII);
 
-        String charset = CharsetIdentification.getCharsetFast(new Metadata(), content, cut);
+        String charset = CharsetIdentification.getCharsetFast(new Metadata(), content, cut, "");
 
         Assertions.assertEquals(DECLARED, charset);
     }
@@ -134,10 +134,13 @@ class CharsetIdentificationTest {
     void lookAheadForTheClosingQuoteIsBounded() {
         String within =
                 CharsetIdentification.getCharsetFast(
-                        new Metadata(), metaCharsetClosingAfterTheWindow(LOOKAHEAD - 1), MAXLENGTH);
+                        new Metadata(),
+                        metaCharsetClosingAfterTheWindow(LOOKAHEAD - 1),
+                        MAXLENGTH,
+                        "");
         String beyond =
                 CharsetIdentification.getCharsetFast(
-                        new Metadata(), metaCharsetClosingAfterTheWindow(LOOKAHEAD), MAXLENGTH);
+                        new Metadata(), metaCharsetClosingAfterTheWindow(LOOKAHEAD), MAXLENGTH, "");
 
         Assertions.assertEquals(DECLARED, within);
         Assertions.assertNotEquals(
