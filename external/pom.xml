@@ -19,18 +19,28 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 https://maven.apache.org/xsd/maven-4.1.0.xsd">
 
-    <parent>
-        <groupId>org.apache.stormcrawler</groupId>
-        <artifactId>stormcrawler</artifactId>
-        <version>4.0.0-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
-    </parent>
+    <parent/>
 
     <artifactId>stormcrawler-external</artifactId>
     <packaging>pom</packaging>
+
+    <subprojects>
+        <subproject>ai</subproject>
+        <subproject>aws</subproject>
+        <subproject>langid</subproject>
+        <subproject>opensearch</subproject>
+        <subproject>opensearch/archetype</subproject>
+        <subproject>opensearch-java</subproject>
+        <subproject>playwright</subproject>
+        <subproject>solr</subproject>
+        <subproject>solr/archetype</subproject>
+        <subproject>sql</subproject>
+        <subproject>tika</subproject>
+        <subproject>urlfrontier</subproject>
+        <subproject>warc</subproject>
+    </subprojects>
 
     <dependencies>
         <dependency>

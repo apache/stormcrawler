@@ -32,6 +32,17 @@ jobs:
         with:
           java-version: '25'
           distribution: 'temurin'
+      - name: Install Maven 4
+        env:
+          MAVEN_VERSION: 4.0.0-rc-7
+        run: |
+          BASE_URL="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}"
+          curl -fsSL "${BASE_URL}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o maven.tar.gz
+          echo "$(curl -fsSL "${BASE_URL}/apache-maven-${MAVEN_VERSION}-bin.tar.gz.sha512")  maven.tar.gz" | sha512sum -c -
+          mkdir -p "$HOME/maven"
+          tar -xzf maven.tar.gz -C "$HOME/maven"
+          rm maven.tar.gz
+          echo "$HOME/maven/apache-maven-${MAVEN_VERSION}/bin" >> "$GITHUB_PATH"
 
       - name: Cache Maven packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

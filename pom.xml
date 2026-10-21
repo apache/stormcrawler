@@ -19,8 +19,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 https://maven.apache.org/xsd/maven-4.1.0.xsd">
 
     <parent>
         <groupId>org.apache</groupId>
@@ -739,25 +738,5 @@ under the License.
 
         </dependencies>
     </dependencyManagement>
-
-    <modules>
-        <module>core</module>
-        <module>external</module>
-        <module>external/ai</module>
-        <module>external/aws</module>
-        <module>external/langid</module>
-        <module>external/opensearch</module>
-        <module>external/opensearch-java</module>
-        <module>external/playwright</module>
-        <module>external/solr</module>
-        <module>external/sql</module>
-        <module>external/tika</module>
-        <module>external/urlfrontier</module>
-        <module>external/warc</module>
-        <module>archetype</module>
-        <module>external/opensearch/archetype</module>
-        <module>external/solr/archetype</module>
-        <module>docs</module>
-    </modules>
 
 </project>
