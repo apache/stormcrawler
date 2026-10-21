@@ -216,8 +216,7 @@ class BasicURLNormalizerTest {
     void testDoesNotMangleQueryWhenValueContainsSlashes() throws MalformedURLException {
         URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
         URL testSourceUrl = URLUtil.toURL("http://a.example/");
-        String inputUrl =
-                "http://a.example/article.pl?sid=01/10/23/1816257&mode=thread&tid=107";
+        String inputUrl = "http://a.example/article.pl?sid=01/10/23/1816257&mode=thread&tid=107";
         assertEquals(
                 inputUrl,
                 urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
@@ -228,6 +227,28 @@ class BasicURLNormalizerTest {
                 inputUrl,
                 urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
                 "An embedded URL in a query value must remain intact");
+    }
+
+    @Test
+    void testUnmanglesQueryBeforeFragmentQuestionMark() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(false, false);
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        String inputUrl = "http://a.example/p&a=b#frag?x";
+        assertEquals(
+                "http://a.example/p?a=b#frag?x",
+                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
+                "A question mark in the fragment must not suppress query repair");
+    }
+
+    @Test
+    void testRemovesQueryElementWhenValueContainsSlashes() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(List.of("utm_source"));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        String inputUrl = "http://a.example/login/?next=/a/b/&utm_source=ref&z=1";
+        assertEquals(
+                "http://a.example/login/?next=%2Fa%2Fb%2F&z=1",
+                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
+                "Query elements following a slash-containing value must remain removable");
     }
 
     @Test
