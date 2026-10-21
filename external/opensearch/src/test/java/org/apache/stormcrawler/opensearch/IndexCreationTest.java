@@ -20,13 +20,22 @@ package org.apache.stormcrawler.opensearch;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.generic.Body;
+import org.opensearch.client.opensearch.generic.OpenSearchGenericClient;
+import org.opensearch.client.opensearch.generic.Request;
+import org.opensearch.client.opensearch.generic.Response;
 import org.opensearch.client.opensearch.indices.ExistsTemplateRequest;
 import org.opensearch.client.opensearch.indices.OpenSearchIndicesClient;
 import org.opensearch.client.transport.endpoints.BooleanResponse;
@@ -47,6 +56,44 @@ class IndexCreationTest {
         when(indices.existsTemplate(any(ExistsTemplateRequest.class)))
                 .thenReturn(new BooleanResponse(false));
         return client;
+    }
+
+    private static final String REJECTION =
+            "{\"error\":{\"type\":\"mapper_parsing_exception\"},\"status\":400}";
+
+    /** A client on which neither the index nor the template exists and that rejects both. */
+    private static OpenSearchClient rejectingCluster() throws IOException {
+        OpenSearchClient client = emptyCluster();
+        Response response = mock(Response.class);
+        when(response.getStatus()).thenReturn(400);
+        when(response.getBody())
+                .thenReturn(
+                        Optional.of(
+                                Body.from(
+                                        REJECTION.getBytes(StandardCharsets.UTF_8),
+                                        "application/json")));
+        OpenSearchGenericClient generic = mock(OpenSearchGenericClient.class);
+        when(generic.execute(any(Request.class))).thenReturn(response);
+        when(client.generic()).thenReturn(generic);
+        return client;
+    }
+
+    @Test
+    void rejectedIndexIsLoggedWithStatusAndBody() throws IOException {
+        Logger log = mock(Logger.class);
+
+        IndexCreation.checkOrCreateIndex(rejectingCluster(), "idx", "status", log);
+
+        verify(log).warn(anyString(), eq("idx"), eq(400), eq(REJECTION));
+    }
+
+    @Test
+    void rejectedTemplateIsLoggedWithStatusAndBody() throws IOException {
+        Logger log = mock(Logger.class);
+
+        IndexCreation.checkOrCreateIndexTemplate(rejectingCluster(), "status", log);
+
+        verify(log).warn(anyString(), eq("status-template"), eq(400), eq(REJECTION));
     }
 
     @Test

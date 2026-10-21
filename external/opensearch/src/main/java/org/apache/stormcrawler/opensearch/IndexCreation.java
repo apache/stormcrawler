@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.generic.Body;
 import org.opensearch.client.opensearch.generic.Requests;
 import org.opensearch.client.opensearch.generic.Response;
 import org.opensearch.client.opensearch.indices.ExistsTemplateRequest;
@@ -41,7 +42,6 @@ public class IndexCreation {
         final boolean indexExists = client.indices().exists(req -> req.index(indexName)).value();
         log.info("Index '{}' exists? {}", indexName, indexExists);
         // there's a possible check-then-update race condition
-        // createIndex intentionally catches and logs exceptions from OpenSearch
         if (!indexExists) {
             boolean created =
                     IndexCreation.createIndex(client, indexName, boltType + ".mapping", log);
@@ -65,7 +65,6 @@ public class IndexCreation {
                         .value();
         log.info("Template '{}' exists? {}", templateName, templateExists);
         // there's a possible check-then-update race condition
-        // createTemplate intentionally catches and logs exceptions from OpenSearch
         if (!templateExists) {
             boolean created =
                     IndexCreation.createTemplate(client, templateName, boltType + ".mapping", log);
@@ -91,7 +90,15 @@ public class IndexCreation {
                                             .json(jsonIndexConfiguration)
                                             .build())) {
                 int statusCode = response.getStatus();
-                return statusCode == 200 || statusCode == 201;
+                if (statusCode == 200 || statusCode == 201) {
+                    return true;
+                }
+                log.warn(
+                        "template '{}' not created: {} {}",
+                        templateName,
+                        statusCode,
+                        response.getBody().map(Body::bodyAsString).orElse(""));
+                return false;
             }
         } catch (Exception e) {
             log.warn("template '{}' not created", templateName, e);
@@ -117,7 +124,15 @@ public class IndexCreation {
                                             .json(jsonIndexConfiguration)
                                             .build())) {
                 int statusCode = response.getStatus();
-                return statusCode == 200 || statusCode == 201;
+                if (statusCode == 200 || statusCode == 201) {
+                    return true;
+                }
+                log.warn(
+                        "index '{}' not created: {} {}",
+                        indexName,
+                        statusCode,
+                        response.getBody().map(Body::bodyAsString).orElse(""));
+                return false;
             }
         } catch (Exception e) {
             log.warn("index '{}' not created", indexName, e);
