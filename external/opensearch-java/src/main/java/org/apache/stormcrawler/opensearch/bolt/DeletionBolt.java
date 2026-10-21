@@ -111,7 +111,13 @@ public class DeletionBolt extends BaseRichBolt implements AsyncBulkProcessor.Lis
 
         waitAck.addTuple(docID, tuple);
 
-        connection.addToProcessor(op);
+        try {
+            connection.addToProcessor(op);
+        } catch (Exception e) {
+            LOG.error("Error adding the deletion of {} to the bulk", url, e);
+            waitAck.invalidate(docID);
+            _collector.fail(tuple);
+        }
     }
 
     @Override

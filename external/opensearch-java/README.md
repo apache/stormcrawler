@@ -10,16 +10,26 @@ Apache HttpClient 5:
 * [MetricsConsumer](https://github.com/apache/stormcrawler/blob/master/external/opensearch-java/src/main/java/org/apache/stormcrawler/opensearch/metrics/MetricsConsumer.java)
 * [StatusMetricsBolt](https://github.com/apache/stormcrawler/blob/master/external/opensearch-java/src/main/java/org/apache/stormcrawler/opensearch/metrics/StatusMetricsBolt.java) for sending the breakdown of URLs per status as metrics and display its evolution over time.
 
-This module is functionally equivalent to the legacy `external/opensearch` module
-(which is based on the deprecated `RestHighLevelClient` and HttpClient 4), but
-uses the typed `OpenSearchClient` and the `ApacheHttpClient5TransportBuilder`
-transport. Unlike the legacy client, the Java Client 3.x no longer ships a
-sniffer nor a built-in `BulkProcessor`; this module provides an internal
-`AsyncBulkProcessor` that preserves the same semantics (size/count/time based
-flushing, back-pressure, listener callbacks). Like the legacy `BulkProcessor`,
-it sends the bulk requests asynchronously (via the `OpenSearchAsyncClient`), so
-the bolts never wait for the HTTP round trip unless the maximum number of
-concurrent requests is reached.
+The bolts write to OpenSearch through `AsyncBulkProcessor`, which groups their
+operations into bulk requests and:
+
+* sends a bulk request when the number of buffered operations reaches
+  `opensearch.<bolt>.bulkActions`, when the buffered operations reach 5 MiB of
+  JSON (counted before compression), or when `opensearch.<bolt>.flushInterval`
+  elapses.
+* resends the items rejected with status 429 (too many requests) in the bulk
+  response up to 8 times, after 50, 60, 80, 150, 280, 580, 1250 and 2740 ms.
+  A request that OpenSearch rejects as a whole, with status 429 or any other
+  error, is not resent. `IndexerBolt`, `DeletionBolt` and `StatusUpdaterBolt`
+  fail the tuple of an item still rejected after the last retry.
+* fails the whole bulk when a retry fails as a whole, for example on a
+  connection error: `IndexerBolt`, `DeletionBolt` and `StatusUpdaterBolt` fail
+  the tuples of all its items, including those stored by an earlier attempt.
+* sends the requests without blocking the bolt. The bolt waits only when
+  `opensearch.<bolt>.concurrentRequests` bulks are in flight, including bulks
+  waiting for a retry.
+* reports the outcome of a bulk to the bolt once, after its last attempt, with
+  the items in request order.
 
 Getting started
 ---------------------
