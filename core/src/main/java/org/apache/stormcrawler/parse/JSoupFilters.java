@@ -125,6 +125,13 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
         }
     }
 
+    @Override
+    public void cleanup() {
+        for (JSoupFilter filter : filters) {
+            filter.cleanup();
+        }
+    }
+
     /** * Used for quick testing + debugging. */
     public static void main(String[] args) throws IOException, ParseException {
 
