@@ -148,7 +148,6 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
                 CrawlerMetrics.registerPerSecMetric(
                         context, stormConf, "average_persec", metrics_time_bucket_secs);
 
-        // eventCounter MUST be registered before WaitAckCache — the eviction lambda captures it
         this.eventCounter =
                 CrawlerMetrics.registerCounter(
                         context, stormConf, "counters", metrics_time_bucket_secs);

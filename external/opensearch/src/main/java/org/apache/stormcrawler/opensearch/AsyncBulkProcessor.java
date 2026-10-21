@@ -44,16 +44,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Replacement for the legacy {@code org.opensearch.action.bulk.BulkProcessor} that works with the
- * new opensearch-java client. Accumulates {@link BulkOperation} instances and flushes them to
- * OpenSearch when the configured number of actions is reached, when the buffered operations reach 5
- * MiB, or when a periodic timer fires.
+ * Accumulates {@link BulkOperation} instances and flushes them to OpenSearch when the configured
+ * number of actions is reached, when the buffered operations reach 5 MiB, or when a periodic timer
+ * fires.
  *
- * <p>Bulk requests are sent with the {@link OpenSearchAsyncClient}, so the calling thread never
- * waits for the HTTP round trip. Concurrency is controlled via a {@link Semaphore}: each in-flight
- * bulk request acquires a permit, which is only released once the listener has processed the
- * outcome. This provides natural back-pressure towards the Storm topology when the cluster slows
- * down.
+ * <p>Bulk requests are sent with the {@link OpenSearchAsyncClient}. Each in-flight bulk request
+ * holds a {@link Semaphore} permit, released once the listener has processed its outcome, so the
+ * calling thread waits for a permit when the cluster slows down.
  *
  * <p>Items rejected with status 429 are sent again up to 8 times, while the bulk keeps its permit.
  * The listener's {@code afterBulk} is called once per bulk, with the items of all attempts in
@@ -68,7 +65,7 @@ public final class AsyncBulkProcessor implements AutoCloseable {
     /** Flush threshold, in bytes of the serialized operations before compression. */
     static final long BULK_SIZE_BYTES = 5L * 1024 * 1024;
 
-    /** Listener interface equivalent to the legacy {@code BulkProcessor.Listener}. */
+    /** Callbacks for the first send of a bulk and for its outcome, retries included. */
     public interface Listener {
         void beforeBulk(long executionId, BulkRequest request);
 
@@ -135,7 +132,7 @@ public final class AsyncBulkProcessor implements AutoCloseable {
      */
     public void add(BulkOperation operation) {
         if (closed.get()) {
-            throw new IllegalStateException("BulkProcessor is closed");
+            throw new IllegalStateException("AsyncBulkProcessor is closed");
         }
         final long size = serializedSize(mapper, operation);
         List<BulkOperation> toFlush = null;
@@ -290,8 +287,8 @@ public final class AsyncBulkProcessor implements AutoCloseable {
     }
 
     /**
-     * Drains pending operations and waits for all in-flight bulk requests to complete, up to the
-     * given timeout. Equivalent to the legacy {@code BulkProcessor.awaitClose()}.
+     * Flushes the pending operations, then waits up to the given timeout for the in-flight bulk
+     * requests, retries included. The flush itself can wait for a concurrency permit.
      *
      * @return {@code true} if all operations completed within the timeout
      */

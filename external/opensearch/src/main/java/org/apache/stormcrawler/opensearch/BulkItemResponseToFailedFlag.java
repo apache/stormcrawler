@@ -63,7 +63,6 @@ public record BulkItemResponseToFailedFlag(
         return error.reason() != null ? error.reason() : error.type();
     }
 
-    // opensearch-java: status() returns int HTTP code, not RestStatus enum
     /** Returns the HTTP status code of this response item. */
     public int getStatus() {
         return response.status();

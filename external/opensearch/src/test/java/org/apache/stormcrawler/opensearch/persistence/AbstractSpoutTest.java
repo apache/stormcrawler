@@ -33,15 +33,8 @@ import org.opensearch.client.json.JsonpMapper;
 import org.opensearch.client.json.jackson.JacksonJsonpMapper;
 
 /**
- * Unit tests for {@link AbstractSpout#sourceAsMap(JsonData)}.
- *
- * <p>Regression coverage for the {@code ClassCastException: JsonStringImpl cannot be cast to
- * String} that was thrown by {@link AggregationSpout} and {@link HybridSpout} when the previous
- * implementation called {@code hit.source().to(Object.class)}: in the OpenSearch Java client,
- * {@code Object.class} is bound to a built-in {@code jsonValueDeserializer} that returns the raw
- * Jakarta JSON-P {@code JsonValue} tree (Parsson types) instead of going through the configured
- * Jackson mapper. The fix routes deserialisation through {@code Map.class}, which correctly falls
- * through to {@link JacksonJsonpMapper} and yields native Java types.
+ * Unit tests for {@link AbstractSpout#sourceAsMap(JsonData)}: the map holds Java values, not the
+ * Jakarta JSON-P values of the parsed source.
  */
 class AbstractSpoutTest {
 
@@ -116,14 +109,11 @@ class AbstractSpoutTest {
     }
 
     @Test
-    @DisplayName(
-            "control: JsonData.to(Object.class) leaks Jakarta JsonValue types — proves the bug")
+    @DisplayName("control: JsonData.to(Object.class) returns Jakarta JSON-P values")
     void controlTest_toObjectClassLeaksJsonValue() {
-        // This test pins the underlying root cause of the original ClassCastException:
-        // calling JsonData#to(Object.class) bypasses JacksonJsonpMapper and returns a raw
-        // Jakarta JSON-P JsonValue, NOT a java.lang.String. If a future opensearch-java
-        // release ever changes this behaviour to align with Map.class, we can simplify the
-        // production code — until then, AbstractSpout#sourceAsMap must keep using Map.class.
+        // JsonData#to returns the parsed JSON-P value itself when it is an instance of the
+        // requested class, as for Object.class and Map.class.
+        // sourceAsMap therefore asks for LinkedHashMap.class.
         JsonpMapper mapper = new JacksonJsonpMapper();
         JsonData data = parse(mapper, "{\"url\":\"http://example.com/\"}");
 
@@ -132,8 +122,6 @@ class AbstractSpoutTest {
         // It is a Jakarta JsonObject, not a Java Map<String,String>:
         assertInstanceOf(jakarta.json.JsonObject.class, asObject);
         jakarta.json.JsonObject jsonObject = (jakarta.json.JsonObject) asObject;
-        // And the "url" entry is a JsonString, not a java.lang.String — exactly the cast that
-        // blew up at runtime in AggregationSpout before the fix.
         assertInstanceOf(jakarta.json.JsonString.class, jsonObject.get("url"));
     }
 }

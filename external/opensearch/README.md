@@ -114,9 +114,10 @@ described above are new, and `AsyncBulkProcessor.Builder` takes an
 * The bolts and metrics consumers that write through `AsyncBulkProcessor` log a
   WARN at startup when `opensearch.sniff`, `opensearch.responseBufferSize` or
   their per-type forms are set. Remove these keys from the configuration.
-* `opensearch.<type>.flushInterval` accepts a number followed by `ms`, `s` or
-  `m`, or a number of milliseconds without a unit. Any other value, for example
-  `1h`, logs a WARN and the interval falls back to 5 seconds.
+* `opensearch.<type>.flushInterval` takes a positive integer followed by `ms`,
+  `s` or `m`, or a positive integer of milliseconds without a unit. Zero or a
+  negative value makes the component fail at startup. Any other value, for
+  example `1h` or `1.5s`, logs a WARN and the interval falls back to 5 seconds.
 * `opensearch.<type>.concurrentRequests: 0` behaves as `1`. Earlier versions
   sent bulk requests synchronously with `0`. This module always sends them
   asynchronously.

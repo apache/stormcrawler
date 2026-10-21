@@ -34,7 +34,6 @@ import java.util.stream.Collectors;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.jetbrains.annotations.Nullable;
-// opensearch-java: uses typed BulkRequest/BulkResponse, not legacy REST equivalents
 import org.opensearch.client.opensearch.core.BulkRequest;
 import org.opensearch.client.opensearch.core.BulkResponse;
 import org.slf4j.Logger;
@@ -178,7 +177,6 @@ public class WaitAckCache {
             @Nullable ScopedCounter conflictCounter,
             TupleAction action) {
 
-        // opensearch-java: items() returns List<BulkResponseItem>; status() returns int
         var idsToBulkItems =
                 response.items().stream()
                         .map(
@@ -186,7 +184,6 @@ public class WaitAckCache {
                                     var error = bir.error();
                                     boolean failed = false;
                                     if (error != null) {
-                                        // opensearch-java: int status code, not RestStatus enum
                                         if (bir.status() == 409) {
                                             if (conflictCounter != null) {
                                                 conflictCounter.scope("doc_conflicts").incrBy(1);
@@ -277,8 +274,6 @@ public class WaitAckCache {
 
         log.error("Exception with bulk {} - failing the whole lot ", executionId, failure);
 
-        // opensearch-java: operations() + getBulkOperationId replaces
-        //   legacy requests() + DocWriteRequest::id
         final var failedIds =
                 request.operations().stream()
                         .map(OpenSearchConnection::getBulkOperationId)

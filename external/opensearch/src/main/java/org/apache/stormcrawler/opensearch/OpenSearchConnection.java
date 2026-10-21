@@ -186,12 +186,11 @@ public final class OpenSearchConnection {
 
         LOG.debug("Start closing the OpenSearch connection");
 
-        // First, close the BulkProcessor ensuring pending actions are flushed
         try {
             boolean success = processor.awaitClose(60, TimeUnit.SECONDS);
             if (!success) {
                 throw new RuntimeException(
-                        "Failed to flush pending actions when closing BulkProcessor");
+                        "Failed to flush pending actions when closing AsyncBulkProcessor");
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -343,7 +342,6 @@ public final class OpenSearchConnection {
             if (uri.getScheme() != null) {
                 scheme = uri.getScheme();
             }
-            // HC5: constructor is (scheme, hostname, port) — not (hostname, port, scheme)
             hosts.add(new HttpHost(scheme, uri.getHost(), port));
         }
 
@@ -376,7 +374,6 @@ public final class OpenSearchConnection {
         final boolean needsUser = StringUtils.isNotBlank(user) && StringUtils.isNotBlank(password);
         final boolean needsProxy = StringUtils.isNotBlank(proxyhost) && proxyport != -1;
 
-        // Defaults from ApacheHttpClient5TransportBuilder (same as the former RestClientBuilder)
         final int connectTimeout =
                 ConfUtils.getInt(
                         stormConf,
@@ -421,7 +418,6 @@ public final class OpenSearchConnection {
         if (needsUser || needsProxy || disableTlsValidation) {
             builder.setHttpClientConfigCallback(
                     httpClientBuilder -> {
-                        // hc.client5 auth: password is char[], AuthScope(host, port)
                         if (needsUser) {
                             final BasicCredentialsProvider credentialsProvider =
                                     new BasicCredentialsProvider();
@@ -432,7 +428,6 @@ public final class OpenSearchConnection {
                             }
                             httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
                         }
-                        // hc.client5 proxy: HttpHost(scheme, host, port)
                         if (needsProxy) {
                             httpClientBuilder.setProxy(
                                     new HttpHost(proxyscheme, proxyhost, proxyport));
@@ -482,7 +477,6 @@ public final class OpenSearchConnection {
                     });
         }
 
-        // Compression: first-class builder method, not a request interceptor
         builder.setCompressionEnabled(compression);
 
         final OpenSearchTransport transport = builder.build();
