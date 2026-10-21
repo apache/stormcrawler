@@ -34,6 +34,8 @@ import org.apache.stormcrawler.util.RobotsTags;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -376,17 +378,22 @@ class JSoupParserBoltTest extends ParsingTester {
      * header and the meta charset can never agree, and ICU guesses a UTF-8 page whose detection
      * window is plain ASCII as ISO-8859-1, see issue #2250.
      */
-    @Test
-    void prefixedContentTypeCharsetIsUsed() throws IOException {
+    @ParameterizedTest(name = "detect.charset.fast={0}")
+    @ValueSource(booleans = {false, true})
+    void prefixedContentTypeCharsetIsUsed(boolean fast) throws IOException {
         Map<String, Object> parserConfig = new HashMap<>();
         parserConfig.put("protocol.md.prefix", "protocol.");
         parserConfig.put("detect.charset.maxlength", 2048);
+        parserConfig.put("detect.charset.fast", fast);
         bolt.prepare(
                 parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
-        // a meta charset followed by an ASCII head longer than the detection window, like most real
-        // pages
+        // an ASCII head longer than the detection window, like most real pages. The default
+        // detection uses the header when it agrees with the meta charset; the fast one returns the
+        // header first, so it is tested without a meta charset, which it would use otherwise
+        String meta = fast ? "" : "<meta charset=\"utf-8\">";
         String head =
-                "<meta charset=\"utf-8\"><meta name=\"description\" content=\""
+                meta
+                        + "<meta name=\"description\" content=\""
                         + "free shipping on every order ".repeat(100)
                         + "\">";
         String text = "What\u2019s new: caf\u00e9 imotine\u2122";

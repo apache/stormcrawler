@@ -58,7 +58,10 @@ public class CharsetIdentification {
      * less reliable than getCharset.
      *
      * @since 1.18
+     * @deprecated reads the HTTP Content-Type without a prefix, while fetched metadata carries the
+     *     one set by protocol.md.prefix: use {@link #getCharsetFast(Metadata, byte[], int, String)}
      */
+    @Deprecated
     public static String getCharsetFast(
             final Metadata metadata, final byte[] content, final int maxLengthCharsetDetection) {
         return getCharsetFast(metadata, content, maxLengthCharsetDetection, "");
@@ -67,6 +70,10 @@ public class CharsetIdentification {
     /**
      * Same as {@link #getCharsetFast(Metadata, byte[], int)}, reading the HTTP Content-Type under
      * the prefix the fetcher stores the response headers with (protocol.md.prefix).
+     *
+     * @param protocolMetadataPrefix prefix of the response headers in the metadata, including its
+     *     separator (e.g. {@code "protocol."}); empty if they are not prefixed
+     * @since 4.0
      */
     public static String getCharsetFast(
             final Metadata metadata,
@@ -104,9 +111,13 @@ public class CharsetIdentification {
     /**
      * Identifies the charset of a document based on the following logic: guess from the
      * ByteOrderMark - else if the same charset is specified in the http headers and the html
-     * metadata then use it - otherwise use ICU's charset detector to make an educated guess and if
-     * that fails too returns UTF-8.
+     * metadata then use it - otherwise use ICU's charset detector to make an educated guess, with
+     * the html metadata or else the http headers as a hint, and if that fails too returns UTF-8.
+     *
+     * @deprecated reads the HTTP Content-Type without a prefix, while fetched metadata carries the
+     *     one set by protocol.md.prefix: use {@link #getCharset(Metadata, byte[], int, String)}
      */
+    @Deprecated
     public static String getCharset(
             Metadata metadata, byte[] content, int maxLengthCharsetDetection) {
         return getCharset(metadata, content, maxLengthCharsetDetection, "");
@@ -115,6 +126,10 @@ public class CharsetIdentification {
     /**
      * Same as {@link #getCharset(Metadata, byte[], int)}, reading the HTTP Content-Type under the
      * prefix the fetcher stores the response headers with (protocol.md.prefix).
+     *
+     * @param protocolMetadataPrefix prefix of the response headers in the metadata, including its
+     *     separator (e.g. {@code "protocol."}); empty if they are not prefixed
+     * @since 4.0
      */
     public static String getCharset(
             Metadata metadata,
@@ -139,13 +154,9 @@ public class CharsetIdentification {
             return httpCharset;
         }
 
-        // let's guess from the text - using a hint or not
-        String hintCharset = null;
-        if (httpCharset != null && htmlCharset == null) {
-            hintCharset = httpCharset;
-        } else if (httpCharset == null && htmlCharset != null) {
-            hintCharset = htmlCharset;
-        }
+        // let's guess from the text, with a hint if any: when the header and the meta disagree
+        // the meta is the hint, as it was while the header could not be read (#2250)
+        String hintCharset = htmlCharset != null ? htmlCharset : httpCharset;
 
         String textCharset = getCharsetFromText(content, hintCharset, maxLengthCharsetDetection);
         if (textCharset != null) {

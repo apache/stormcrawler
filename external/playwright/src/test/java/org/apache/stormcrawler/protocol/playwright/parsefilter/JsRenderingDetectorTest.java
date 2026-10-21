@@ -18,8 +18,10 @@
 package org.apache.stormcrawler.protocol.playwright.parsefilter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.protocol.playwright.HttpProtocol;
 import org.junit.jupiter.api.Assertions;
@@ -196,5 +198,25 @@ class JsRenderingDetectorTest {
                                 + "A".repeat(1000)
                                 + "</p><a href='/x'>x</a><a href='/y'>y</a><a href='/z'>z</a></body></html>");
         Assertions.assertNull(p.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
+    }
+
+    /**
+     * The page is decoded with the charset of the Content-Type stored under protocol.md.prefix, see
+     * #2250. ISO-8859-15 is not one ICU detects, so without the header the euro sign is read as
+     * another character and the required message is not found.
+     */
+    @Test
+    void decodesWithThePrefixedContentTypeCharset() throws Exception {
+        final String message = "JavaScript required to pay 5 \u20ac";
+        final JsRenderingDetector d = new JsRenderingDetector();
+        d.configure(
+                Map.of("protocol.md.prefix", "protocol."),
+                MAPPER.readTree("{\"requiredMessages\":[\"" + message + "\"]}"));
+        final ParseResult parse = new ParseResult();
+        final Metadata md = parse.getOrCreate("u").getMetadata();
+        md.setValue("protocol.Content-Type", "text/html; charset=ISO-8859-15");
+        final String html = "<html><body><p>" + message + "</p></body></html>";
+        d.filter("u", html.getBytes(Charset.forName("ISO-8859-15")), null, parse);
+        Assertions.assertEquals("playwright", md.getFirstValue("fetch.with"));
     }
 }
