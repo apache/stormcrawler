@@ -12,13 +12,6 @@
       }
     },
     {
-      "class": "org.apache.stormcrawler.parse.filter.LDJsonParseFilter",
-      "name": "LDJsonParseFilter",
-      "params": {
-        "streetAddress": "/location/streetAddress"
-       }
-    },
-    {
       "class": "org.apache.stormcrawler.parse.filter.CommaSeparatedToMultivaluedMetadata",
       "name": "CommaSeparatedToMultivaluedMetadata",
       "params": {

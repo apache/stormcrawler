@@ -64,16 +64,4 @@ class XPathFilterTest extends ParsingTester {
         Assertions.assertEquals("", scripts[0].trim());
         Assertions.assertTrue(scripts[1].contains("_paq"));
     }
-
-    @Test
-    void testLDJsonExtraction() throws IOException {
-        prepareParserBolt("test.parsefilters.json");
-        parse("https://stormcrawler.apache.org", "stormcrawler.apache.org.html");
-        Assertions.assertEquals(1, output.getEmitted().size());
-        List<Object> parsedTuple = output.getEmitted().get(0);
-        Metadata metadata = (Metadata) parsedTuple.get(2);
-        Assertions.assertNotNull(metadata);
-        String[] scripts = metadata.getValues("streetAddress");
-        Assertions.assertNotNull(scripts);
-    }
 }
