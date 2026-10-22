@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.http.HttpHeaders;
 import org.apache.storm.task.OutputCollector;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
@@ -33,6 +34,8 @@ import org.apache.stormcrawler.util.RobotsTags;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -129,7 +132,10 @@ class JSoupParserBoltTest extends ParsingTester {
                     .when(
                             () ->
                                     CharsetIdentification.getCharset(
-                                            Mockito.any(), Mockito.any(), Mockito.anyInt()))
+                                            Mockito.any(),
+                                            Mockito.any(),
+                                            Mockito.anyInt(),
+                                            Mockito.any()))
                     .thenThrow(new StackOverflowError());
             parse("https://stormcrawler.apache.org", "stormcrawler.apache.org.html");
         }
@@ -364,5 +370,42 @@ class JSoupParserBoltTest extends ParsingTester {
         Assertions.assertEquals(
                 "https://www.example.be/fr/rayons/stockage-archivage-de-donnees/218725",
                 statusTuples.get(0).get(0));
+    }
+
+    /**
+     * The fetcher stores the response headers under protocol.md.prefix, so the charset declared in
+     * the Content-Type has to be read with that prefix. Without it the header is never seen, the
+     * header and the meta charset can never agree, and ICU guesses a UTF-8 page whose detection
+     * window is plain ASCII as ISO-8859-1, see issue #2250.
+     */
+    @ParameterizedTest(name = "detect.charset.fast={0}")
+    @ValueSource(booleans = {false, true})
+    void prefixedContentTypeCharsetIsUsed(boolean fast) throws IOException {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("protocol.md.prefix", "protocol.");
+        parserConfig.put("detect.charset.maxlength", 2048);
+        parserConfig.put("detect.charset.fast", fast);
+        bolt.prepare(
+                parserConfig, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        // an ASCII head longer than the detection window, like most real pages. The default
+        // detection uses the header when it agrees with the meta charset; the fast one returns the
+        // header first, so it is tested without a meta charset, which it would use otherwise
+        String meta = fast ? "" : "<meta charset=\"utf-8\">";
+        String head =
+                meta
+                        + "<meta name=\"description\" content=\""
+                        + "free shipping on every order ".repeat(100)
+                        + "\">";
+        String text = "What’s new: café imotine™";
+        byte[] content =
+                ("<html><head>" + head + "</head><body><p>" + text + "</p></body></html>")
+                        .getBytes(StandardCharsets.UTF_8);
+        Metadata metadata = new Metadata();
+        metadata.setValue("protocol." + HttpHeaders.CONTENT_TYPE, "text/html; charset=UTF-8");
+        parse("http://www.example.com/page.html", content, metadata);
+
+        Assertions.assertEquals(1, output.getEmitted().size());
+        String parsedText = (String) output.getEmitted().get(0).get(3);
+        Assertions.assertTrue(parsedText.contains(text), parsedText);
     }
 }
