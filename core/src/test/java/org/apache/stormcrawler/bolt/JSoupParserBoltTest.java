@@ -396,7 +396,7 @@ class JSoupParserBoltTest extends ParsingTester {
                         + "<meta name=\"description\" content=\""
                         + "free shipping on every order ".repeat(100)
                         + "\">";
-        String text = "What\u2019s new: caf\u00e9 imotine\u2122";
+        String text = "What’s new: café imotine™";
         byte[] content =
                 ("<html><head>" + head + "</head><body><p>" + text + "</p></body></html>")
                         .getBytes(StandardCharsets.UTF_8);

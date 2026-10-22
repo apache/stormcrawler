@@ -207,7 +207,7 @@ class JsRenderingDetectorTest {
      */
     @Test
     void decodesWithThePrefixedContentTypeCharset() throws Exception {
-        final String message = "JavaScript required to pay 5 \u20ac";
+        final String message = "JavaScript required to pay 5 €";
         final JsRenderingDetector d = new JsRenderingDetector();
         d.configure(
                 Map.of("protocol.md.prefix", "protocol."),

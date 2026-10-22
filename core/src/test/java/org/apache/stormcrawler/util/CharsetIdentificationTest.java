@@ -160,7 +160,7 @@ class CharsetIdentificationTest {
         String meta = withMeta ? "<meta charset=\"utf-8\">" : "";
         String head =
                 "<meta name=\"description\" content=\"" + "free shipping ".repeat(200) + "\">";
-        return ("<html><head>" + meta + head + "</head><body><p>caf\u00e9</p></body></html>")
+        return ("<html><head>" + meta + head + "</head><body><p>café</p></body></html>")
                 .getBytes(StandardCharsets.UTF_8);
     }
 
