@@ -25,17 +25,23 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.parse.JSoupFilter;
 import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.util.AbstractConfigurable;
 import org.jetbrains.annotations.NotNull;
+import org.jsoup.helper.W3CDom;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.w3c.dom.NodeList;
 
 /** Reads a XPATH patterns and stores the value found in web page as metadata. */
 public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
@@ -43,6 +49,8 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
     private static final Logger LOG = LoggerFactory.getLogger(XPathFilter.class);
 
     protected final Map<String, List<LabelledExpression>> expressions = new HashMap<>();
+
+    private final XPath xpath = XPathFactory.newInstance().newXPath();
 
     /**
      * Supported extraction functions that can be appended to XPath expressions. These provide
@@ -98,16 +106,33 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
                 .replaceAll(m -> m.group().toLowerCase(java.util.Locale.ROOT));
     }
 
+    /**
+     * W3C representation of a JSoup document, built once per page and shared by all the
+     * expressions. Element.selectXpath() would otherwise convert the whole document on every call.
+     */
+    static class W3CContext {
+
+        private final W3CDom w3c = new W3CDom().namespaceAware(false);
+        private final org.w3c.dom.Node contextNode;
+
+        W3CContext(Document doc) {
+            this.contextNode = w3c.contextNode(w3c.fromJsoup(doc));
+        }
+    }
+
     static class LabelledExpression {
 
         String key;
         private String xpath;
+        private XPathExpression expression;
         private EvalFunction evalFunction;
         private String attrName;
 
-        private LabelledExpression(String key, String xpath) {
+        private LabelledExpression(String key, String xpath, XPath compiler)
+                throws XPathExpressionException {
             this.key = key;
             parseExpression(xpath);
+            this.expression = compiler.compile(this.xpath);
         }
 
         private void parseExpression(String rawXpath) {
@@ -149,8 +174,10 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
             this.evalFunction = EvalFunction.NONE;
         }
 
-        List<String> evaluate(Document doc) {
-            Elements elements = doc.selectXpath(xpath);
+        List<String> evaluate(W3CContext context) throws XPathExpressionException {
+            NodeList nodes =
+                    (NodeList) expression.evaluate(context.contextNode, XPathConstants.NODESET);
+            List<Element> elements = context.w3c.sourceNodes(nodes, Element.class);
             List<String> results = new ArrayList<>();
             for (Element element : elements) {
                 String value = evalFunction.evaluate(element, attrName);
@@ -189,15 +216,36 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
         try {
             expressions
                     .computeIfAbsent(key, k -> new ArrayList<>())
-                    .add(new LabelledExpression(key, xpathvalue));
+                    .add(new LabelledExpression(key, xpathvalue, xpath));
         } catch (Exception e) {
             throw new RuntimeException("Can't compile expression : " + xpathvalue, e);
+        }
+    }
+
+    /**
+     * Converts the JSoup document into a W3C DOM against which the expressions are evaluated.
+     * Returns null if there are no expressions or the conversion failed.
+     */
+    W3CContext toW3C(String url, Document doc) {
+        if (expressions.isEmpty()) {
+            return null;
+        }
+        try {
+            return new W3CContext(doc);
+        } catch (Exception e) {
+            LOG.error("Error converting {} to W3C DOM: {}", url, e);
+            return null;
         }
     }
 
     @Override
     public void filter(
             String url, byte[] content, org.jsoup.nodes.Document doc, ParseResult parse) {
+
+        W3CContext context = toW3C(url, doc);
+        if (context == null) {
+            return;
+        }
 
         ParseData parseData = parse.getOrCreate(url);
         Metadata metadata = parseData.getMetadata();
@@ -206,7 +254,7 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
         for (List<LabelledExpression> leList : expressions.values()) {
             for (LabelledExpression le : leList) {
                 try {
-                    List<String> values = le.evaluate(doc);
+                    List<String> values = le.evaluate(context);
                     if (values != null && !values.isEmpty()) {
                         metadata.addValues(le.key, values);
                         break;

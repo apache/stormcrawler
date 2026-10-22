@@ -61,6 +61,11 @@ public class LinkParseFilter extends XPathFilter {
     public void filter(
             String url, byte[] content, org.jsoup.nodes.Document doc, ParseResult parse) {
 
+        W3CContext context = toW3C(url, doc);
+        if (context == null) {
+            return;
+        }
+
         ParseData parseData = parse.getOrCreate(url);
         Metadata metadata = parseData.getMetadata();
 
@@ -84,7 +89,7 @@ public class LinkParseFilter extends XPathFilter {
         for (List<LabelledExpression> leList : expressions.values()) {
             for (LabelledExpression le : leList) {
                 try {
-                    List<String> values = le.evaluate(doc);
+                    List<String> values = le.evaluate(context);
                     if (values == null || values.isEmpty()) {
                         continue;
                     }
