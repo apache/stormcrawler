@@ -17,8 +17,10 @@
 
 package org.apache.stormcrawler.opensearch;
 
-import static org.opensearch.client.RestClientBuilder.DEFAULT_CONNECT_TIMEOUT_MILLIS;
-import static org.opensearch.client.RestClientBuilder.DEFAULT_SOCKET_TIMEOUT_MILLIS;
+import static org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder.DEFAULT_CONNECT_TIMEOUT_MILLIS;
+import static org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder.DEFAULT_MAX_CONN_PER_ROUTE;
+import static org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder.DEFAULT_MAX_CONN_TOTAL;
+import static org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder.DEFAULT_RESPONSE_TIMEOUT_MILLIS;
 
 import java.io.IOException;
 import java.net.URI;
@@ -30,32 +32,29 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpHost;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.Credentials;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.conn.ssl.TrustAllStrategy;
-import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.hc.client5.http.auth.AuthScope;
+import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
+import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.ClientTlsStrategyBuilder;
+import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.reactor.ssl.TlsDetails;
+import org.apache.hc.core5.ssl.SSLContextBuilder;
+import org.apache.hc.core5.util.Timeout;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.opensearch.action.DocWriteRequest;
-import org.opensearch.action.bulk.BulkProcessor;
-import org.opensearch.action.bulk.BulkRequest;
-import org.opensearch.action.bulk.BulkResponse;
-import org.opensearch.client.HttpAsyncResponseConsumerFactory;
-import org.opensearch.client.Node;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.RestClient;
-import org.opensearch.client.RestClientBuilder;
-import org.opensearch.client.RestHighLevelClient;
-import org.opensearch.client.sniff.OpenSearchNodesSniffer;
-import org.opensearch.client.sniff.Sniffer;
-import org.opensearch.common.unit.TimeValue;
+import org.opensearch.client.json.jackson.JacksonJsonpMapper;
+import org.opensearch.client.opensearch.OpenSearchAsyncClient;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.core.bulk.BulkOperation;
+import org.opensearch.client.transport.OpenSearchTransport;
+import org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,24 +65,248 @@ public final class OpenSearchConnection {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenSearchConnection.class);
 
-    @NotNull private final RestHighLevelClient client;
+    @NotNull private final OpenSearchClient client;
 
-    @NotNull private final BulkProcessor processor;
+    @NotNull private final AsyncBulkProcessor processor;
 
-    @Nullable private final Sniffer sniffer;
+    @NotNull private final OpenSearchTransport transport;
 
     private OpenSearchConnection(
-            @NotNull RestHighLevelClient c, @NotNull BulkProcessor p, @Nullable Sniffer s) {
-        processor = p;
+            @NotNull OpenSearchClient c,
+            @NotNull AsyncBulkProcessor p,
+            @NotNull OpenSearchTransport t) {
         client = c;
-        sniffer = s;
+        processor = p;
+        transport = t;
     }
 
-    public RestHighLevelClient getClient() {
+    public OpenSearchClient getClient() {
         return client;
     }
 
-    public static RestHighLevelClient getClient(Map<String, Object> stormConf, String boltType) {
+    /**
+     * Creates a standalone {@link OpenSearchClient}. Used by classes that need a client without a
+     * bulk processor (e.g. spouts, filters). Callers are responsible for closing the returned
+     * client's transport via {@code client._transport().close()}.
+     */
+    public static OpenSearchClient getClient(Map<String, Object> stormConf, String boltType) {
+        return buildClientResources(stormConf, boltType).client();
+    }
+
+    /** Adds a single bulk operation to the internal processor. */
+    public void addToProcessor(final BulkOperation operation) {
+        processor.add(operation);
+    }
+
+    /**
+     * Creates a connection with a default (no-op) listener. The values for bolt type are
+     * [indexer,status,metrics].
+     */
+    public static OpenSearchConnection getConnection(
+            Map<String, Object> stormConf, String boltType) {
+        AsyncBulkProcessor.Listener listener =
+                new AsyncBulkProcessor.Listener() {
+                    @Override
+                    public void afterBulk(
+                            long arg0,
+                            org.opensearch.client.opensearch.core.BulkRequest arg1,
+                            org.opensearch.client.opensearch.core.BulkResponse arg2) {}
+
+                    @Override
+                    public void afterBulk(
+                            long arg0,
+                            org.opensearch.client.opensearch.core.BulkRequest arg1,
+                            Throwable arg2) {}
+
+                    @Override
+                    public void beforeBulk(
+                            long arg0, org.opensearch.client.opensearch.core.BulkRequest arg1) {}
+                };
+        return getConnection(stormConf, boltType, listener);
+    }
+
+    public static OpenSearchConnection getConnection(
+            Map<String, Object> stormConf, String boltType, AsyncBulkProcessor.Listener listener) {
+
+        final String dottedType = boltType + ".";
+
+        warnOnRemovedKeys(stormConf, dottedType);
+
+        ClientResources cr = buildClientResources(stormConf, boltType);
+
+        final String flushIntervalString =
+                ConfUtils.getString(
+                        stormConf, Constants.PARAMPREFIX, dottedType, "flushInterval", "5s");
+
+        final long flushIntervalMillis = parseTimeValueToMillis(flushIntervalString, 5000);
+
+        final int bulkActions =
+                ConfUtils.getInt(stormConf, Constants.PARAMPREFIX, dottedType, "bulkActions", 50);
+
+        final int concurrentRequests =
+                ConfUtils.getInt(
+                        stormConf, Constants.PARAMPREFIX, dottedType, "concurrentRequests", 1);
+
+        AsyncBulkProcessor bulkProcessor = null;
+        try {
+            bulkProcessor =
+                    new AsyncBulkProcessor.Builder(
+                                    new OpenSearchAsyncClient(cr.transport()), listener)
+                            .setBulkActions(bulkActions)
+                            .setFlushIntervalMillis(flushIntervalMillis)
+                            .setConcurrentRequests(concurrentRequests)
+                            .build();
+
+            return new OpenSearchConnection(cr.client(), bulkProcessor, cr.transport());
+        } catch (Exception e) {
+            if (bulkProcessor != null) {
+                try {
+                    bulkProcessor.close();
+                } catch (Exception suppressed) {
+                    e.addSuppressed(suppressed);
+                }
+            }
+            try {
+                cr.transport().close();
+            } catch (IOException suppressed) {
+                e.addSuppressed(suppressed);
+            }
+            throw e;
+        }
+    }
+
+    private final AtomicBoolean isClosed = new AtomicBoolean(false);
+
+    public void close() {
+
+        if (!isClosed.compareAndSet(false, true)) {
+            LOG.warn("Tried to close an already closed connection!");
+            return;
+        }
+
+        LOG.debug("Start closing the OpenSearch connection");
+
+        try {
+            boolean success = processor.awaitClose(60, TimeUnit.SECONDS);
+            if (!success) {
+                throw new RuntimeException(
+                        "Failed to flush pending actions when closing AsyncBulkProcessor");
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        // Now close the transport (also shuts down the underlying HTTP client)
+        try {
+            transport.close();
+        } catch (IOException e) {
+            LOG.trace("Transport threw IO exception on close.");
+        }
+    }
+
+    /**
+     * Extracts the document ID from a {@link BulkOperation} regardless of its type (index, create,
+     * delete, update).
+     */
+    public static String getBulkOperationId(BulkOperation op) {
+        if (op.isIndex()) {
+            return op.index().id();
+        }
+        if (op.isCreate()) {
+            return op.create().id();
+        }
+        if (op.isDelete()) {
+            return op.delete().id();
+        }
+        if (op.isUpdate()) {
+            return op.update().id();
+        }
+        return null;
+    }
+
+    /**
+     * Returns the scopes the Basic credentials are registered for: the scheme, host and port of
+     * each configured address. A request to any other address does not receive them.
+     */
+    static List<AuthScope> credentialScopes(List<HttpHost> hosts) {
+        final Set<AuthScope> scopes = new LinkedHashSet<>();
+        for (HttpHost host : hosts) {
+            scopes.add(new AuthScope(host));
+        }
+        return new ArrayList<>(scopes);
+    }
+
+    /**
+     * Returns the addresses which use plain http and are not a loopback address, i.e. those the
+     * Basic credentials would be sent to in the clear over the network.
+     */
+    static List<HttpHost> plainHttpHosts(List<HttpHost> hosts) {
+        final List<HttpHost> plain = new ArrayList<>();
+        for (HttpHost host : hosts) {
+            if ("http".equalsIgnoreCase(host.getSchemeName()) && !isLoopback(host.getHostName())) {
+                plain.add(host);
+            }
+        }
+        return plain;
+    }
+
+    private static final Pattern IPV4_LOOPBACK = Pattern.compile("127(\\.\\d{1,3}){3}");
+
+    /** Whether the host is localhost or a loopback IP literal. No name is resolved. */
+    static boolean isLoopback(String hostname) {
+        String host = StringUtils.strip(hostname.toLowerCase(Locale.ROOT), "[]");
+        return host.equals("localhost")
+                || IPV4_LOOPBACK.matcher(host).matches()
+                || host.equals("::1")
+                || host.equals("0:0:0:0:0:0:0:1");
+    }
+
+    private static void warnAboutPlainHttp(String boltType, List<HttpHost> hosts) {
+        final List<HttpHost> plain = plainHttpHosts(hosts);
+        if (!plain.isEmpty()) {
+            LOG.warn(
+                    "OpenSearch credentials are configured for {} but the addresses {} use plain "
+                            + "http, the credentials are sent unencrypted. Give the addresses an "
+                            + "https:// scheme.",
+                    boltType,
+                    plain);
+        }
+    }
+
+    // internal helpers
+    private record ClientResources(OpenSearchClient client, OpenSearchTransport transport) {}
+
+    /**
+     * Logs a WARN for configuration keys, per type or global, that earlier releases of this module
+     * read and this one ignores. See the module README for the full list of differences.
+     */
+    private static void warnOnRemovedKeys(Map<String, Object> stormConf, String dottedType) {
+        for (String prefix : List.of(Constants.PARAMPREFIX + dottedType, Constants.PARAMPREFIX)) {
+            final String responseBufferKey = prefix + "responseBufferSize";
+            if (stormConf.containsKey(responseBufferKey)) {
+                LOG.warn(
+                        "Configuration key '{}' is set but no longer supported. "
+                                + "The HC5-based async transport does not expose an equivalent per-request "
+                                + "heap-buffer override. The setting is ignored — remove it from your "
+                                + "configuration. See external/opensearch/README.md for details.",
+                        responseBufferKey);
+            }
+
+            final String sniffKey = prefix + "sniff";
+            if (stormConf.containsKey(sniffKey)) {
+                LOG.warn(
+                        "Configuration key '{}' is set but no longer supported. "
+                                + "The OpenSearch Java Client 3.x does not ship a Sniffer equivalent, so "
+                                + "automatic node discovery is not available. Keep the 'addresses' list up to "
+                                + "date manually or put a load balancer in front of the cluster. "
+                                + "See external/opensearch/README.md for details.",
+                        sniffKey);
+            }
+        }
+    }
+
+    private static ClientResources buildClientResources(
+            Map<String, Object> stormConf, String boltType) {
 
         final String dottedType = boltType + ".";
 
@@ -119,10 +342,14 @@ public final class OpenSearchConnection {
             if (uri.getScheme() != null) {
                 scheme = uri.getScheme();
             }
-            hosts.add(new HttpHost(uri.getHost(), port, scheme));
+            hosts.add(new HttpHost(scheme, uri.getHost(), port));
         }
 
-        final RestClientBuilder builder = RestClient.builder(hosts.toArray(new HttpHost[0]));
+        LOG.info(
+                "OpenSearch {} transport configured with {} host(s): {}",
+                boltType,
+                hosts.size(),
+                hosts);
 
         // authentication via user / password
         final String user =
@@ -144,47 +371,8 @@ public final class OpenSearchConnection {
                 ConfUtils.getBoolean(
                         stormConf, Constants.PARAMPREFIX, "", "disable.tls.validation", false);
 
-        final boolean needsUser = hasCredentials(user, password);
+        final boolean needsUser = StringUtils.isNotBlank(user) && StringUtils.isNotBlank(password);
         final boolean needsProxy = StringUtils.isNotBlank(proxyhost) && proxyport != -1;
-
-        if (needsUser) {
-            warnAboutPlainHttp(boltType, hosts);
-        }
-        if (disableTlsValidation) {
-            LOG.warn(
-                    "opensearch.disable.tls.validation is set: the certificates and host names of "
-                            + "the OpenSearch nodes used for {} are not checked",
-                    boltType);
-        }
-
-        if (needsUser || needsProxy || disableTlsValidation) {
-            builder.setHttpClientConfigCallback(
-                    httpClientBuilder -> {
-                        if (needsUser) {
-                            httpClientBuilder.setDefaultCredentialsProvider(
-                                    new OriginCredentialsProvider(
-                                            hosts,
-                                            new UsernamePasswordCredentials(user, password)));
-                        }
-                        if (needsProxy) {
-                            httpClientBuilder.setProxy(
-                                    new HttpHost(proxyhost, proxyport, proxyscheme));
-                        }
-
-                        if (disableTlsValidation) {
-                            try {
-                                final SSLContextBuilder sslContext = new SSLContextBuilder();
-                                sslContext.loadTrustMaterial(null, new TrustAllStrategy());
-                                httpClientBuilder.setSSLContext(sslContext.build());
-                                httpClientBuilder.setSSLHostnameVerifier(
-                                        NoopHostnameVerifier.INSTANCE);
-                            } catch (Exception e) {
-                                throw new RuntimeException("Failed to disable TLS validation", e);
-                            }
-                        }
-                        return httpClientBuilder;
-                    });
-        }
 
         final int connectTimeout =
                 ConfUtils.getInt(
@@ -199,311 +387,129 @@ public final class OpenSearchConnection {
                         Constants.PARAMPREFIX,
                         dottedType,
                         "socket.timeout",
-                        DEFAULT_SOCKET_TIMEOUT_MILLIS);
-        // timeout until connection is established
-        builder.setRequestConfigCallback(
-                requestConfigBuilder ->
-                        requestConfigBuilder
-                                .setConnectTimeout(connectTimeout)
-                                // Timeout when waiting for data
-                                .setSocketTimeout(socketTimeout));
-
-        // TODO check if this has gone somewhere else
-        // int maxRetryTimeout = ConfUtils.getInt(stormConf, Constants.PARAMPREFIX +
-        // boltType +
-        // ".max.retry.timeout",
-        // DEFAULT_MAX_RETRY_TIMEOUT_MILLIS);
-        // builder.setMaxRetryTimeoutMillis(maxRetryTimeout);
-
-        // TODO configure headers etc...
-        // Map<String, String> configSettings = (Map) stormConf
-        // .get(Constants.PARAMPREFIX + boltType + ".settings");
-        // if (configSettings != null) {
-        // configSettings.forEach((k, v) -> settings.put(k, v));
-        // }
-
-        // use node selector only to log nodes listed in the config
-        // and/or discovered through sniffing
-        builder.setNodeSelector(
-                nodes -> {
-                    for (Node node : nodes) {
-                        LOG.debug(
-                                "Connected to OpenSearch node {} [{}] for {}",
-                                node.getName(),
-                                node.getHost(),
-                                boltType);
-                    }
-                });
+                        DEFAULT_RESPONSE_TIMEOUT_MILLIS);
 
         final boolean compression =
                 ConfUtils.getBoolean(
                         stormConf, Constants.PARAMPREFIX, dottedType, "compression", false);
 
+        final ApacheHttpClient5TransportBuilder builder =
+                ApacheHttpClient5TransportBuilder.builder(hosts.toArray(new HttpHost[0]))
+                        .setMapper(new JacksonJsonpMapper());
+
+        // Timeouts via ConnectionConfig on the builder's internal connection manager
+        builder.setConnectionConfigCallback(
+                connConfigBuilder ->
+                        connConfigBuilder
+                                .setConnectTimeout(Timeout.ofMilliseconds(connectTimeout))
+                                .setSocketTimeout(Timeout.ofMilliseconds(socketTimeout)));
+
+        if (needsUser) {
+            warnAboutPlainHttp(boltType, hosts);
+        }
+        if (disableTlsValidation) {
+            LOG.warn(
+                    "opensearch.disable.tls.validation is set: the certificates and host names of "
+                            + "the OpenSearch nodes used for {} are not checked",
+                    boltType);
+        }
+
+        // Auth, proxy, and/or trust-all SSL via HttpClient customisation
+        if (needsUser || needsProxy || disableTlsValidation) {
+            builder.setHttpClientConfigCallback(
+                    httpClientBuilder -> {
+                        if (needsUser) {
+                            final BasicCredentialsProvider credentialsProvider =
+                                    new BasicCredentialsProvider();
+                            final UsernamePasswordCredentials credentials =
+                                    new UsernamePasswordCredentials(user, password.toCharArray());
+                            for (AuthScope scope : credentialScopes(hosts)) {
+                                credentialsProvider.setCredentials(scope, credentials);
+                            }
+                            httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+                        }
+                        if (needsProxy) {
+                            httpClientBuilder.setProxy(
+                                    new HttpHost(proxyscheme, proxyhost, proxyport));
+                        }
+                        // Custom connection manager overrides the builder's internal one,
+                        // so pool limits, timeouts and TlsDetailsFactory must be replicated here
+                        if (disableTlsValidation) {
+                            try {
+                                final SSLContext sslContext =
+                                        SSLContextBuilder.create()
+                                                .loadTrustMaterial((chain, authType) -> true)
+                                                .build();
+                                httpClientBuilder.setConnectionManager(
+                                        PoolingAsyncClientConnectionManagerBuilder.create()
+                                                .setMaxConnPerRoute(DEFAULT_MAX_CONN_PER_ROUTE)
+                                                .setMaxConnTotal(DEFAULT_MAX_CONN_TOTAL)
+                                                .setTlsStrategy(
+                                                        ClientTlsStrategyBuilder.create()
+                                                                .setSslContext(sslContext)
+                                                                .setHostnameVerifier(
+                                                                        NoopHostnameVerifier
+                                                                                .INSTANCE)
+                                                                // HTTP/2 ALPN negotiation
+                                                                .setTlsDetailsFactory(
+                                                                        sslEngine ->
+                                                                                new TlsDetails(
+                                                                                        sslEngine
+                                                                                                .getSession(),
+                                                                                        sslEngine
+                                                                                                .getApplicationProtocol()))
+                                                                .build())
+                                                .setDefaultConnectionConfig(
+                                                        ConnectionConfig.custom()
+                                                                .setConnectTimeout(
+                                                                        Timeout.ofMilliseconds(
+                                                                                connectTimeout))
+                                                                .setSocketTimeout(
+                                                                        Timeout.ofMilliseconds(
+                                                                                socketTimeout))
+                                                                .build())
+                                                .build());
+                            } catch (Exception e) {
+                                throw new RuntimeException("Failed to disable TLS validation", e);
+                            }
+                        }
+                        return httpClientBuilder;
+                    });
+        }
+
         builder.setCompressionEnabled(compression);
 
-        return new RestHighLevelClient(builder);
-    }
+        final OpenSearchTransport transport = builder.build();
+        final OpenSearchClient openSearchClient = new OpenSearchClient(transport);
 
-    /** Basic authentication is only set up when both the user and the password are given. */
-    static boolean hasCredentials(String user, String password) {
-        return StringUtils.isNotBlank(user) && StringUtils.isNotBlank(password);
-    }
-
-    /**
-     * Gives the Basic credentials only to requests for one of the configured addresses, matched on
-     * scheme, host and port. A node reached under any other address, such as one found by the
-     * sniffer under the address it publishes, does not receive them.
-     */
-    static final class OriginCredentialsProvider implements CredentialsProvider {
-
-        private final Set<String> origins = new LinkedHashSet<>();
-        private final Credentials credentials;
-
-        OriginCredentialsProvider(List<HttpHost> hosts, Credentials credentials) {
-            for (HttpHost host : hosts) {
-                origins.add(origin(host));
-            }
-            this.credentials = credentials;
-        }
-
-        private static String origin(HttpHost host) {
-            final String scheme = host.getSchemeName().toLowerCase(Locale.ROOT);
-            int port = host.getPort();
-            if (port < 0) {
-                port = "https".equals(scheme) ? 443 : 80;
-            }
-            return scheme + "://" + host.getHostName().toLowerCase(Locale.ROOT) + ":" + port;
-        }
-
-        @Override
-        public Credentials getCredentials(AuthScope scope) {
-            final HttpHost origin = scope.getOrigin();
-            if (origin != null && origins.contains(origin(origin))) {
-                return credentials;
-            }
-            return null;
-        }
-
-        @Override
-        public void setCredentials(AuthScope scope, Credentials credentials) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void clear() {}
+        return new ClientResources(openSearchClient, transport);
     }
 
     /**
-     * Returns the addresses which use plain http and are not a loopback address, i.e. those the
-     * Basic credentials would be sent to in the clear over the network.
+     * Parses a time value string (e.g. "5s", "500ms", "1m") into milliseconds.
+     *
+     * @param value the string to parse
+     * @param defaultMillis the default if parsing fails
+     * @return milliseconds
      */
-    static List<HttpHost> plainHttpHosts(List<HttpHost> hosts) {
-        final List<HttpHost> plain = new ArrayList<>();
-        for (HttpHost host : hosts) {
-            if ("http".equalsIgnoreCase(host.getSchemeName()) && !isLoopback(host.getHostName())) {
-                plain.add(host);
-            }
+    static long parseTimeValueToMillis(String value, long defaultMillis) {
+        if (value == null || value.isBlank()) {
+            return defaultMillis;
         }
-        return plain;
-    }
-
-    /**
-     * Returns the scheme under which the sniffer registers the nodes it finds. The nodes publish no
-     * scheme, so https is used as soon as one configured address uses it; otherwise sniffing would
-     * move the requests to plain http after the first round.
-     */
-    static OpenSearchNodesSniffer.Scheme sniffScheme(List<HttpHost> hosts) {
-        for (HttpHost host : hosts) {
-            if ("https".equalsIgnoreCase(host.getSchemeName())) {
-                return OpenSearchNodesSniffer.Scheme.HTTPS;
-            }
-        }
-        return OpenSearchNodesSniffer.Scheme.HTTP;
-    }
-
-    private static final Pattern IPV4_LOOPBACK = Pattern.compile("127(\\.\\d{1,3}){3}");
-
-    /** Whether the host is localhost or a loopback IP literal. No name is resolved. */
-    static boolean isLoopback(String hostname) {
-        String host = StringUtils.strip(hostname.toLowerCase(Locale.ROOT), "[]");
-        return host.equals("localhost")
-                || IPV4_LOOPBACK.matcher(host).matches()
-                || host.equals("::1")
-                || host.equals("0:0:0:0:0:0:0:1");
-    }
-
-    private static void warnAboutPlainHttp(String boltType, List<HttpHost> hosts) {
-        final List<HttpHost> plain = plainHttpHosts(hosts);
-        if (!plain.isEmpty()) {
-            LOG.warn(
-                    "OpenSearch credentials are configured for {} but the addresses {} use plain "
-                            + "http, the credentials are sent unencrypted. Give the addresses an "
-                            + "https:// scheme.",
-                    boltType,
-                    plain);
-        }
-    }
-
-    public void addToProcessor(final DocWriteRequest<?> request) {
-        processor.add(request);
-    }
-
-    /**
-     * Creates a connection with a default listener. The values for bolt type are
-     * [indexer,status,metrics]
-     */
-    public static OpenSearchConnection getConnection(
-            Map<String, Object> stormConf, String boltType) {
-        BulkProcessor.Listener listener =
-                new BulkProcessor.Listener() {
-                    @Override
-                    public void afterBulk(long arg0, BulkRequest arg1, BulkResponse arg2) {}
-
-                    @Override
-                    public void afterBulk(long arg0, BulkRequest arg1, Throwable arg2) {}
-
-                    @Override
-                    public void beforeBulk(long arg0, BulkRequest arg1) {}
-                };
-        return getConnection(stormConf, boltType, listener);
-    }
-
-    public static OpenSearchConnection getConnection(
-            Map<String, Object> stormConf, String boltType, BulkProcessor.Listener listener) {
-
-        final RestHighLevelClient client = getClient(stormConf, boltType);
-
-        final String dottedType = boltType + ".";
-
-        final String flushIntervalString =
-                ConfUtils.getString(
-                        stormConf, Constants.PARAMPREFIX, dottedType, "flushInterval", "5s");
-
-        final TimeValue flushInterval =
-                TimeValue.parseTimeValue(
-                        flushIntervalString, TimeValue.timeValueSeconds(5), "flushInterval");
-
-        final int bulkActions =
-                ConfUtils.getInt(stormConf, Constants.PARAMPREFIX, dottedType, "bulkActions", 50);
-
-        final int concurrentRequests =
-                ConfUtils.getInt(
-                        stormConf, Constants.PARAMPREFIX, dottedType, "concurrentRequests", 1);
-
-        final RequestOptions requestOptions = RequestOptions.DEFAULT;
-        final RequestOptions.Builder requestOptionsBuilder = requestOptions.toBuilder();
-        final int bufferSize =
-                ConfUtils.getInt(
-                        stormConf, Constants.PARAMPREFIX, dottedType, "responseBufferSize", 100);
-
-        requestOptionsBuilder.setHttpAsyncResponseConsumerFactory(
-                new HttpAsyncResponseConsumerFactory.HeapBufferedResponseConsumerFactory(
-                        bufferSize * 1024 * 1024));
-
-        BulkProcessor bulkProcessor = null;
-        Sniffer sniffer = null;
+        value = value.trim();
         try {
-            bulkProcessor =
-                    BulkProcessor.builder(
-                                    (request, bulkListener) ->
-                                            client.bulkAsync(
-                                                    request,
-                                                    requestOptionsBuilder.build(),
-                                                    bulkListener),
-                                    listener)
-                            .setFlushInterval(flushInterval)
-                            .setBulkActions(bulkActions)
-                            .setConcurrentRequests(concurrentRequests)
-                            .build();
-
-            boolean sniff =
-                    ConfUtils.getBoolean(
-                            stormConf, Constants.PARAMPREFIX, dottedType, "sniff", true);
-            if (sniff) {
-                if (hasCredentials(
-                        ConfUtils.getString(stormConf, Constants.PARAMPREFIX, dottedType, "user"),
-                        ConfUtils.getString(
-                                stormConf, Constants.PARAMPREFIX, dottedType, "password"))) {
-                    LOG.warn(
-                            "Sniffing is enabled for {} and OpenSearch credentials are configured. "
-                                    + "The credentials are only sent to the configured addresses: "
-                                    + "requests to a node the sniffer finds under another host or "
-                                    + "port are sent without them and fail if the cluster requires "
-                                    + "authentication. List every node in opensearch.{}.addresses "
-                                    + "or set opensearch.{}.sniff: false.",
-                            boltType,
-                            boltType,
-                            boltType);
-                }
-                final RestClient lowLevelClient = client.getLowLevelClient();
-                final List<HttpHost> configured = new ArrayList<>();
-                for (Node node : lowLevelClient.getNodes()) {
-                    configured.add(node.getHost());
-                }
-                sniffer =
-                        Sniffer.builder(lowLevelClient)
-                                .setNodesSniffer(
-                                        new OpenSearchNodesSniffer(
-                                                lowLevelClient,
-                                                OpenSearchNodesSniffer
-                                                        .DEFAULT_SNIFF_REQUEST_TIMEOUT,
-                                                sniffScheme(configured)))
-                                .build();
+            if (value.endsWith("ms")) {
+                return Long.parseLong(value.substring(0, value.length() - 2));
+            } else if (value.endsWith("s")) {
+                return Long.parseLong(value.substring(0, value.length() - 1)) * 1000;
+            } else if (value.endsWith("m")) {
+                return Long.parseLong(value.substring(0, value.length() - 1)) * 60000;
+            } else {
+                return Long.parseLong(value);
             }
-
-            return new OpenSearchConnection(client, bulkProcessor, sniffer);
-        } catch (Exception e) {
-            if (bulkProcessor != null) {
-                try {
-                    bulkProcessor.close();
-                } catch (Exception suppressed) {
-                    e.addSuppressed(suppressed);
-                }
-            }
-            try {
-                client.close();
-            } catch (IOException suppressed) {
-                e.addSuppressed(suppressed);
-            }
-            throw e;
+        } catch (NumberFormatException e) {
+            LOG.warn("Could not parse time value '{}', using default {}ms", value, defaultMillis);
+            return defaultMillis;
         }
-    }
-
-    private boolean isClosed = false;
-
-    public void close() {
-
-        if (isClosed) {
-            LOG.warn("Tried to close an already closed connection!");
-            return;
-        }
-
-        // Maybe some kind of identifier?
-        LOG.debug("Start closing the OpenSearch connection");
-
-        // First, close the BulkProcessor ensuring pending actions are flushed
-        try {
-            boolean success = processor.awaitClose(60, TimeUnit.SECONDS);
-            if (!success) {
-                throw new RuntimeException(
-                        "Failed to flush pending actions when closing BulkProcessor");
-            }
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
-        if (sniffer != null) {
-            sniffer.close();
-        }
-
-        // Now close the actual client
-        try {
-            client.close();
-        } catch (IOException e) {
-            // ignore silently
-            LOG.trace("Client threw IO exception.");
-        }
-
-        isClosed = true;
     }
 }

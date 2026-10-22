@@ -17,12 +17,11 @@
 
 package org.apache.stormcrawler.opensearch.metrics;
 
-import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
-
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -32,8 +31,7 @@ import org.apache.storm.task.TopologyContext;
 import org.apache.stormcrawler.opensearch.IndexCreation;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.opensearch.action.index.IndexRequest;
-import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.client.opensearch.core.bulk.BulkOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,19 +142,20 @@ public class MetricsConsumer implements IMetricsConsumer {
 
     private void indexDataPoint(TaskInfo taskInfo, Date timestamp, String name, double value) {
         try {
-            XContentBuilder builder = jsonBuilder().startObject();
-            builder.field("stormId", stormID);
-            builder.field("srcComponentId", taskInfo.srcComponentId);
-            builder.field("srcTaskId", taskInfo.srcTaskId);
-            builder.field("srcWorkerHost", taskInfo.srcWorkerHost);
-            builder.field("srcWorkerPort", taskInfo.srcWorkerPort);
-            builder.field("name", name);
-            builder.field("value", value);
-            builder.field("timestamp", timestamp);
-            builder.endObject();
+            Map<String, Object> doc = new HashMap<>();
+            doc.put("stormId", stormID);
+            doc.put("srcComponentId", taskInfo.srcComponentId);
+            doc.put("srcTaskId", taskInfo.srcTaskId);
+            doc.put("srcWorkerHost", taskInfo.srcWorkerHost);
+            doc.put("srcWorkerPort", taskInfo.srcWorkerPort);
+            doc.put("name", name);
+            doc.put("value", value);
+            doc.put("timestamp", timestamp.toInstant().toString());
 
-            IndexRequest indexRequest = new IndexRequest(getIndexName(timestamp)).source(builder);
-            connection.addToProcessor(indexRequest);
+            final String targetIndex = getIndexName(timestamp);
+            BulkOperation op =
+                    BulkOperation.of(b -> b.index(idx -> idx.index(targetIndex).document(doc)));
+            connection.addToProcessor(op);
         } catch (Exception e) {
             LOG.error("problem when building request for OpenSearch", e);
         }

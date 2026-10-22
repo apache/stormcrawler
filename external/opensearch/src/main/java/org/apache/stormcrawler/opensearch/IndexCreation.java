@@ -17,32 +17,31 @@
 
 package org.apache.stormcrawler.opensearch;
 
-import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
 import java.io.IOException;
 import java.net.URL;
-import org.opensearch.OpenSearchException;
-import org.opensearch.action.support.master.AcknowledgedResponse;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.RestHighLevelClient;
-import org.opensearch.client.indices.CreateIndexRequest;
-import org.opensearch.client.indices.CreateIndexResponse;
-import org.opensearch.client.indices.GetIndexRequest;
-import org.opensearch.client.indices.IndexTemplatesExistRequest;
-import org.opensearch.client.indices.PutIndexTemplateRequest;
-import org.opensearch.common.xcontent.XContentType;
+import java.nio.charset.StandardCharsets;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.generic.Body;
+import org.opensearch.client.opensearch.generic.Requests;
+import org.opensearch.client.opensearch.generic.Response;
+import org.opensearch.client.opensearch.indices.ExistsTemplateRequest;
 import org.slf4j.Logger;
 
 public class IndexCreation {
 
+    /**
+     * Creates the index with the {@code <boltType>.mapping} resource if it does not exist.
+     *
+     * @throws IllegalArgumentException if the index does not exist and the resource is not on the
+     *     classpath
+     */
     public static synchronized void checkOrCreateIndex(
-            RestHighLevelClient client, String indexName, String boltType, Logger log)
+            OpenSearchClient client, String indexName, String boltType, Logger log)
             throws IOException {
-        final boolean indexExists =
-                client.indices().exists(new GetIndexRequest(indexName), RequestOptions.DEFAULT);
+        final boolean indexExists = client.indices().exists(req -> req.index(indexName)).value();
         log.info("Index '{}' exists? {}", indexName, indexExists);
         // there's a possible check-then-update race condition
-        // createIndex intentionally catches and logs exceptions from OpenSearch
         if (!indexExists) {
             boolean created =
                     IndexCreation.createIndex(client, indexName, boltType + ".mapping", log);
@@ -50,17 +49,22 @@ public class IndexCreation {
         }
     }
 
+    /**
+     * Creates the template {@code <boltType>-template} with the {@code <boltType>.mapping} resource
+     * if it does not exist.
+     *
+     * @throws IllegalArgumentException if the template does not exist and the resource is not on
+     *     the classpath
+     */
     public static synchronized void checkOrCreateIndexTemplate(
-            RestHighLevelClient client, String boltType, Logger log) throws IOException {
+            OpenSearchClient client, String boltType, Logger log) throws IOException {
         final String templateName = boltType + "-template";
         final boolean templateExists =
                 client.indices()
-                        .existsTemplate(
-                                new IndexTemplatesExistRequest(templateName),
-                                RequestOptions.DEFAULT);
+                        .existsTemplate(ExistsTemplateRequest.of(r -> r.name(templateName)))
+                        .value();
         log.info("Template '{}' exists? {}", templateName, templateExists);
         // there's a possible check-then-update race condition
-        // createTemplate intentionally catches and logs exceptions from OpenSearch
         if (!templateExists) {
             boolean created =
                     IndexCreation.createTemplate(client, templateName, boltType + ".mapping", log);
@@ -69,46 +73,68 @@ public class IndexCreation {
     }
 
     private static boolean createTemplate(
-            RestHighLevelClient client, String templateName, String resourceName, Logger log) {
+            OpenSearchClient client, String templateName, String resourceName, Logger log) {
+
+        final URL mapping = Resources.getResource(resourceName);
 
         try {
-            final PutIndexTemplateRequest createIndexRequest =
-                    new PutIndexTemplateRequest(templateName);
+            final String jsonIndexConfiguration =
+                    Resources.toString(mapping, StandardCharsets.UTF_8);
 
-            final URL mapping =
-                    Thread.currentThread().getContextClassLoader().getResource(resourceName);
-
-            final String jsonIndexConfiguration = Resources.toString(mapping, Charsets.UTF_8);
-
-            createIndexRequest.source(jsonIndexConfiguration, XContentType.JSON);
-
-            final AcknowledgedResponse createIndexResponse =
-                    client.indices().putTemplate(createIndexRequest, RequestOptions.DEFAULT);
-            return createIndexResponse.isAcknowledged();
-        } catch (IOException | OpenSearchException e) {
+            try (Response response =
+                    client.generic()
+                            .execute(
+                                    Requests.builder()
+                                            .endpoint("/_template/" + templateName)
+                                            .method("PUT")
+                                            .json(jsonIndexConfiguration)
+                                            .build())) {
+                int statusCode = response.getStatus();
+                if (statusCode == 200 || statusCode == 201) {
+                    return true;
+                }
+                log.warn(
+                        "template '{}' not created: {} {}",
+                        templateName,
+                        statusCode,
+                        response.getBody().map(Body::bodyAsString).orElse(""));
+                return false;
+            }
+        } catch (Exception e) {
             log.warn("template '{}' not created", templateName, e);
             return false;
         }
     }
 
     private static boolean createIndex(
-            RestHighLevelClient client, String indexName, String resourceName, Logger log) {
+            OpenSearchClient client, String indexName, String resourceName, Logger log) {
+
+        final URL mapping = Resources.getResource(resourceName);
 
         try {
+            final String jsonIndexConfiguration =
+                    Resources.toString(mapping, StandardCharsets.UTF_8);
 
-            final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName);
-
-            final URL mapping =
-                    Thread.currentThread().getContextClassLoader().getResource(resourceName);
-
-            final String jsonIndexConfiguration = Resources.toString(mapping, Charsets.UTF_8);
-
-            createIndexRequest.source(jsonIndexConfiguration, XContentType.JSON);
-
-            final CreateIndexResponse createIndexResponse =
-                    client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
-            return createIndexResponse.isAcknowledged();
-        } catch (IOException | OpenSearchException e) {
+            try (Response response =
+                    client.generic()
+                            .execute(
+                                    Requests.builder()
+                                            .endpoint("/" + indexName)
+                                            .method("PUT")
+                                            .json(jsonIndexConfiguration)
+                                            .build())) {
+                int statusCode = response.getStatus();
+                if (statusCode == 200 || statusCode == 201) {
+                    return true;
+                }
+                log.warn(
+                        "index '{}' not created: {} {}",
+                        indexName,
+                        statusCode,
+                        response.getBody().map(Body::bodyAsString).orElse(""));
+                return false;
+            }
+        } catch (Exception e) {
             log.warn("index '{}' not created", indexName, e);
             return false;
         }

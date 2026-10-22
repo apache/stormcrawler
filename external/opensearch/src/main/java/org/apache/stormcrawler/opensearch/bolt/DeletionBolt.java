@@ -28,13 +28,13 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.indexing.AbstractIndexerBolt;
 import org.apache.stormcrawler.metrics.CrawlerMetrics;
+import org.apache.stormcrawler.opensearch.AsyncBulkProcessor;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.opensearch.WaitAckCache;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.opensearch.action.bulk.BulkProcessor.Listener;
-import org.opensearch.action.bulk.BulkRequest;
-import org.opensearch.action.bulk.BulkResponse;
-import org.opensearch.action.delete.DeleteRequest;
+import org.opensearch.client.opensearch.core.BulkRequest;
+import org.opensearch.client.opensearch.core.BulkResponse;
+import org.opensearch.client.opensearch.core.bulk.BulkOperation;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  * will also try to delete documents even though they were never indexed and it currently won't
  * delete documents which were indexed under the canonical URL.
  */
-public class DeletionBolt extends BaseRichBolt implements Listener {
+public class DeletionBolt extends BaseRichBolt implements AsyncBulkProcessor.Listener {
 
     static final org.slf4j.Logger LOG =
             LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -81,7 +81,7 @@ public class DeletionBolt extends BaseRichBolt implements Listener {
         try {
             connection = OpenSearchConnection.getConnection(conf, BOLT_TYPE, this);
         } catch (Exception e1) {
-            LOG.error("Can't connect to opensearch", e1);
+            LOG.error("Can't connect to OpenSearch", e1);
             throw new RuntimeException(e1);
         }
 
@@ -106,10 +106,18 @@ public class DeletionBolt extends BaseRichBolt implements Listener {
         // used
 
         final String docID = getDocumentID(metadata, url);
-        DeleteRequest dr = new DeleteRequest(getIndexName(metadata), docID);
-        connection.addToProcessor(dr);
+        final String targetIndex = getIndexName(metadata);
+        BulkOperation op = BulkOperation.of(b -> b.delete(d -> d.index(targetIndex).id(docID)));
 
         waitAck.addTuple(docID, tuple);
+
+        try {
+            connection.addToProcessor(op);
+        } catch (Exception e) {
+            LOG.error("Error adding the deletion of {} to the bulk", url, e);
+            waitAck.invalidate(docID);
+            _collector.fail(tuple);
+        }
     }
 
     @Override
@@ -155,9 +163,9 @@ public class DeletionBolt extends BaseRichBolt implements Listener {
         waitAck.processBulkResponse(
                 response,
                 executionId,
-                null, // no conflict counter — deletion conflicts are expected and only logged
+                null,
                 (id, t, selected) -> {
-                    if (!selected.failed) {
+                    if (!selected.failed()) {
                         _collector.ack(t);
                     } else {
                         String url = (String) t.getValueByField("url");

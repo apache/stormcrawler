@@ -17,8 +17,6 @@
 
 package org.apache.stormcrawler.opensearch.metrics;
 
-import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
-
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
@@ -30,6 +28,7 @@ import com.codahale.metrics.Timer;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.SortedMap;
@@ -38,8 +37,7 @@ import org.apache.storm.metrics2.reporters.ScheduledStormReporter;
 import org.apache.stormcrawler.opensearch.IndexCreation;
 import org.apache.stormcrawler.opensearch.OpenSearchConnection;
 import org.apache.stormcrawler.util.ConfUtils;
-import org.opensearch.action.index.IndexRequest;
-import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.client.opensearch.core.bulk.BulkOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +65,8 @@ public class MetricsReporter extends ScheduledStormReporter {
             "opensearch." + OSBoltType + ".index.name";
 
     private static final String DATE_FORMAT_KEY = "opensearch.metrics.date.format";
+
+    private ScheduledReporter reporter;
 
     @Override
     public void prepare(
@@ -107,8 +107,6 @@ public class MetricsReporter extends ScheduledStormReporter {
         reporter.start(reportPeriod, reportPeriodUnit);
     }
 
-    private ScheduledReporter reporter;
-
     @Override
     public void start() {
         // already started in prepare()
@@ -123,7 +121,7 @@ public class MetricsReporter extends ScheduledStormReporter {
 
     /**
      * Inner ScheduledReporter that writes Codahale metrics to OpenSearch in the same format as the
-     * V1 MetricsConsumer.
+     * V1 {@link MetricsConsumer}.
      */
     private static class OpenSearchScheduledReporter extends ScheduledReporter {
 
@@ -203,16 +201,16 @@ public class MetricsReporter extends ScheduledStormReporter {
 
         private void indexDataPoint(Date timestamp, String name, double value) {
             try {
-                XContentBuilder builder = jsonBuilder().startObject();
-                builder.field("stormId", stormId);
-                builder.field("name", name);
-                builder.field("value", value);
-                builder.field("timestamp", timestamp);
-                builder.endObject();
+                Map<String, Object> doc = new HashMap<>();
+                doc.put("stormId", stormId);
+                doc.put("name", name);
+                doc.put("value", value);
+                doc.put("timestamp", timestamp.toInstant().toString());
 
-                IndexRequest indexRequest =
-                        new IndexRequest(getIndexName(timestamp)).source(builder);
-                connection.addToProcessor(indexRequest);
+                final String targetIndex = getIndexName(timestamp);
+                BulkOperation op =
+                        BulkOperation.of(b -> b.index(idx -> idx.index(targetIndex).document(doc)));
+                connection.addToProcessor(op);
             } catch (Exception e) {
                 LOG.error("Problem when building request for OpenSearch", e);
             }

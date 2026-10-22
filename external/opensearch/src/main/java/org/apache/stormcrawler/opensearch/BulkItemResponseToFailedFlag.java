@@ -17,118 +17,54 @@
 
 package org.apache.stormcrawler.opensearch;
 
-import java.io.IOException;
+import java.util.Objects;
 import org.jetbrains.annotations.NotNull;
-import org.opensearch.action.DocWriteRequest;
-import org.opensearch.action.DocWriteResponse;
-import org.opensearch.action.bulk.BulkItemResponse;
-import org.opensearch.core.common.io.stream.StreamOutput;
-import org.opensearch.core.rest.RestStatus;
-import org.opensearch.core.xcontent.ToXContent;
-import org.opensearch.core.xcontent.XContentBuilder;
+import org.jetbrains.annotations.Nullable;
+import org.opensearch.client.opensearch._types.ErrorCause;
+import org.opensearch.client.opensearch.core.bulk.BulkResponseItem;
 
-public final class BulkItemResponseToFailedFlag {
-    @NotNull public final BulkItemResponse response;
-    public final boolean failed;
-    @NotNull public final String id;
+/**
+ * Wraps a {@link BulkResponseItem} with a pre-computed failure flag. A 409 (conflict) is not
+ * considered a failure — it simply indicates a document already existed when using create mode.
+ *
+ * @param response the original bulk response item
+ * @param failed whether this item represents a real failure (excludes 409 conflicts)
+ * @param id the document id from the response item
+ */
+public record BulkItemResponseToFailedFlag(
+        @NotNull BulkResponseItem response, boolean failed, @NotNull String id) {
 
-    public BulkItemResponseToFailedFlag(@NotNull BulkItemResponse response, boolean failed) {
-        this.response = response;
-        this.failed = failed;
-        this.id = response.getId();
+    public BulkItemResponseToFailedFlag {
+        Objects.requireNonNull(response, "response");
+        Objects.requireNonNull(id, "id");
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof BulkItemResponseToFailedFlag)) {
-            return false;
-        }
-
-        BulkItemResponseToFailedFlag that = (BulkItemResponseToFailedFlag) o;
-
-        if (failed != that.failed) {
-            return false;
-        }
-        if (!response.equals(that.response)) {
-            return false;
-        }
-        return id.equals(that.id);
+    /** Constructs with id derived from the response item. */
+    public BulkItemResponseToFailedFlag(@NotNull BulkResponseItem response, boolean failed) {
+        this(
+                response,
+                failed,
+                Objects.requireNonNull(response.id(), "BulkResponseItem id must not be null"));
     }
 
-    @Override
-    public int hashCode() {
-        int result = response.hashCode();
-        result = 31 * result + (failed ? 1 : 0);
-        result = 31 * result + id.hashCode();
-        return result;
+    /** Returns the error cause, or {@code null} if the item did not fail. */
+    @Nullable
+    public ErrorCause getFailedCause() {
+        return response.error();
     }
 
-    @Override
-    public String toString() {
-        return "BulkItemResponseToFailedFlag{"
-                + "response="
-                + response
-                + ", failed="
-                + failed
-                + ", id='"
-                + id
-                + '\''
-                + '}';
+    /** Returns a human-readable failure description, or {@code null} if the item did not fail. */
+    @Nullable
+    public String getFailure() {
+        ErrorCause error = response.error();
+        if (error == null) {
+            return null;
+        }
+        return error.reason() != null ? error.reason() : error.type();
     }
 
-    public RestStatus status() {
+    /** Returns the HTTP status code of this response item. */
+    public int getStatus() {
         return response.status();
-    }
-
-    public XContentBuilder toXContent(XContentBuilder builder, ToXContent.Params params)
-            throws IOException {
-        return response.toXContent(builder, params);
-    }
-
-    public int getItemId() {
-        return response.getItemId();
-    }
-
-    public DocWriteRequest.OpType getOpType() {
-        return response.getOpType();
-    }
-
-    public String getIndex() {
-        return response.getIndex();
-    }
-
-    public long getVersion() {
-        return response.getVersion();
-    }
-
-    public <T extends DocWriteResponse> T getResponse() {
-        return response.getResponse();
-    }
-
-    public boolean isFailed() {
-        return response.isFailed();
-    }
-
-    public String getFailureMessage() {
-        return response.getFailureMessage();
-    }
-
-    public BulkItemResponse.Failure getFailure() {
-        return response.getFailure();
-    }
-
-    public void writeTo(StreamOutput out) throws IOException {
-        response.writeTo(out);
-    }
-
-    public void writeThin(StreamOutput out) throws IOException {
-        response.writeThin(out);
-    }
-
-    public boolean isFragment() {
-        return response.isFragment();
     }
 }

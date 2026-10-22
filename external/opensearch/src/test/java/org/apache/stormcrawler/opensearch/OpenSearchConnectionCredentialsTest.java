@@ -31,86 +31,111 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import org.apache.http.HttpHost;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.Credentials;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
+import java.util.function.IntFunction;
+import org.apache.hc.client5.http.auth.AuthScope;
+import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
+import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
+import org.apache.hc.core5.http.HttpHost;
 import org.junit.jupiter.api.Test;
-import org.opensearch.client.Request;
-import org.opensearch.client.RestClient;
-import org.opensearch.client.sniff.OpenSearchNodesSniffer;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.generic.Requests;
+import org.opensearch.client.opensearch.generic.Response;
+import org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder;
 
 class OpenSearchConnectionCredentialsTest {
 
-    private static final Credentials CREDENTIALS =
-            new UsernamePasswordCredentials("crawler", "s3cret");
-
-    private static CredentialsProvider providerFor(HttpHost... hosts) {
-        return new OpenSearchConnection.OriginCredentialsProvider(List.of(hosts), CREDENTIALS);
-    }
-
-    /** The scope HttpClient looks the credentials up with for a request to the given node. */
-    private static AuthScope request(String scheme, String host, int port) {
-        return new AuthScope(new HttpHost(host, port, scheme), AuthScope.ANY_REALM, "Basic");
+    private static BasicCredentialsProvider providerFor(List<HttpHost> hosts) {
+        final BasicCredentialsProvider provider = new BasicCredentialsProvider();
+        final UsernamePasswordCredentials credentials =
+                new UsernamePasswordCredentials("crawler", "s3cret".toCharArray());
+        for (AuthScope scope : OpenSearchConnection.credentialScopes(hosts)) {
+            provider.setCredentials(scope, credentials);
+        }
+        return provider;
     }
 
     @Test
-    void credentialsAreGivenToTheConfiguredAddresses() {
-        final CredentialsProvider provider =
-                providerFor(
-                        new HttpHost("opensearch1.example.org", 9200, "https"),
-                        new HttpHost("OpenSearch2.example.org", 9201, "https"));
+    void scopesCoverTheConfiguredHostsAndPorts() {
+        final List<AuthScope> scopes =
+                OpenSearchConnection.credentialScopes(
+                        List.of(
+                                new HttpHost("https", "opensearch1.example.org", 9200),
+                                new HttpHost("https", "opensearch2.example.org", 9201)));
         assertEquals(
-                CREDENTIALS,
-                provider.getCredentials(request("https", "opensearch1.example.org", 9200)));
-        assertEquals(
-                CREDENTIALS,
-                provider.getCredentials(request("HTTPS", "opensearch2.example.org", 9201)));
+                List.of(
+                        new AuthScope("https", "opensearch1.example.org", 9200, null, null),
+                        new AuthScope("https", "opensearch2.example.org", 9201, null, null)),
+                scopes);
+    }
+
+    @Test
+    void duplicateAddressesGiveOneScope() {
+        final List<AuthScope> scopes =
+                OpenSearchConnection.credentialScopes(
+                        List.of(
+                                new HttpHost("https", "opensearch1.example.org", 9200),
+                                new HttpHost("https", "OpenSearch1.example.org", 9200)));
+        assertEquals(1, scopes.size());
+    }
+
+    @Test
+    void noAddressGivesNoScope() {
+        assertTrue(OpenSearchConnection.credentialScopes(List.of()).isEmpty());
     }
 
     @Test
     void credentialsAreOnlyGivenToTheConfiguredHosts() {
-        final CredentialsProvider provider =
-                providerFor(new HttpHost("opensearch1.example.org", 9200, "https"));
+        final BasicCredentialsProvider provider =
+                providerFor(List.of(new HttpHost("https", "opensearch1.example.org", 9200)));
 
-        // a node found by the sniffer under the address it publishes
-        assertNull(provider.getCredentials(request("https", "10.0.0.12", 9200)));
+        assertNotNull(
+                provider.getCredentials(request("https", "opensearch1.example.org", 9200), null));
+        // another node of the cluster which is not listed in the addresses
+        assertNull(provider.getCredentials(request("https", "10.0.0.12", 9200), null));
         // same host, another port
-        assertNull(provider.getCredentials(request("https", "opensearch1.example.org", 9300)));
-        assertNull(provider.getCredentials(request("https", "other.example.org", 9200)));
+        assertNull(
+                provider.getCredentials(request("https", "opensearch1.example.org", 9300), null));
+        assertNull(provider.getCredentials(request("https", "other.example.org", 9200), null));
     }
 
     @Test
     void credentialsAreMatchedOnTheScheme() {
-        final CredentialsProvider provider =
-                providerFor(new HttpHost("opensearch1.example.org", 9200, "https"));
-        assertNull(provider.getCredentials(request("http", "opensearch1.example.org", 9200)));
+        final BasicCredentialsProvider provider =
+                providerFor(List.of(new HttpHost("https", "opensearch1.example.org", 9200)));
+        assertNull(provider.getCredentials(request("http", "opensearch1.example.org", 9200), null));
+    }
+
+    /** The scope HttpClient looks the credentials up with for a request to the given node. */
+    private static AuthScope request(String scheme, String host, int port) {
+        return new AuthScope(new HttpHost(scheme, host, port), null, "Basic");
     }
 
     @Test
-    void credentialsNeedAnOrigin() {
-        final CredentialsProvider provider =
-                providerFor(new HttpHost("opensearch1.example.org", 9200, "https"));
-        assertNull(provider.getCredentials(new AuthScope("opensearch1.example.org", 9200)));
-        assertNull(provider.getCredentials(AuthScope.ANY));
-    }
-
-    @Test
-    void noAddressGivesTheCredentialsToNoOne() {
-        assertNull(providerFor().getCredentials(request("https", "opensearch1.example.org", 9200)));
+    void credentialsAreGivenToTheConfiguredAddresses() {
+        final BasicCredentialsProvider provider =
+                providerFor(
+                        List.of(
+                                new HttpHost("https", "opensearch1.example.org", 9200),
+                                new HttpHost("https", "OpenSearch2.example.org", 9201)));
+        assertNotNull(
+                provider.getCredentials(request("https", "opensearch1.example.org", 9200), null));
+        assertNotNull(
+                provider.getCredentials(request("HTTPS", "opensearch2.example.org", 9201), null));
     }
 
     /**
-     * Sends a request with the client to a local server and returns the Authorization header it
-     * received, if any.
+     * Sends a request with the client built for the port of a local server and returns the
+     * Authorization header the server received, if any.
      */
-    private static String authorizationSentTo(HttpHost configured) throws Exception {
+    private static String authorizationSentTo(IntFunction<OpenSearchClient> clientForPort)
+            throws Exception {
         try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
-            final int port = server.getLocalPort();
             final CompletableFuture<String> authorization =
                     CompletableFuture.supplyAsync(
                             () -> {
@@ -137,70 +162,72 @@ class OpenSearchConnectionCredentialsTest {
                                     throw new UncheckedIOException(e);
                                 }
                             });
-            final HttpHost configuredHere =
-                    new HttpHost(configured.getHostName(), port, configured.getSchemeName());
-            try (RestClient client =
-                    RestClient.builder(new HttpHost("127.0.0.1", port, "http"))
-                            .setHttpClientConfigCallback(
-                                    b ->
-                                            b.setDefaultCredentialsProvider(
-                                                    providerFor(configuredHere)))
-                            .build()) {
-                client.performRequest(new Request("GET", "/"));
+            final OpenSearchClient client = clientForPort.apply(server.getLocalPort());
+            try (Response response =
+                    client.generic()
+                            .execute(Requests.builder().endpoint("/").method("GET").build())) {
+                return authorization.get(10, TimeUnit.SECONDS);
+            } finally {
+                client._transport().close();
             }
-            return authorization.get(10, TimeUnit.SECONDS);
         }
+    }
+
+    private static OpenSearchClient connectionClient(int port, String user, String password) {
+        final Map<String, Object> conf = new HashMap<>();
+        conf.put("opensearch.test.addresses", "http://127.0.0.1:" + port);
+        conf.put("opensearch.test.user", user);
+        conf.put("opensearch.test.password", password);
+        return OpenSearchConnection.getClient(conf, "test");
     }
 
     @Test
     void clientSendsTheCredentialsToAConfiguredAddress() throws Exception {
-        assertNotNull(authorizationSentTo(new HttpHost("127.0.0.1", 0, "http")));
+        assertEquals(
+                "Basic "
+                        + Base64.getEncoder()
+                                .encodeToString("crawler:s3cret".getBytes(StandardCharsets.UTF_8)),
+                authorizationSentTo(port -> connectionClient(port, "crawler", "s3cret")));
     }
 
     @Test
     void clientSendsNoCredentialsToAnotherAddress() throws Exception {
-        assertNull(authorizationSentTo(new HttpHost("127.0.0.1", 0, "https")));
+        assertNull(
+                authorizationSentTo(
+                        port ->
+                                new OpenSearchClient(
+                                        ApacheHttpClient5TransportBuilder.builder(
+                                                        new HttpHost("http", "127.0.0.1", port))
+                                                .setHttpClientConfigCallback(
+                                                        b ->
+                                                                b.setDefaultCredentialsProvider(
+                                                                        providerFor(
+                                                                                List.of(
+                                                                                        new HttpHost(
+                                                                                                "https",
+                                                                                                "127.0.0.1",
+                                                                                                port)))))
+                                                .build())));
+    }
+
+    @Test
+    void credentialsNeedUserAndPassword() throws Exception {
+        assertNull(authorizationSentTo(port -> connectionClient(port, "crawler", " ")));
+        assertNull(authorizationSentTo(port -> connectionClient(port, null, "s3cret")));
     }
 
     @Test
     void plainHttpToARemoteHostIsReported() {
-        final HttpHost remote = new HttpHost("opensearch1.example.org", 9200, "http");
+        final HttpHost remote = new HttpHost("http", "opensearch1.example.org", 9200);
         final List<HttpHost> plain =
                 OpenSearchConnection.plainHttpHosts(
                         List.of(
                                 remote,
-                                new HttpHost("opensearch2.example.org", 9200, "https"),
-                                new HttpHost("localhost", 9200, "http"),
-                                new HttpHost("127.0.0.1", 9200, "http"),
-                                new HttpHost("[::1]", 9200, "http")));
+                                new HttpHost("https", "opensearch2.example.org", 9200),
+                                new HttpHost("http", "localhost", 9200),
+                                new HttpHost("http", "127.0.0.1", 9200),
+                                new HttpHost("http", "[::1]", 9200)));
         assertEquals(List.of(remote), plain);
-    }
-
-    @Test
-    void sniffedNodesKeepTheSchemeOfTheAddresses() {
-        assertEquals(
-                OpenSearchNodesSniffer.Scheme.HTTPS,
-                OpenSearchConnection.sniffScheme(
-                        List.of(new HttpHost("opensearch1.example.org", 9200, "https"))));
-        assertEquals(
-                OpenSearchNodesSniffer.Scheme.HTTPS,
-                OpenSearchConnection.sniffScheme(
-                        List.of(
-                                new HttpHost("opensearch1.example.org", 9200, "http"),
-                                new HttpHost("opensearch2.example.org", 9200, "https"))));
-        assertEquals(
-                OpenSearchNodesSniffer.Scheme.HTTP,
-                OpenSearchConnection.sniffScheme(
-                        List.of(new HttpHost("opensearch1.example.org", 9200, "http"))));
-    }
-
-    @Test
-    void credentialsNeedUserAndPassword() {
-        assertTrue(OpenSearchConnection.hasCredentials("crawler", "s3cret"));
-        assertFalse(OpenSearchConnection.hasCredentials("crawler", null));
-        assertFalse(OpenSearchConnection.hasCredentials("crawler", " "));
-        assertFalse(OpenSearchConnection.hasCredentials(null, "s3cret"));
-        assertFalse(OpenSearchConnection.hasCredentials("", ""));
     }
 
     @Test
