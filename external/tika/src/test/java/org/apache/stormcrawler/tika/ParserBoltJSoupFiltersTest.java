@@ -77,19 +77,38 @@ class ParserBoltJSoupFiltersTest extends ParsingTester {
         return (Metadata) emitted.get(0).get(2);
     }
 
-    @Test
-    void testHtml() throws IOException {
+    private void checkHtml(Map<String, Object> conf) throws IOException {
         // same expressions as the JSoupParserBolt tests in core; the meta elements are not
         // checked as Tika rewrites the head from its own metadata (e.g. dc:subject)
-        prepare("test.xpath.jsoupfilters.json", new HashMap<>());
-        parse("https://example.com", "xpath-test.html");
+        prepare("test.xpath.jsoupfilters.json", conf);
+        try {
+            parse("https://example.com", "xpath-test.html");
+        } finally {
+            bolt.cleanup();
+        }
         Metadata metadata = emittedMetadata();
         Assertions.assertEquals("XPath Test Page", metadata.getFirstValue("title_text"));
         Assertions.assertEquals(
                 "Hello world, this is a test.", metadata.getFirstValue("tidy_text").strip());
         Assertions.assertTrue(metadata.getFirstValue("html_content").contains("<strong>world"));
+        // span elements and class attributes are dropped by Tika's DefaultHtmlMapper
         Assertions.assertEquals(2, metadata.getValues("concept_upper").length);
         Assertions.assertTrue(metadata.getFirstValue("fallback").contains("Main Title"));
+    }
+
+    @Test
+    void testHtml() throws IOException {
+        checkHtml(new HashMap<>());
+    }
+
+    /** The IdentityHtmlMapper used by default must be applied in the forked JVM too. */
+    @Test
+    @Timeout(60)
+    void testHtmlWithPipes() throws IOException {
+        Map<String, Object> conf = new HashMap<>();
+        conf.put(ParserBolt.PARSE_TIMEOUT_PARAM, 30_000L);
+        conf.put(ParserBolt.PIPES_JVM_ARGS_PARAM, "-Xmx256m");
+        checkHtml(conf);
     }
 
     @Test
