@@ -289,7 +289,7 @@ public class BasicURLNormalizer extends URLFilter {
                 return urlToFilter;
             }
 
-            List<NameValuePair> pairs = URLEncodedUtils.parse(query, StandardCharsets.UTF_8);
+            List<NameValuePair> pairs = URLEncodedUtils.parse(query, StandardCharsets.UTF_8, '&');
             Iterator<NameValuePair> pairsIterator = pairs.iterator();
             while (pairsIterator.hasNext()) {
                 NameValuePair param = pairsIterator.next();
