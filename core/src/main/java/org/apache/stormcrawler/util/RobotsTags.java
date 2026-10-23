@@ -17,16 +17,7 @@
 
 package org.apache.stormcrawler.util;
 
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathExpression;
-import javax.xml.xpath.XPathExpressionException;
-import javax.xml.xpath.XPathFactory;
 import org.apache.stormcrawler.Metadata;
-import org.w3c.dom.DocumentFragment;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 /**
  * Normalises the robots instructions provided by the HTML meta tags or the HTTP X-Robots-Tag
@@ -52,17 +43,6 @@ public class RobotsTags {
 
     private boolean noCache = false;
 
-    private static final XPathExpression expression;
-
-    static {
-        XPath xpath = XPathFactory.newInstance().newXPath();
-        try {
-            expression = xpath.compile("/HTML/*/META");
-        } catch (XPathExpressionException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     /** Get the values from the fetch metadata. */
     public RobotsTags(Metadata metadata, String protocolMDprefix) {
         // HTTP headers
@@ -79,46 +59,6 @@ public class RobotsTags {
     }
 
     public RobotsTags() {}
-
-    // set the values based on the meta tags
-    // HTML tags
-    // <meta name="robots" content="noarchive, nofollow"/>
-    // called by the parser bolts
-    public void extractMetaTags(DocumentFragment doc) throws XPathExpressionException {
-        NodeList nodes = (NodeList) expression.evaluate(doc, XPathConstants.NODESET);
-        if (nodes == null) {
-            return;
-        }
-        int numNodes = nodes.getLength();
-        for (int i = 0; i < numNodes; i++) {
-            Node n = (Node) nodes.item(i);
-            // iterate on the attributes
-            // and check that it has name=robots and content
-            // whatever the case is
-            boolean isRobots = false;
-            String content = null;
-            NamedNodeMap attrs = n.getAttributes();
-            for (int att = 0; att < attrs.getLength(); att++) {
-                Node keyval = attrs.item(att);
-                if ("name".equalsIgnoreCase(keyval.getNodeName())
-                        && "robots".equalsIgnoreCase(keyval.getNodeValue())) {
-                    isRobots = true;
-                    continue;
-                }
-                if ("content".equalsIgnoreCase(keyval.getNodeName())) {
-                    content = keyval.getNodeValue();
-                    continue;
-                }
-            }
-
-            if (isRobots && content != null) {
-                // got a value - split it
-                String[] vals = content.split(" *, *");
-                parseValues(vals);
-                return;
-            }
-        }
-    }
 
     /** Extracts meta tags based on the value of the content attribute. */
     public void extractMetaTags(String content) {

@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  *
  * <pre>{@code
  * {
- *   "class": "org.apache.stormcrawler.parse.filter.LinkParseFilter",
+ *   "class": "org.apache.stormcrawler.jsoup.LinkParseFilter",
  *   "name": "LinkParseFilter",
  *   "params": {
  *     "pattern": "//IMG/@src",

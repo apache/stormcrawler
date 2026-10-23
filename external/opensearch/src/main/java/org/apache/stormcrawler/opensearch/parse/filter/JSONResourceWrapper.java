@@ -71,6 +71,11 @@ public class JSONResourceWrapper extends ParseFilter {
     }
 
     @Override
+    public boolean needsDOM() {
+        return refresher.getDelegate().needsDOM();
+    }
+
+    @Override
     public void cleanup() {
         if (refresher != null) {
             refresher.cleanup();
