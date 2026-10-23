@@ -61,6 +61,8 @@ public class LinkParseFilter extends XPathFilter {
     public void filter(
             String url, byte[] content, org.jsoup.nodes.Document doc, ParseResult parse) {
 
+        // nothing to add if there are no expressions or the conversion failed:
+        // leave the existing outlinks untouched
         W3CContext context = toW3C(url, doc);
         if (context == null) {
             return;
@@ -119,7 +121,7 @@ public class LinkParseFilter extends XPathFilter {
                         dedup.put(ol.getTargetURL(), ol);
                     }
                 } catch (Exception e) {
-                    LOG.error("Error evaluating {}: {}", le.key, e);
+                    LOG.error("Error evaluating {} on {}", le.key, url, e);
                 }
             }
         }

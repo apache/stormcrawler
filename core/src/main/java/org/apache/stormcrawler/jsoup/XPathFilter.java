@@ -233,7 +233,7 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
         try {
             return new W3CContext(doc);
         } catch (Exception e) {
-            LOG.error("Error converting {} to W3C DOM: {}", url, e);
+            LOG.error("Error converting {} to W3C DOM", url, e);
             return null;
         }
     }
@@ -260,7 +260,7 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
                         break;
                     }
                 } catch (Exception e) {
-                    LOG.error("Error evaluating {}: {}", le.key, e);
+                    LOG.error("Error evaluating {} on {}", le.key, url, e);
                 }
             }
         }
