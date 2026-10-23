@@ -58,6 +58,7 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilters;
 import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.metrics.ScopedCounter;
+import org.apache.stormcrawler.parse.JSoupFilters;
 import org.apache.stormcrawler.parse.Outlink;
 import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
@@ -188,6 +189,7 @@ public class ParserBolt extends BaseRichBolt {
 
     private URLFilters urlFilters = null;
     private ParseFilter parseFilters = null;
+    private JSoupFilters jsoupFilters = null;
 
     private OutputCollector collector;
 
@@ -238,6 +240,8 @@ public class ParserBolt extends BaseRichBolt {
         urlFilters = URLFilters.fromConf(conf);
 
         parseFilters = ParseFilters.fromConf(conf);
+
+        jsoupFilters = JSoupFilters.fromConf(conf);
 
         upperCaseElementNames = ConfUtils.getBoolean(conf, "parser.uppercase.element.names", true);
 
@@ -395,7 +399,7 @@ public class ParserBolt extends BaseRichBolt {
 
         LinkContentHandler linkHandler = new LinkContentHandler();
         ContentHandler textHandler = new BodyContentHandler(textMaxLength);
-        TeeContentHandler teeHandler = new TeeContentHandler(linkHandler, textHandler);
+        List<ContentHandler> handlers = new ArrayList<>(List.of(linkHandler, textHandler));
         // seed the context with the components configured in the
         // "parse-context" section of the Tika configuration
         ParseContext parseContext = createParseContext();
@@ -424,8 +428,18 @@ public class ParserBolt extends BaseRichBolt {
             DOMBuilder domhandler = new DOMBuilder(doc, root);
             domhandler.setUpperCaseElementNames(upperCaseElementNames);
             domhandler.setDefaultNamespaceURI(XHTMLContentHandler.XHTML);
-            teeHandler = new TeeContentHandler(linkHandler, textHandler, domhandler);
+            handlers.add(domhandler);
         }
+
+        // build a JSoup document if there are JSoupFilters
+        JSoupBuilder jsoupBuilder = null;
+        if (!jsoupFilters.isEmpty()) {
+            jsoupBuilder = new JSoupBuilder(url);
+            handlers.add(jsoupBuilder);
+        }
+
+        TeeContentHandler teeHandler =
+                new TeeContentHandler(handlers.toArray(new ContentHandler[0]));
 
         // parse
         String text;
@@ -490,6 +504,16 @@ public class ParserBolt extends BaseRichBolt {
         parseData.setMetadata(metadata);
         parseData.setText(text);
         parseData.setContent(content);
+
+        // apply the JSoup filters if any
+        if (jsoupBuilder != null) {
+            try {
+                jsoupFilters.filter(url, content, jsoupBuilder.getDocument(), parse);
+            } catch (RuntimeException e) {
+                handleException(url, e, metadata, tuple, "jsoup filtering");
+                return;
+            }
+        }
 
         // apply the parse filters if any
         try {

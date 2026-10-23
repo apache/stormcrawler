@@ -1,0 +1,11 @@
+{
+  "org.apache.stormcrawler.parse.JSoupFilters": [
+    {
+      "class": "org.apache.stormcrawler.jsoup.XPathFilter",
+      "name": "XPathFilter",
+      "params": {
+        "page_text": "//DIV[@class=\"page\"]"
+      }
+    }
+  ]
+}
