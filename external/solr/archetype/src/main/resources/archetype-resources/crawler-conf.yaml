@@ -23,6 +23,11 @@ config:
   topology.workers: 1
   topology.message.timeout.secs: 300
   topology.max.spout.pending: 100
+  # Inter-executor batching (Storm 3.0+).
+  # With dynamic batching the effective batch size adapts between 1 and
+  # producer.batch.size: small under light load, larger under sustained load.
+  topology.producer.batch.size: 32
+  topology.producer.batch.dynamic: true
   topology.debug: false
 
   fetcher.threads.number: 50
