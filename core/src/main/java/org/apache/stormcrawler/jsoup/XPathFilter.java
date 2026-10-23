@@ -29,7 +29,7 @@ import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
-import javax.xml.xpath.XPathFactory;
+import org.apache.commons.xml.secure.SecureXPathFactory;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.parse.JSoupFilter;
 import org.apache.stormcrawler.parse.ParseData;
@@ -50,7 +50,7 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
 
     protected final Map<String, List<LabelledExpression>> expressions = new HashMap<>();
 
-    private final XPath xpath = XPathFactory.newInstance().newXPath();
+    private final XPath xpath = SecureXPathFactory.newDefaultInstance().newXPath();
 
     /**
      * Supported extraction functions that can be appended to XPath expressions. These provide

@@ -232,6 +232,12 @@ under the License.
             <version>${commons.lang.version}</version>
         </dependency>
 
+        <!-- JAXP factories with external entities and DTDs disabled -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-secure-xml</artifactId>
+        </dependency>
+
 
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
