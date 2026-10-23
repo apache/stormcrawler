@@ -55,9 +55,9 @@ public class JSoupBuilder extends DefaultHandler {
     }
 
     @Override
-    public void startElement(String uri, String localName, String qName, Attributes atts) {
+    public void startElement(String uri, String localName, String qualifiedName, Attributes atts) {
         flushText();
-        String name = StringUtils.isNotEmpty(localName) ? localName : qName;
+        String name = StringUtils.isNotEmpty(localName) ? localName : qualifiedName;
         Element element =
                 new Element(Tag.valueOf(name, ParseSettings.htmlDefault), document.baseUri());
         for (int i = 0; i < atts.getLength(); i++) {
@@ -75,7 +75,7 @@ public class JSoupBuilder extends DefaultHandler {
     }
 
     @Override
-    public void endElement(String uri, String localName, String qName) {
+    public void endElement(String uri, String localName, String qualifiedName) {
         flushText();
         if (current != document) {
             current = current.parent();
