@@ -167,7 +167,12 @@ public class XPathFilter extends ParseFilter {
             for (LabelledExpression le : leList) {
                 try {
                     List<String> values = le.evaluate(doc);
-                    if (values != null && !values.isEmpty()) {
+                    if (values == null) {
+                        continue;
+                    }
+                    // blank values are skipped so that the next expression can be tried
+                    values.removeIf(StringUtils::isBlank);
+                    if (!values.isEmpty()) {
                         metadata.addValues(le.key, values);
                         break;
                     }

@@ -181,7 +181,8 @@ public class XPathFilter extends AbstractConfigurable implements JSoupFilter {
             List<String> results = new ArrayList<>();
             for (Element element : elements) {
                 String value = evalFunction.evaluate(element, attrName);
-                if (value != null) {
+                // blank values are skipped so that the next expression can be tried
+                if (value != null && !value.isBlank()) {
                     results.add(value);
                 }
             }
