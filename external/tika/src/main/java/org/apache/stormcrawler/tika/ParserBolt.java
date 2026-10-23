@@ -74,6 +74,7 @@ import org.apache.tika.Tika;
 import org.apache.tika.config.JsonConfig;
 import org.apache.tika.config.TimeoutLimits;
 import org.apache.tika.config.loader.TikaLoader;
+import org.apache.tika.config.loader.TikaObjectMapperFactory;
 import org.apache.tika.exception.TikaConfigException;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.exception.WriteLimitReachedException;
@@ -97,6 +98,7 @@ import org.apache.tika.sax.Link;
 import org.apache.tika.sax.LinkContentHandler;
 import org.apache.tika.sax.TeeContentHandler;
 import org.apache.tika.sax.XHTMLContentHandler;
+import org.apache.tika.serialization.ComponentNameResolver;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
@@ -170,7 +172,9 @@ public class ParserBolt extends BaseRichBolt {
 
     private static SAXParserFactory newHardenedSaxParserFactory() {
         SAXParserFactory factory = SAXParserFactory.newInstance();
-        factory.setNamespaceAware(true);
+        // the fork writes prefixed names without declaring their namespace, see
+        // NamespaceRestoringHandler
+        factory.setNamespaceAware(false);
         try {
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
@@ -644,19 +648,7 @@ public class ParserBolt extends BaseRichBolt {
         }
         pipesConfig.setJvmArgs(forkedJvmArgs(conf));
 
-        // Tika only sends the components registered in its index files to the forked JVM,
-        // which falls back to its default mapper otherwise
-        if (IdentityHtmlMapper.class.equals(htmlMapperClass)) {
-            pipesHtmlMapper = IdentityHtmlMapper.INSTANCE;
-        } else if (!DefaultHtmlMapper.class.equals(htmlMapperClass)) {
-            LOG.warn(
-                    "parser.htmlmapper.classname ({}) is ignored under {}: the forked JVM maps"
-                            + " HTML with {}, which drops some elements from the documents given"
-                            + " to the JSoup and parse filters",
-                    htmlMapperClass.getName(),
-                    PARSE_TIMEOUT_PARAM,
-                    DefaultHtmlMapper.class.getSimpleName());
-        }
+        pipesHtmlMapper = pipesHtmlMapper(htmlMapperClass, isIdentityMapperRegistered());
 
         try {
             return new PipesForkParser(pipesConfig);
@@ -665,6 +657,49 @@ public class ParserBolt extends BaseRichBolt {
                     "Failed to initialise the Tika Pipes fork parser for " + PARSE_TIMEOUT_PARAM,
                     e);
         }
+    }
+
+    /** Whether a META-INF/tika/parse-context.idx file registers the IdentityHtmlMapper. */
+    static boolean isIdentityMapperRegistered() {
+        // Tika loads the registries when it creates its object mapper
+        TikaObjectMapperFactory.getMapper();
+        return ComponentNameResolver.getFriendlyName(IdentityHtmlMapper.class) != null;
+    }
+
+    /**
+     * Returns the HtmlMapper to send to the forked JVM, or null to leave it to Tika's {@link
+     * DefaultHtmlMapper}. Tika only sends the components registered in its index files, a mapper
+     * which is not registered would make every parse fail in the fork.
+     *
+     * @param identityMapperRegistered whether META-INF/tika/parse-context.idx registers the
+     *     IdentityHtmlMapper
+     */
+    static HtmlMapper pipesHtmlMapper(
+            Class<? extends HtmlMapper> htmlMapperClass, boolean identityMapperRegistered) {
+        if (DefaultHtmlMapper.class.equals(htmlMapperClass)) {
+            return null;
+        }
+        if (!IdentityHtmlMapper.class.equals(htmlMapperClass)) {
+            LOG.warn(
+                    "parser.htmlmapper.classname ({}) is ignored under {}: the forked JVM maps"
+                            + " HTML with {}, which drops some elements from the documents given"
+                            + " to the JSoup and parse filters",
+                    htmlMapperClass.getName(),
+                    PARSE_TIMEOUT_PARAM,
+                    DefaultHtmlMapper.class.getSimpleName());
+            return null;
+        }
+        if (!identityMapperRegistered) {
+            LOG.warn(
+                    "{} is not registered with Tika, the forked JVM used under {} maps HTML with {}"
+                            + " instead. If the topology runs from a shaded jar, merge"
+                            + " META-INF/tika/parse-context.idx with an AppendingTransformer.",
+                    IdentityHtmlMapper.class.getSimpleName(),
+                    PARSE_TIMEOUT_PARAM,
+                    DefaultHtmlMapper.class.getSimpleName());
+            return null;
+        }
+        return IdentityHtmlMapper.INSTANCE;
     }
 
     /**
@@ -851,7 +886,7 @@ public class ParserBolt extends BaseRichBolt {
             throws SAXException, IOException {
         try {
             XMLReader reader = PIPES_CONTENT_PARSER_FACTORY.newSAXParser().getXMLReader();
-            reader.setContentHandler(handler);
+            reader.setContentHandler(new NamespaceRestoringHandler(handler));
             reader.parse(new InputSource(new StringReader(xml)));
         } catch (ParserConfigurationException e) {
             throw new IllegalStateException(
