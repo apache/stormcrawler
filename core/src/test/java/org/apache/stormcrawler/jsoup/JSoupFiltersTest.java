@@ -17,10 +17,13 @@
 
 package org.apache.stormcrawler.jsoup;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.xml.xpath.XPathExpressionException;
 import org.apache.storm.task.OutputCollector;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestUtil;
@@ -154,6 +157,16 @@ class JSoupFiltersTest extends ParsingTester {
         String fallback = metadata.getFirstValue("fallback");
         Assertions.assertNotNull(fallback, "Fallback expression should have matched");
         Assertions.assertTrue(fallback.contains("Main Title"));
+    }
+
+    @Test
+    void testInvalidExpressionFailsInConfigure() throws IOException {
+        JsonNode params = new ObjectMapper().readTree("{\"broken\": \"//div[@class=\"}");
+        XPathFilter filter = new XPathFilter();
+        RuntimeException e =
+                Assertions.assertThrows(
+                        RuntimeException.class, () -> filter.configure(new HashMap<>(), params));
+        Assertions.assertInstanceOf(XPathExpressionException.class, e.getCause());
     }
 
     @Test
