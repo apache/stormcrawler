@@ -247,7 +247,6 @@ List of third-party dependencies grouped by their license type.
         * Storm Shaded Deps (org.apache.storm:storm-shaded-deps:3.1.0 - https://storm.apache.org/storm-shaded-deps)
         * swagger-annotations-jakarta (io.swagger.core.v3:swagger-annotations-jakarta:2.2.22 - https://github.com/swagger-api/swagger-core/modules/swagger-annotations-jakarta)
         * urlfrontier-API (com.github.crawler-commons:urlfrontier-API:2.6 - https://github.com/crawler-commons/url-frontier/urlfrontier-API)
-        * Xerces2-j (xerces:xercesImpl:2.12.2 - https://xerces.apache.org/xerces2-j/)
         * XmlBeans (org.apache.xmlbeans:xmlbeans:5.3.0 - https://xmlbeans.apache.org/)
         * zstd-kmp (com.squareup.zstd:zstd-kmp-jvm:0.4.0 - https://github.com/square/okio-zstd/)
         * zstd-kmp-okio (com.squareup.zstd:zstd-kmp-okio-jvm:0.4.0 - https://github.com/square/okio-zstd/)

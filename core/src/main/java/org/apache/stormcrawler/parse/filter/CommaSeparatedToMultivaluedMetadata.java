@@ -30,7 +30,6 @@ import org.apache.stormcrawler.parse.ParseResult;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Rewrites single metadata containing comma separated values into multiple values for the same key,
@@ -73,7 +72,7 @@ public class CommaSeparatedToMultivaluedMetadata extends ParseFilter {
     }
 
     @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, ParseResult parse) {
         Metadata m = parse.getOrCreate(url).getMetadata();
         for (String key : keys) {
             String val = m.getFirstValue(key);

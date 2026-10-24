@@ -69,7 +69,7 @@ class CommaSeparatedToMultivaluedMetadataTest {
 
         // the default cap is deliberately small; the bulk write path is what is under test here
         newFilter("{\"keys\": [\"parse.keywords\"], \"maxTokens\": 1000}")
-                .filter(url, new byte[0], null, parse);
+                .filter(url, new byte[0], parse);
 
         Assertions.assertEquals(1000, md.getValues("parse.keywords").length);
         Assertions.assertTrue(
@@ -94,7 +94,7 @@ class CommaSeparatedToMultivaluedMetadataTest {
         long start = System.nanoTime();
         // the default cap is deliberately small; the bulk write path is what is under test here
         newFilter("{\"keys\": [\"parse.keywords\"], \"maxTokens\": 65536}")
-                .filter(url, new byte[0], null, parse);
+                .filter(url, new byte[0], parse);
         long msec = (System.nanoTime() - start) / 1_000_000;
 
         System.out.println("32768 tokens took " + msec + " ms");
@@ -110,7 +110,7 @@ class CommaSeparatedToMultivaluedMetadataTest {
         md.setValue("parse.keywords", "a,,b");
         ParseResult parse = new ParseResult();
         parse.set(url, md);
-        newFilter("{\"keys\": [\"parse.keywords\"]}").filter(url, new byte[0], null, parse);
+        newFilter("{\"keys\": [\"parse.keywords\"]}").filter(url, new byte[0], parse);
         Assertions.assertArrayEquals(new String[] {"a", "b"}, md.getValues("parse.keywords"));
 
         // a value made only of empty tokens leaves no entry behind
@@ -118,7 +118,7 @@ class CommaSeparatedToMultivaluedMetadataTest {
         md.setValue("parse.keywords", " , ,");
         parse = new ParseResult();
         parse.set(url, md);
-        newFilter("{\"keys\": [\"parse.keywords\"]}").filter(url, new byte[0], null, parse);
+        newFilter("{\"keys\": [\"parse.keywords\"]}").filter(url, new byte[0], parse);
         Assertions.assertNull(md.getValues("parse.keywords"));
     }
 
@@ -132,7 +132,7 @@ class CommaSeparatedToMultivaluedMetadataTest {
         ParseResult parse = new ParseResult();
         parse.set(url, md);
         newFilter("{\"keys\": [\"parse.keywords\"], \"maxTokens\": 2}")
-                .filter(url, new byte[0], null, parse);
+                .filter(url, new byte[0], parse);
         Assertions.assertArrayEquals(new String[] {"a", "b"}, md.getValues("parse.keywords"));
     }
 
@@ -144,7 +144,7 @@ class CommaSeparatedToMultivaluedMetadataTest {
         md.setValue("parse.keywords", commaList(200));
         ParseResult parse = new ParseResult();
         parse.set(url, md);
-        newFilter("{\"keys\": [\"parse.keywords\"]}").filter(url, new byte[0], null, parse);
+        newFilter("{\"keys\": [\"parse.keywords\"]}").filter(url, new byte[0], parse);
         Assertions.assertEquals(128, md.getValues("parse.keywords").length);
     }
 }

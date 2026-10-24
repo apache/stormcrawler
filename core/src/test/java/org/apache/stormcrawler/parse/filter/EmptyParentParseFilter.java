@@ -21,7 +21,6 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Empties the ParseData of the URL being parsed: no text, no content and no metadata. Used to check
@@ -31,7 +30,7 @@ import org.w3c.dom.DocumentFragment;
 public class EmptyParentParseFilter extends ParseFilter {
 
     @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, ParseResult parse) {
         ParseData parent = parse.getOrCreate(url);
         parent.setText(null);
         parent.setContent(new byte[0]);

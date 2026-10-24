@@ -205,7 +205,7 @@ public class SiteMapParserBolt extends StatusEmitterBolt {
 
         // apply the parse filters if any
         try {
-            parseFilters.filter(url, content, null, parse);
+            parseFilters.filter(url, content, parse);
         } catch (RuntimeException e) {
             String errorMessage = "Exception while running parse filters on " + url + ": " + e;
             LOG.error(errorMessage);

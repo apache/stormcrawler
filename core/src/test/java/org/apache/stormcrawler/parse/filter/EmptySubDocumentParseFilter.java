@@ -19,7 +19,6 @@ package org.apache.stormcrawler.parse.filter;
 
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Creates an entry in the ParseResult for a URL which was never parsed and which carries no
@@ -29,7 +28,7 @@ import org.w3c.dom.DocumentFragment;
 public class EmptySubDocumentParseFilter extends ParseFilter {
 
     @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, ParseResult parse) {
         parse.getOrCreate(url + "#never-parsed");
     }
 }

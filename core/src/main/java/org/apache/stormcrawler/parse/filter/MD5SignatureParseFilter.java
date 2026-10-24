@@ -27,7 +27,6 @@ import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.jetbrains.annotations.NotNull;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Computes a signature for a page, based on the binary content or text. If the content is empty,
@@ -55,7 +54,7 @@ public class MD5SignatureParseFilter extends ParseFilter {
     private String copyKeyName = null;
 
     @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, ParseResult parse) {
         ParseData parseData = parse.getOrCreate(url);
         Metadata metadata = parseData.getMetadata();
         if (copyKeyName != null) {

@@ -26,7 +26,6 @@ import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.util.URLPartitioner;
 import org.jetbrains.annotations.NotNull;
-import org.w3c.dom.DocumentFragment;
 
 /** Adds domain (or host) to metadata - can be used later on for indexing. */
 public class DomainParseFilter extends ParseFilter {
@@ -55,7 +54,7 @@ public class DomainParseFilter extends ParseFilter {
     }
 
     @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, ParseResult parse) {
         Metadata metadata = parse.getOrCreate(url).getMetadata();
         String value = partitioner.getPartition(url, metadata);
         metadata.setValue(mdKey, value);

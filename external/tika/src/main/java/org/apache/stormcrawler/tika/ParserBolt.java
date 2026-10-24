@@ -44,7 +44,6 @@ import java.util.regex.Pattern;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParserFactory;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.html.dom.HTMLDocumentImpl;
 import org.apache.http.HttpHeaders;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -97,11 +96,9 @@ import org.apache.tika.sax.BodyContentHandler;
 import org.apache.tika.sax.Link;
 import org.apache.tika.sax.LinkContentHandler;
 import org.apache.tika.sax.TeeContentHandler;
-import org.apache.tika.sax.XHTMLContentHandler;
 import org.apache.tika.serialization.ComponentNameResolver;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.DocumentFragment;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -201,7 +198,6 @@ public class ParserBolt extends BaseRichBolt {
 
     private ScopedCounter eventCounter;
 
-    private boolean upperCaseElementNames = true;
     private Class<? extends HtmlMapper> htmlMapperClass = IdentityHtmlMapper.class;
 
     private boolean extractEmbedded = false;
@@ -252,8 +248,6 @@ public class ParserBolt extends BaseRichBolt {
         parseFilters = ParseFilters.fromConf(conf);
 
         jsoupFilters = JSoupFilters.fromConf(conf);
-
-        upperCaseElementNames = ConfUtils.getBoolean(conf, "parser.uppercase.element.names", true);
 
         extractEmbedded = ConfUtils.getBoolean(conf, "parser.extract.embedded", false);
 
@@ -429,18 +423,6 @@ public class ParserBolt extends BaseRichBolt {
             LOG.error("Exception while specifying HTMLMapper {}", url, e);
         }
 
-        // build a DOM if required by the parseFilters
-        DocumentFragment root = null;
-        if (parseFilters.needsDOM()) {
-            HTMLDocumentImpl doc = new HTMLDocumentImpl();
-            doc.setErrorChecking(false);
-            root = doc.createDocumentFragment();
-            DOMBuilder domhandler = new DOMBuilder(doc, root);
-            domhandler.setUpperCaseElementNames(upperCaseElementNames);
-            domhandler.setDefaultNamespaceURI(XHTMLContentHandler.XHTML);
-            handlers.add(domhandler);
-        }
-
         // build a JSoup document if there are JSoupFilters
         JSoupBuilder jsoupBuilder = null;
         if (!jsoupFilters.isEmpty()) {
@@ -527,7 +509,7 @@ public class ParserBolt extends BaseRichBolt {
 
         // apply the parse filters if any
         try {
-            parseFilters.filter(url, content, root, parse);
+            parseFilters.filter(url, content, parse);
         } catch (RuntimeException e) {
             handleException(url, e, metadata, tuple, "parse filters");
             return;
