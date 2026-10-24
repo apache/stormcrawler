@@ -351,7 +351,7 @@ public class BasicURLNormalizer extends URLFilter {
             return urlToFilter;
         }
 
-        String[] pathElements = url.split("/");
+        String[] pathElements = url.split("/", -1);
         final String lastPathElement = pathElements[pathElements.length - 1];
         int firstAmp = lastPathElement.indexOf('&');
         if (firstAmp == -1) {
