@@ -241,6 +241,28 @@ class BasicURLNormalizerTest {
     }
 
     @Test
+    void testDoesNotDropTrailingSlashWhenUnmanglingWithFragment() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(false, false);
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        String inputUrl = "http://a.example/x&a=b/#frag";
+        assertEquals(
+                inputUrl,
+                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
+                "A trailing slash before a fragment must not be mistaken for a query");
+    }
+
+    @Test
+    void testDoesNotDropTrailingSlashWhenUnmanglingByDefault() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        String inputUrl = "http://a.example/x&a=b/";
+        assertEquals(
+                inputUrl,
+                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
+                "A trailing slash must not be removed during default normalization");
+    }
+
+    @Test
     void testRemovesQueryElementWhenValueContainsSlashes() throws MalformedURLException {
         URLFilter urlFilter = createFilter(List.of("utm_source"));
         URL testSourceUrl = URLUtil.toURL("http://a.example/");
