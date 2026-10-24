@@ -344,6 +344,10 @@ public class BasicURLNormalizer extends URLFilter {
      * @return corrected url
      */
     private String unmangleQueryString(String urlToFilter) {
+        if (urlToFilter.indexOf('&') == -1) {
+            return urlToFilter;
+        }
+
         int fragmentStart = urlToFilter.indexOf('#');
         String fragment = fragmentStart == -1 ? "" : urlToFilter.substring(fragmentStart);
         String url = fragmentStart == -1 ? urlToFilter : urlToFilter.substring(0, fragmentStart);
@@ -351,15 +355,13 @@ public class BasicURLNormalizer extends URLFilter {
             return urlToFilter;
         }
 
-        String[] pathElements = url.split("/", -1);
-        final String lastPathElement = pathElements[pathElements.length - 1];
-        int firstAmp = lastPathElement.indexOf('&');
+        int lastSlash = url.lastIndexOf('/');
+        int firstAmp = url.indexOf('&', lastSlash + 1);
         if (firstAmp == -1) {
             return urlToFilter;
         }
-        if (lastPathElement.indexOf("=") > 0) {
-            pathElements[pathElements.length - 1] = lastPathElement.replaceFirst("&", "?");
-            return String.join("/", pathElements) + fragment;
+        if (url.indexOf('=', firstAmp + 1) > firstAmp) {
+            return url.substring(0, firstAmp) + '?' + url.substring(firstAmp + 1) + fragment;
         }
         return urlToFilter;
     }

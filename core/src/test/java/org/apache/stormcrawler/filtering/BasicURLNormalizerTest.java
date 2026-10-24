@@ -35,6 +35,8 @@ import org.apache.stormcrawler.filtering.basic.BasicURLNormalizer;
 import org.apache.stormcrawler.util.URLUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Utility class which encapsulates the filtering of URLs based on the hostname or domain of the
@@ -243,21 +245,20 @@ class BasicURLNormalizerTest {
         assertEquals(expectedResult, normalizedUrl, "Failed to filter query string");
     }
 
-    @Test
-    void testDoesNotMangleQueryWhenValueContainsSlashes() throws MalformedURLException {
+    @ParameterizedTest
+    @CsvSource({
+        "http://a.example/article.pl?sid=01/10/23/1816257&mode=thread&tid=107",
+        "http://a.example/p?u=http://b.example/x&z=1",
+        "http://a.example/login/?next=/a/b/&utm_source=ref&z=1"
+    })
+    void testDoesNotMangleQueryWhenValueContainsSlashes(String inputUrl)
+            throws MalformedURLException {
         URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
         URL testSourceUrl = URLUtil.toURL("http://a.example/");
-        String inputUrl = "http://a.example/article.pl?sid=01/10/23/1816257&mode=thread&tid=107";
         assertEquals(
                 inputUrl,
                 urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
                 "An existing query must not be unmangled because a value contains slashes");
-
-        inputUrl = "http://a.example/p?u=http://b.example/x&z=1";
-        assertEquals(
-                inputUrl,
-                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
-                "An embedded URL in a query value must remain intact");
     }
 
     @Test
@@ -271,26 +272,39 @@ class BasicURLNormalizerTest {
                 "A question mark in the fragment must not suppress query repair");
     }
 
-    @Test
-    void testDoesNotDropTrailingSlashWhenUnmanglingWithFragment() throws MalformedURLException {
-        URLFilter urlFilter = createFilter(false, false);
+    @ParameterizedTest
+    @CsvSource({
+        "false, http://a.example/x&a=b/#frag",
+        "true, http://a.example/x&a=b/"
+    })
+    void testDoesNotDropTrailingSlashWhenUnmangling(boolean removeAnchor, String inputUrl)
+            throws MalformedURLException {
+        URLFilter urlFilter = createFilter(removeAnchor, true, List.of());
         URL testSourceUrl = URLUtil.toURL("http://a.example/");
-        String inputUrl = "http://a.example/x&a=b/#frag";
         assertEquals(
                 inputUrl,
                 urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
-                "A trailing slash before a fragment must not be mistaken for a query");
+                "The URL must remain unchanged when the last path segment has no query parameters");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "http://a.example/p&a=b, http://a.example/p?a=b",
+        "http://a.example/p&a=b&c=d, http://a.example/p?a=b&c=d"
+    })
+    void testRepairsMangledQueryString(String inputUrl, String expectedUrl)
+            throws MalformedURLException {
+        URLFilter urlFilter = createFilter(false, true, List.of());
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        assertEquals(expectedUrl, urlFilter.filter(testSourceUrl, new Metadata(), inputUrl));
     }
 
     @Test
-    void testDoesNotDropTrailingSlashWhenUnmanglingByDefault() throws MalformedURLException {
-        URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
+    void testDoesNotRewriteAmpersandInFragment() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(false, true, List.of());
         URL testSourceUrl = URLUtil.toURL("http://a.example/");
-        String inputUrl = "http://a.example/x&a=b/";
-        assertEquals(
-                inputUrl,
-                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
-                "A trailing slash must not be removed during default normalization");
+        String inputUrl = "http://a.example/p#a&b=c";
+        assertEquals(inputUrl, urlFilter.filter(testSourceUrl, new Metadata(), inputUrl));
     }
 
     @Test
