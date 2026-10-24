@@ -40,6 +40,7 @@ under the License.
         <crawler-commons.version>1.6</crawler-commons.version>
         <jsoup.version>1.23.2</jsoup.version>
         <icu4j.version>78.3</icu4j.version>
+        <xerces.version>2.12.2</xerces.version>
         <httpclient.version>4.5.14</httpclient.version>
         <snakeyaml.version>2.7</snakeyaml.version>
         <commons.lang.version>3.21.0</commons.lang.version>
@@ -170,6 +171,20 @@ under the License.
             <groupId>com.github.crawler-commons</groupId>
             <artifactId>crawler-commons</artifactId>
             <version>${crawler-commons.version}</version>
+        </dependency>
+
+        <!-- provides the SAX parser for crawler-commons, ROME and Tika's timeout path,
+             avoiding entity-limit failures with the JDK parser on Java 25. -->
+        <dependency>
+            <groupId>xerces</groupId>
+            <artifactId>xercesImpl</artifactId>
+            <version>${xerces.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>xml-apis</groupId>
+                    <artifactId>xml-apis</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
