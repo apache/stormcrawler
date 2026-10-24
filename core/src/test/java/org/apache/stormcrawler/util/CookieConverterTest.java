@@ -19,14 +19,96 @@ package org.apache.stormcrawler.util;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Instant;
 import java.util.List;
-import org.apache.http.cookie.Cookie;
+import org.apache.stormcrawler.util.CookieConverter.Cookie;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class CookieConverterTest {
 
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "Wed, 09 Jun 2021 10:18:14 GMT",
+                "Wednesday, 09-Jun-21 10:18:14 GMT",
+                "Wed Jun 9 10:18:14 2021",
+                "'Wed, 09 Jun 2021 10:18:14 GMT'"
+            })
+    void testExpiredCookieDateFormats(String expires) {
+        List<Cookie> cookies =
+                CookieConverter.getCookies(
+                        new String[] {"sid=value; Expires=" + expires},
+                        getUrl(unsecuredUrl),
+                        getUrl(unsecuredUrl));
+        Assertions.assertTrue(cookies.isEmpty());
+    }
+
+    @Test
+    void testInvalidExpiryRemainsASessionCookie() {
+        List<Cookie> cookies =
+                CookieConverter.getCookies(
+                        new String[] {"sid=value; Expires=invalid"},
+                        getUrl(unsecuredUrl),
+                        getUrl(unsecuredUrl));
+        Assertions.assertEquals(1, cookies.size());
+        Assertions.assertNull(cookies.get(0).expiry());
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "Tue, 11 Apr 2117 07:13:39 -0000",
+                "Sun, 11 Apr 2117 07:13:39 GMT",
+                "Sun Apr 11 07:13:39 2117",
+                "'Sun Apr 11 07:13:39 2117'",
+                "Sun, 11 Apr 2117 09:13:39 +0200"
+            })
+    void testFutureCookieKeepsItsExpiry(String expires) {
+        List<Cookie> cookies =
+                CookieConverter.getCookies(
+                        new String[] {"sid=value; Expires=" + expires},
+                        getUrl(unsecuredUrl),
+                        getUrl(unsecuredUrl));
+        Assertions.assertEquals(1, cookies.size());
+        Assertions.assertEquals(Instant.parse("2117-04-11T07:13:39Z"), cookies.get(0).expiry());
+    }
+
+    @Test
+    void testCookieExpiryPreservesLegacyTimezoneAndTwoDigitYearParsing() {
+        Assertions.assertEquals(
+                Instant.parse("2021-06-09T18:18:14Z"),
+                CookieConverter.parseCookieExpiry("Wed, 09 Jun 2021 10:18:14 PST"));
+        Assertions.assertEquals(
+                Instant.parse("0021-06-07T10:18:14Z"),
+                CookieConverter.parseCookieExpiry("Wed, 09 Jun 21 10:18:14 GMT"));
+    }
+
     private static String securedUrl = "https://someurl.com";
+
+    @Test
+    void testCookieRecordRetainsAttributes() {
+        List<Cookie> cookies =
+                CookieConverter.getCookies(
+                        new String[] {
+                            "sid=value; Domain=SomeUrl.COM; Path=/; Secure; Expires=Sun Apr 11"
+                                    + " 07:13:39 2117"
+                        },
+                        getUrl(securedUrl),
+                        getUrl(securedUrl));
+        Assertions.assertEquals(
+                List.of(
+                        new Cookie(
+                                "sid",
+                                "value",
+                                "someurl.com",
+                                "/",
+                                true,
+                                Instant.parse("2117-04-11T07:13:39Z"))),
+                cookies);
+    }
 
     private static String unsecuredUrl = "http://someurl.com";
 
@@ -45,9 +127,9 @@ class CookieConverterTest {
                         cookiesStrings, getUrl(unsecuredUrl), getUrl(unsecuredUrl));
         Assertions.assertEquals(1, result.size(), "Should have 1 cookie");
         Assertions.assertEquals(
-                dummyCookieHeader, result.get(0).getName(), "Cookie header should be as defined");
+                dummyCookieHeader, result.get(0).name(), "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue, result.get(0).getValue(), "Cookie value should be as defined");
+                dummyCookieValue, result.get(0).value(), "Cookie value should be as defined");
     }
 
     @Test
@@ -67,9 +149,9 @@ class CookieConverterTest {
                         cookiesStrings, getUrl(unsecuredUrl), getUrl(unsecuredUrl));
         Assertions.assertEquals(1, result.size(), "Should have 1 cookie");
         Assertions.assertEquals(
-                dummyCookieHeader, result.get(0).getName(), "Cookie header should be as defined");
+                dummyCookieHeader, result.get(0).name(), "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue, result.get(0).getValue(), "Cookie value should be as defined");
+                dummyCookieValue, result.get(0).value(), "Cookie value should be as defined");
     }
 
     @Test
@@ -102,9 +184,9 @@ class CookieConverterTest {
                         cookiesStrings, getUrl(unsecuredUrl), getUrl(unsecuredUrl + "/somepage"));
         Assertions.assertEquals(1, result.size(), "Should have 1 cookie");
         Assertions.assertEquals(
-                dummyCookieHeader, result.get(0).getName(), "Cookie header should be as defined");
+                dummyCookieHeader, result.get(0).name(), "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue, result.get(0).getValue(), "Cookie value should be as defined");
+                dummyCookieValue, result.get(0).value(), "Cookie value should be as defined");
     }
 
     @Test
@@ -118,9 +200,9 @@ class CookieConverterTest {
                         cookiesStrings, getUrl(unsecuredUrl), getUrl(unsecuredUrl));
         Assertions.assertEquals(1, result.size(), "Should have 1 cookie");
         Assertions.assertEquals(
-                dummyCookieHeader, result.get(0).getName(), "Cookie header should be as defined");
+                dummyCookieHeader, result.get(0).name(), "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue, result.get(0).getValue(), "Cookie value should be as defined");
+                dummyCookieValue, result.get(0).value(), "Cookie value should be as defined");
     }
 
     @Test
@@ -135,9 +217,9 @@ class CookieConverterTest {
                         cookiesStrings, getUrl(unsecuredUrl), getUrl(unsecuredUrl + "/someFolder"));
         Assertions.assertEquals(1, result.size(), "Should have 1 cookie");
         Assertions.assertEquals(
-                dummyCookieHeader, result.get(0).getName(), "Cookie header should be as defined");
+                dummyCookieHeader, result.get(0).name(), "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue, result.get(0).getValue(), "Cookie value should be as defined");
+                dummyCookieValue, result.get(0).value(), "Cookie value should be as defined");
     }
 
     @Test
@@ -154,9 +236,9 @@ class CookieConverterTest {
                         getUrl(unsecuredUrl + "/someFolder/SomeOtherFolder"));
         Assertions.assertEquals(1, result.size(), "Should have 1 cookie");
         Assertions.assertEquals(
-                dummyCookieHeader, result.get(0).getName(), "Cookie header should be as defined");
+                dummyCookieHeader, result.get(0).name(), "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue, result.get(0).getValue(), "Cookie value should be as defined");
+                dummyCookieValue, result.get(0).value(), "Cookie value should be as defined");
     }
 
     @Test
@@ -188,9 +270,9 @@ class CookieConverterTest {
                         getUrl(unsecuredUrl + "/someFolder/SomeOtherFolder"));
         Assertions.assertEquals(1, result.size(), "Should have 1 cookie");
         Assertions.assertEquals(
-                dummyCookieHeader, result.get(0).getName(), "Cookie header should be as defined");
+                dummyCookieHeader, result.get(0).name(), "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue, result.get(0).getValue(), "Cookie value should be as defined");
+                dummyCookieValue, result.get(0).value(), "Cookie value should be as defined");
     }
 
     @Test
@@ -238,9 +320,9 @@ class CookieConverterTest {
                         getUrl(securedUrl + "/someFolder/SomeOtherFolder"));
         Assertions.assertEquals(1, result.size(), "Target url is  secured - Should have 1 cookie");
         Assertions.assertEquals(
-                dummyCookieHeader, result.get(0).getName(), "Cookie header should be as defined");
+                dummyCookieHeader, result.get(0).name(), "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue, result.get(0).getValue(), "Cookie value should be as defined");
+                dummyCookieValue, result.get(0).value(), "Cookie value should be as defined");
     }
 
     @Test
@@ -262,9 +344,9 @@ class CookieConverterTest {
                         getUrl(securedUrl + "/someFolder/SomeOtherFolder"));
         Assertions.assertEquals(1, result.size(), "Should have 1 cookie");
         Assertions.assertEquals(
-                dummyCookieHeader, result.get(0).getName(), "Cookie header should be as defined");
+                dummyCookieHeader, result.get(0).name(), "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue, result.get(0).getValue(), "Cookie value should be as defined");
+                dummyCookieValue, result.get(0).value(), "Cookie value should be as defined");
     }
 
     @Test
@@ -295,17 +377,15 @@ class CookieConverterTest {
                         getUrl(securedUrl + "/someFolder/SomeOtherFolder"));
         Assertions.assertEquals(2, result.size(), "Should have 2 cookies");
         Assertions.assertEquals(
-                dummyCookieHeader, result.get(0).getName(), "Cookie header should be as defined");
+                dummyCookieHeader, result.get(0).name(), "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue, result.get(0).getValue(), "Cookie value should be as defined");
+                dummyCookieValue, result.get(0).value(), "Cookie value should be as defined");
         Assertions.assertEquals(
                 dummyCookieHeader + "2",
-                result.get(1).getName(),
+                result.get(1).name(),
                 "Cookie header should be as defined");
         Assertions.assertEquals(
-                dummyCookieValue + "2",
-                result.get(1).getValue(),
-                "Cookie value should be as defined");
+                dummyCookieValue + "2", result.get(1).value(), "Cookie value should be as defined");
     }
 
     @Test
@@ -678,7 +758,7 @@ class CookieConverterTest {
                 CookieConverter.getCookies(
                         cookiesStrings, getUrl(unsecuredUrl), getUrl(unsecuredUrl));
         Assertions.assertEquals(1, result.size(), "Only the usable cookie is kept");
-        Assertions.assertEquals("sid", result.get(0).getName());
+        Assertions.assertEquals("sid", result.get(0).name());
     }
 
     @Test

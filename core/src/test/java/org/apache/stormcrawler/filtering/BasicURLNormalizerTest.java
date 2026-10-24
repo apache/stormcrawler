@@ -44,6 +44,37 @@ class BasicURLNormalizerTest {
 
     List<String> queryParamsToFilter = Arrays.asList("a", "foo");
 
+    @Test
+    void testMixedQuerySeparatorsAndEncoding() {
+        URLFilter filter = createFilter(List.of("tracking"));
+        assertEquals(
+                "http://example.com/?a=2&b=1&c=x+y+z&d",
+                filter.filter(null, new Metadata(), "http://example.com/?b=1;a=2&c=x+y%20z&d"));
+        assertEquals(
+                "http://example.com/?a=&b=x%3By%26z&b=%2B&flag",
+                filter.filter(
+                        null, new Metadata(), "http://example.com/?flag;b=x%3By%26z&b=%2B;a="));
+        assertEquals(
+                "http://example.com/?a=%C3%A9&b=%E2%82%AC",
+                filter.filter(null, new Metadata(), "http://example.com/?b=%E2%82%AC;a=%C3%A9"));
+    }
+
+    @Test
+    void testQueryFormattingKeepsLegacyEncoding() {
+        URLFilter filter = createFilter(List.of("tracking"));
+        assertEquals(
+                "http://example.com/?a=~%21%27%28%29*&b=2",
+                filter.filter(null, new Metadata(), "http://example.com/?b=2&a=~!'()*"));
+    }
+
+    @Test
+    void testRemoveSemicolonSeparatedQueryParameters() {
+        URLFilter filter = createFilter(queryParamsToFilter);
+        assertEquals(
+                "http://example.com/?keep=yes",
+                filter.filter(null, new Metadata(), "http://example.com/?foo=bar;keep=yes&a=1"));
+    }
+
     private URLFilter createFilter(boolean removeAnchor, boolean checkValidURI) {
         ObjectNode filterParams = new ObjectNode(JsonNodeFactory.instance);
         filterParams.put("removeAnchorPart", Boolean.valueOf(removeAnchor));
