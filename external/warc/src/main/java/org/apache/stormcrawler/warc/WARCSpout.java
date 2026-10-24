@@ -395,8 +395,8 @@ public class WARCSpout extends FileSpout {
 
         Map<String, Object> map = (Map<String, Object>) conf.get(configKey);
         if (map != null) {
-            for (String key : map.keySet()) {
-                this.hdfsConfig.set(key, String.valueOf(map.get(key)));
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                this.hdfsConfig.set(entry.getKey(), String.valueOf(entry.getValue()));
             }
         }
     }

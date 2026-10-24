@@ -115,8 +115,9 @@ public class IndexerBolt extends AbstractIndexerBolt {
             // select which metadata to index
             Map<String, String[]> keyVals = filterMetadata(metadata);
 
-            for (String fieldName : keyVals.keySet()) {
-                String[] values = keyVals.get(fieldName);
+            for (Map.Entry<String, String[]> entry : keyVals.entrySet()) {
+                String fieldName = entry.getKey();
+                String[] values = entry.getValue();
                 for (String value : values) {
                     if (!ignoreEmptyFields() || StringUtils.isNotBlank(value)) {
                         doc.addField(fieldName, value);
