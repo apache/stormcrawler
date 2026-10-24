@@ -57,7 +57,7 @@ services:
       - "127.0.0.1:8000:8000"
 
   opensearch-sc:
-    image: opensearchproject/opensearch:2.19.4
+    image: opensearchproject/opensearch:3.9.0
     container_name: opensearch-sc
     environment:
       - cluster.name=opensearch-sc-cluster
@@ -80,7 +80,7 @@ services:
       - "127.0.0.1:9200:9200" # REST API
 
   opensearch-dashboard:
-    image: opensearchproject/opensearch-dashboards:2.19.4
+    image: opensearchproject/opensearch-dashboards:3.9.0
     container_name: dashboard
     ports:
       - "127.0.0.1:5601:5601"

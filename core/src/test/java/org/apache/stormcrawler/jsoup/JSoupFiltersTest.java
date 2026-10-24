@@ -17,15 +17,21 @@
 
 package org.apache.stormcrawler.jsoup;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.xml.xpath.XPathExpressionException;
 import org.apache.storm.task.OutputCollector;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestUtil;
 import org.apache.stormcrawler.bolt.JSoupParserBolt;
+import org.apache.stormcrawler.parse.ParseResult;
 import org.apache.stormcrawler.parse.ParsingTester;
+import org.jsoup.Jsoup;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,10 +76,9 @@ class JSoupFiltersTest extends ParsingTester {
         Assertions.assertNotNull(metadata);
         String[] scripts = metadata.getValues("js");
         Assertions.assertNotNull(scripts);
-        // should be 2 of them
-        Assertions.assertEquals(2, scripts.length);
-        Assertions.assertEquals("", scripts[0].trim());
-        Assertions.assertTrue(scripts[1].contains("_paq"));
+        // the first script is external and has no content, its blank value is skipped
+        Assertions.assertEquals(1, scripts.length);
+        Assertions.assertTrue(scripts[0].contains("_paq"));
     }
 
     @Test
@@ -157,6 +162,16 @@ class JSoupFiltersTest extends ParsingTester {
     }
 
     @Test
+    void testInvalidExpressionFailsInConfigure() throws IOException {
+        JsonNode params = new ObjectMapper().readTree("{\"broken\": \"//div[@class=\"}");
+        XPathFilter filter = new XPathFilter();
+        RuntimeException e =
+                Assertions.assertThrows(
+                        RuntimeException.class, () -> filter.configure(new HashMap<>(), params));
+        Assertions.assertInstanceOf(XPathExpressionException.class, e.getCause());
+    }
+
+    @Test
     void testLowercaseElementNames() {
         Assertions.assertEquals(
                 "//span[@class=\"concept\"]",
@@ -169,5 +184,40 @@ class JSoupFiltersTest extends ParsingTester {
         Assertions.assertEquals(
                 "//div/span/a[@href]", XPathFilter.lowercaseElementNames("//DIV/SPAN/A[@href]"));
         Assertions.assertEquals("//title", XPathFilter.lowercaseElementNames("//title"));
+    }
+
+    private static final String TITLE_PARAMS =
+            """
+            {"title": ["//title", "//meta[@name='title']/@content"]}
+            """;
+
+    private static Metadata filterTitle(String html) throws IOException {
+        XPathFilter filter = new XPathFilter();
+        filter.configure(new HashMap<>(), new ObjectMapper().readTree(TITLE_PARAMS));
+        String url = "https://example.com";
+        ParseResult parse = new ParseResult();
+        org.jsoup.nodes.Document doc = Jsoup.parse(html, url);
+        filter.filter(url, html.getBytes(StandardCharsets.UTF_8), doc, parse);
+        return parse.getOrCreate(url).getMetadata();
+    }
+
+    @Test
+    void testBlankValueFallsBackToNextExpression() throws IOException {
+        Metadata metadata =
+                filterTitle(
+                        "<html><head><title> </title>"
+                                + "<meta name=\"title\" content=\"Fallback title\"></head>"
+                                + "<body></body></html>");
+        Assertions.assertArrayEquals(new String[] {"Fallback title"}, metadata.getValues("title"));
+    }
+
+    @Test
+    void testBlankValuesAreNotStored() throws IOException {
+        Metadata metadata =
+                filterTitle(
+                        "<html><head><title></title>"
+                                + "<meta name=\"title\" content=\"  \"></head>"
+                                + "<body></body></html>");
+        Assertions.assertNull(metadata.getValues("title"));
     }
 }

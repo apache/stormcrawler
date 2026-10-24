@@ -58,6 +58,7 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilters;
 import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.metrics.ScopedCounter;
+import org.apache.stormcrawler.parse.JSoupFilters;
 import org.apache.stormcrawler.parse.Outlink;
 import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
@@ -73,6 +74,7 @@ import org.apache.tika.Tika;
 import org.apache.tika.config.JsonConfig;
 import org.apache.tika.config.TimeoutLimits;
 import org.apache.tika.config.loader.TikaLoader;
+import org.apache.tika.config.loader.TikaObjectMapperFactory;
 import org.apache.tika.exception.TikaConfigException;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.exception.WriteLimitReachedException;
@@ -96,6 +98,7 @@ import org.apache.tika.sax.Link;
 import org.apache.tika.sax.LinkContentHandler;
 import org.apache.tika.sax.TeeContentHandler;
 import org.apache.tika.sax.XHTMLContentHandler;
+import org.apache.tika.serialization.ComponentNameResolver;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
@@ -169,7 +172,9 @@ public class ParserBolt extends BaseRichBolt {
 
     private static SAXParserFactory newHardenedSaxParserFactory() {
         SAXParserFactory factory = SAXParserFactory.newInstance();
-        factory.setNamespaceAware(true);
+        // the fork writes prefixed names without declaring their namespace, see
+        // NamespaceRestoringHandler
+        factory.setNamespaceAware(false);
         try {
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
@@ -188,6 +193,7 @@ public class ParserBolt extends BaseRichBolt {
 
     private URLFilters urlFilters = null;
     private ParseFilter parseFilters = null;
+    private JSoupFilters jsoupFilters = null;
 
     private OutputCollector collector;
 
@@ -221,6 +227,12 @@ public class ParserBolt extends BaseRichBolt {
     /** Runs parses under {@link #PARSE_TIMEOUT_PARAM} in a forked JVM; null otherwise. */
     private PipesForkParser pipesForkParser;
 
+    /**
+     * HtmlMapper sent to the forked JVM, which uses Tika's DefaultHtmlMapper when null. Only the
+     * IdentityHtmlMapper can be sent, as it is registered in META-INF/tika/parse-context.idx.
+     */
+    private HtmlMapper pipesHtmlMapper;
+
     /** On-disk copy of the Tika configuration, kept alive to merge into the forked JVM's config. */
     private Path resolvedTikaConfigPath;
 
@@ -238,6 +250,8 @@ public class ParserBolt extends BaseRichBolt {
         urlFilters = URLFilters.fromConf(conf);
 
         parseFilters = ParseFilters.fromConf(conf);
+
+        jsoupFilters = JSoupFilters.fromConf(conf);
 
         upperCaseElementNames = ConfUtils.getBoolean(conf, "parser.uppercase.element.names", true);
 
@@ -395,7 +409,7 @@ public class ParserBolt extends BaseRichBolt {
 
         LinkContentHandler linkHandler = new LinkContentHandler();
         ContentHandler textHandler = new BodyContentHandler(textMaxLength);
-        TeeContentHandler teeHandler = new TeeContentHandler(linkHandler, textHandler);
+        List<ContentHandler> handlers = new ArrayList<>(List.of(linkHandler, textHandler));
         // seed the context with the components configured in the
         // "parse-context" section of the Tika configuration
         ParseContext parseContext = createParseContext();
@@ -424,8 +438,18 @@ public class ParserBolt extends BaseRichBolt {
             DOMBuilder domhandler = new DOMBuilder(doc, root);
             domhandler.setUpperCaseElementNames(upperCaseElementNames);
             domhandler.setDefaultNamespaceURI(XHTMLContentHandler.XHTML);
-            teeHandler = new TeeContentHandler(linkHandler, textHandler, domhandler);
+            handlers.add(domhandler);
         }
+
+        // build a JSoup document if there are JSoupFilters
+        JSoupBuilder jsoupBuilder = null;
+        if (!jsoupFilters.isEmpty()) {
+            jsoupBuilder = new JSoupBuilder(url);
+            handlers.add(jsoupBuilder);
+        }
+
+        TeeContentHandler teeHandler =
+                new TeeContentHandler(handlers.toArray(new ContentHandler[0]));
 
         // parse
         String text;
@@ -490,6 +514,16 @@ public class ParserBolt extends BaseRichBolt {
         parseData.setMetadata(metadata);
         parseData.setText(text);
         parseData.setContent(content);
+
+        // apply the JSoup filters if any
+        if (jsoupBuilder != null) {
+            try {
+                jsoupFilters.filter(url, content, jsoupBuilder.getDocument(), parse);
+            } catch (RuntimeException e) {
+                handleException(url, e, metadata, tuple, "jsoup filtering");
+                return;
+            }
+        }
 
         // apply the parse filters if any
         try {
@@ -614,16 +648,7 @@ public class ParserBolt extends BaseRichBolt {
         }
         pipesConfig.setJvmArgs(forkedJvmArgs(conf));
 
-        // an HtmlMapper can't be passed to the forked JVM, which always uses Tika's default
-        if (!DefaultHtmlMapper.class.equals(htmlMapperClass)) {
-            LOG.warn(
-                    "parser.htmlmapper.classname ({}) is ignored under {}: the forked JVM maps"
-                            + " HTML with {}, which drops some elements from the DOM given to"
-                            + " the parse filters",
-                    htmlMapperClass.getName(),
-                    PARSE_TIMEOUT_PARAM,
-                    DefaultHtmlMapper.class.getSimpleName());
-        }
+        pipesHtmlMapper = pipesHtmlMapper(htmlMapperClass, isIdentityMapperRegistered());
 
         try {
             return new PipesForkParser(pipesConfig);
@@ -632,6 +657,49 @@ public class ParserBolt extends BaseRichBolt {
                     "Failed to initialise the Tika Pipes fork parser for " + PARSE_TIMEOUT_PARAM,
                     e);
         }
+    }
+
+    /** Whether a META-INF/tika/parse-context.idx file registers the IdentityHtmlMapper. */
+    static boolean isIdentityMapperRegistered() {
+        // Tika loads the registries when it creates its object mapper
+        TikaObjectMapperFactory.getMapper();
+        return ComponentNameResolver.getFriendlyName(IdentityHtmlMapper.class) != null;
+    }
+
+    /**
+     * Returns the HtmlMapper to send to the forked JVM, or null to leave it to Tika's {@link
+     * DefaultHtmlMapper}. Tika only sends the components registered in its index files, a mapper
+     * which is not registered would make every parse fail in the fork.
+     *
+     * @param identityMapperRegistered whether META-INF/tika/parse-context.idx registers the
+     *     IdentityHtmlMapper
+     */
+    static HtmlMapper pipesHtmlMapper(
+            Class<? extends HtmlMapper> htmlMapperClass, boolean identityMapperRegistered) {
+        if (DefaultHtmlMapper.class.equals(htmlMapperClass)) {
+            return null;
+        }
+        if (!IdentityHtmlMapper.class.equals(htmlMapperClass)) {
+            LOG.warn(
+                    "parser.htmlmapper.classname ({}) is ignored under {}: the forked JVM maps"
+                            + " HTML with {}, which drops some elements from the documents given"
+                            + " to the JSoup and parse filters",
+                    htmlMapperClass.getName(),
+                    PARSE_TIMEOUT_PARAM,
+                    DefaultHtmlMapper.class.getSimpleName());
+            return null;
+        }
+        if (!identityMapperRegistered) {
+            LOG.warn(
+                    "{} is not registered with Tika, the forked JVM used under {} maps HTML with {}"
+                            + " instead. If the topology runs from a shaded jar, merge"
+                            + " META-INF/tika/parse-context.idx with an AppendingTransformer.",
+                    IdentityHtmlMapper.class.getSimpleName(),
+                    PARSE_TIMEOUT_PARAM,
+                    DefaultHtmlMapper.class.getSimpleName());
+            return null;
+        }
+        return IdentityHtmlMapper.INSTANCE;
     }
 
     /**
@@ -731,6 +799,9 @@ public class ParserBolt extends BaseRichBolt {
             // the fork loads the "parse-context" section of the Tika configuration itself
             ParseContext parseContext = new ParseContext();
             setPdfParserConfig(parseContext);
+            if (pipesHtmlMapper != null) {
+                parseContext.set(HtmlMapper.class, pipesHtmlMapper);
+            }
             result = pipesForkParser.parse(tis, seedMetadata, parseContext);
         } catch (TikaException | PipesException e) {
             throw new ParsePipesInfraException("Tika Pipes error for " + url, e);
@@ -815,7 +886,7 @@ public class ParserBolt extends BaseRichBolt {
             throws SAXException, IOException {
         try {
             XMLReader reader = PIPES_CONTENT_PARSER_FACTORY.newSAXParser().getXMLReader();
-            reader.setContentHandler(handler);
+            reader.setContentHandler(new NamespaceRestoringHandler(handler));
             reader.parse(new InputSource(new StringReader(xml)));
         } catch (ParserConfigurationException e) {
             throw new IllegalStateException(

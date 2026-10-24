@@ -57,10 +57,15 @@ public class CharsetIdentification {
      * guess and if that fails too returns UTF-8. This approach is expected to be faster but maybe
      * less reliable than getCharset.
      *
-     * @since 1.18
+     * @param protocolMetadataPrefix prefix of the response headers in the metadata, including its
+     *     separator (e.g. {@code "protocol."}); empty if they are not prefixed
+     * @since 4.0
      */
     public static String getCharsetFast(
-            final Metadata metadata, final byte[] content, final int maxLengthCharsetDetection) {
+            final Metadata metadata,
+            final byte[] content,
+            final int maxLengthCharsetDetection,
+            final String protocolMetadataPrefix) {
 
         // let's look at the BOM first
         String charset = getCharsetFromBOM(content);
@@ -69,7 +74,7 @@ public class CharsetIdentification {
         }
 
         // then look at what we get from HTTP headers
-        charset = getCharsetFromHTTP(metadata);
+        charset = getCharsetFromHTTP(metadata, protocolMetadataPrefix);
         if (charset != null) {
             return charset;
         }
@@ -92,11 +97,18 @@ public class CharsetIdentification {
     /**
      * Identifies the charset of a document based on the following logic: guess from the
      * ByteOrderMark - else if the same charset is specified in the http headers and the html
-     * metadata then use it - otherwise use ICU's charset detector to make an educated guess and if
-     * that fails too returns UTF-8.
+     * metadata then use it - otherwise use ICU's charset detector to make an educated guess, with
+     * the html metadata or else the http headers as a hint, and if that fails too returns UTF-8.
+     *
+     * @param protocolMetadataPrefix prefix of the response headers in the metadata, including its
+     *     separator (e.g. {@code "protocol."}); empty if they are not prefixed
+     * @since 4.0
      */
     public static String getCharset(
-            Metadata metadata, byte[] content, int maxLengthCharsetDetection) {
+            Metadata metadata,
+            byte[] content,
+            int maxLengthCharsetDetection,
+            String protocolMetadataPrefix) {
 
         // let's look at the BOM first
         String BOMCharset = getCharsetFromBOM(content);
@@ -105,7 +117,7 @@ public class CharsetIdentification {
         }
 
         // then look at what we get from HTTP headers and HTML content
-        String httpCharset = getCharsetFromHTTP(metadata);
+        String httpCharset = getCharsetFromHTTP(metadata, protocolMetadataPrefix);
         String htmlCharset = getCharsetFromMeta(content, maxLengthCharsetDetection);
 
         // both exist and agree
@@ -116,12 +128,7 @@ public class CharsetIdentification {
         }
 
         // let's guess from the text - using a hint or not
-        String hintCharset = null;
-        if (httpCharset != null && htmlCharset == null) {
-            hintCharset = httpCharset;
-        } else if (httpCharset == null && htmlCharset != null) {
-            hintCharset = htmlCharset;
-        }
+        String hintCharset = htmlCharset != null ? htmlCharset : httpCharset;
 
         String textCharset = getCharsetFromText(content, hintCharset, maxLengthCharsetDetection);
         if (textCharset != null) {
@@ -133,8 +140,9 @@ public class CharsetIdentification {
     }
 
     /** Returns the charset declared by the server if any. */
-    private static String getCharsetFromHTTP(Metadata metadata) {
-        return getCharsetFromContentType(metadata.getFirstValue(HttpHeaders.CONTENT_TYPE));
+    private static String getCharsetFromHTTP(Metadata metadata, String protocolMetadataPrefix) {
+        return getCharsetFromContentType(
+                metadata.getFirstValue(HttpHeaders.CONTENT_TYPE, protocolMetadataPrefix));
     }
 
     /** Detects any BOMs and returns the corresponding charset. */

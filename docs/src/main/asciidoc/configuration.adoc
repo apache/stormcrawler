@@ -355,8 +355,8 @@ Note: `indexer.md.docid` is never used raw: the matching value is passed through
 (the same digest used for the default URL-based ID), except for CloudSearch, whose
 `CloudSearchIndexerBolt` re-digests it with SHA-512 via `CloudSearchUtils.getID` to satisfy
 CloudSearch's ID constraints. It is only honoured by backends whose bolts call
-`AbstractIndexerBolt#getDocumentID` under the hood: the OpenSearch and OpenSearch-Java
-`IndexerBolt`/`DeletionBolt` pairs, and the CloudSearch `CloudSearchIndexerBolt`. The Solr and
+`AbstractIndexerBolt#getDocumentID` under the hood: the OpenSearch
+`IndexerBolt`/`DeletionBolt` pair, and the CloudSearch `CloudSearchIndexerBolt`. The Solr and
 SQL indexers build their document/row key directly from the URL and never call
 `getDocumentID()`, so this setting is silently ignored for those two backends.
 
@@ -394,6 +394,7 @@ Configures parsing of fetched text and the handling of discovered URIs
 | detect.mimetype | true | Enable MIME type detection during parsing.
 | feed.filter.hours.since.published | -1 | Discard feeds older than value hours.
 | feed.sniffContent | false | Try to detect feeds automatically.
+| jsoup.filters.config.file | - | Path to JSON config defining the JSoupFilters used by JSoupParserBolt. See link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/jsoupfilters.json[default jsoupfilters.json].
 | jsoup.treat.non.html.as.error | true | If true, non-HTML content is treated as an error by JSoupParserBolt. Note that `text/plain` is always handled directly (the content is used as the text) and never treated as an error. Its stored text honors `textextractor.no.text` and is capped at `textextractor.skip.after`; the raw fetched size is bounded by `http.content.limit`.
 | parsefilters.config.file | parsefilters.json | Path to JSON config defining ParseFilters. See link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/parsefilters.json[default parsefilters.json].
 | parser.emitOutlinks | true | Emit discovered links as DISCOVERED tuples.
@@ -443,9 +444,8 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/opensearc
 | key | default value | description
 
 | opensearch.addresses | - | OpenSearch server address(es). An address without a scheme is contacted over plain http, on port 9200 if none is given; use `https://` when credentials are configured.
-| opensearch.user | - | Username for Basic authentication (optional). The credentials are only sent to the addresses listed, matched on scheme, host and port, not to nodes discovered by sniffing under another address; list those nodes in the addresses or disable `opensearch.<type>.sniff`, which is on by default. A warning is logged when sniffing is enabled together with credentials, and if an address other than a loopback one uses plain http.
+| opensearch.user | - | Username for Basic authentication (optional). The credentials are only sent to the addresses listed, matched on scheme, host and port. A warning is logged if an address other than a loopback one uses plain http.
 | opensearch.password | - | Password for authentication (optional).
-| opensearch.<type>.sniff | true | Discover the other nodes of the cluster and send requests to them as well. The nodes found are contacted over https if one of the addresses uses https, over plain http otherwise.
 | opensearch.disable.tls.validation | false | Do not check the certificates and host names of the OpenSearch nodes. A warning is logged when this is enabled.
 | opensearch.concurrentRequests | 2 | Number of concurrent bulk requests.
 | opensearch.indexer.index.name | content | Index name for crawled documents.
@@ -571,7 +571,7 @@ See the link:https://github.com/apache/stormcrawler/tree/main/external/tika[tika
 | parser.extract.embedded | false | Whether to parse embedded documents. Since Tika 4 embedded documents are no longer parsed unless this is set to `true`.
 | parser.tika.text.maxlength | -1 | Maximum number of characters of text extracted from a document, -1 (or any negative value) for no limit. When the limit is reached the parse stops, the text and outlinks extracted so far are kept and the metadata `parse.text.trimmed` is set to `true`.
 | parser.tika.pdf.maxpages | -1 | Maximum number of pages of a PDF document to parse, 0 or less to keep the `maxPages` of the Tika configuration (no limit by default). The pages after it are skipped, their text and outlinks are not extracted. Other settings of `pdf-parser` in the `parse-context` section of the Tika configuration are kept.
-| parser.tika.timeout | -1 | Maximum time in milliseconds a document may take to parse, 0 or less for no limit. When set, the parse runs in a forked JVM (Tika Pipes), one per bolt instance; a parse that exceeds this is killed outright and reported to the status stream as an `ERROR` with the message `parse timeout`. A partial result returned between embedded documents is kept and marked `parse.text.trimmed`. When `parser.tika.text.maxlength` is negative (the default), the text is limited to 20,000,000 characters in this mode. Keep it well below `topology.message.timeout.secs`: the time a tuple waits behind a slow parse or a fork restart counts against that too. `parser.htmlmapper.classname` is ignored in this mode, see the README of the module.
+| parser.tika.timeout | -1 | Maximum time in milliseconds a document may take to parse, 0 or less for no limit. When set, the parse runs in a forked JVM (Tika Pipes), one per bolt instance; a parse that exceeds this is killed outright and reported to the status stream as an `ERROR` with the message `parse timeout`. A partial result returned between embedded documents is kept and marked `parse.text.trimmed`. When `parser.tika.text.maxlength` is negative (the default), the text is limited to 20,000,000 characters in this mode. Keep it well below `topology.message.timeout.secs`: the time a tuple waits behind a slow parse or a fork restart counts against that too. The forked JVM uses the `IdentityHtmlMapper` (the default), any other value of `parser.htmlmapper.classname` is ignored in this mode and Tika's `DefaultHtmlMapper` is used instead, see the README of the module.
 | parser.tika.pipes.jvmargs | -Xmx512m | JVM arguments passed to each forked process under `parser.tika.timeout`. `-Xmx512m` is added when they set no maximum heap (`-Xmx`, `-XX:MaxHeapSize` or `-XX:MaxRAM*`).
 | parser.tika.pipes.maxfilesperprocess | - | Restart a forked process after this many documents under `parser.tika.timeout`, to bound slow leaks in parsing libraries. Unset uses Tika's default, 10000.
 | parser.tika.pipes.plugins.dir | - | Directory holding Tika Pipes plugin zips under `parser.tika.timeout`, not needed by default. Unset uses Tika's default plugin directory resolution.

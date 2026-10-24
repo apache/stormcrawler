@@ -111,6 +111,11 @@ public class JSoupFilters extends AbstractConfigurable implements JSoupFilter, J
         filters = list.toArray(new JSoupFilter[0]);
     }
 
+    /** Returns true if no filters are configured, so callers can skip building a document. */
+    public boolean isEmpty() {
+        return filters.length == 0;
+    }
+
     @Override
     public void filter(
             @NotNull String url,

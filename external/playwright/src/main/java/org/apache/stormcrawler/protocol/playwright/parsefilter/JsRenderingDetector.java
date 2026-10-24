@@ -27,8 +27,10 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
+import org.apache.stormcrawler.protocol.ProtocolResponse;
 import org.apache.stormcrawler.protocol.playwright.HttpProtocol;
 import org.apache.stormcrawler.util.CharsetIdentification;
+import org.apache.stormcrawler.util.ConfUtils;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.DocumentFragment;
@@ -138,6 +140,7 @@ public class JsRenderingDetector extends ParseFilter {
     private List<String> emptyRootIds = DEFAULT_EMPTY_ROOT_IDS;
     private List<String> requiredMessages = List.of();
     private String skipIfMetadataPresent = HttpProtocol.MD_KEY_END;
+    private String protocolMetadataPrefix = "";
     private boolean recordReason = true;
 
     private final List<Pattern> emptyRootPatterns = new ArrayList<>();
@@ -145,6 +148,8 @@ public class JsRenderingDetector extends ParseFilter {
     @Override
     public void configure(
             @NotNull final Map<String, Object> stormConf, @NotNull final JsonNode params) {
+        protocolMetadataPrefix =
+                ConfUtils.getString(stormConf, ProtocolResponse.PROTOCOL_MD_PREFIX_PARAM, "");
         if (params != null && !params.isMissingNode() && !params.isNull()) {
             if (params.has("metadataKey")) {
                 this.metadataKey = params.get("metadataKey").asText();
@@ -223,7 +228,8 @@ public class JsRenderingDetector extends ParseFilter {
 
     private String detectReason(final String url, final byte[] content, final ParseResult parse) {
         final Metadata md = parse.getOrCreate(url).getMetadata();
-        final String charsetName = CharsetIdentification.getCharsetFast(md, content, -1);
+        final String charsetName =
+                CharsetIdentification.getCharsetFast(md, content, -1, protocolMetadataPrefix);
         java.nio.charset.Charset cs;
         try {
             cs = java.nio.charset.Charset.forName(charsetName);

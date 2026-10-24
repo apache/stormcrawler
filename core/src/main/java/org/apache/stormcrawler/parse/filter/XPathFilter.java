@@ -33,6 +33,7 @@ import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.xml.secure.SecureXPathFactory;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.parse.ParseData;
 import org.apache.stormcrawler.parse.ParseFilter;
@@ -72,7 +73,7 @@ public class XPathFilter extends ParseFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(XPathFilter.class);
 
-    private XPathFactory factory = XPathFactory.newInstance();
+    private XPathFactory factory = SecureXPathFactory.newDefaultInstance();
     private XPath xpath = factory.newXPath();
 
     protected final Map<String, List<LabelledExpression>> expressions = new HashMap<>();
@@ -167,7 +168,12 @@ public class XPathFilter extends ParseFilter {
             for (LabelledExpression le : leList) {
                 try {
                     List<String> values = le.evaluate(doc);
-                    if (values != null && !values.isEmpty()) {
+                    if (values == null) {
+                        continue;
+                    }
+                    // blank values are skipped so that the next expression can be tried
+                    values.removeIf(StringUtils::isBlank);
+                    if (!values.isEmpty()) {
                         metadata.addValues(le.key, values);
                         break;
                     }

@@ -34,8 +34,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.xml.secure.SecureDocumentBuilderFactory;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilter;
 import org.jetbrains.annotations.NotNull;
@@ -164,7 +164,7 @@ public class RegexURLNormalizer extends URLFilter {
 
             // borrowed heavily from code in Configuration.java
             Document doc =
-                    DocumentBuilderFactory.newInstance()
+                    SecureDocumentBuilderFactory.newDefaultInstance()
                             .newDocumentBuilder()
                             .parse(new InputSource(reader));
             Element root = doc.getDocumentElement();

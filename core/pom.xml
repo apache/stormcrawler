@@ -47,7 +47,7 @@ under the License.
         <rometools.version>2.1.0</rometools.version>
         <cli.version>1.11.0</cli.version>
         <okhttp.version>5.5.0</okhttp.version>
-        <caffeine.version>3.3.0</caffeine.version>
+        <caffeine.version>3.3.1</caffeine.version>
 
         <jacoco.haltOnFailure>true</jacoco.haltOnFailure>
         <jacoco.classRatio>0.72</jacoco.classRatio>
@@ -229,6 +229,12 @@ under the License.
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>${commons.lang.version}</version>
+        </dependency>
+
+        <!-- JAXP factories with external entities and DTDs disabled -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-secure-xml</artifactId>
         </dependency>
 
 

@@ -20,6 +20,7 @@ package org.apache.stormcrawler.util;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.http.HttpHeaders;
 import org.apache.stormcrawler.Metadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -56,7 +57,7 @@ class CharsetIdentificationTest {
                         () -> {
                             try {
                                 CharsetIdentification.getCharset(
-                                        new Metadata(), content, maxlength);
+                                        new Metadata(), content, maxlength, "");
                             } catch (Throwable t) {
                                 thrown.set(t);
                             }
@@ -106,7 +107,7 @@ class CharsetIdentificationTest {
         page.append("<meta charset=\"").append(DECLARED).append("\">").append(BODY);
         byte[] content = page.toString().getBytes(StandardCharsets.US_ASCII);
 
-        String charset = CharsetIdentification.getCharsetFast(new Metadata(), content, cut);
+        String charset = CharsetIdentification.getCharsetFast(new Metadata(), content, cut, "");
 
         Assertions.assertEquals(DECLARED, charset);
     }
@@ -133,13 +134,59 @@ class CharsetIdentificationTest {
     void lookAheadForTheClosingQuoteIsBounded() {
         String within =
                 CharsetIdentification.getCharsetFast(
-                        new Metadata(), metaCharsetClosingAfterTheWindow(LOOKAHEAD - 1), MAXLENGTH);
+                        new Metadata(),
+                        metaCharsetClosingAfterTheWindow(LOOKAHEAD - 1),
+                        MAXLENGTH,
+                        "");
         String beyond =
                 CharsetIdentification.getCharsetFast(
-                        new Metadata(), metaCharsetClosingAfterTheWindow(LOOKAHEAD), MAXLENGTH);
+                        new Metadata(), metaCharsetClosingAfterTheWindow(LOOKAHEAD), MAXLENGTH, "");
 
         Assertions.assertEquals(DECLARED, within);
         Assertions.assertNotEquals(
                 DECLARED, beyond, "a declaration closing beyond the look-ahead is not used");
+    }
+
+    /** The prefix the fetcher stores the response headers with, see protocol.md.prefix. */
+    private static final String PREFIX = "protocol.";
+
+    /** The detection window of these tests: the page is plain ASCII within it. */
+    private static final int WINDOW = 2048;
+
+    /**
+     * A UTF-8 page, optionally with a meta charset, whose first non-ASCII byte is past the window.
+     */
+    private static byte[] utf8PageWithAsciiWindow(boolean withMeta) {
+        String meta = withMeta ? "<meta charset=\"utf-8\">" : "";
+        String head =
+                "<meta name=\"description\" content=\"" + "free shipping ".repeat(200) + "\">";
+        return ("<html><head>" + meta + head + "</head><body><p>café</p></body></html>")
+                .getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static Metadata prefixedUtf8ContentType() {
+        Metadata metadata = new Metadata();
+        metadata.setValue(PREFIX + HttpHeaders.CONTENT_TYPE, "text/html; charset=UTF-8");
+        return metadata;
+    }
+
+    /** The fast detection returns the charset of the prefixed Content-Type, see #2250. */
+    @Test
+    void fastDetectionReadsThePrefixedContentType() {
+        String charset =
+                CharsetIdentification.getCharsetFast(
+                        prefixedUtf8ContentType(), utf8PageWithAsciiWindow(false), WINDOW, PREFIX);
+
+        Assertions.assertEquals("UTF-8", charset);
+    }
+
+    /** The prefixed Content-Type agrees with the meta charset, so it is used, see #2250. */
+    @Test
+    void detectionReadsThePrefixedContentType() {
+        String charset =
+                CharsetIdentification.getCharset(
+                        prefixedUtf8ContentType(), utf8PageWithAsciiWindow(true), WINDOW, PREFIX);
+
+        Assertions.assertEquals("UTF-8", charset);
     }
 }

@@ -132,6 +132,38 @@ class ParserBoltPipesTimeoutTest extends ParsingTester {
     }
 
     /**
+     * The IdentityHtmlMapper keeps prefixed attributes such as {@code xlink:href} or {@code
+     * x-on:click}, which the fork writes back without declaring their namespace.
+     */
+    @Test
+    @Timeout(30)
+    void prefixedAttributesUnderTimeout() throws IOException {
+        prepare(new HashMap<>());
+
+        String url = "https://example.org/svg.html";
+        byte[] content =
+                ("<html><body><svg><use xlink:href=\"#i\"></use></svg>"
+                                + "<button x-on:click=\"open = true\">open</button>"
+                                + "<a href=\"http://example.com/next\">next page</a>"
+                                + "</body></html>")
+                        .getBytes(StandardCharsets.UTF_8);
+        parse(url, content, new Metadata());
+
+        Assertions.assertTrue(
+                output.getEmitted(Constants.StatusStreamName).stream()
+                        .noneMatch(t -> t.get(2) == Status.ERROR));
+        List<List<Object>> emitted = output.getEmitted();
+        Assertions.assertEquals(1, emitted.size());
+        Assertions.assertTrue(emitted.get(0).get(3).toString().contains("next page"));
+        List<List<Object>> discovered =
+                output.getEmitted(Constants.StatusStreamName).stream()
+                        .filter(t -> t.get(2) == Status.DISCOVERED)
+                        .toList();
+        Assertions.assertEquals(1, discovered.size());
+        Assertions.assertEquals("http://example.com/next", discovered.get(0).get(0));
+    }
+
+    /**
      * The fork stops at parser.tika.text.maxlength and returns XML cut off mid-document: the
      * document is still emitted, trimmed, instead of failing on the truncated XML.
      */
