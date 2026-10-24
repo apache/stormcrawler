@@ -40,7 +40,6 @@ import org.apache.stormcrawler.parse.ParseResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import org.w3c.dom.DocumentFragment;
 
 class DelegateRefresherTest {
 
@@ -84,7 +83,7 @@ class DelegateRefresherTest {
         }
 
         @Override
-        public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {}
+        public void filter(String url, byte[] content, ParseResult parse) {}
 
         @Override
         public String getResourceFile() {

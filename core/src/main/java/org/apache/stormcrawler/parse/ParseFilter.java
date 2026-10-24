@@ -19,7 +19,6 @@ package org.apache.stormcrawler.parse;
 
 import org.apache.storm.task.IBolt;
 import org.apache.stormcrawler.util.AbstractConfigurable;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Implementations of ParseFilter are responsible for extracting custom data from the crawled
@@ -34,22 +33,9 @@ public abstract class ParseFilter extends AbstractConfigurable {
      *
      * @param url the URL of the page being parsed
      * @param content the content being parsed
-     * @param doc the DOM tree resulting of the parsing of the content or null if {@link
-     *     #needsDOM()} returns <code>false</code>
      * @param parse the metadata to be updated with the resulting of the parsing
      */
-    public abstract void filter(
-            String url, byte[] content, DocumentFragment doc, ParseResult parse);
-
-    /**
-     * Specifies whether this filter requires a DOM representation of the document.
-     *
-     * @return <code>true</code>if this needs a DOM representation of the document, <code>false
-     *     </code> otherwise.
-     */
-    public boolean needsDOM() {
-        return false;
-    }
+    public abstract void filter(String url, byte[] content, ParseResult parse);
 
     /**
      * Might be used to clean any resources associated with this {@link ParseFilter}.- See {@link

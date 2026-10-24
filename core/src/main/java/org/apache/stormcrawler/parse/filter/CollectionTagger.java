@@ -36,7 +36,6 @@ import org.apache.stormcrawler.util.ConfUtils;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Assigns one or more tags to the metadata of a document based on its URL matching patterns defined
@@ -119,7 +118,7 @@ public class CollectionTagger extends ParseFilter implements JSONResource {
     }
 
     @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, ParseResult parse) {
         String[] tags = collections.tag(url);
         if (tags.length > 0) {
             parse.getOrCreate(url).getMetadata().setValues(key, tags);

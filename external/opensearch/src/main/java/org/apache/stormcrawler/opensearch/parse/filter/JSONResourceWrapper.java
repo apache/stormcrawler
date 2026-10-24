@@ -23,7 +23,6 @@ import org.apache.stormcrawler.opensearch.DelegateRefresher;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.jetbrains.annotations.NotNull;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Wraps a ParseFilter whose resources are in a JSON file that can be stored in OpenSearch. The
@@ -66,13 +65,8 @@ public class JSONResourceWrapper extends ParseFilter {
     }
 
     @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
-        refresher.getDelegate().filter(url, content, doc, parse);
-    }
-
-    @Override
-    public boolean needsDOM() {
-        return refresher.getDelegate().needsDOM();
+    public void filter(String url, byte[] content, ParseResult parse) {
+        refresher.getDelegate().filter(url, content, parse);
     }
 
     @Override

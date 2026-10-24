@@ -43,7 +43,6 @@ import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.metrics.CrawlerMetrics;
 import org.apache.stormcrawler.metrics.ScopedCounter;
-import org.apache.stormcrawler.parse.DocumentFragmentBuilder;
 import org.apache.stormcrawler.parse.JSoupFilter;
 import org.apache.stormcrawler.parse.JSoupFilters;
 import org.apache.stormcrawler.parse.JSoupTextExtractor;
@@ -70,7 +69,6 @@ import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
 import org.jsoup.select.Elements;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Parser for HTML documents only which uses ICU4J to detect the charset encoding. Kindly donated to
@@ -477,12 +475,7 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
         // apply the parse filters if any
         try {
-            DocumentFragment fragment = null;
-            // lazy building of fragment
-            if (parseFilters.needsDOM()) {
-                fragment = DocumentFragmentBuilder.fromJsoup(jsoupDoc);
-            }
-            parseFilters.filter(url, content, fragment, parse);
+            parseFilters.filter(url, content, parse);
         } catch (RuntimeException e) {
             String errorMessage = "Exception while running parse filters on " + url + ": " + e;
             handleException(url, e, metadata, tuple, "content filtering", errorMessage);
