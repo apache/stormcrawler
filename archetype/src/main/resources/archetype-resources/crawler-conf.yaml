@@ -28,7 +28,8 @@ config:
   fetcher.threads.number: 50
 
   # override the JVM parameters for the workers
-  topology.worker.childopts: "-Xmx2g -Djava.net.preferIPv4Stack=true"
+  # jdk.xml.* lift the JDK parser limits hit by large sitemaps and feeds; in local mode use STORM_JAR_JVM_OPTS
+  topology.worker.childopts: "-Xmx2g -Djava.net.preferIPv4Stack=true -Djdk.xml.maxGeneralEntitySizeLimit=0 -Djdk.xml.totalEntitySizeLimit=0"
 
   # mandatory when using Flux
   topology.kryo.register:

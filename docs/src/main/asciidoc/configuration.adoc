@@ -411,6 +411,8 @@ Configures parsing of fetched text and the handling of discovered URIs
 | urlfilters.config.file | urlfilters.json | JSON file defining URL filters. See link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/urlfilters.json[default urlfilters.json].
 |===
 
+The JDK XML parser fails on sitemaps, feeds and XML-based documents parsed by Tika with many entity references, such as escaped ampersands in URLs. Add `-Djdk.xml.maxGeneralEntitySizeLimit=0 -Djdk.xml.totalEntitySizeLimit=0` to `topology.worker.childopts`, to `STORM_JAR_JVM_OPTS` in local mode, and to `parser.tika.pipes.jvmargs` when `parser.tika.timeout` is set. These properties set JVM-wide defaults for the JDK XML parsers; parser-specific settings take precedence.
+
 ====  Metadata
 
 Options on how Storm Crawler should handle metadata tracking as well as
