@@ -20,6 +20,8 @@ include::overview.adoc[]
 
 include::quick-start.adoc[]
 
+include::migrating.adoc[]
+
 include::architecture.adoc[]
 
 include::internals.adoc[]

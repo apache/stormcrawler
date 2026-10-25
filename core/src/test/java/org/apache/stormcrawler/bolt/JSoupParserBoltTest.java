@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.storm.task.OutputCollector;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;

@@ -40,7 +40,6 @@ under the License.
         <crawler-commons.version>1.6</crawler-commons.version>
         <jsoup.version>1.23.2</jsoup.version>
         <icu4j.version>78.3</icu4j.version>
-        <httpclient.version>4.5.14</httpclient.version>
         <snakeyaml.version>2.7</snakeyaml.version>
         <commons.lang.version>3.21.0</commons.lang.version>
         <wiremock.version>3.13.2</wiremock.version>
@@ -202,9 +201,9 @@ under the License.
         </dependency>
 
         <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>${httpclient.version}</version>
+            <groupId>org.apache.httpcomponents.core5</groupId>
+            <artifactId>httpcore5</artifactId>
+            <version>${httpcore5.version}</version>
         </dependency>
 
         <dependency>
