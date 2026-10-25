@@ -39,7 +39,6 @@ import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Language identification; the language codes gets stored in the metadata. <br>
@@ -102,7 +101,7 @@ public class LanguageID extends ParseFilter {
     }
 
     @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, ParseResult parse) {
 
         // check whether the metadata already contains a lang value
         // in which case we normalise its value and use it

@@ -17,63 +17,28 @@
 
 package org.apache.stormcrawler.parse.filter;
 
+import java.nio.charset.StandardCharsets;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
-import org.w3c.dom.DocumentFragment;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Element;
 
 public class SubDocumentsParseFilter extends ParseFilter {
 
     @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
-        if (doc == null) {
+    public void filter(String url, byte[] content, ParseResult parse) {
+        if (content == null) {
             return;
         }
 
-        NodeList links = findElements(doc, "a");
-        for (int i = 0; i < links.getLength(); i++) {
-            Node node = links.item(i);
-            if (node instanceof Element) {
-                String href = ((Element) node).getAttribute("href");
-                if (href != null && !href.isEmpty()) {
-                    // create a sub-document for each link; the metadata entry
-                    // makes sure that it is not skipped as an empty document
-                    parse.put(href, "isSubDocument", "true");
-                }
+        String html = new String(content, StandardCharsets.UTF_8);
+        for (Element link : Jsoup.parse(html, url).select("a[href]")) {
+            String href = link.attr("href");
+            if (!href.isEmpty()) {
+                // create a sub-document for each link; the metadata entry
+                // makes sure that it is not skipped as an empty document
+                parse.put(href, "isSubDocument", "true");
             }
-        }
-    }
-
-    private NodeList findElements(Node node, String tagName) {
-        if (node instanceof org.w3c.dom.Document) {
-            return ((org.w3c.dom.Document) node).getElementsByTagName(tagName);
-        }
-        Node child = node.getFirstChild();
-        while (child != null) {
-            if (child instanceof Element) {
-                return ((Element) child).getElementsByTagName(tagName);
-            }
-            child = child.getNextSibling();
-        }
-        return new EmptyNodeList();
-    }
-
-    @Override
-    public boolean needsDOM() {
-        return true;
-    }
-
-    private static class EmptyNodeList implements NodeList {
-        @Override
-        public Node item(int index) {
-            return null;
-        }
-
-        @Override
-        public int getLength() {
-            return 0;
         }
     }
 }

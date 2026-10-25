@@ -40,7 +40,6 @@ under the License.
         <crawler-commons.version>1.6</crawler-commons.version>
         <jsoup.version>1.23.2</jsoup.version>
         <icu4j.version>78.3</icu4j.version>
-        <xerces.version>2.12.2</xerces.version>
         <snakeyaml.version>2.7</snakeyaml.version>
         <commons.lang.version>3.21.0</commons.lang.version>
         <wiremock.version>3.13.2</wiremock.version>
@@ -170,18 +169,6 @@ under the License.
             <groupId>com.github.crawler-commons</groupId>
             <artifactId>crawler-commons</artifactId>
             <version>${crawler-commons.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>xerces</groupId>
-            <artifactId>xercesImpl</artifactId>
-            <version>${xerces.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>xml-apis</groupId>
-                    <artifactId>xml-apis</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <dependency>

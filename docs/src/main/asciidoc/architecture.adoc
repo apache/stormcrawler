@@ -76,8 +76,8 @@ processed.
 Parse Filters are applied within the parsing bolts, following parsing by
 `SiteMapParser`, `JSoupParser`, or `ParserBolt` (Tika). They can modify extracted text,
 metadata, and links before the content is indexed or new URLs are emitted.
-For HTML documents, `JSoupParser` also applies JSoup Filters, which work directly
-on the JSoup document and do not require a DOM.
+For HTML documents, `JSoupParser` and `ParserBolt` also apply JSoup Filters, which work
+directly on the JSoup document.
 
 Common Parse Filters include:
 

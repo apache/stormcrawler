@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
@@ -40,10 +39,7 @@ import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.Configurable;
 import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Wrapper for the ParseFilters defined in a JSON configuration.
@@ -119,29 +115,11 @@ public class ParseFilters extends ParseFilter implements JSONResource {
     }
 
     @Override
-    public boolean needsDOM() {
-        for (ParseFilter filter : filters) {
-            boolean needsDom = filter.needsDOM();
-            if (needsDom) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, ParseResult parse) {
 
         for (ParseFilter filter : filters) {
             long start = System.currentTimeMillis();
-            if (doc == null && filter.needsDOM()) {
-                LOG.info(
-                        "ParseFilter {} needs DOM but has none to work on - skip : {}",
-                        filter.getClass().getName(),
-                        url);
-                continue;
-            }
-            filter.filter(url, content, doc, parse);
+            filter.filter(url, content, parse);
             long end = System.currentTimeMillis();
             LOG.debug("ParseFilter {} took {} msec", filter.getClass().getName(), end - start);
         }
@@ -189,9 +167,7 @@ public class ParseFilters extends ParseFilter implements JSONResource {
 
         byte[] content = IOUtils.toByteArray(URLUtil.toURL(url).openStream());
 
-        Document doc = Jsoup.parse(new String(content, StandardCharsets.UTF_8), url);
-
-        filters.filter(url, content, DocumentFragmentBuilder.fromJsoup(doc), parse);
+        filters.filter(url, content, parse);
 
         System.out.println(parse.toString());
 
