@@ -26,10 +26,10 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import org.apache.commons.io.IOUtils;
-import org.apache.hc.core5.http.HttpHeaders;
-import org.apache.hc.core5.http.HttpStatus;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
+import org.apache.stormcrawler.shade.httpcore5.HttpHeaders;
+import org.apache.stormcrawler.shade.httpcore5.HttpStatus;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 

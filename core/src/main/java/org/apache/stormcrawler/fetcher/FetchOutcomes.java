@@ -20,7 +20,6 @@ package org.apache.stormcrawler.fetcher;
 import java.io.InterruptedIOException;
 import java.net.UnknownHostException;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.bolt.FetcherBolt;
@@ -31,6 +30,7 @@ import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
 import org.apache.stormcrawler.protocol.FetchTimeoutException;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
+import org.apache.stormcrawler.shade.httpcore5.HttpHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
