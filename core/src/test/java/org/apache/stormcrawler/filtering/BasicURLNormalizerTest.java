@@ -273,10 +273,7 @@ class BasicURLNormalizerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "false, http://a.example/x&a=b/#frag",
-        "true, http://a.example/x&a=b/"
-    })
+    @CsvSource({"false, http://a.example/x&a=b/#frag", "true, http://a.example/x&a=b/"})
     void testDoesNotDropTrailingSlashWhenUnmangling(boolean removeAnchor, String inputUrl)
             throws MalformedURLException {
         URLFilter urlFilter = createFilter(removeAnchor, true, List.of());
