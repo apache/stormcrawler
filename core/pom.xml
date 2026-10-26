@@ -39,7 +39,7 @@ under the License.
         <!-- dependency versions -->
         <crawler-commons.version>1.6</crawler-commons.version>
         <jsoup.version>1.23.2</jsoup.version>
-        <icu4j.version>78.3</icu4j.version>
+        <icu4j.version>79.1</icu4j.version>
         <snakeyaml.version>2.7</snakeyaml.version>
         <commons.lang.version>3.21.0</commons.lang.version>
         <wiremock.version>3.13.2</wiremock.version>
