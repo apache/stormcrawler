@@ -35,6 +35,8 @@ import org.apache.stormcrawler.filtering.basic.BasicURLNormalizer;
 import org.apache.stormcrawler.util.URLUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Utility class which encapsulates the filtering of URLs based on the hostname or domain of the
@@ -241,6 +243,76 @@ class BasicURLNormalizerTest {
         normalizedUrl = urlFilter.filter(testSourceUrl, new Metadata(), testUrl);
         expectedResult = "http://dev.com/s&utax/NEWSRLSEfy18.pdf";
         assertEquals(expectedResult, normalizedUrl, "Failed to filter query string");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "http://a.example/article.pl?sid=01/10/23/1816257&mode=thread&tid=107",
+        "http://a.example/p?u=http://b.example/x&z=1",
+        "http://a.example/login/?next=/a/b/&utm_source=ref&z=1"
+    })
+    void testDoesNotMangleQueryWhenValueContainsSlashes(String inputUrl)
+            throws MalformedURLException {
+        URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        assertEquals(
+                inputUrl,
+                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
+                "An existing query must not be unmangled because a value contains slashes");
+    }
+
+    @Test
+    void testUnmanglesQueryBeforeFragmentQuestionMark() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(false, false);
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        String inputUrl = "http://a.example/p&a=b#frag?x";
+        assertEquals(
+                "http://a.example/p?a=b#frag?x",
+                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
+                "A question mark in the fragment must not suppress query repair");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, http://a.example/x&a=b/#frag", "true, http://a.example/x&a=b/"})
+    void testDoesNotDropTrailingSlashWhenUnmangling(boolean removeAnchor, String inputUrl)
+            throws MalformedURLException {
+        URLFilter urlFilter = createFilter(removeAnchor, true, List.of());
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        assertEquals(
+                inputUrl,
+                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
+                "The URL must remain unchanged when the last path segment has no query parameters");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "http://a.example/p&a=b, http://a.example/p?a=b",
+        "http://a.example/p&a=b&c=d, http://a.example/p?a=b&c=d"
+    })
+    void testRepairsMangledQueryString(String inputUrl, String expectedUrl)
+            throws MalformedURLException {
+        URLFilter urlFilter = createFilter(false, true, List.of());
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        assertEquals(expectedUrl, urlFilter.filter(testSourceUrl, new Metadata(), inputUrl));
+    }
+
+    @Test
+    void testDoesNotRewriteAmpersandInFragment() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(false, true, List.of());
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        String inputUrl = "http://a.example/p#a&b=c";
+        assertEquals(inputUrl, urlFilter.filter(testSourceUrl, new Metadata(), inputUrl));
+    }
+
+    @Test
+    void testRemovesQueryElementWhenValueContainsSlashes() throws MalformedURLException {
+        URLFilter urlFilter = createFilter(List.of("utm_source"));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        String inputUrl = "http://a.example/login/?next=/a/b/&utm_source=ref&z=1";
+        assertEquals(
+                "http://a.example/login/?next=%2Fa%2Fb%2F&z=1",
+                urlFilter.filter(testSourceUrl, new Metadata(), inputUrl),
+                "Query elements following a slash-containing value must remain removable");
     }
 
     @Test

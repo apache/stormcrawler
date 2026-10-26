@@ -336,23 +336,32 @@ public class BasicURLNormalizer extends URLFilter {
             };
 
     /**
-     * A common error to find is a query string that starts with an & instead of a ? This will fix
-     * that error. So http://foo.com&a=b will be changed to http://foo.com?a=b.
+     * Repairs a query string that starts with an & instead of a ?. The query check ignores the
+     * fragment, and the repair only checks the last path segment so an & in an earlier path segment
+     * is not mistaken for a query separator.
      *
      * @param urlToFilter the url to filter
      * @return corrected url
      */
     private String unmangleQueryString(String urlToFilter) {
-        String[] pathElements = urlToFilter.split("/");
-        final String lastPathElement = pathElements[pathElements.length - 1];
-        int firstAmp = lastPathElement.indexOf('&');
+        if (urlToFilter.indexOf('&') == -1) {
+            return urlToFilter;
+        }
+
+        int fragmentStart = urlToFilter.indexOf('#');
+        String fragment = fragmentStart == -1 ? "" : urlToFilter.substring(fragmentStart);
+        String url = fragmentStart == -1 ? urlToFilter : urlToFilter.substring(0, fragmentStart);
+        if (url.indexOf('?') != -1) {
+            return urlToFilter;
+        }
+
+        int lastSlash = url.lastIndexOf('/');
+        int firstAmp = url.indexOf('&', lastSlash + 1);
         if (firstAmp == -1) {
             return urlToFilter;
         }
-        int firstQuestionMark = lastPathElement.indexOf('?');
-        if (firstQuestionMark == -1 && lastPathElement.indexOf("=") > 0) {
-            pathElements[pathElements.length - 1] = lastPathElement.replaceFirst("&", "?");
-            return String.join("/", pathElements);
+        if (url.indexOf('=', firstAmp + 1) > firstAmp) {
+            return url.substring(0, firstAmp) + '?' + url.substring(firstAmp + 1) + fragment;
         }
         return urlToFilter;
     }
