@@ -80,13 +80,18 @@ import org.apache.stormcrawler.util.ConfUtils;
  * task and is called from its own thread. The URLs are routed to the instances based on their hash,
  * as a fields grouping on the URL does, so that a given URL always goes to the same instance. The
  * input is read and parsed by a separate thread, which caps the total throughput at what it can
- * deliver; a run with the {@link MemoryStatusUpdater} on a sample of the input gives an idea of
- * that limit.
+ * deliver. Passing {@code baseline} instead of a class name measures that limit: the URLs are acked
+ * as soon as they are received, without being stored, so the result is the highest throughput the
+ * utility can report on that input and machine. The throughput of a backend can then be expressed
+ * as a fraction of the baseline obtained with the same input, number of instances and machine.
+ * Unlike the raw figures, which depend largely on the hardware, these ratios can be compared across
+ * environments, e.g. to compare results obtained on different machines or to track the performance
+ * of a backend over time.
  *
- * <p>The arguments are, in this order, the class name of the bolt, optionally the number of
- * instances to run (1 by default), one or more configuration files, which are loaded after
- * crawler-default.yaml, and the file containing the URLs. A single configuration file with the
- * settings of the backend is usually all that is needed, whatever its name: the settings of the
+ * <p>The arguments are, in this order, the class name of the bolt or {@code baseline}, optionally
+ * the number of instances to run (1 by default), one or more configuration files, which are loaded
+ * after crawler-default.yaml, and the file containing the URLs. A single configuration file with
+ * the settings of the backend is usually all that is needed, whatever its name: the settings of the
  * rest of a crawl don't apply to the bolt on its own. The arguments are positional as the {@code
  * storm} command would take options such as {@code -c} for its own.
  *
@@ -116,6 +121,14 @@ import org.apache.stormcrawler.util.ConfUtils;
  *   org.apache.stormcrawler.persistence.StatusUpdaterBenchmark \
  *   org.apache.stormcrawler.opensearch.persistence.StatusUpdaterBolt 4 \
  *   backend.yaml urls.txt.gz
+ * </pre>
+ *
+ * <p>The baseline for the same input is obtained with:
+ *
+ * <pre>
+ * storm local target/crawler-1.0-SNAPSHOT.jar \
+ *   org.apache.stormcrawler.persistence.StatusUpdaterBenchmark \
+ *   baseline 4 backend.yaml urls.txt.gz
  * </pre>
  */
 public class StatusUpdaterBenchmark {
@@ -149,8 +162,8 @@ public class StatusUpdaterBenchmark {
         }
         if (args.length - firstConf < 2 || instances < 1) {
             System.err.println(
-                    "Usage: StatusUpdaterBenchmark <bolt class> [<instances>] <conf file>..."
-                            + " <URL file>");
+                    "Usage: StatusUpdaterBenchmark <bolt class>|baseline [<instances>]"
+                            + " <conf file>... <URL file>");
             System.exit(1);
         }
 
@@ -175,9 +188,17 @@ public class StatusUpdaterBenchmark {
         List<AbstractStatusUpdaterBolt> bolts = new ArrayList<>(instances);
         List<BlockingQueue<List<Item>>> queues = new ArrayList<>(instances);
         List<Thread> threads = new ArrayList<>(instances);
+
+        String className = args[0];
+
+        // acks without storing, to measure the overhead of the utility
+        if ("baseline".equalsIgnoreCase(className)) {
+            className = BaselineStatusUpdater.class.getName();
+        }
+
         for (int task : tasks) {
             AbstractStatusUpdaterBolt bolt =
-                    Class.forName(args[0])
+                    Class.forName(className)
                             .asSubclass(AbstractStatusUpdaterBolt.class)
                             .getDeclaredConstructor()
                             .newInstance();
@@ -459,6 +480,21 @@ public class StatusUpdaterBenchmark {
         @Override
         public void reportError(Throwable error) {
             error.printStackTrace();
+        }
+    }
+
+    /**
+     * Acks the URLs without storing them, selected with {@code baseline} as class name. Gives the
+     * throughput of the utility itself, against which the results of the real backends can be
+     * normalised so that they are comparable across machines.
+     */
+    static class BaselineStatusUpdater extends AbstractStatusUpdaterBolt {
+
+        @Override
+        public void store(
+                String url, Status status, Metadata metadata, Optional<Date> nextFetch, Tuple t)
+                throws Exception {
+            ack(t, url);
         }
     }
 }
