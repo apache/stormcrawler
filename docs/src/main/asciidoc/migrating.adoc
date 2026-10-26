@@ -12,10 +12,12 @@ HttpClient cookies. Update the cookie type import and use the record accessors
 `name()`, `value()`, `domain()`, `path()`, `secure()` and `expiry()`.
 The expiry is a `java.time.Instant`, or `null` for a session cookie.
 
-Core now depends only on HttpCore 5, not HttpClient. Applications using
-HttpClient classes through core's former transitive dependency must declare
-their own HttpClient dependency. The legacy OpenSearch module still uses
-HttpClient 4 through its REST client.
+Core no longer depends on HttpComponents (HttpClient or HttpCore). The few
+classes it used are copied into `org.apache.stormcrawler.internal.httpcomponents`,
+which is for internal use only. Applications using HttpComponents classes
+through core's former transitive dependency, for instance
+`org.apache.hc.core5.http.HttpHeaders` for the names of the response headers
+in the metadata, must declare their own dependency.
 
 Core no longer depends on Xerces, so sitemaps, feeds and the XML-based
 documents parsed by Tika, such as OpenDocument files, use the JDK parser,
