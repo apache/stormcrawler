@@ -27,9 +27,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import org.apache.commons.io.IOUtils;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.internal.httpcomponents.HttpHeaders;
+import org.apache.stormcrawler.internal.httpcomponents.HttpStatus;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
-import org.apache.stormcrawler.shade.httpcore5.HttpHeaders;
-import org.apache.stormcrawler.shade.httpcore5.HttpStatus;
 import org.apache.stormcrawler.util.URLUtil;
 import org.slf4j.LoggerFactory;
 

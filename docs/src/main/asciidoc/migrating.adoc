@@ -13,7 +13,7 @@ HttpClient cookies. Update the cookie type import and use the record accessors
 The expiry is a `java.time.Instant`, or `null` for a session cookie.
 
 Core no longer depends on HttpComponents (HttpClient or HttpCore). The few
-classes it used are copied into `org.apache.stormcrawler.shade.httpcore5`,
+classes it used are copied into `org.apache.stormcrawler.internal.httpcomponents`,
 which is for internal use only. Applications using HttpComponents classes
 through core's former transitive dependency, for instance
 `org.apache.hc.core5.http.HttpHeaders` for the names of the response headers

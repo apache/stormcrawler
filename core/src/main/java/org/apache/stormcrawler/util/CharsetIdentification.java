@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.io.ByteOrderMark;
 import org.apache.commons.io.input.BOMInputStream;
 import org.apache.stormcrawler.Metadata;
-import org.apache.stormcrawler.shade.httpcore5.HttpHeaders;
+import org.apache.stormcrawler.internal.httpcomponents.HttpHeaders;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;

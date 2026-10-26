@@ -43,8 +43,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.hdfs.bolt.format.RecordFormat;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.internal.httpcomponents.HttpHeaders;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
-import org.apache.stormcrawler.shade.httpcore5.HttpHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

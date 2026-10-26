@@ -30,7 +30,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Metadata;
-import org.apache.stormcrawler.shade.httpcore5.HttpHeaders;
+import org.apache.stormcrawler.internal.httpcomponents.HttpHeaders;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.URLUtil;
 

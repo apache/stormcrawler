@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.shade.httpcore5;
+package org.apache.stormcrawler.internal.httpcomponents;
 
 /**
  * A name-value pair parameter used as an element of HTTP messages.

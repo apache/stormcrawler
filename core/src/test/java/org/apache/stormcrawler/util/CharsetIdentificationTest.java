@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.stormcrawler.Metadata;
-import org.apache.stormcrawler.shade.httpcore5.HttpHeaders;
+import org.apache.stormcrawler.internal.httpcomponents.HttpHeaders;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

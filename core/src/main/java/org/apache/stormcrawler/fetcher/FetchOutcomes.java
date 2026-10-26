@@ -25,12 +25,12 @@ import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.bolt.FetcherBolt;
 import org.apache.stormcrawler.bolt.SiteMapParserBolt;
 import org.apache.stormcrawler.bolt.StatusEmitterBolt;
+import org.apache.stormcrawler.internal.httpcomponents.HttpHeaders;
 import org.apache.stormcrawler.metrics.ScopedCounter;
 import org.apache.stormcrawler.persistence.Status;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
 import org.apache.stormcrawler.protocol.FetchTimeoutException;
 import org.apache.stormcrawler.protocol.ProtocolResponse;
-import org.apache.stormcrawler.shade.httpcore5.HttpHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

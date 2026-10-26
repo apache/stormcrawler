@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.stormcrawler.shade.httpcore5;
+package org.apache.stormcrawler.internal.httpcomponents;
 
 /**
  * Constants enumerating the HTTP status codes.
