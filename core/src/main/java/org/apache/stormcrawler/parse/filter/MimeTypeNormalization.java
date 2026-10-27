@@ -22,7 +22,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Normalises the MimeType value e.g. text/html; charset=UTF-8 =&gt; HTML application/pdf =&gt; PDF
@@ -32,7 +31,7 @@ import org.w3c.dom.DocumentFragment;
 public class MimeTypeNormalization extends ParseFilter {
 
     @Override
-    public void filter(String url, byte[] content, DocumentFragment doc, ParseResult parse) {
+    public void filter(String url, byte[] content, ParseResult parse) {
 
         Metadata m = parse.getOrCreate(url).getMetadata();
         String ct = m.getFirstValue("parse.Content-Type");

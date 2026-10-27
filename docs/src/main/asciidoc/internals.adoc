@@ -173,19 +173,16 @@ The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org
 
 ParseFilters are called from parsing bolts such as link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] and link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/SiteMapParserBolt.java[SiteMapParserBolt] to extract data from web pages. The extracted data is stored in the Metadata object. ParseFilters can also modify the Outlinks and, in that sense, act as URLFilters.
 
-ParseFilters need to implement the interface link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/ParseFilter.java[ParseFilter], which defines three methods:
+ParseFilters need to implement the interface link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/ParseFilter.java[ParseFilter], which defines two methods:
 
 [source,java]
 ----
-public void filter(String URL, byte[] content, DocumentFragment doc, ParseResult parse);
+public void filter(String URL, byte[] content, ParseResult parse);
 
 public void configure(Map stormConf, JsonNode filterParams);
-
-public boolean needsDOM();
 ----
 
 * The `filter` method is where the extraction occurs. ParseResult objects contain the outlinks extracted from the document as well as a Map of String to ParseData, where the String is the URL of a subdocument or the main document itself. ParseData objects contain Metadata, binary content, and text for the subdocuments, which is useful for indexing subdocuments independently of the main document. Use link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/ParseResult.java[ParseResult.getOrCreate(URL)] to add data for a URL and ParseResult.getIfPresent(URL) for a read-only lookup. Note that the parsing bolts skip entries which carry no content, no text and no metadata, except for the URL being parsed, so a sub-document should always set at least one of the three to be emitted.
-* The `needsDOM` method indicates whether the ParseFilter instance requires the DOM structure. If no ParseFilters need it, the parsing bolt will skip generating the DOM, slightly improving performance.
 * The `configure` method takes a JSON object loaded by the wrapper class ParseFilters. The Storm configuration map can also be used to configure the filters, as described in xref:configuration.adoc[Configuration].
 
 The archetype includes a default link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/parsefilters.json[JSON configuration file] for ParseFilters. The configuration allows multiple instances of the same filter class with different parameters and supports complex parameter objects. ParseFilters are executed in the order they appear in the JSON file.
@@ -212,13 +209,11 @@ The archetype includes a default link:https://github.com/apache/stormcrawler/blo
 ----
 
 * **CommaSeparatedToMultivaluedMetadata** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/CommaSeparatedToMultivaluedMetadata.java[CommaSeparatedToMultivaluedMetadata] rewrites single metadata values containing comma-separated entries into multiple values for the same key, useful for keyword tags. The number of values produced from a single entry is bounded by the optional `maxTokens` parameter (128 by default), so that a page cannot generate an unbounded amount of metadata.
-* **DebugParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/DebugParseFilter.java[DebugParseFilter] dumps an XML representation of the DOM structure to a temporary file.
 * **DomainParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/DomainParseFilter.java[DomainParseFilter] stores the domain or host name in the metadata for later indexing.
 * **MD5SignatureParseFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/MD5SignatureParseFilter.java[MD5SignatureParseFilter] generates an MD5 signature of a document based on the binary content, text, or URL (as a last resort). It can be combined with content filtering to exclude boilerplate text.
 * **MimeTypeNormalization** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/MimeTypeNormalization.java[MimeTypeNormalization] converts server-reported or inferred mime-type values into human-readable values such as _pdf_, _html_, or _image_ and stores them in the metadata, useful for indexing and filtering search results.
-* **XPathFilter** – link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/filter/XPathFilter.java[XPathFilter] allows extraction of data using XPath expressions and storing them in the Metadata object.
 
-For HTML documents parsed by the JSoupParserBolt, extracting data from JSON-LD or outlinks with XPath expressions is done with xref:jsoupfilters[JSoupFilters].
+Extracting data from the markup of a document, e.g. with XPath expressions or from JSON-LD, is done with xref:jsoupfilters[JSoupFilters].
 
 You can also implement custom ParseFilters to extend the capabilities of the parsing pipeline. For example, you might create a filter to enrich a document's metadata with additional information, such as language detection, sentiment analysis, named entity recognition, or custom tags extracted from the content. Custom filters can also modify or remove outlinks, normalize text, or integrate external data sources, allowing you to tailor the crawler to your specific processing or indexing requirements.
 By implementing the ParseFilter interface and configuring the filter in the JSON file, your custom logic will be seamlessly executed within the parsing bolt.
@@ -226,7 +221,7 @@ By implementing the ParseFilter interface and configuring the filter in the JSON
 [[jsoupfilters]]
 ==== JSoup Filters
 
-JSoupFilters are called by the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] only. Unlike ParseFilters, they work directly on the document produced by link:https://jsoup.org/[JSoup] and do not require a DOM, which makes them the preferred option for extracting data from HTML documents. They are called before the xref:parsefilters[ParseFilters], which can therefore use the metadata and outlinks generated by the JSoupFilters.
+JSoupFilters are called by the link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/bolt/JSoupParserBolt.java[JSoupParserBolt] and by the Tika-based ParserBolt. Unlike ParseFilters, they get the document produced by link:https://jsoup.org/[JSoup], which makes them the option to use for extracting data from the markup of a document. They are called before the xref:parsefilters[ParseFilters], which can therefore use the metadata and outlinks generated by the JSoupFilters.
 
 JSoupFilters need to implement the interface link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/JSoupFilter.java[JSoupFilter]:
 
@@ -237,7 +232,7 @@ public void filter(String url, byte[] content, org.jsoup.nodes.Document doc, Par
 public void configure(Map stormConf, JsonNode filterParams);
 ----
 
-The `filter` method has the same role as for the ParseFilters (see above) but gets the JSoup document instead of a DOM. The `configure` method takes the JSON object loaded by the wrapper class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/JSoupFilters.java[JSoupFilters].
+The `filter` method has the same role as for the ParseFilters (see above) but also gets the JSoup document. The `configure` method takes the JSON object loaded by the wrapper class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/JSoupFilters.java[JSoupFilters].
 
 The JSoupFilters are defined in a JSON file whose location is set with `jsoup.filters.config.file`; no JSoupFilters are used if this is not set. The archetype includes a default link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/jsoupfilters.json[jsoupfilters.json]:
 

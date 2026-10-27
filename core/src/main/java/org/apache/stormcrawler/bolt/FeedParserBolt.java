@@ -36,7 +36,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpHeaders;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -45,6 +44,7 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
+import org.apache.stormcrawler.internal.httpcomponents.HttpHeaders;
 import org.apache.stormcrawler.parse.Outlink;
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseFilters;
@@ -140,7 +140,7 @@ public class FeedParserBolt extends StatusEmitterBolt {
 
         // apply the parse filters if any
         try {
-            parseFilters.filter(url, content, null, parse);
+            parseFilters.filter(url, content, parse);
         } catch (RuntimeException e) {
             String errorMessage = "Exception while running parse filters on " + url + ": " + e;
             LOG.error(errorMessage, e);

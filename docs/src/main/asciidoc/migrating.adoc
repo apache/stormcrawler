@@ -1,0 +1,26 @@
+////
+Licensed under the Apache License, Version 2.0 (the "License");
+You may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+https://www.apache.org/licenses/LICENSE-2.0
+////
+== Migrating to 4.0.0
+
+Both overloads of `CookieConverter.getCookies(...)` now return immutable
+`org.apache.stormcrawler.util.CookieConverter.Cookie` records instead of
+HttpClient cookies. Update the cookie type import and use the record accessors
+`name()`, `value()`, `domain()`, `path()`, `secure()` and `expiry()`.
+The expiry is a `java.time.Instant`, or `null` for a session cookie.
+
+Core no longer depends on HttpComponents (HttpClient or HttpCore). The few
+classes it used are copied into `org.apache.stormcrawler.internal.httpcomponents`,
+which is for internal use only. Applications using HttpComponents classes
+through core's former transitive dependency, for instance
+`org.apache.hc.core5.http.HttpHeaders` for the names of the response headers
+in the metadata, must declare their own dependency.
+
+Core no longer depends on Xerces, so sitemaps, feeds and the XML-based
+documents parsed by Tika, such as OpenDocument files, use the JDK parser,
+which fails on documents with many entity references. See
+xref:configuration.adoc#_parsing[Parsing] for the JVM options that lift its
+limits. Applications using Xerces classes must declare their own dependency.

@@ -69,7 +69,6 @@ Parse filters extract data from fetched documents and can modify metadata and ou
 import org.apache.stormcrawler.parse.ParseFilter;
 import org.apache.stormcrawler.parse.ParseResult;
 import com.fasterxml.jackson.databind.JsonNode;
-import org.w3c.dom.DocumentFragment;
 import java.util.Map;
 
 public class MyParseFilter extends ParseFilter {
@@ -82,13 +81,7 @@ public class MyParseFilter extends ParseFilter {
     }
 
     @Override
-    public boolean needsDOM() {
-        return false; // set to true if you need the DOM tree
-    }
-
-    @Override
-    public void filter(String url, byte[] content, DocumentFragment doc,
-                       ParseResult parse) {
+    public void filter(String url, byte[] content, ParseResult parse) {
         // Extract data and store in metadata
         parse.getOrCreate(url).getMetadata().setValue(metadataKey, "extracted-value");
     }
@@ -112,7 +105,7 @@ Register it in `parsefilters.json`:
 }
 ----
 
-If `needsDOM()` returns `false` for all configured parse filters, the parsing bolt skips DOM generation entirely, improving performance.
+ParseFilters do not get a parsed representation of the document. To extract data from the HTML markup, implement a xref:internals.adoc#jsoupfilters[JSoupFilter] instead, which gets the JSoup document.
 
 ==== Custom Protocol
 

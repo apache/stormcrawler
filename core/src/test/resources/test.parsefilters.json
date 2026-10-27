@@ -1,17 +1,6 @@
 {
   "org.apache.stormcrawler.parse.ParseFilters": [
     {
-      "class": "org.apache.stormcrawler.parse.filter.XPathFilter",
-      "name": "XPathFilter",
-      "params": {
-        "concept": "//SPAN[@class=\"concept\"]",
-        "concept2": "//*[@class=\"concept\"]",
-        "js": "//SCRIPT[@type='text/javascript']",
-        "keywords": "//META[@name=\"keywords\"]/@content",
-        "title": "//TITLE"
-      }
-    },
-    {
       "class": "org.apache.stormcrawler.parse.filter.CommaSeparatedToMultivaluedMetadata",
       "name": "CommaSeparatedToMultivaluedMetadata",
       "params": {

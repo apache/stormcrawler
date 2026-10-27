@@ -18,7 +18,9 @@
 package org.apache.stormcrawler.parse.filter;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.bolt.JSoupParserBolt;
 import org.apache.stormcrawler.parse.ParsingTester;
@@ -36,7 +38,9 @@ class CSVMetadataFilterTest extends ParsingTester {
 
     @Test
     void testMultivalued() throws IOException {
-        prepareParserBolt("test.parsefilters.json");
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("jsoup.filters.config.file", "test.jsoupfilters.json");
+        prepareParserBolt("test.parsefilters.json", parserConfig);
         parse("https://stormcrawler.apache.org", "stormcrawler.apache.org.html");
         Assertions.assertEquals(1, output.getEmitted().size());
         List<Object> parsedTuple = output.getEmitted().get(0);

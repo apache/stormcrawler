@@ -33,7 +33,6 @@ import org.apache.stormcrawler.util.CharsetIdentification;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.DocumentFragment;
 
 /**
  * Heuristic parse filter that flags URLs whose content looks like it requires JavaScript rendering,
@@ -192,16 +191,7 @@ public class JsRenderingDetector extends ParseFilter {
     }
 
     @Override
-    public boolean needsDOM() {
-        return false;
-    }
-
-    @Override
-    public void filter(
-            final String url,
-            final byte[] content,
-            final DocumentFragment doc,
-            final ParseResult parse) {
+    public void filter(final String url, final byte[] content, final ParseResult parse) {
         if (content == null || content.length == 0) {
             return;
         }

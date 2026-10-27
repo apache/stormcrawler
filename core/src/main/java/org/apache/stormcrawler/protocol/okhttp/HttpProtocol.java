@@ -71,12 +71,11 @@ import okhttp3.zstd.Zstd;
 import okio.BufferedSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableObject;
-import org.apache.http.HttpHeaders;
-import org.apache.http.cookie.Cookie;
 import org.apache.storm.Config;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilters;
+import org.apache.stormcrawler.internal.httpcomponents.HttpHeaders;
 import org.apache.stormcrawler.protocol.AbstractHttpProtocol;
 import org.apache.stormcrawler.protocol.FetchTimeout;
 import org.apache.stormcrawler.protocol.FetchTimeoutException;
@@ -86,6 +85,7 @@ import org.apache.stormcrawler.protocol.ProtocolResponse.TrimmedContentReason;
 import org.apache.stormcrawler.proxy.SCProxy;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.apache.stormcrawler.util.CookieConverter;
+import org.apache.stormcrawler.util.CookieConverter.Cookie;
 import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
@@ -506,7 +506,7 @@ public class HttpProtocol extends AbstractHttpProtocol {
                     CookieConverter.getCookies(
                             cookieStrings, getCookieOrigin(md, url), URLUtil.toURL(url));
             for (Cookie c : cookies) {
-                rb.addHeader("Cookie", c.getName() + "=" + c.getValue());
+                rb.addHeader("Cookie", c.name() + "=" + c.value());
             }
         } catch (MalformedURLException e) { // Bad url , nothing to do
         }

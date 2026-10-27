@@ -39,7 +39,7 @@ class JsRenderingDetectorTest {
 
     private ParseResult applyTo(final JsRenderingDetector d, final String url, final String html) {
         final ParseResult parse = new ParseResult();
-        d.filter(url, html.getBytes(StandardCharsets.UTF_8), null, parse);
+        d.filter(url, html.getBytes(StandardCharsets.UTF_8), parse);
         return parse;
     }
 
@@ -137,7 +137,7 @@ class JsRenderingDetectorTest {
         parse.getOrCreate("u")
                 .getMetadata()
                 .setValue(HttpProtocol.MD_KEY_END, "2026-05-04T00:00:00Z");
-        d.filter("u", "<div data-reactroot></div>".getBytes(StandardCharsets.UTF_8), null, parse);
+        d.filter("u", "<div data-reactroot></div>".getBytes(StandardCharsets.UTF_8), parse);
         Assertions.assertNull(parse.getOrCreate("u").getMetadata().getFirstValue("fetch.with"));
     }
 
@@ -149,7 +149,6 @@ class JsRenderingDetectorTest {
         d.filter(
                 "u",
                 "<html><body><p>some content</p></body></html>".getBytes(StandardCharsets.UTF_8),
-                null,
                 parse);
         // not overwritten, no reason added
         Assertions.assertEquals(
@@ -216,7 +215,7 @@ class JsRenderingDetectorTest {
         final Metadata md = parse.getOrCreate("u").getMetadata();
         md.setValue("protocol.Content-Type", "text/html; charset=ISO-8859-15");
         final String html = "<html><body><p>" + message + "</p></body></html>";
-        d.filter("u", html.getBytes(Charset.forName("ISO-8859-15")), null, parse);
+        d.filter("u", html.getBytes(Charset.forName("ISO-8859-15")), parse);
         Assertions.assertEquals("playwright", md.getFirstValue("fetch.with"));
     }
 }

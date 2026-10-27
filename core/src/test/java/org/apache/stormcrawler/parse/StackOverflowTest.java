@@ -20,7 +20,9 @@ package org.apache.stormcrawler.parse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.stormcrawler.Constants;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.bolt.JSoupParserBolt;
@@ -41,7 +43,7 @@ class StackOverflowTest extends ParsingTester {
 
     @Test
     void testStackOverflow() throws IOException {
-        prepareParserBolt("test.parsefilters.json");
+        prepareParserBolt("test.parsefilters.json", jsoupFiltersConfig());
         Metadata metadata = new Metadata();
         parse("https://stormcrawler.apache.org", "stackexception.html", metadata);
         Assertions.assertEquals(31, output.getEmitted(Constants.StatusStreamName).size());
@@ -52,12 +54,18 @@ class StackOverflowTest extends ParsingTester {
      */
     @Test
     void testNamespaceExtraction() throws IOException {
-        prepareParserBolt("test.parsefilters.json");
+        prepareParserBolt("test.parsefilters.json", jsoupFiltersConfig());
         Metadata metadata = new Metadata();
         parse("https://stormcrawler.apache.org", "stackexception.html", metadata);
         Assertions.assertEquals(1, output.getEmitted().size());
         List<Object> obj = output.getEmitted().get(0);
         Metadata m = (Metadata) obj.get(2);
-        assertNotNull(m.getFirstValue("title"));
+        assertNotNull(m.getFirstValue("title_text"));
+    }
+
+    private static Map<String, Object> jsoupFiltersConfig() {
+        Map<String, Object> parserConfig = new HashMap<>();
+        parserConfig.put("jsoup.filters.config.file", "test.xpath.jsoupfilters.json");
+        return parserConfig;
     }
 }
