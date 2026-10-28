@@ -80,16 +80,19 @@ import org.apache.stormcrawler.util.ConfUtils;
  * updater would get. As Storm would give each of them its own executor, every instance has its own
  * task and is called from its own thread. The URLs are routed to the instances based on their hash,
  * as a fields grouping on the URL does, so that a given URL always goes to the same instance. The
- * input is read and decompressed by one thread and parsed by a pool of threads, half the number of
- * cores by default or the value of {@code status.updater.benchmark.parsers} in the configuration;
- * the URLs are therefore not handed to the instances in the exact order of the input. Reading and
- * parsing cap the total throughput at what they can deliver. Passing {@code baseline} instead of a
- * class name measures that limit: the URLs are acked as soon as they are received, without being
- * stored, so the result is the highest throughput the utility can report on that input and machine.
- * The throughput of a backend can then be expressed as a fraction of the baseline obtained with the
- * same input, number of instances and machine. Unlike the raw figures, which depend largely on the
- * hardware, these ratios can be compared across environments, e.g. to compare results obtained on
- * different machines or to track the performance of a backend over time.
+ * input is read and decompressed by one thread and parsed by a pool of threads, 2 by default or the
+ * value of {@code status.updater.benchmark.parsers} in the configuration. With more than one parser
+ * the URLs are not handed to the instances in the exact order of the input, which can matter if it
+ * contains the same URL more than once, e.g. as discovered then as known; a single parser keeps the
+ * order. The parsers use CPU which is then not available to the instances, the number of parsers
+ * should be the same for all the runs being compared. Reading and parsing cap the total throughput
+ * at what they can deliver. Passing {@code baseline} instead of a class name measures that limit:
+ * the URLs are acked as soon as they are received, without being stored, so the result is the
+ * highest throughput the utility can report on that input and machine. The throughput of a backend
+ * can then be expressed as a fraction of the baseline obtained with the same input, number of
+ * instances and machine. Unlike the raw figures, which depend largely on the hardware, these ratios
+ * can be compared across environments, e.g. to compare results obtained on different machines or to
+ * track the performance of a backend over time.
  *
  * <p>The arguments are, in this order, the class name of the bolt or {@code baseline}, optionally
  * the number of instances to run (1 by default), one or more configuration files, which are loaded
@@ -159,8 +162,14 @@ public class StatusUpdaterBenchmark {
     /** size of the buffers used for reading and decompressing the input */
     private static final int INPUT_BUFFER_SIZE = 64 * 1024;
 
-    /** number of threads parsing the input, half the number of cores by default */
+    /** number of threads parsing the input */
     public static final String PARSERS_PARAM_NAME = "status.updater.benchmark.parsers";
+
+    /**
+     * fixed rather than derived from the number of cores, so that the baselines obtained on
+     * different machines are comparable
+     */
+    private static final int DEFAULT_PARSERS = 2;
 
     private static final JsonFactory JSON = new JsonFactory();
 
@@ -228,11 +237,11 @@ public class StatusUpdaterBenchmark {
             threads.add(thread);
         }
 
-        int parsers =
-                ConfUtils.getInt(
-                        conf,
-                        PARSERS_PARAM_NAME,
-                        Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
+        int parsers = ConfUtils.getInt(conf, PARSERS_PARAM_NAME, DEFAULT_PARSERS);
+        if (parsers < 1) {
+            throw new IllegalArgumentException(
+                    PARSERS_PARAM_NAME + " must be at least 1, got " + parsers);
+        }
 
         long start = System.currentTimeMillis();
         threads.forEach(Thread::start);
@@ -281,30 +290,7 @@ public class StatusUpdaterBenchmark {
         }
 
         try (InputStream in = openInput(args[args.length - 1])) {
-            byte[] block = new byte[READ_BLOCK_SIZE];
-            int filled = 0;
-            while (true) {
-                filled += in.readNBytes(block, filled, block.length - filled);
-                if (filled < block.length) {
-                    // end of the input
-                    if (filled > 0) {
-                        blocks.put(new Block(block, filled));
-                    }
-                    break;
-                }
-                int end = lastLineEnd(block, filled);
-                if (end == 0) {
-                    // a line longer than the block
-                    block = Arrays.copyOf(block, block.length * 2);
-                    continue;
-                }
-                // the incomplete line at the end goes to the next block
-                byte[] next = new byte[block.length];
-                System.arraycopy(block, end, next, 0, filled - end);
-                filled -= end;
-                blocks.put(new Block(block, end));
-                block = next;
-            }
+            readBlocks(in, READ_BLOCK_SIZE, blocks);
         }
 
         // an empty block tells each parser that the input is over, they then hand over what they
@@ -353,7 +339,71 @@ public class StatusUpdaterBenchmark {
     }
 
     /** Lines of input, the first {@code length} bytes of {@code data} ending with a full line. */
-    private record Block(byte[] data, int length) {}
+    record Block(byte[] data, int length) {}
+
+    /** Receives a line of input, without leading or trailing whitespace. */
+    interface LineHandler {
+        void line(byte[] data, int off, int len) throws InterruptedException;
+    }
+
+    /**
+     * Reads the input and puts it on the queue as blocks of whole lines, of {@code blockSize} bytes
+     * at most unless a line is longer than that, in which case the blocks grow to fit it. The last
+     * line doesn't need to end with a line feed.
+     */
+    static void readBlocks(InputStream in, int blockSize, BlockingQueue<Block> blocks)
+            throws IOException, InterruptedException {
+        byte[] block = new byte[blockSize];
+        int filled = 0;
+        while (true) {
+            filled += in.readNBytes(block, filled, block.length - filled);
+            if (filled < block.length) {
+                // end of the input
+                if (filled > 0) {
+                    blocks.put(new Block(block, filled));
+                }
+                return;
+            }
+            int end = lastLineEnd(block, filled);
+            if (end == 0) {
+                // a line longer than the block
+                block = Arrays.copyOf(block, block.length * 2);
+                continue;
+            }
+            // the incomplete line at the end goes to the next block
+            byte[] next = new byte[block.length];
+            System.arraycopy(block, end, next, 0, filled - end);
+            filled -= end;
+            blocks.put(new Block(block, end));
+            block = next;
+        }
+    }
+
+    /**
+     * Passes each line of the block to the handler, trimmed as {@link String#trim()} does, which
+     * also removes the carriage return of CRLF line endings. Blank lines are skipped.
+     */
+    static void forEachLine(Block block, LineHandler handler) throws InterruptedException {
+        byte[] data = block.data();
+        int lineStart = 0;
+        while (lineStart < block.length()) {
+            int lineEnd = lineStart;
+            while (lineEnd < block.length() && data[lineEnd] != '\n') {
+                lineEnd++;
+            }
+            int next = lineEnd + 1;
+            while (lineStart < lineEnd && (data[lineStart] & 0xff) <= ' ') {
+                lineStart++;
+            }
+            while (lineEnd > lineStart && (data[lineEnd - 1] & 0xff) <= ' ') {
+                lineEnd--;
+            }
+            if (lineEnd > lineStart) {
+                handler.line(data, lineStart, lineEnd - lineStart);
+            }
+            lineStart = next;
+        }
+    }
 
     /** Returns the position after the last line feed of the block or 0 if there is none. */
     private static int lastLineEnd(byte[] block, int length) {
@@ -377,34 +427,20 @@ public class StatusUpdaterBenchmark {
             batches.add(new ArrayList<>(HANDOFF_BATCH_SIZE));
         }
         // counted locally, the parsers would otherwise contend on the counter for every URL
-        long routed = 0;
+        long[] routed = {0};
         try {
             while (true) {
                 Block block = blocks.take();
                 if (block.length() == 0) {
                     break;
                 }
-                byte[] data = block.data();
-                int lineStart = 0;
-                while (lineStart < block.length()) {
-                    int lineEnd = lineStart;
-                    while (lineEnd < block.length() && data[lineEnd] != '\n') {
-                        lineEnd++;
-                    }
-                    int next = lineEnd + 1;
-                    // trims the line as String.trim() does
-                    while (lineStart < lineEnd && (data[lineStart] & 0xff) <= ' ') {
-                        lineStart++;
-                    }
-                    while (lineEnd > lineStart && (data[lineEnd - 1] & 0xff) <= ' ') {
-                        lineEnd--;
-                    }
-                    if (lineEnd > lineStart
-                            && route(data, lineStart, lineEnd - lineStart, batches, queues)) {
-                        routed++;
-                    }
-                    lineStart = next;
-                }
+                forEachLine(
+                        block,
+                        (data, off, len) -> {
+                            if (route(data, off, len, batches, queues)) {
+                                routed[0]++;
+                            }
+                        });
             }
             // hand over what is left
             for (int i = 0; i < instances; i++) {
@@ -415,7 +451,7 @@ public class StatusUpdaterBenchmark {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        sent.addAndGet(routed);
+        sent.addAndGet(routed[0]);
     }
 
     /** Parses a line and adds it to the batch of its instance, returns false if it is invalid. */

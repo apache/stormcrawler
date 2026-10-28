@@ -22,7 +22,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
+import org.apache.stormcrawler.persistence.StatusUpdaterBenchmark.Block;
 import org.apache.stormcrawler.persistence.StatusUpdaterBenchmark.Item;
 import org.junit.jupiter.api.Test;
 
@@ -71,6 +77,78 @@ class StatusUpdaterBenchmarkTest {
                 StatusUpdaterBenchmark.parse(
                         "{\"known\": {\"info\": {\"url\": \"https://example.com/\"}}}");
         assertTrue(item.nextFetch().isEmpty());
+    }
+
+    @Test
+    void discoveredTakesPrecedence() {
+        String discovered = "\"discovered\": {\"info\": {\"url\": \"https://example.com/d\"}}";
+        String known =
+                "\"known\": {\"refetchable_from_date\": 1, \"info\": {\"url\":"
+                        + " \"https://example.com/k\"}}";
+        for (String line :
+                List.of(
+                        "{" + known + ", " + discovered + "}",
+                        "{" + discovered + ", " + known + "}")) {
+            Item item = StatusUpdaterBenchmark.parse(line);
+            assertEquals("https://example.com/d", item.url());
+            assertEquals(Status.DISCOVERED, item.status());
+        }
+    }
+
+    /** Splits the input into blocks of the given size, then the blocks into lines. */
+    private static List<String> lines(String input, int blockSize) throws Exception {
+        LinkedBlockingQueue<Block> blocks = new LinkedBlockingQueue<>();
+        StatusUpdaterBenchmark.readBlocks(
+                new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)),
+                blockSize,
+                blocks);
+        List<String> lines = new ArrayList<>();
+        for (Block block : blocks) {
+            // every block but the last one ends with a full line
+            assertTrue(block.length() > 0);
+            StatusUpdaterBenchmark.forEachLine(
+                    block,
+                    (data, off, len) ->
+                            lines.add(new String(data, off, len, StandardCharsets.UTF_8)));
+        }
+        return lines;
+    }
+
+    @Test
+    void lineSplitAcrossBlocks() throws Exception {
+        // the second line straddles the end of the first block
+        assertEquals(List.of("aaaa", "bbbbbb", "cc"), lines("aaaa\nbbbbbb\ncc\n", 8));
+        for (int size = 1; size <= 16; size++) {
+            assertEquals(List.of("aaaa", "bbbbbb", "cc"), lines("aaaa\nbbbbbb\ncc\n", size));
+        }
+    }
+
+    @Test
+    void lineLongerThanBlock() throws Exception {
+        String longLine = "x".repeat(100);
+        assertEquals(List.of("a", longLine, "b"), lines("a\n" + longLine + "\nb\n", 8));
+        assertEquals(List.of(longLine), lines(longLine, 8));
+    }
+
+    @Test
+    void lastLineWithoutLineFeed() throws Exception {
+        assertEquals(List.of("a", "b"), lines("a\nb", 4));
+        assertEquals(List.of("a", "b"), lines("a\nb", 1024));
+    }
+
+    @Test
+    void crlfLineEndings() throws Exception {
+        // whatever the size of the blocks, the CR is removed with the rest of the whitespace
+        for (int size = 1; size <= 16; size++) {
+            assertEquals(List.of("aaa", "bbb", "c"), lines("aaa\r\nbbb\r\nc\r\n", size));
+        }
+    }
+
+    @Test
+    void blankLines() throws Exception {
+        assertEquals(List.of("a", "b", "c"), lines("\n  \n a \n\t\n\r\nb\n \t \nc", 4));
+        assertEquals(List.of(), lines("", 4));
+        assertEquals(List.of(), lines(" \n\n", 4));
     }
 
     @Test
