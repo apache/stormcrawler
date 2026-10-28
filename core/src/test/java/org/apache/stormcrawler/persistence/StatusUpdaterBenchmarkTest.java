@@ -80,6 +80,14 @@ class StatusUpdaterBenchmarkTest {
     }
 
     @Test
+    void refetchOutOfRange() {
+        assertNull(
+                StatusUpdaterBenchmark.parse(
+                        "{\"known\": {\"refetchable_from_date\": \"9223372036854775807\","
+                                + " \"info\": {\"url\": \"https://example.com/\"}}}"));
+    }
+
+    @Test
     void discoveredTakesPrecedence() {
         String discovered = "\"discovered\": {\"info\": {\"url\": \"https://example.com/d\"}}";
         String known =

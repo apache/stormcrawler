@@ -232,6 +232,7 @@ public class StatusUpdaterBenchmark {
                             "StatusUpdaterBenchmark-bolt-" + task);
             // must not keep the JVM alive if reading the input fails
             thread.setDaemon(true);
+            thread.setUncaughtExceptionHandler(StatusUpdaterBenchmark::abort);
             bolts.add(bolt);
             queues.add(queue);
             threads.add(thread);
@@ -285,6 +286,8 @@ public class StatusUpdaterBenchmark {
                             () -> parseAll(blocks, queues, sentCounter),
                             "StatusUpdaterBenchmark-parser-" + i);
             thread.setDaemon(true);
+            // the run would otherwise hang or under count the URLs sent
+            thread.setUncaughtExceptionHandler(StatusUpdaterBenchmark::abort);
             thread.start();
             parserThreads.add(thread);
         }
@@ -336,6 +339,13 @@ public class StatusUpdaterBenchmark {
 
         // some backends leave non-daemon threads behind
         System.exit(collector.acked.get() == sent ? 0 : 1);
+    }
+
+    /** Ends the run if a bolt or parser thread dies, as its URLs would never be acked. */
+    private static void abort(Thread thread, Throwable e) {
+        System.err.println("Uncaught exception in " + thread.getName() + ": " + e);
+        e.printStackTrace();
+        System.exit(1);
     }
 
     /** Lines of input, the first {@code length} bytes of {@code data} ending with a full line. */
@@ -631,6 +641,10 @@ public class StatusUpdaterBenchmark {
             return new Item(entry.url, Status.DISCOVERED, entry.metadata, Optional.of(new Date()));
         }
 
+        // beyond what a Date can hold in milliseconds
+        if (entry.refetch > Long.MAX_VALUE / 1000) {
+            return null;
+        }
         Optional<Date> nextFetch =
                 entry.refetch > 0
                         ? Optional.of(Date.from(Instant.ofEpochSecond(entry.refetch)))
