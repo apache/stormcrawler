@@ -236,6 +236,28 @@ class JSoupParserBoltTest extends ParsingTester {
         Assertions.assertEquals(2, statusTuples.size());
     }
 
+    /**
+     * The target of a meta refresh is discovered with SitemapFilter in the chain even if the site
+     * declares a sitemap: the filter is meant for outlinks of non-sitemap pages.
+     */
+    @Test
+    void testHTMLRedirWithSitemapFilter() throws IOException {
+        stormConf.put("sitemap.discovery", true);
+        stormConf.put("urlfilters.config.file", "urlfilters-sitemap-only.json");
+        bolt.prepare(stormConf, TestUtil.getMockedTopologyContext(), new OutputCollector(output));
+        Metadata metadata = new Metadata();
+        metadata.setValue(SiteMapParserBolt.foundSitemapKey, "true");
+        parse("http://www.somesite.com", "redir.html", metadata);
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertEquals(2, statusTuples.size());
+        Assertions.assertTrue(
+                statusTuples.stream()
+                        .anyMatch(
+                                t ->
+                                        t.get(0).equals("http://www.somesite.com/site")
+                                                && t.get(2) == Status.DISCOVERED));
+    }
+
     @Test
     void testExecuteWithOutlinksLimit() throws IOException {
         stormConf.put("parser.emitOutlinks.max.per.page", 5);
