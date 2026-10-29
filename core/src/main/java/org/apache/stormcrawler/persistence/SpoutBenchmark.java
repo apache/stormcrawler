@@ -154,6 +154,8 @@ public class SpoutBenchmark {
         // log4j is what storm local uses, the INFO messages of the components would drown the
         // reports
         Configurator.setAllLevels(LogManager.ROOT_LOGGER_NAME, Level.WARN);
+        // storm local warns about a deprecated config set in Storm's own defaults.yaml
+        Configurator.setLevel("org.apache.storm.validation.ConfigValidation", Level.ERROR);
 
         Config conf = new Config();
         conf.putAll(
@@ -242,13 +244,13 @@ public class SpoutBenchmark {
                     long delta = current - lastUnique.getAndSet(current);
                     System.out.printf(
                             Locale.ROOT,
-                            "Emitted: %d - Unique: %d - Acked: %d - Unique URLs/sec over the last"
-                                    + " %d sec: %.2f%n",
+                            "Emitted: %,d - Unique: %,d - Acked: %,d - Unique URLs/sec over the last"
+                                    + " %d sec: %,d%n",
                             emitted.get(),
                             current,
                             acked.get(),
                             Math.round(elapsed / 1000.0),
-                            delta * 1000.0 / Math.max(1, elapsed));
+                            Math.round(delta * 1000.0 / Math.max(1, elapsed)));
                 },
                 REPORT_INTERVAL_SEC,
                 REPORT_INTERVAL_SEC,
@@ -285,13 +287,15 @@ public class SpoutBenchmark {
         System.out.println("Spout instances: " + spoutInstances);
         System.out.println("Bolt instances: " + boltInstances);
         System.out.println("Max spout pending: " + (maxPending > 0 ? maxPending : "none"));
-        System.out.println("Total time: " + elapsed + " msec");
-        System.out.println("Emitted: " + totalEmitted);
-        System.out.println("Unique: " + totalUnique);
-        System.out.println("Acked: " + acked.get());
-        System.out.println("Failed: " + failed.get());
+        System.out.printf(Locale.ROOT, "Total time: %,d msec%n", elapsed);
+        System.out.printf(Locale.ROOT, "Emitted: %,d%n", totalEmitted);
+        System.out.printf(Locale.ROOT, "Unique: %,d%n", totalUnique);
+        System.out.printf(Locale.ROOT, "Acked: %,d%n", acked.get());
+        System.out.printf(Locale.ROOT, "Failed: %,d%n", failed.get());
         System.out.printf(
-                Locale.ROOT, "Average unique URLs/sec: %.2f%n", totalUnique * 1000.0 / elapsed);
+                Locale.ROOT,
+                "Average unique URLs/sec: %,d%n",
+                Math.round(totalUnique * 1000.0 / elapsed));
 
         // some backends leave non-daemon threads behind
         System.exit(0);
