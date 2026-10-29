@@ -151,7 +151,7 @@ public class WARCRequestRecordFormat extends WARCRecordFormat {
                                 requestLine);
                     } else if (parts.length < 3
                             || !HTTP_VERSION_PATTERN.matcher(parts[2]).matches()) {
-                        LOG.info(requestLine);
+                        LOG.debug("Replacing the HTTP version of request line: {}", requestLine);
                         // append HTTP version string accepted by most WARC parsers
                         replacement.append(parts[0]);
                         replacement.append(' ');
