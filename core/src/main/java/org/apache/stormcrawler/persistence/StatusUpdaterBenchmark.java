@@ -17,17 +17,18 @@
 
 package org.apache.stormcrawler.persistence;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.BufferedReader;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -79,14 +80,19 @@ import org.apache.stormcrawler.util.ConfUtils;
  * updater would get. As Storm would give each of them its own executor, every instance has its own
  * task and is called from its own thread. The URLs are routed to the instances based on their hash,
  * as a fields grouping on the URL does, so that a given URL always goes to the same instance. The
- * input is read and parsed by a separate thread, which caps the total throughput at what it can
- * deliver. Passing {@code baseline} instead of a class name measures that limit: the URLs are acked
- * as soon as they are received, without being stored, so the result is the highest throughput the
- * utility can report on that input and machine. The throughput of a backend can then be expressed
- * as a fraction of the baseline obtained with the same input, number of instances and machine.
- * Unlike the raw figures, which depend largely on the hardware, these ratios can be compared across
- * environments, e.g. to compare results obtained on different machines or to track the performance
- * of a backend over time.
+ * input is read and decompressed by one thread and parsed by a pool of threads, 2 by default or the
+ * value of {@code status.updater.benchmark.parsers} in the configuration. With more than one parser
+ * the URLs are not handed to the instances in the exact order of the input, which can matter if it
+ * contains the same URL more than once, e.g. as discovered then as known; a single parser keeps the
+ * order. The parsers use CPU which is then not available to the instances, the number of parsers
+ * should be the same for all the runs being compared. Reading and parsing cap the total throughput
+ * at what they can deliver. Passing {@code baseline} instead of a class name measures that limit:
+ * the URLs are acked as soon as they are received, without being stored, so the result is the
+ * highest throughput the utility can report on that input and machine. The throughput of a backend
+ * can then be expressed as a fraction of the baseline obtained with the same input, number of
+ * instances and machine. Unlike the raw figures, which depend largely on the hardware, these ratios
+ * can be compared across environments, e.g. to compare results obtained on different machines or to
+ * track the performance of a backend over time.
  *
  * <p>The arguments are, in this order, the class name of the bolt or {@code baseline}, optionally
  * the number of instances to run (1 by default), one or more configuration files, which are loaded
@@ -150,7 +156,22 @@ public class StatusUpdaterBenchmark {
     /** how often the intermediate throughput is displayed */
     private static final long REPORT_INTERVAL_SEC = 60;
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    /** size of the blocks of input handed to the parsers */
+    private static final int READ_BLOCK_SIZE = 1024 * 1024;
+
+    /** size of the buffers used for reading and decompressing the input */
+    private static final int INPUT_BUFFER_SIZE = 64 * 1024;
+
+    /** number of threads parsing the input */
+    public static final String PARSERS_PARAM_NAME = "status.updater.benchmark.parsers";
+
+    /**
+     * fixed rather than derived from the number of cores, so that the baselines obtained on
+     * different machines are comparable
+     */
+    private static final int DEFAULT_PARSERS = 2;
+
+    private static final JsonFactory JSON = new JsonFactory();
 
     public static void main(String[] args) throws Exception {
         // the number of instances is optional
@@ -211,13 +232,19 @@ public class StatusUpdaterBenchmark {
                             "StatusUpdaterBenchmark-bolt-" + task);
             // must not keep the JVM alive if reading the input fails
             thread.setDaemon(true);
+            thread.setUncaughtExceptionHandler(StatusUpdaterBenchmark::abort);
             bolts.add(bolt);
             queues.add(queue);
             threads.add(thread);
         }
 
+        int parsers = ConfUtils.getInt(conf, PARSERS_PARAM_NAME, DEFAULT_PARSERS);
+        if (parsers < 1) {
+            throw new IllegalArgumentException(
+                    PARSERS_PARAM_NAME + " must be at least 1, got " + parsers);
+        }
+
         long start = System.currentTimeMillis();
-        long sent = 0;
         threads.forEach(Thread::start);
 
         // reports the throughput at regular intervals, as the URLFrontier client does
@@ -247,40 +274,41 @@ public class StatusUpdaterBenchmark {
                 REPORT_INTERVAL_SEC,
                 TimeUnit.SECONDS);
 
-        // the input is read and parsed by this thread, which hands the URLs to the instances
-        List<List<Item>> batches = new ArrayList<>(instances);
-        for (int i = 0; i < instances; i++) {
-            batches.add(new ArrayList<>(HANDOFF_BATCH_SIZE));
-        }
-        try (BufferedReader reader = openInput(args[args.length - 1])) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.isBlank()) {
-                    continue;
-                }
-                Item item = parse(line);
-                if (item == null) {
-                    System.err.println("Invalid input line: " + line);
-                    continue;
-                }
-                // a URL always goes to the same instance, as with a fields grouping on the URL
-                int target = Math.floorMod(item.url().hashCode(), instances);
-                List<Item> batch = batches.get(target);
-                batch.add(item);
-                if (batch.size() == HANDOFF_BATCH_SIZE) {
-                    queues.get(target).put(batch);
-                    batches.set(target, new ArrayList<>(HANDOFF_BATCH_SIZE));
-                }
-                sent++;
-            }
+        // the input is read by this thread, which hands blocks of whole lines to the parsers,
+        // which in turn hand the URLs to the instances: routing needs the URL, so the lines must
+        // be parsed before an instance can be picked
+        BlockingQueue<Block> blocks = new ArrayBlockingQueue<>(parsers * 2);
+        AtomicLong sentCounter = new AtomicLong();
+        List<Thread> parserThreads = new ArrayList<>(parsers);
+        for (int i = 0; i < parsers; i++) {
+            Thread thread =
+                    new Thread(
+                            () -> parseAll(blocks, queues, sentCounter),
+                            "StatusUpdaterBenchmark-parser-" + i);
+            thread.setDaemon(true);
+            // the run would otherwise hang or under count the URLs sent
+            thread.setUncaughtExceptionHandler(StatusUpdaterBenchmark::abort);
+            thread.start();
+            parserThreads.add(thread);
         }
 
-        // hand over what is left, then an empty batch to mark the end of the input
-        for (int i = 0; i < instances; i++) {
-            if (!batches.get(i).isEmpty()) {
-                queues.get(i).put(batches.get(i));
-            }
-            queues.get(i).put(List.of());
+        try (InputStream in = openInput(args[args.length - 1])) {
+            readBlocks(in, READ_BLOCK_SIZE, blocks);
+        }
+
+        // an empty block tells each parser that the input is over, they then hand over what they
+        // have left
+        for (int i = 0; i < parsers; i++) {
+            blocks.put(new Block(new byte[0], 0));
+        }
+        for (Thread thread : parserThreads) {
+            thread.join();
+        }
+        long sent = sentCounter.get();
+
+        // an empty batch marks the end of the input for the instances
+        for (BlockingQueue<List<Item>> queue : queues) {
+            queue.put(List.of());
         }
         for (Thread thread : threads) {
             thread.join();
@@ -301,6 +329,7 @@ public class StatusUpdaterBenchmark {
         }
 
         System.out.println("Instances: " + instances);
+        System.out.println("Parsers: " + parsers);
         System.out.println("Sent: " + sent);
         System.out.println("Acked: " + collector.acked.get());
         System.out.println("Failed: " + collector.failed.get());
@@ -312,9 +341,157 @@ public class StatusUpdaterBenchmark {
         System.exit(collector.acked.get() == sent ? 0 : 1);
     }
 
+    /** Ends the run if a bolt or parser thread dies, as its URLs would never be acked. */
+    private static void abort(Thread thread, Throwable e) {
+        System.err.println("Uncaught exception in " + thread.getName() + ": " + e);
+        e.printStackTrace();
+        System.exit(1);
+    }
+
+    /** Lines of input, the first {@code length} bytes of {@code data} ending with a full line. */
+    record Block(byte[] data, int length) {}
+
+    /** Receives a line of input, without leading or trailing whitespace. */
+    interface LineHandler {
+        void line(byte[] data, int off, int len) throws InterruptedException;
+    }
+
     /**
-     * Passes the URLs handed over by the reading thread to one instance of the bolt, until an empty
-     * batch marks the end of the input.
+     * Reads the input and puts it on the queue as blocks of whole lines, of {@code blockSize} bytes
+     * at most unless a line is longer than that, in which case the blocks grow to fit it. The last
+     * line doesn't need to end with a line feed.
+     */
+    static void readBlocks(InputStream in, int blockSize, BlockingQueue<Block> blocks)
+            throws IOException, InterruptedException {
+        byte[] block = new byte[blockSize];
+        int filled = 0;
+        while (true) {
+            filled += in.readNBytes(block, filled, block.length - filled);
+            if (filled < block.length) {
+                // end of the input
+                if (filled > 0) {
+                    blocks.put(new Block(block, filled));
+                }
+                return;
+            }
+            int end = lastLineEnd(block, filled);
+            if (end == 0) {
+                // a line longer than the block
+                block = Arrays.copyOf(block, block.length * 2);
+                continue;
+            }
+            // the incomplete line at the end goes to the next block
+            byte[] next = new byte[block.length];
+            System.arraycopy(block, end, next, 0, filled - end);
+            filled -= end;
+            blocks.put(new Block(block, end));
+            block = next;
+        }
+    }
+
+    /**
+     * Passes each line of the block to the handler, trimmed as {@link String#trim()} does, which
+     * also removes the carriage return of CRLF line endings. Blank lines are skipped.
+     */
+    static void forEachLine(Block block, LineHandler handler) throws InterruptedException {
+        byte[] data = block.data();
+        int lineStart = 0;
+        while (lineStart < block.length()) {
+            int lineEnd = lineStart;
+            while (lineEnd < block.length() && data[lineEnd] != '\n') {
+                lineEnd++;
+            }
+            int next = lineEnd + 1;
+            while (lineStart < lineEnd && (data[lineStart] & 0xff) <= ' ') {
+                lineStart++;
+            }
+            while (lineEnd > lineStart && (data[lineEnd - 1] & 0xff) <= ' ') {
+                lineEnd--;
+            }
+            if (lineEnd > lineStart) {
+                handler.line(data, lineStart, lineEnd - lineStart);
+            }
+            lineStart = next;
+        }
+    }
+
+    /** Returns the position after the last line feed of the block or 0 if there is none. */
+    private static int lastLineEnd(byte[] block, int length) {
+        for (int i = length - 1; i >= 0; i--) {
+            if (block[i] == '\n') {
+                return i + 1;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Parses the blocks of lines handed over by the reading thread and routes the URLs to the
+     * instances of the bolt, until an empty block marks the end of the input.
+     */
+    private static void parseAll(
+            BlockingQueue<Block> blocks, List<BlockingQueue<List<Item>>> queues, AtomicLong sent) {
+        int instances = queues.size();
+        List<List<Item>> batches = new ArrayList<>(instances);
+        for (int i = 0; i < instances; i++) {
+            batches.add(new ArrayList<>(HANDOFF_BATCH_SIZE));
+        }
+        // counted locally, the parsers would otherwise contend on the counter for every URL
+        long[] routed = {0};
+        try {
+            while (true) {
+                Block block = blocks.take();
+                if (block.length() == 0) {
+                    break;
+                }
+                forEachLine(
+                        block,
+                        (data, off, len) -> {
+                            if (route(data, off, len, batches, queues)) {
+                                routed[0]++;
+                            }
+                        });
+            }
+            // hand over what is left
+            for (int i = 0; i < instances; i++) {
+                if (!batches.get(i).isEmpty()) {
+                    queues.get(i).put(batches.get(i));
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        sent.addAndGet(routed[0]);
+    }
+
+    /** Parses a line and adds it to the batch of its instance, returns false if it is invalid. */
+    private static boolean route(
+            byte[] data,
+            int off,
+            int len,
+            List<List<Item>> batches,
+            List<BlockingQueue<List<Item>>> queues)
+            throws InterruptedException {
+        Item item = parse(data, off, len);
+        if (item == null) {
+            System.err.println(
+                    "Invalid input line: " + new String(data, off, len, StandardCharsets.UTF_8));
+            return false;
+        }
+        // a URL always goes to the same instance, as with a fields grouping on the URL
+        int target = Math.floorMod(item.url().hashCode(), queues.size());
+        List<Item> batch = batches.get(target);
+        batch.add(item);
+        if (batch.size() == HANDOFF_BATCH_SIZE) {
+            queues.get(target).put(batch);
+            batches.set(target, new ArrayList<>(HANDOFF_BATCH_SIZE));
+        }
+        return true;
+    }
+
+    /**
+     * Passes the URLs handed over by the parsers to one instance of the bolt, until an empty batch
+     * marks the end of the input.
      */
     private static void storeAll(
             AbstractStatusUpdaterBolt bolt,
@@ -387,12 +564,15 @@ public class StatusUpdaterBenchmark {
                 new StormMetricRegistry());
     }
 
-    private static BufferedReader openInput(String file) throws IOException {
-        InputStream is = Files.newInputStream(Paths.get(file));
+    private static InputStream openInput(String file) throws IOException {
+        // the stream returned by Files is not buffered and GZIPInputStream inflates 512 bytes at a
+        // time by default
+        InputStream is =
+                new BufferedInputStream(Files.newInputStream(Paths.get(file)), INPUT_BUFFER_SIZE);
         if (file.endsWith(".gz")) {
-            is = new GZIPInputStream(is);
+            is = new GZIPInputStream(is, INPUT_BUFFER_SIZE);
         }
-        return new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+        return is;
     }
 
     /** A URL to store, with the values to pass to the bolt. */
@@ -400,50 +580,179 @@ public class StatusUpdaterBenchmark {
 
     /** Returns the item for a line of input or null if it is invalid. */
     static Item parse(String line) {
-        String input = line.trim();
-        if (!input.startsWith("{")) {
-            return new Item(input, Status.DISCOVERED, new Metadata(), Optional.of(new Date()));
+        byte[] bytes = line.getBytes(StandardCharsets.UTF_8);
+        int start = 0;
+        int end = bytes.length;
+        while (start < end && (bytes[start] & 0xff) <= ' ') {
+            start++;
+        }
+        while (end > start && (bytes[end - 1] & 0xff) <= ' ') {
+            end--;
+        }
+        return parse(bytes, start, end - start);
+    }
+
+    /**
+     * Returns the item for a line of input, given as UTF-8 bytes without leading or trailing
+     * whitespace, or null if it is invalid. The JSON is read token by token rather than as a tree,
+     * as only a few of its fields are needed.
+     */
+    static Item parse(byte[] buf, int off, int len) {
+        if (len == 0) {
+            return null;
+        }
+        if (buf[off] != '{') {
+            String url = new String(buf, off, len, StandardCharsets.UTF_8);
+            return new Item(url, Status.DISCOVERED, new Metadata(), Optional.of(new Date()));
         }
 
-        JsonNode root;
-        try {
-            root = MAPPER.readTree(input);
+        boolean discovered = false;
+        Entry entry = null;
+        Entry known = null;
+        try (JsonParser parser = JSON.createParser(buf, off, len)) {
+            if (parser.nextToken() != JsonToken.START_OBJECT) {
+                return null;
+            }
+            while (parser.nextToken() == JsonToken.FIELD_NAME) {
+                String name = parser.currentName();
+                JsonToken token = parser.nextToken();
+                if ("discovered".equals(name)) {
+                    discovered = true;
+                    entry = token == JsonToken.START_OBJECT ? parseEntry(parser) : skip(parser);
+                } else if ("known".equals(name)) {
+                    known = token == JsonToken.START_OBJECT ? parseEntry(parser) : skip(parser);
+                } else {
+                    parser.skipChildren();
+                }
+            }
         } catch (IOException e) {
             return null;
         }
 
-        JsonNode node = root.path("discovered");
-        boolean discovered = !node.isMissingNode();
+        // a discovered item takes precedence over a known one
         if (!discovered) {
-            node = root.path("known");
+            entry = known;
         }
-
-        JsonNode url = node.path("info").path("url");
-        if (!url.isTextual()) {
+        if (entry == null || entry.url == null) {
             return null;
         }
 
-        Metadata metadata = new Metadata();
-        for (Map.Entry<String, JsonNode> entry : node.path("info").path("metadata").properties()) {
-            for (JsonNode value : entry.getValue().path("values")) {
-                metadata.addValue(entry.getKey(), value.asText());
+        if (discovered) {
+            return new Item(entry.url, Status.DISCOVERED, entry.metadata, Optional.of(new Date()));
+        }
+
+        // beyond what a Date can hold in milliseconds
+        if (entry.refetch > Long.MAX_VALUE / 1000) {
+            return null;
+        }
+        Optional<Date> nextFetch =
+                entry.refetch > 0
+                        ? Optional.of(Date.from(Instant.ofEpochSecond(entry.refetch)))
+                        : Optional.empty();
+        return new Item(entry.url, Status.FETCHED, entry.metadata, nextFetch);
+    }
+
+    /** The fields of a discovered or known item, read from its JSON object. */
+    private static final class Entry {
+        String url;
+        final Metadata metadata = new Metadata();
+        long refetch;
+        boolean refetchCamelCase;
+    }
+
+    private static Entry skip(JsonParser parser) throws IOException {
+        parser.skipChildren();
+        return null;
+    }
+
+    /** Reads a discovered or known item, the parser being on the start of its object. */
+    private static Entry parseEntry(JsonParser parser) throws IOException {
+        Entry entry = new Entry();
+        while (parser.nextToken() == JsonToken.FIELD_NAME) {
+            String name = parser.currentName();
+            JsonToken token = parser.nextToken();
+            switch (name) {
+                case "info" -> {
+                    if (token == JsonToken.START_OBJECT) {
+                        parseInfo(parser, entry);
+                    } else {
+                        parser.skipChildren();
+                    }
+                }
+                // either name is accepted, the camel case one takes precedence
+                case "refetchableFromDate" -> {
+                    entry.refetch = readLong(parser, token);
+                    entry.refetchCamelCase = true;
+                }
+                case "refetchable_from_date" -> {
+                    long refetch = readLong(parser, token);
+                    if (!entry.refetchCamelCase) {
+                        entry.refetch = refetch;
+                    }
+                }
+                default -> parser.skipChildren();
             }
         }
+        return entry;
+    }
 
-        if (discovered) {
-            return new Item(url.asText(), Status.DISCOVERED, metadata, Optional.of(new Date()));
+    /** Reads the URL and metadata of an item, the parser being on the start of the info object. */
+    private static void parseInfo(JsonParser parser, Entry entry) throws IOException {
+        while (parser.nextToken() == JsonToken.FIELD_NAME) {
+            String name = parser.currentName();
+            JsonToken token = parser.nextToken();
+            if ("url".equals(name)) {
+                entry.url = token == JsonToken.VALUE_STRING ? parser.getText() : null;
+                parser.skipChildren();
+            } else if ("metadata".equals(name) && token == JsonToken.START_OBJECT) {
+                parseMetadata(parser, entry.metadata);
+            } else {
+                parser.skipChildren();
+            }
         }
+    }
 
-        // int64 values can be written as strings, either name is accepted
-        long refetch =
-                node.has("refetchableFromDate")
-                        ? node.get("refetchableFromDate").asLong()
-                        : node.path("refetchable_from_date").asLong();
-        Optional<Date> nextFetch =
-                refetch > 0
-                        ? Optional.of(Date.from(Instant.ofEpochSecond(refetch)))
-                        : Optional.empty();
-        return new Item(url.asText(), Status.FETCHED, metadata, nextFetch);
+    /** Reads the metadata, the parser being on the start of their object. */
+    private static void parseMetadata(JsonParser parser, Metadata metadata) throws IOException {
+        while (parser.nextToken() == JsonToken.FIELD_NAME) {
+            String key = parser.currentName();
+            if (parser.nextToken() != JsonToken.START_OBJECT) {
+                parser.skipChildren();
+                continue;
+            }
+            while (parser.nextToken() == JsonToken.FIELD_NAME) {
+                String name = parser.currentName();
+                JsonToken token = parser.nextToken();
+                if (!"values".equals(name) || token != JsonToken.START_ARRAY) {
+                    parser.skipChildren();
+                    continue;
+                }
+                while ((token = parser.nextToken()) != JsonToken.END_ARRAY) {
+                    if (token.isStructStart()) {
+                        parser.skipChildren();
+                    } else {
+                        metadata.addValue(key, parser.getText());
+                    }
+                }
+            }
+        }
+    }
+
+    /** int64 values can be written as strings, anything that is not a number is 0. */
+    private static long readLong(JsonParser parser, JsonToken token) throws IOException {
+        switch (token) {
+            case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT:
+                return parser.getValueAsLong();
+            case VALUE_STRING:
+                try {
+                    return Long.parseLong(parser.getText().trim());
+                } catch (NumberFormatException e) {
+                    return 0;
+                }
+            default:
+                parser.skipChildren();
+                return 0;
+        }
     }
 
     /** Counts the acks and fails, which can come from any thread. */
