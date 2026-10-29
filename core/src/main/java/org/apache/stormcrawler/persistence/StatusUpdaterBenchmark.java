@@ -190,6 +190,8 @@ public class StatusUpdaterBenchmark {
 
         // log4j is what storm local uses, the INFO messages of the bolts would drown the reports
         Configurator.setAllLevels(LogManager.ROOT_LOGGER_NAME, Level.WARN);
+        // storm local warns about a deprecated config set in Storm's own defaults.yaml
+        Configurator.setLevel("org.apache.storm.validation.ConfigValidation", Level.ERROR);
 
         Config conf = new Config();
         conf.putAll(
@@ -265,10 +267,10 @@ public class StatusUpdaterBenchmark {
                     long delta = current - lastAcked.getAndSet(current);
                     System.out.printf(
                             Locale.ROOT,
-                            "Acked: %d - OPS over the last %d sec: %.2f%n",
+                            "Acked: %,d - OPS over the last %d sec: %,d%n",
                             current,
                             Math.round(elapsed / 1000.0),
-                            delta * 1000.0 / Math.max(1, elapsed));
+                            Math.round(delta * 1000.0 / Math.max(1, elapsed)));
                 },
                 REPORT_INTERVAL_SEC,
                 REPORT_INTERVAL_SEC,
@@ -330,12 +332,14 @@ public class StatusUpdaterBenchmark {
 
         System.out.println("Instances: " + instances);
         System.out.println("Parsers: " + parsers);
-        System.out.println("Sent: " + sent);
-        System.out.println("Acked: " + collector.acked.get());
-        System.out.println("Failed: " + collector.failed.get());
-        System.out.println("Total time: " + elapsed + " msec");
+        System.out.printf(Locale.ROOT, "Sent: %,d%n", sent);
+        System.out.printf(Locale.ROOT, "Acked: %,d%n", collector.acked.get());
+        System.out.printf(Locale.ROOT, "Failed: %,d%n", collector.failed.get());
+        System.out.printf(Locale.ROOT, "Total time: %,d msec%n", elapsed);
         System.out.printf(
-                Locale.ROOT, "Average OPS: %.2f%n", collector.acked.get() * 1000.0 / elapsed);
+                Locale.ROOT,
+                "Average OPS: %,d%n",
+                Math.round(collector.acked.get() * 1000.0 / elapsed));
 
         // some backends leave non-daemon threads behind
         System.exit(collector.acked.get() == sent ? 0 : 1);
