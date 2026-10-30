@@ -141,6 +141,7 @@ class ParserBoltPdfMaxPagesTest extends ParsingTester {
         Assertions.assertNotNull(config);
         Assertions.assertTrue(config.json().contains("\"maxPages\":2"), config.json());
         Assertions.assertTrue(config.json().contains("\"extractInlineImages\":false"));
+        Assertions.assertTrue(config.trusted());
     }
 
     @Test

@@ -889,7 +889,7 @@ public class ParserBolt extends BaseRichBolt {
 
     private void setPdfParserConfig(ParseContext parseContext) {
         if (pdfParserConfig != null) {
-            parseContext.setJsonConfig(PDF_PARSER_CONFIG, pdfParserConfig);
+            parseContext.setJsonConfig(PDF_PARSER_CONFIG, JsonConfig.trusted(pdfParserConfig));
         }
     }
 
