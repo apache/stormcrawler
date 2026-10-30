@@ -259,9 +259,7 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
         metadata = mdTransfer.filter(metadata);
 
         // round next fetch date - unless it is never
-        if (nextFetch.isPresent()) {
-            nextFetch = Optional.of(DateUtils.round(nextFetch.get(), this.roundDateUnit));
-        }
+        nextFetch = nextFetch.map(date -> roundDate(date, roundDateUnit));
 
         // extensions of this class will handle the storage
         // on a per document basis
@@ -271,6 +269,23 @@ public abstract class AbstractStatusUpdaterBolt extends BaseRichBolt {
             LOG.error("Exception caught when storing", e);
             collector.fail(tuple);
         }
+    }
+
+    /**
+     * Rounds the date as {@link DateUtils#round(Date, int)} does. Seconds and minutes are rounded
+     * on the epoch time, half up, as building a Calendar for every URL is costly. Hours depend on
+     * the time zone, e.g. with an offset of 5:30, so they still go through DateUtils.
+     */
+    static Date roundDate(Date date, int unit) {
+        long unitMsec;
+        if (unit == Calendar.SECOND) {
+            unitMsec = 1000L;
+        } else if (unit == Calendar.MINUTE) {
+            unitMsec = 60_000L;
+        } else {
+            return DateUtils.round(date, unit);
+        }
+        return new Date(Math.floorDiv(date.getTime() + unitMsec / 2, unitMsec) * unitMsec);
     }
 
     /**

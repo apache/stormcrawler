@@ -29,11 +29,15 @@ import static org.mockito.Mockito.when;
 
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
+import java.util.TimeZone;
+import org.apache.commons.lang3.time.DateUtils;
 import org.apache.storm.metric.api.MultiCountMetric;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -254,5 +258,70 @@ class AbstractStatusUpdaterBoltTest {
 
         assertEquals(Map.of("hits", 2L, "misses", 1L), metric.getValue().getValueAndReset());
         assertEquals(Map.of("hits", 0L, "misses", 0L), metric.getValue().getValueAndReset());
+    }
+
+    /** The rounding done without a Calendar must give the same dates as DateUtils. */
+    @Test
+    void roundDateAsDateUtils() {
+        long[] times = {
+            0L,
+            -1L,
+            -500L,
+            -501L,
+            1_700_000_000_499L,
+            1_700_000_000_500L,
+            1_700_000_029_999L,
+            1_700_000_030_000L,
+            1_700_000_059_999L
+        };
+        for (long time : times) {
+            assertRoundedAsDateUtils(new Date(time));
+        }
+        Random random = new Random(0);
+        for (int i = 0; i < 100_000; i++) {
+            // between 2000 and 2100, some time zones had offsets with seconds in the past
+            long time = 946_684_800_000L + (long) (random.nextDouble() * 3_155_760_000_000L);
+            assertRoundedAsDateUtils(new Date(time));
+        }
+    }
+
+    private static void assertRoundedAsDateUtils(Date date) {
+        int[] units = {Calendar.SECOND, Calendar.MINUTE, Calendar.HOUR};
+        long[] unitMsec = {1000L, 60_000L, 3_600_000L};
+        for (int i = 0; i < units.length; i++) {
+            int unit = units[i];
+            Date expected = DateUtils.round(date, unit);
+            // DateUtils can move a date of the hour repeated when the clocks go back to its
+            // other occurrence, see roundDateInRepeatedHour
+            if (Math.abs(expected.getTime() - date.getTime()) > unitMsec[i] / 2) {
+                continue;
+            }
+            assertEquals(
+                    expected,
+                    AbstractStatusUpdaterBolt.roundDate(date, unit),
+                    "unit " + unit + " for " + date.getTime());
+        }
+    }
+
+    /**
+     * When the clocks go back, DateUtils rounds 02:22:47 CEST to 02:23 CET, an hour later, the date
+     * must stay in the same hour.
+     */
+    @Test
+    void roundDateInRepeatedHour() {
+        TimeZone timeZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Europe/Paris"));
+            // 2060-10-31T02:22:47.299+02:00
+            Date date = new Date(2_866_407_767_299L);
+            assertEquals(
+                    new Date(2_866_407_780_000L),
+                    AbstractStatusUpdaterBolt.roundDate(date, Calendar.MINUTE));
+            assertEquals(
+                    new Date(2_866_407_767_000L),
+                    AbstractStatusUpdaterBolt.roundDate(date, Calendar.SECOND));
+        } finally {
+            TimeZone.setDefault(timeZone);
+        }
     }
 }
