@@ -511,7 +511,13 @@ abstract class AbstractFetcherBoltTest {
 
         TestOutputCollector output = fetch(wmRuntimeInfo, config, "/start");
         verify(1, getRequestedFor(urlEqualTo("/target")));
-        Assertions.assertEquals(1, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
+        List<List<Object>> parseTuples = output.getEmitted(Utils.DEFAULT_STREAM_ID);
+        Assertions.assertEquals(1, parseTuples.size());
+        // the fetched page itself keeps foundSitemap for SitemapFilter on its outlinks
+        Metadata metadata = (Metadata) parseTuples.get(0).get(2);
+        Assertions.assertEquals(
+                Boolean.toString(robotsDeclaresSitemap),
+                metadata.getFirstValue(SiteMapParserBolt.foundSitemapKey));
     }
 
     TestOutputCollector fetch(
