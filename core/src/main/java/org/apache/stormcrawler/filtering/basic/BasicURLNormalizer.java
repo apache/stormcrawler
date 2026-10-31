@@ -289,10 +289,7 @@ public class BasicURLNormalizer extends URLFilter {
                 return urlToFilter;
             }
 
-            // Keep parse and format: WWWFormCodec changes semicolon splitting and tilde/star
-            // encoding.
-            List<NameValuePair> pairs =
-                    URLEncodedUtils.parse(query, StandardCharsets.UTF_8, '&', ';');
+            List<NameValuePair> pairs = URLEncodedUtils.parse(query, StandardCharsets.UTF_8, '&');
             Iterator<NameValuePair> pairsIterator = pairs.iterator();
             while (pairsIterator.hasNext()) {
                 NameValuePair param = pairsIterator.next();

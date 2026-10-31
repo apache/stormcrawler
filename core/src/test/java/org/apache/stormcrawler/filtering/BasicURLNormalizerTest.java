@@ -487,6 +487,35 @@ class BasicURLNormalizerTest {
                 urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/p?u=%7Euser"));
     }
 
+    // https://github.com/apache/stormcrawler/issues/2199
+    @Test
+    void testSemicolonIsNotAQuerySeparator() throws MalformedURLException {
+        // the query is only parsed when there are elements to remove
+        URLFilter urlFilter = createFilter(List.of("utm_source"));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        // ';' is data: the pair must stay a single parameter
+        assertEquals(
+                "http://a.example/search?q=a%3Bb",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/search?q=a;b"));
+        assertEquals(
+                "http://a.example/p?a=1%3Bb%3D2",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/p?a=1;b=2"));
+        // a trailing ';' in a value must not be dropped
+        assertEquals(
+                "http://a.example/books?dq=x+%3B&hl=fr",
+                urlFilter.filter(
+                        testSourceUrl, new Metadata(), "http://a.example/books?dq=x+;&hl=fr"));
+        // an escaped ';' is left alone
+        assertEquals(
+                "http://a.example/p?q=a%3Bb&z=1",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/p?q=a%3Bb&z=1"));
+        // a removed parameter is removed as a whole, including a ';' in its value
+        assertEquals(
+                "http://a.example/p?q=1",
+                urlFilter.filter(
+                        testSourceUrl, new Metadata(), "http://a.example/p?utm_source=x;y&q=1"));
+    }
+
     @Test
     void testHostWithUnderscoreWhenURLRebuilt() throws MalformedURLException {
         URLFilter urlFilter = createFilter(new ObjectNode(JsonNodeFactory.instance));
