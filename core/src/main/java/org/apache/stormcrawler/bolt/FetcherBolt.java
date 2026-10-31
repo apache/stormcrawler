@@ -262,7 +262,7 @@ public class FetcherBolt extends StatusEmitterBolt {
                         continue;
                     }
 
-                    final Metadata fetchMetadata = metadata;
+                    final Metadata fetchMetadata = redirectMetadata(metadata);
                     ProtocolResponse response;
                     response =
                             fetchHelpers.call(
@@ -316,7 +316,7 @@ public class FetcherBolt extends StatusEmitterBolt {
                                     fit.tuple(),
                                     url,
                                     outcome.redirectTarget(),
-                                    outcome.metadata(),
+                                    redirectMetadata(outcome.metadata()),
                                     outcome.redirectKeyValues());
                         }
                         collector.emit(

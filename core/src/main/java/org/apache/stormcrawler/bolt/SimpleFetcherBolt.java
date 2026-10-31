@@ -449,7 +449,7 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
 
             long start = System.currentTimeMillis();
             final String fetchUrl = urlString;
-            final Metadata fetchMetadata = metadata;
+            final Metadata fetchMetadata = redirectMetadata(metadata);
             ProtocolResponse response;
             response =
                     fetchHelpers.call(
@@ -555,11 +555,11 @@ public class SimpleFetcherBolt extends StatusEmitterBolt {
                                 input,
                                 url,
                                 redirection,
-                                mergedMetadata,
+                                redirectMetadata(mergedMetadata),
                                 SiteMapParserBolt.isSitemapKey,
                                 "true");
                     } else {
-                        emitOutlink(input, url, redirection, mergedMetadata);
+                        emitOutlink(input, url, redirection, redirectMetadata(mergedMetadata));
                     }
                 }
                 // Mark URL as redirected

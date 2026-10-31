@@ -119,6 +119,21 @@ public abstract class StatusEmitterBolt extends BaseRichBolt {
         return allowRedirs;
     }
 
+    /**
+     * Returns the metadata to filter the redirect target of a URL with: a copy without {@link
+     * SiteMapParserBolt#foundSitemapKey} if the metadata has it. SitemapFilter drops the outlinks
+     * of a page on a site with sitemaps, which must not apply to where the URL itself redirects to.
+     */
+    protected static Metadata redirectMetadata(Metadata metadata) {
+        if (metadata.getFirstValue(SiteMapParserBolt.foundSitemapKey) == null) {
+            return metadata;
+        }
+        Metadata copy = new Metadata();
+        copy.putAll(metadata);
+        copy.remove(SiteMapParserBolt.foundSitemapKey);
+        return copy;
+    }
+
     @Override
     public void cleanup() {
         if (urlFilters != null) {
