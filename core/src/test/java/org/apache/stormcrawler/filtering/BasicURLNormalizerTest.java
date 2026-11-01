@@ -47,17 +47,18 @@ class BasicURLNormalizerTest {
     List<String> queryParamsToFilter = Arrays.asList("a", "foo");
 
     @Test
-    void testMixedQuerySeparatorsAndEncoding() {
+    void testSemicolonInQueryAndEncoding() {
+        // ';' is not a separator: it stays in the value and gets encoded
         URLFilter filter = createFilter(List.of("tracking"));
         assertEquals(
-                "http://example.com/?a=2&b=1&c=x+y+z&d",
+                "http://example.com/?b=1%3Ba%3D2&c=x+y+z&d",
                 filter.filter(null, new Metadata(), "http://example.com/?b=1;a=2&c=x+y%20z&d"));
         assertEquals(
-                "http://example.com/?a=&b=x%3By%26z&b=%2B&flag",
+                "http://example.com/?b=%2B%3Ba%3D&flag%3Bb=x%3By%26z",
                 filter.filter(
                         null, new Metadata(), "http://example.com/?flag;b=x%3By%26z&b=%2B;a="));
         assertEquals(
-                "http://example.com/?a=%C3%A9&b=%E2%82%AC",
+                "http://example.com/?b=%E2%82%AC%3Ba%3D%C3%A9",
                 filter.filter(null, new Metadata(), "http://example.com/?b=%E2%82%AC;a=%C3%A9"));
     }
 
@@ -70,11 +71,12 @@ class BasicURLNormalizerTest {
     }
 
     @Test
-    void testRemoveSemicolonSeparatedQueryParameters() {
+    void testSemicolonSeparatedParameterIsNotRemoved() {
+        // foo=bar is part of the value of keep, not a parameter of its own
         URLFilter filter = createFilter(queryParamsToFilter);
         assertEquals(
-                "http://example.com/?keep=yes",
-                filter.filter(null, new Metadata(), "http://example.com/?foo=bar;keep=yes&a=1"));
+                "http://example.com/?keep=yes%3Bfoo%3Dbar",
+                filter.filter(null, new Metadata(), "http://example.com/?keep=yes;foo=bar&a=1"));
     }
 
     private URLFilter createFilter(boolean removeAnchor, boolean checkValidURI) {
@@ -485,6 +487,35 @@ class BasicURLNormalizerTest {
         assertEquals(
                 "http://a.example/p?u=~user",
                 urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/p?u=%7Euser"));
+    }
+
+    // https://github.com/apache/stormcrawler/issues/2199
+    @Test
+    void testSemicolonIsNotAQuerySeparator() throws MalformedURLException {
+        // the query is only parsed when there are elements to remove
+        URLFilter urlFilter = createFilter(List.of("utm_source"));
+        URL testSourceUrl = URLUtil.toURL("http://a.example/");
+        // ';' is data: the pair must stay a single parameter
+        assertEquals(
+                "http://a.example/search?q=a%3Bb",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/search?q=a;b"));
+        assertEquals(
+                "http://a.example/p?a=1%3Bb%3D2",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/p?a=1;b=2"));
+        // a trailing ';' in a value must not be dropped
+        assertEquals(
+                "http://a.example/books?dq=x+%3B&hl=fr",
+                urlFilter.filter(
+                        testSourceUrl, new Metadata(), "http://a.example/books?dq=x+;&hl=fr"));
+        // an escaped ';' is left alone
+        assertEquals(
+                "http://a.example/p?q=a%3Bb&z=1",
+                urlFilter.filter(testSourceUrl, new Metadata(), "http://a.example/p?q=a%3Bb&z=1"));
+        // a removed parameter is removed as a whole, including a ';' in its value
+        assertEquals(
+                "http://a.example/p?q=1",
+                urlFilter.filter(
+                        testSourceUrl, new Metadata(), "http://a.example/p?utm_source=x;y&q=1"));
     }
 
     @Test
