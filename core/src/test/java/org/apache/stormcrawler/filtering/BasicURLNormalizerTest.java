@@ -47,17 +47,18 @@ class BasicURLNormalizerTest {
     List<String> queryParamsToFilter = Arrays.asList("a", "foo");
 
     @Test
-    void testMixedQuerySeparatorsAndEncoding() {
+    void testSemicolonInQueryAndEncoding() {
+        // ';' is not a separator: it stays in the value and gets encoded
         URLFilter filter = createFilter(List.of("tracking"));
         assertEquals(
-                "http://example.com/?a=2&b=1&c=x+y+z&d",
+                "http://example.com/?b=1%3Ba%3D2&c=x+y+z&d",
                 filter.filter(null, new Metadata(), "http://example.com/?b=1;a=2&c=x+y%20z&d"));
         assertEquals(
-                "http://example.com/?a=&b=x%3By%26z&b=%2B&flag",
+                "http://example.com/?b=%2B%3Ba%3D&flag%3Bb=x%3By%26z",
                 filter.filter(
                         null, new Metadata(), "http://example.com/?flag;b=x%3By%26z&b=%2B;a="));
         assertEquals(
-                "http://example.com/?a=%C3%A9&b=%E2%82%AC",
+                "http://example.com/?b=%E2%82%AC%3Ba%3D%C3%A9",
                 filter.filter(null, new Metadata(), "http://example.com/?b=%E2%82%AC;a=%C3%A9"));
     }
 
@@ -70,11 +71,12 @@ class BasicURLNormalizerTest {
     }
 
     @Test
-    void testRemoveSemicolonSeparatedQueryParameters() {
+    void testSemicolonSeparatedParameterIsNotRemoved() {
+        // foo=bar is part of the value of keep, not a parameter of its own
         URLFilter filter = createFilter(queryParamsToFilter);
         assertEquals(
-                "http://example.com/?keep=yes",
-                filter.filter(null, new Metadata(), "http://example.com/?foo=bar;keep=yes&a=1"));
+                "http://example.com/?keep=yes%3Bfoo%3Dbar",
+                filter.filter(null, new Metadata(), "http://example.com/?keep=yes;foo=bar&a=1"));
     }
 
     private URLFilter createFilter(boolean removeAnchor, boolean checkValidURI) {
