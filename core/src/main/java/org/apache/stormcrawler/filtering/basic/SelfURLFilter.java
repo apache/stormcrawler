@@ -18,10 +18,13 @@
 package org.apache.stormcrawler.filtering.basic;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.filtering.URLFilter;
+import org.apache.stormcrawler.util.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,11 +41,31 @@ public class SelfURLFilter extends URLFilter {
             return urlToFilter;
         }
 
-        if (sourceUrl.toExternalForm().equalsIgnoreCase(urlToFilter)) {
+        final URL target;
+        try {
+            target = URLUtil.toURL(urlToFilter);
+        } catch (MalformedURLException e) {
+            // not for this filter to judge
+            return urlToFilter;
+        }
+
+        if (isSameURL(sourceUrl, target)) {
             return null;
         }
 
         return urlToFilter;
+    }
+
+    /**
+     * Only the scheme and the host are case-insensitive (RFC 3986, section 6.2.2.1), the path and
+     * the query are not: a redirect from /a.html to /A.html points to another resource.
+     */
+    private static boolean isSameURL(URL source, URL target) {
+        return source.getProtocol().equalsIgnoreCase(target.getProtocol())
+                && source.getHost().equalsIgnoreCase(target.getHost())
+                && source.getPort() == target.getPort()
+                && source.getFile().equals(target.getFile())
+                && Objects.equals(source.getRef(), target.getRef());
     }
 
     @Override
