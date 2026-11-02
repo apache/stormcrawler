@@ -38,7 +38,7 @@ under the License.
     <description>Solr resources for StormCrawler</description>
 
     <properties>
-        <solr.version>10.0.0</solr.version>
+        <solr.version>10.1.0</solr.version>
     </properties>
 
     <build>
