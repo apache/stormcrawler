@@ -292,8 +292,8 @@ Each URL has a `Status` value that drives scheduling:
 
 * **DISCOVERED** — new URL, not yet fetched
 * **FETCHED** — successfully retrieved and processed
-* **FETCH_ERROR** — transient error (network timeout, HTTP 5xx). Will be retried.
-* **ERROR** — terminal error (too many retries, HTTP 4xx). Not retried by default.
+* **FETCH_ERROR** — failed fetch (e.g. network error, HTTP 4xx or 5xx). Retried by default until `max.fetch.errors` is reached.
+* **ERROR** — error not retried by default (e.g. fetch error limit reached or URL denied by robots.txt).
 * **REDIRECTION** — HTTP 3xx redirect encountered
 
 ==== Retry Mechanism
