@@ -1,0 +1,8 @@
+{
+	"org.apache.stormcrawler.filtering.URLFilters": [
+		{
+			"class": "org.apache.stormcrawler.filtering.sitemap.SitemapFilter",
+			"name": "SitemapFilter"
+		}
+	]
+}

@@ -437,7 +437,8 @@ public class JSoupParserBolt extends StatusEmitterBolt {
 
                     // https://github.com/apache/stormcrawler/issues/954
                     if (allowRedirs() && StringUtils.isNotBlank(redirection)) {
-                        emitOutlink(tuple, URLUtil.toURL(url), redirection, metadata);
+                        emitOutlink(
+                                tuple, URLUtil.toURL(url), redirection, redirectMetadata(metadata));
                     }
 
                     // Mark URL as redirected

@@ -19,9 +19,11 @@ package org.apache.stormcrawler.bolt;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
+import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -52,6 +54,8 @@ import org.apache.stormcrawler.protocol.StuckProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @WireMockTest
 abstract class AbstractFetcherBoltTest {
@@ -442,6 +446,78 @@ abstract class AbstractFetcherBoltTest {
         TestOutputCollector output = fetch(wmRuntimeInfo, config, "/metrics-header");
         Assertions.assertEquals(1, output.getEmitted(Utils.DEFAULT_STREAM_ID).size());
         Assertions.assertEquals(0, output.getEmitted(Constants.StatusStreamName).size());
+    }
+
+    /**
+     * With SitemapFilter in the chain, the redirect target of the fetched URL is discovered whether
+     * robots.txt declares a sitemap or not: the filter is meant for outlinks of non-sitemap pages.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void redirectTargetIsDiscoveredWithSitemapFilter(
+            boolean robotsDeclaresSitemap, WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        String robots = "User-agent: *\n";
+        if (robotsDeclaresSitemap) {
+            robots += "Sitemap: " + wmRuntimeInfo.getHttpBaseUrl() + "/sitemap.xml\n";
+        }
+        stubFor(get(urlEqualTo("/robots.txt")).willReturn(aResponse().withBody(robots)));
+        String target = wmRuntimeInfo.getHttpBaseUrl() + "/target";
+        stubFor(
+                get(urlEqualTo("/start"))
+                        .willReturn(aResponse().withStatus(301).withHeader("Location", target)));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("http.allow.redirects", false);
+        config.put("redirections.allowed", true);
+        config.put("sitemap.discovery", true);
+        config.put("urlfilters.config.file", "urlfilters-sitemap-only.json");
+
+        TestOutputCollector output = fetch(wmRuntimeInfo, config, "/start");
+        List<List<Object>> statusTuples = output.getEmitted(Constants.StatusStreamName);
+        Assertions.assertTrue(
+                statusTuples.stream()
+                        .anyMatch(t -> t.get(0).equals(target) && t.get(2) == Status.DISCOVERED),
+                "redirect target not discovered, got "
+                        + statusTuples.stream().map(t -> t.get(0) + " " + t.get(2)).toList());
+    }
+
+    /**
+     * Same as above with http.allow.redirects=true: the protocol follows the redirect itself and
+     * filters each hop, so SitemapFilter must not reject the target either.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void redirectIsFollowedByProtocolWithSitemapFilter(
+            boolean robotsDeclaresSitemap, WireMockRuntimeInfo wmRuntimeInfo)
+            throws ReflectiveOperationException {
+        String robots = "User-agent: *\n";
+        if (robotsDeclaresSitemap) {
+            robots += "Sitemap: " + wmRuntimeInfo.getHttpBaseUrl() + "/sitemap.xml\n";
+        }
+        stubFor(get(urlEqualTo("/robots.txt")).willReturn(aResponse().withBody(robots)));
+        String target = wmRuntimeInfo.getHttpBaseUrl() + "/target";
+        stubFor(
+                get(urlEqualTo("/start"))
+                        .willReturn(aResponse().withStatus(301).withHeader("Location", target)));
+        stubFor(get(urlEqualTo("/target")).willReturn(aResponse().withBody("target page")));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("http.agent.name", "this_is_only_a_test");
+        config.put("http.allow.redirects", true);
+        config.put("sitemap.discovery", true);
+        config.put("urlfilters.config.file", "urlfilters-sitemap-only.json");
+
+        TestOutputCollector output = fetch(wmRuntimeInfo, config, "/start");
+        verify(1, getRequestedFor(urlEqualTo("/target")));
+        List<List<Object>> parseTuples = output.getEmitted(Utils.DEFAULT_STREAM_ID);
+        Assertions.assertEquals(1, parseTuples.size());
+        // the fetched page itself keeps foundSitemap for SitemapFilter on its outlinks
+        Metadata metadata = (Metadata) parseTuples.get(0).get(2);
+        Assertions.assertEquals(
+                Boolean.toString(robotsDeclaresSitemap),
+                metadata.getFirstValue(SiteMapParserBolt.foundSitemapKey));
     }
 
     TestOutputCollector fetch(
