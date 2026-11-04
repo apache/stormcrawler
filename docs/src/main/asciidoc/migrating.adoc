@@ -24,3 +24,31 @@ documents parsed by Tika, such as OpenDocument files, use the JDK parser,
 which fails on documents with many entity references. See
 xref:configuration.adoc#_parsing[Parsing] for the JVM options that lift its
 limits. Applications using Xerces classes must declare their own dependency.
+
+=== Changed defaults
+
+Six changes alter the behaviour of existing topologies. Set the old values
+explicitly to keep the previous behaviour.
+
+* The `file` scheme is no longer in the shipped `protocols` list, which now
+defaults to `http,https`. Crawling a local corpus requires adding `file` and
+setting `file.protocol.root`; reads are confined to that directory, and a
+`file:` URL without a root is refused.
+* The OkHttp protocol validates TLS certificates by default:
+`http.trust.everything` is `false` and `http.verify.hostnames` is `true`.
+Servers with self-signed certificates need `http.trust.everything: true`.
+Credentials are withheld from cleartext `http://` requests, and from servers
+whose certificate is not validated, unless
+`http.credentials.allow.insecure` is `true`.
+* The fetcher blocks private address space by default. The shipped
+`http.filter.ipaddress.exclude` covers loopback, site-local, link-local,
+any-local, multicast, CGNAT (`100.64.0.0/10`), `0.0.0.0/8`, ULA (`fc00::/7`)
+and `::/128`. Crawling an intranet requires overriding the key, for example
+with `http.filter.ipaddress.exclude: ""`.
+* Sitemaps are only recognised from the `isSitemap=true` metadata unless
+`sitemap.sniffContent: true`. `sitemap.strict` remains available and defaults
+to `false`.
+* Spouts report a stored URL whose scheme is not in `protocols` as
+`Status.ERROR` on the status stream instead of emitting it for fetching.
+* A rule in `http.filter.ipaddress.exclude` that is neither a keyword, a CIDR
+block nor an address now fails configuration instead of being ignored.
