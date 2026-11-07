@@ -374,7 +374,7 @@ that is being calculated by a link:https://github.com/apache/stormcrawler/blob/m
 | fetchInterval.fetch.error | 120 | Revisit interval for fetch errors (minutes).
 | max.fetch.errors | 3 | Maximum number of successive fetch errors before changing status to ERROR.
 | scheduler.class | org.apache.stormcrawler.persistence.DefaultScheduler | Scheduler implementation for computing next fetch dates. Use AdaptiveScheduler for change-rate-based intervals.
-| status.updater.cache.spec | maximumSize=10000, expireAfterAccess=1h | Cache specification for the status updater.
+| status.updater.cache.spec | maximumSize=1000000,expireAfterAccess=1h | Cache specification for the status updater.
 | status.updater.unit.round.date | SECOND | Unit for rounding the next fetch date. Can also be MINUTE or HOUR.
 | status.updater.use.cache | true | Whether to use cache to avoid re-persisting URLs.
 | status.updater.normalise.hosts | false | Normalise the host component of discovered URLs (percent-decoded, lowercased, trailing dot removed) so that aliases of one server are stored once, share a politeness queue and a robots.txt fetch. Off by default: document ids are hashed from the URL, so enabling it re-discovers aliases already stored in raw form as a second, bounded record.
@@ -403,6 +403,8 @@ Configures parsing of fetched text and the handling of discovered URIs
 | sitemap.filter.hours.since.modified | -1 | Filter URLs in sitemaps based on their modification date. -1 disables filtering.
 | sitemap.schedule.delay | -1 | Staggered scheduling delay for sitemaps (minutes). -1 disables staggering.
 | sitemap.extensions | - | Sitemap extensions to parse (IMAGE, LINKS, MOBILE, NEWS, VIDEO).
+| sitemap.sniffContent | false | Classify a document without the `isSitemap` key as a sitemap when the first bytes of its content contain the sitemaps.org namespace. A content type which rules a sitemap out, such as HTML, stops the check.
+| sitemap.strict | false | Apply strict URL checking: a sitemap only yields URLs below its own host and path. Off by default, since a sitemap on `example.com` listing URLs under `www.example.com` is common. Recommended for open crawls.
 | textextractor.exclude.tags | "" | HTML tags ignored by TextExtractor.
 | textextractor.include.pattern | "" | Regex patterns to include for TextExtractor.
 | textextractor.no.text | false | Disable text extraction entirely.
