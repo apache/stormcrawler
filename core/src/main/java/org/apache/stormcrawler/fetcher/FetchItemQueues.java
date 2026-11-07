@@ -182,9 +182,11 @@ public final class FetchItemQueues {
     }
 
     private void rescheduleOrReap(FetchItemQueue fiq) {
-        if (fiq.queue.isEmpty()) {
+        if (fiq.queue.isEmpty() && fiq.isReady(System.currentTimeMillis())) {
             reapIfEmpty(fiq);
         } else {
+            // a drained queue is kept until its delay has elapsed, so that a URL arriving for it
+            // meanwhile waits for the delay; getFetchItem reaps it when the ticket is due
             schedule(fiq, fiq.getNextFetchTime());
         }
     }
@@ -338,6 +340,7 @@ public final class FetchItemQueues {
         return null;
     }
 
+    /** Number of fetch queues, including empty ones kept until their delay has elapsed. */
     public int numQueues() {
         return queues.size();
     }
