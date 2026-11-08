@@ -13,3 +13,6 @@ nbactions.xml
 
 # Ignore OSX system files
 .DS_Store
+
+# Ignore VS Code config files
+.vscode
