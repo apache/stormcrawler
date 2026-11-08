@@ -29,9 +29,9 @@ if [ -z "$ROUTER_FIELD" ]; then
 fi
 
 SOLR_PORT=8983
-SOLR_HOME=/opt/solr-10.0.0
+SOLR_HOME=/opt/solr-10.1.0
 
-$SOLR_HOME/bin/solr start -c -p $SOLR_PORT
+$SOLR_HOME/bin/solr start -p $SOLR_PORT
 
 echo -e "\n\e[1mUploading configsets ...\e[0m\n"
 
