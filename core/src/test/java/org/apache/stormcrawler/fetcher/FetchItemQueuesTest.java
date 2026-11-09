@@ -181,6 +181,50 @@ class FetchItemQueuesTest {
     }
 
     @Test
+    void hostWaitsForItsDelayAfterItsQueueDrained() throws Exception {
+        FetchItemQueues q = queues("fetcher.server.delay", 5.0f);
+        add(q, "http://a.net/1");
+        q.finishFetchItem(q.getFetchItem(), false);
+        // the next URL of the host arrives after its queue drained, e.g. an outlink of /1
+        add(q, "http://a.net/2");
+        Assertions.assertNull(q.getFetchItem());
+    }
+
+    @Test
+    void hostWaitsForItsRobotsCrawlDelayAfterItsQueueDrained() throws Exception {
+        // no default delay: only the Crawl-delay of the robots.txt makes the host wait
+        FetchItemQueues q = queues("fetcher.server.delay", 0.0f);
+        add(q, "http://a.net/1");
+        FetchItem first = q.getFetchItem();
+        // as FetcherBolt does once it has the robots.txt
+        q.getFetchItemQueue(first.queueId(), null).setCrawlDelay(10_000);
+        q.finishFetchItem(first, false);
+        add(q, "http://a.net/2");
+        Assertions.assertNull(q.getFetchItem());
+    }
+
+    @Test
+    void drainedQueueIsRemovedOnceItsDelayHasElapsed() throws Exception {
+        FetchItemQueues q = queues("fetcher.server.delay", 0.2f);
+        add(q, "http://a.net/1");
+        q.finishFetchItem(q.getFetchItem(), false);
+        Assertions.assertEquals(1, q.numQueues());
+        Thread.sleep(300);
+        Assertions.assertNull(q.getFetchItem());
+        Assertions.assertEquals(0, q.numQueues());
+    }
+
+    @Test
+    void backoffOfADrainedQueueIsKept() throws Exception {
+        // no crawl delay: only the backoff, at least 0.5 s, makes the host wait
+        FetchItemQueues q = queues("fetcher.server.delay", 0.0f);
+        add(q, "http://a.net/1");
+        q.backOffFetchItem(q.getFetchItem());
+        add(q, "http://a.net/2");
+        Assertions.assertNull(q.getFetchItem());
+    }
+
+    @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void concurrentProducersAndConsumersLoseNothing() throws Exception {
         final int hosts = 200;
