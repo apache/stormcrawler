@@ -38,7 +38,7 @@ import org.testcontainers.utility.MountableFile;
 public abstract class SolrContainerTest {
     protected static ExecutorService executorService;
 
-    private static final DockerImageName image = DockerImageName.parse("solr:10.0.0");
+    private static final DockerImageName image = DockerImageName.parse("solr:10.1.0");
     private static final String configsetsPath = new File("configsets").getAbsolutePath();
 
     @Container
