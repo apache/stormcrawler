@@ -12,7 +12,7 @@ Be sure to replace <CURRENT_VERSION> with the latest released version, which you
 
 You'll be asked to enter a groupId (e.g. com.mycompany.crawler), an artefactId (e.g. stormcrawler), a version, a package name and details about the user agent to use.
 
-This will not only create a fully formed project containing a POM with the dependency above but also a set of resources, configuration files and sample topology classes. Enter the directory you just created (should be the same as the artefactId you specified earlier) and follow the instructions on the README file.
+This will not only create a fully formed project containing a POM with the dependency above but also a set of resources, configuration files and Flux topology definitions. Enter the directory you just created (should be the same as the artefactId you specified earlier) and follow the instructions on the README file.
 
 You will of course need to have both Apache Storm (3.1.0) and Apache Solr (10.1.0) installed.
 

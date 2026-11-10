@@ -30,7 +30,7 @@ To configure the WARCHdfsBolt, include the following snippet in your crawl topol
                 .withPath(warcFilePath);
 
         Map<String,String> fields = new HashMap<>();
-        fields.put("software:", "Apache StormCrawler 3.4.0 http://stormcrawler.net/");
+        fields.put("software:", "Apache StormCrawler 4.0.0 https://stormcrawler.apache.org/");
         fields.put("format", "WARC File Format 1.0");
         fields.put("conformsTo:",
                 "https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.0/");
@@ -80,7 +80,7 @@ components:
       - name: "put"
         args:
          - "software"
-         - "Apache StormCrawler 3.4.0 http://stormcrawler.net/"
+         - "Apache StormCrawler 4.0.0 https://stormcrawler.apache.org/"
       - name: "put"
         args:
          - "format"
@@ -93,7 +93,7 @@ components:
 [...]
 
 bolts:
- - id: "warc"
+  - id: "warc"
     className: "org.apache.stormcrawler.warc.WARCHdfsBolt"
     parallelism: 1
     configMethods:
@@ -107,7 +107,15 @@ bolts:
       - name: "withHeader"
         args:
           - ref: "WARCInfo"
+
+streams:
+  - from: "fetch"
+    to: "warc"
+    grouping:
+      type: LOCAL_OR_SHUFFLE
 ```
+
+Connected to the default stream of the fetcher, the bolt receives the documents fetched with their content. Redirections, fetch errors and `304 Not Modified` responses go to the status stream.
 
 Each instance of the bolt will generate a WARC file and close it once it has reached the required size.
 
@@ -135,7 +143,7 @@ config:
   warc: {"fs.file.impl": "org.apache.hadoop.fs.RawLocalFileSystem"}
 
 bolts:
- - id: "warc"
+  - id: "warc"
     ...
     configMethods:
       ...

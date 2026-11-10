@@ -33,7 +33,7 @@ The link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org
 * REDIRECTION:: set by the fetcher bolts.
 * FETCH_ERROR:: set by the fetcher bolts.
 * ERROR:: used by either the fetcher, parser, or indexer bolts.
-* FETCHED:: set by the DummyIndexer bolt (see below).
+* FETCHED:: set by the indexer bolts, e.g. DummyIndexer (see below) or StdOutIndexer.
 
 The difference between FETCH_ERROR and ERROR is that the former is possibly transient whereas the latter is terminal. The bolt which is in charge of updating the status (see below) can then decide when and whether to schedule a new fetch for a URL based on the status value.
 
@@ -91,6 +91,8 @@ declarer.declareStream(
 ----
 
 with the status stream being used for handling redirections, restrictions by robots directives, or fetch errors, whereas the default stream gets the binary content returned by the server as well as the metadata to the following components (typically a parsing bolt).
+
+A URL disallowed by robots.txt gets the status ERROR with the metadata `error.cause: robots.txt`.
 
 Both use the same xref:protocols[Protocols] implementations and xref:urlfilters[URLFilters] to control the redirections.
 
@@ -183,7 +185,7 @@ public void configure(Map stormConf, JsonNode filterParams);
 ----
 
 * The `filter` method is where the extraction occurs. ParseResult objects contain the outlinks extracted from the document as well as a Map of String to ParseData, where the String is the URL of a subdocument or the main document itself. ParseData objects contain Metadata, binary content, and text for the subdocuments, which is useful for indexing subdocuments independently of the main document. Use link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/parse/ParseResult.java[ParseResult.getOrCreate(URL)] to add data for a URL and ParseResult.getIfPresent(URL) for a read-only lookup. Note that the parsing bolts skip entries which carry no content, no text and no metadata, except for the URL being parsed, so a sub-document should always set at least one of the three to be emitted.
-* The `configure` method takes a JSON object loaded by the wrapper class ParseFilters. The Storm configuration map can also be used to configure the filters, as described in xref:configuration.adoc[Configuration].
+* The `configure` method takes a JSON object loaded by the wrapper class ParseFilters. The Storm configuration map can also be used to configure the filters, as described in xref:configuration.adoc#_configuration[Configuration].
 
 The archetype includes a default link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/parsefilters.json[JSON configuration file] for ParseFilters. The configuration allows multiple instances of the same filter class with different parameters and supports complex parameter objects. ParseFilters are executed in the order they appear in the JSON file.
 
@@ -295,7 +297,7 @@ and inherits a default one from link:https://github.com/apache/stormcrawler/blob
 public void configure(Map stormConf, JsonNode jsonNode);
 ----
 
-The configuration is done via a JSON file which is loaded by the wrapper class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/URLFilters.java[URLFilters]. The URLFilter instances can be used directly, but it is easier to use the class URLFilters instead. Some filter implementations can also be configured with the xref:configuration.adoc[standard configuration mechanism].
+The configuration is done via a JSON file which is loaded by the wrapper class link:https://github.com/apache/stormcrawler/blob/main/core/src/main/java/org/apache/stormcrawler/filtering/URLFilters.java[URLFilters]. The URLFilter instances can be used directly, but it is easier to use the class URLFilters instead. Some filter implementations can also be configured with the xref:configuration.adoc#_configuration[standard configuration mechanism].
 
 Here is an example of a link:https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/src/main/resources/urlfilters.json[JSON configuration file].
 
@@ -413,8 +415,8 @@ The latter is used by extensions of the https://github.com/apache/stormcrawler/b
 
 The behavior of the default MetadataTransfer class is driven by configuration only. It has the following options.
 
-* `metadata.transfer` list of metadata key values to filter or transfer to the outlinks. See https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml#L70[crawler-default.yaml]
-* `metadata.persist` list of metadata key values to persist in the status storage. See https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml#L75[crawler-default.yaml]
+* `metadata.transfer` list of metadata key values to filter or transfer to the outlinks. See https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml[crawler-default.yaml]
+* `metadata.persist` list of metadata key values to persist in the status storage. See https://github.com/apache/stormcrawler/blob/main/core/src/main/resources/crawler-default.yaml[crawler-default.yaml]
 * `metadata.track.path` whether to track the URL path or not. Boolean value, true by default.
 * `metadata.track.depth` whether to track the depth from seed. Boolean value, true by default.
 

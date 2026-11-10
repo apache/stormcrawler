@@ -24,16 +24,16 @@ To get started, please first join the Apache StormCrawler mailing lists:
 
 This list is for development discussions, patch suggestions, and current issues posted to the issue tracker for the project.
 
-- [Subscribe](dev-subscribe@stormcrawler.apache.org)
-- [Unsubscribe](dev-unsubscribe@stormcrawler.apache.org)
+- [Subscribe](mailto:dev-subscribe@stormcrawler.apache.org)
+- [Unsubscribe](mailto:dev-unsubscribe@stormcrawler.apache.org)
 - [Archives](https://lists.apache.org/list.html?dev@stormcrawler.apache.org)
 
 #### <commits@stormcrawler.apache.org>
 
 This list follows changes to the project. This list is not for questions. This list is used by git to post changes to the project. If you have questions about any content here, post them to the stormcrawler-dev list above.
 
-- [Subscribe](commits-subscribe@stormcrawler.apache.org)
-- [Unsubscribe](commits-unsubscribe@stormcrawler.apache.org)
+- [Subscribe](mailto:commits-subscribe@stormcrawler.apache.org)
+- [Unsubscribe](mailto:commits-unsubscribe@stormcrawler.apache.org)
 - [Archives](https://lists.apache.org/list.html?commits@stormcrawler.apache.org)
 
 #### GitHub Discussions

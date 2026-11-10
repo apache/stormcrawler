@@ -329,10 +329,10 @@ StormCrawler exposes metrics through Apache Storm's built-in metrics system. Bol
 
 The `FetcherBolt` tracks:
 
-* `fetcher_counter` — event counts (fetched, error, redirection, robots_rules_fetches)
-* `fetcher_average` — averaged values (download_time, queue_wait_time)
-* `fetcher_average_persec` — throughput rates (fetched_per_sec, error_per_sec)
-* `activethreads` — number of currently active fetching threads
+* `fetcher_counter` — event counts (fetched, bytes_fetched, status_<code>, exception, fetch.timeout, fetch.deadline, queue.timeout, robots.fetched, robots.fromCache, robots.timeout, fetch.helper.rejected)
+* `fetcher_average_perdoc` — averaged values per document (fetch_time, time_in_queues, bytes_fetched)
+* `fetcher_average_persec` — throughput rates (bytes_fetched_perSec, fetched_perSec)
+* `activethreads`, `in_queues`, `num_queues` — gauges of the active fetching threads, the URLs waiting in the queues and the number of queues
 
 The reporting interval is controlled by `fetcher.metrics.time.bucket.secs` (default: 10 seconds).
 
@@ -364,7 +364,7 @@ In Flux or topology code, set `parallelism` for each bolt to control Storm execu
 
 ==== Queue and Buffer Tuning
 
-* `fetcher.max.urls.in.queues` — caps total queued URLs to prevent memory exhaustion. -1 for unlimited.
+* `fetcher.max.urls.in.queues` — caps the URLs being fetched plus the URLs waiting in all queues, to prevent memory exhaustion. -1 for unlimited.
 * `fetcher.max.queue.size` — caps individual queue length.
 * `urlbuffer.class` — URL buffer implementation used by spouts. The default `SimpleURLBuffer` is suitable for most use cases.
 
@@ -412,7 +412,7 @@ http.custom.headers.hosts:
   - "api.example.com"
 ----
 
-The headers of `http.custom.headers` which carry credentials (see `http.credentials.headers`) are only sent to the hosts listed in `http.custom.headers.hosts`, which takes entries of the same form and is matched in the same way as `http.basicauth.hosts`; the other headers, like `X-Trace` above, are sent to every host. The two host lists are independent of each other. On a host listed in both, an `Authorization` header of `http.custom.headers` replaces the one built from `http.basicauth.*`; on a host listed only in `http.basicauth.hosts`, the Basic Authentication header is sent. Credential headers are withheld from servers which were not authenticated in the same way as the Basic Authentication credentials. For per-URL authentication, use metadata-driven headers instead (see <<Metadata-dependent Behavior For HTTP Protocols>> in the Internals section).
+The headers of `http.custom.headers` which carry credentials (see `http.credentials.headers`) are only sent to the hosts listed in `http.custom.headers.hosts`, which takes entries of the same form and is matched in the same way as `http.basicauth.hosts`; the other headers, like `X-Trace` above, are sent to every host. The two host lists are independent of each other. On a host listed in both, an `Authorization` header of `http.custom.headers` replaces the one built from `http.basicauth.*`; on a host listed only in `http.basicauth.hosts`, the Basic Authentication header is sent. Credential headers are withheld from servers which were not authenticated in the same way as the Basic Authentication credentials. For per-URL authentication, use metadata-driven headers instead (see xref:internals.adoc#_metadata_dependent_behavior_for_http_protocols[Metadata-dependent Behavior For HTTP Protocols] in the Internals section).
 
 WARNING: Breaking change in 4.0.0: before, the credentials of `http.basicauth.*` and the credential headers of `http.custom.headers` were sent to every host crawled, including the targets of outlinks. If `http.basicauth.hosts` or `http.custom.headers.hosts` is empty, the corresponding credentials are now not sent at all, and a warning is logged at startup.
 
@@ -428,4 +428,4 @@ http.proxy.user: "proxyuser"
 http.proxy.pass: "proxypass"
 ----
 
-For rotating proxies, use the `MultiProxyManager` with a proxy list file. See the xref:configuration.adoc[Proxy configuration section] for details.
+For rotating proxies, use the `MultiProxyManager` with a proxy list file. See the xref:configuration.adoc#_proxy[Proxy configuration section] for details.

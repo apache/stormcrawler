@@ -10,7 +10,8 @@ These instructions should help you get Apache StormCrawler up and running in 5 t
 
 === Prerequisites
 
-To run StormCrawler, you will need Java SE 25 or later.
+To run StormCrawler, you will need Java SE 25 or later, and Apache Maven to generate and build the
+project.
 
 Additionally, since we'll be running the required Apache Storm cluster using Docker Compose,
 make sure Docker is installed on your operating system.
@@ -74,12 +75,12 @@ The archetype will generate a fully-structured project including:
 
 After generation, navigate into the newly created directory (named after the `artifactId` you specified).
 
-TIP: You can learn more about the architecture and how each component works together if you look into xref:architecture[the architecture documentation].
+TIP: You can learn more about the architecture and how each component works together if you look into xref:architecture.adoc#architecture[the architecture documentation].
 By exploring that part of the documentation, you can gain a better understanding of how StormCrawler performs crawling and how bolts, spouts, as well as parse and URL filters, collaborate in the process.
 
 ==== Docker Compose Setup
 
-Below is a simple `docker-compose.yml` configuration to spin up URLFrontier, Zookeeper, Storm Nimbus, Storm Supervisor, and the Storm UI:
+Below is a simple `docker-compose.yml` configuration to spin up URLFrontier, Zookeeper, Storm Nimbus, Storm Supervisor, the Storm UI and the Storm logviewer:
 
 [source,yaml]
 ----
@@ -142,6 +143,7 @@ Notes:
 - Ports may need adjustment depending on your environment.
 - The Storm UI runs on port 8080 by default.
 - Ensure network connectivity between services; Docker Compose handles this by default.
+- The topology runs in the `supervisor` container, where `localhost` is the container itself. Set `urlfrontier.host: "urlfrontier"` in `crawler-conf.yaml`. Seeds are still injected from the host through `127.0.0.1:7071`.
 
 After setting up your Docker Compose, you should start it up:
 
@@ -207,9 +209,9 @@ docker run --network ${NETWORK} -it \
 --rm \
 -v "$(pwd)/crawler-conf.yaml:/apache-storm/crawler-conf.yaml" \
 -v "$(pwd)/crawler.flux:/apache-storm/crawler.flux" \
--v "$(pwd)/${artifactId}-${version}.jar:/apache-storm/${artifactId}-${version}.jar" \
+-v "$(pwd)/target/${artifactId}-${version}.jar:/apache-storm/${artifactId}-${version}.jar" \
 storm:latest \
-storm jar ${artifactId}-${version}.jar org.apache.storm.flux.Flux --remote crawler.flux
+storm jar ${artifactId}-${version}.jar org.apache.storm.flux.Flux crawler.flux
 ----
 
 .PowerShell
@@ -221,13 +223,13 @@ docker run --network $NETWORK -it `
   --rm `
   -v "${PWD}/crawler-conf.yaml:/apache-storm/crawler-conf.yaml" `
   -v "${PWD}/crawler.flux:/apache-storm/crawler.flux" `
-  -v "${PWD}/$artifactId-$version.jar:/apache-storm/$artifactId-$version.jar" `
+  -v "${PWD}/target/$artifactId-$version.jar:/apache-storm/$artifactId-$version.jar" `
   storm:latest `
-  storm jar $artifactId-$version.jar org.apache.storm.flux.Flux --remote crawler.flux
+  storm jar $artifactId-$version.jar org.apache.storm.flux.Flux crawler.flux
 ----
 ====
 
-where `${NETWORK}` is the name of the Docker network of the previously started Docker Compose. You can find this name by running
+where `${NETWORK}` is the network Docker Compose created for these services, by default `<project>_default`, where Docker Compose derives `<project>` from the name of the directory holding `docker-compose.yml`. You can find this name by running
 
 [source,shell]
 ----

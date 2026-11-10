@@ -43,11 +43,11 @@ Here is a short list of provided features:
 ** Parse Filters for post-fetch content filtering
 * Built-in support for crawl metrics and monitoring
 * Configurable politeness policies (e.g., crawl delay, user agent management)
-* Robust HTTP fetcher based on link:https://hc.apache.org/[Apache HttpComponents] or link:https://square.github.io/okhttp/[OkHttp].
+* HTTP fetcher based on link:https://lysine.dev/okhttp/[OkHttp].
 * MIME type detection and response-based filtering
 * Support for parsing and honoring `robots.txt` and sitemaps
 * Stream-based, real-time architecture using link:https://storm.apache.org/[Apache Storm] — suitable for both recursive and one-shot crawling tasks
 * Can run in both local and distributed environments
 * Apache Maven archetypes for quickly bootstrapping new crawler projects
-* Actively developed and used in production by xref:poweredby[multiple organizations]
+* Actively developed and used in production by xref:powered-by.adoc#poweredby[multiple organizations]
 

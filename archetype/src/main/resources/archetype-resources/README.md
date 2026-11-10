@@ -42,6 +42,7 @@ where _seeds.txt_ is a file containing URLs to inject, with one URL per line.
 You can now submit the flux topology using the storm command:
 
 ``` sh
+export STORM_JAR_JVM_OPTS="-Djdk.xml.maxGeneralEntitySizeLimit=0 -Djdk.xml.totalEntitySizeLimit=0"
 storm local target/${artifactId}-${version}.jar  org.apache.storm.flux.Flux crawler.flux --local-ttl 3600
 ```
 
