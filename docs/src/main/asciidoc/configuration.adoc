@@ -352,11 +352,9 @@ The values below are used by sub-classes of `AbstractIndexerBolt`.
 |===
 
 Note: `indexer.md.docid` is never used raw: the matching value is passed through SHA-256
-(the same digest used for the default URL-based ID), except for CloudSearch, whose
-`CloudSearchIndexerBolt` re-digests it with SHA-512 via `CloudSearchUtils.getID` to satisfy
-CloudSearch's ID constraints. It is only honoured by backends whose bolts call
-`AbstractIndexerBolt#getDocumentID` under the hood: the OpenSearch
-`IndexerBolt`/`DeletionBolt` pair, and the CloudSearch `CloudSearchIndexerBolt`. The Solr and
+(the same digest used for the default URL-based ID). It is only honoured by backends whose
+bolts call `AbstractIndexerBolt#getDocumentID` under the hood: the OpenSearch
+`IndexerBolt`/`DeletionBolt` pair. The Solr and
 SQL indexers build their document/row key directly from the URL and never call
 `getDocumentID()`, so this setting is silently ignored for those two backends.
 
@@ -585,20 +583,13 @@ NOTE: Since Tika 4, Tika metadata keys use namespaced names, which surface as re
 
 ==== AWS
 
-Integration with AWS services: CloudSearch for indexing and S3 for content caching.
+Integration with AWS services: S3 for content caching.
 See the link:https://github.com/apache/stormcrawler/tree/main/external/aws[aws module] for full details.
-
-NOTE: AWS CloudSearch support (the `cloudsearch.*` settings below) is deprecated and will be removed in the next major release of StormCrawler.
 
 [cols="1,1,3", options="header"]
 |===
 | key | default value | description
 
-| cloudsearch.endpoint | - | AWS CloudSearch document endpoint URL.
-| cloudsearch.region | - | AWS region (e.g., "eu-west-1").
-| cloudsearch.batch.maxSize | -1 | Documents to buffer before sending a batch. -1 disables batching.
-| cloudsearch.batch.max.time.buffered | 10 | Maximum time (seconds) before flushing the buffer.
-| cloudsearch.batch.dump | false | Dump batch JSON to a temp directory for debugging.
 | s3.region | - | AWS region for S3 operations.
 | s3.bucket | - | S3 bucket name for content caching.
 | s3.endpoint | - | Custom S3 endpoint (optional, for S3-compatible services).

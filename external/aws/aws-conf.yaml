@@ -14,28 +14,6 @@
 # limitations under the License.
 
 ###############################
-#  CloudSearch Configuration  #
-###############################
-
-# NOTE: AWS CloudSearch support is deprecated and will be removed
-# in the next major release of StormCrawler.
-
-# max number of docs to keep in buffer
-# before sending to CS irrespective of size limits
-cloudsearch.batch.maxSize: 100
-
-# max delay before flushing buffer in seconds
-cloudsearch.batch.max.time.buffered: 10
-
-# specify the doc endpoint to use unless in batch dump mode
-# cloudsearch.endpoint: doc-stormcrawler-xxxxxxxxxxxxxxxxxxxxxx.eu-west-1.cloudsearch.amazonaws.com
-
-cloudsearch.region: "eu-west-1"
-
-# dump JSON files to temp dir for debugging
-cloudsearch.batch.dump: true
-
-###############################
 #  S3 Configuration  #
 ###############################
 
