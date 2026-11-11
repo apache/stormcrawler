@@ -77,6 +77,50 @@ under the License.
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <!-- Storm ships these in lib-common, which comes before the topology jar on the
+                                 worker classpath, so copies bundled here would never be loaded -->
+                            <artifactSet>
+                                <excludes>
+                                    <exclude>com.rabbitmq:amqp-client</exclude>
+                                    <exclude>org.bouncycastle:bcpkix-jdk18on</exclude>
+                                    <exclude>org.bouncycastle:bcprov-jdk18on</exclude>
+                                    <exclude>org.bouncycastle:bcutil-jdk18on</exclude>
+                                    <exclude>commons-codec:commons-codec</exclude>
+                                    <exclude>org.apache.commons:commons-compress</exclude>
+                                    <exclude>commons-io:commons-io</exclude>
+                                    <exclude>org.apache.commons:commons-lang3</exclude>
+                                    <exclude>com.sun.activation:jakarta.activation</exclude>
+                                    <exclude>jakarta.activation:jakarta.activation-api</exclude>
+                                    <exclude>jakarta.xml.bind:jakarta.xml.bind-api</exclude>
+                                    <exclude>javax.annotation:javax.annotation-api</exclude>
+                                    <exclude>org.jspecify:jspecify</exclude>
+                                    <exclude>com.esotericsoftware:kryo</exclude>
+                                    <exclude>com.esotericsoftware:minlog</exclude>
+                                    <exclude>com.esotericsoftware:reflectasm</exclude>
+                                    <exclude>org.apache.logging.log4j:log4j-api</exclude>
+                                    <exclude>org.apache.logging.log4j:log4j-core</exclude>
+                                    <exclude>org.apache.logging.log4j:log4j-slf4j2-impl</exclude>
+                                    <exclude>org.slf4j:log4j-over-slf4j</exclude>
+                                    <exclude>org.slf4j:slf4j-api</exclude>
+                                    <exclude>io.dropwizard.metrics:metrics-core</exclude>
+                                    <exclude>io.dropwizard.metrics:metrics-graphite</exclude>
+                                    <exclude>io.dropwizard.metrics:metrics-jmx</exclude>
+                                    <exclude>io.dropwizard.metrics:metrics-jvm</exclude>
+                                    <exclude>io.netty:netty-buffer</exclude>
+                                    <exclude>io.netty:netty-codec</exclude>
+                                    <exclude>io.netty:netty-codec-base</exclude>
+                                    <exclude>io.netty:netty-codec-compression</exclude>
+                                    <exclude>io.netty:netty-codec-marshalling</exclude>
+                                    <exclude>io.netty:netty-codec-protobuf</exclude>
+                                    <exclude>io.netty:netty-common</exclude>
+                                    <exclude>io.netty:netty-handler</exclude>
+                                    <exclude>io.netty:netty-resolver</exclude>
+                                    <exclude>io.netty:netty-transport</exclude>
+                                    <exclude>io.netty:netty-transport-native-unix-common</exclude>
+                                    <exclude>org.objenesis:objenesis</exclude>
+                                    <exclude>com.github.luben:zstd-jni</exclude>
+                                </excludes>
+                            </artifactSet>
                             <transformers>
                                 <transformer
                                     implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
@@ -143,6 +187,8 @@ under the License.
                                     <excludes>
                                         <exclude>org/apache/commons/**</exclude>
                                         <exclude>org/yaml/**</exclude>
+                                        <!-- flux-core embeds slf4j-api, which Storm ships in lib-common -->
+                                        <exclude>org/slf4j/**</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

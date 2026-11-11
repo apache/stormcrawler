@@ -41,6 +41,7 @@ under the License.
         <jsoup.version>1.24.1</jsoup.version>
         <icu4j.version>79.1</icu4j.version>
         <snakeyaml.version>2.7</snakeyaml.version>
+        <commons.lang.version>3.21.0</commons.lang.version>
         <wiremock.version>3.13.2</wiremock.version>
         <rometools.version>2.1.0</rometools.version>
         <cli.version>1.11.0</cli.version>
@@ -208,6 +209,7 @@ under the License.
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
+            <version>${commons.lang.version}</version>
         </dependency>
 
         <!-- JAXP factories with external entities and DTDs disabled -->
