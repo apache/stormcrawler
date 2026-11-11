@@ -62,12 +62,6 @@ public interface URLBuffer {
         return buffer;
     }
 
-    /** Replace with {@link URLBuffer#createInstance(Map)}. */
-    @Deprecated
-    static URLBuffer getInstance(Map<String, Object> stormConf) {
-        return URLBuffer.createInstance(stormConf);
-    }
-
     /**
      * Stores the URL and its Metadata under a given key.
      *
