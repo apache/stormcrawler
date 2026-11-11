@@ -65,19 +65,28 @@ under the License.
         <additionalparam>-Xdoclint:none</additionalparam>
         <!-- dependency versions -->
         <junit.version>6.1.3</junit.version>
-        <storm-client.version>3.1.0</storm-client.version>
+        <storm-client.version>3.2.0</storm-client.version>
         <!-- Jackson's version should be in-line with the one in Storm -->
         <jackson-annotations.version>2.22</jackson-annotations.version>
-        <jackson.version>2.22.0</jackson.version>
+        <jackson.version>2.22.4</jackson.version>
         <tika.version>4.2.0</tika.version>
         <mockito.version>5.24.0</mockito.version>
-        <slf4j-simple.version>2.0.20</slf4j-simple.version>
+        <slf4j.version>2.0.20</slf4j.version>
         <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
         <commons.io.version>2.22.0</commons.io.version>
         <commons.compress.version>1.28.0</commons.compress.version>
         <commons.codec.version>1.23.0</commons.codec.version>
         <commons.secure.xml.version>1.1.0</commons.secure.xml.version>
         <guava.version>33.8.0-jre</guava.version>
+        <!-- transitive dependencies pinned so that all modules resolve the same version -->
+        <commons.logging.version>1.4.0</commons.logging.version>
+        <gson.version>2.14.0</gson.version>
+        <error_prone_annotations.version>2.52.0</error_prone_annotations.version>
+        <jspecify.version>1.0.1</jspecify.version>
+        <!-- the netty that the Storm distribution ships unshaded in lib-common, ahead of the topology
+             jar on the worker classpath, so it is what the AWS SDK and Solr run with. Keep it in
+             step with Storm -->
+        <netty.version>4.2.19.Final</netty.version>
         <git-code-format-maven-plugin.version>6.2</git-code-format-maven-plugin.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <awaitility.version>4.3.0</awaitility.version>
@@ -182,6 +191,7 @@ under the License.
                                 ASL, version 2 |
                                 The Apache License, Version 2.0 |
                                 The Apache Software License, Version 2.0 |
+                                The Apache Software License, version 2.0 |
                                 Apache License v2
                             </licenseMerge>
                             <licenseMerge>
@@ -196,7 +206,8 @@ under the License.
                             </licenseMerge>
                             <licenseMerge>
                                 BSD 2-Clause License |
-                                BSD 2-Clause license
+                                BSD 2-Clause license |
+                                BSD-2-Clause
                             </licenseMerge>
                             <licenseMerge>
                                 BSD 3-Clause License |
@@ -206,7 +217,8 @@ under the License.
                                 The BSD 3-Clause License |
                                 New BSD License |
                                 New BSD license |
-                                The BSD 3-Clause License (BSD3)
+                                The BSD 3-Clause License (BSD3) |
+                                3-Clause BSD License
                             </licenseMerge>
                             <licenseMerge>
                                 Common Development and Distribution License (CDDL) v1.0 |
@@ -225,7 +237,8 @@ under the License.
                                 <!-- Multilicense, choosing CDDL -->
                                 CDDL+GPL |
                                 CDDL+GPL License |
-                                CDDL + GPLv2 with classpath exception
+                                CDDL + GPLv2 with classpath exception |
+                                CDDL/GPLv2+CE
                             </licenseMerge>
                             <licenseMerge>
                                 Eclipse Public License, Version 1.0 |
@@ -235,12 +248,15 @@ under the License.
                             <licenseMerge>
                                 Eclipse Public License, Version 2.0 |
                                 EPL-2.0 |
-                                EPL 2.0
+                                EPL 2.0 |
+                                Eclipse Public License 2.0 |
+                                Eclipse Public License v. 2.0
                             </licenseMerge>
                             <licenseMerge>
                                 Eclipse Distribution License, Version 1.0 |
                                 Eclipse Distribution License - v 1.0 |
-                                EDL 1.0
+                                EDL 1.0 |
+                                Eclipse Distribution License v. 1.0
                             </licenseMerge>
                             <licenseMerge>
                                 MIT License |
@@ -251,7 +267,9 @@ under the License.
                             </licenseMerge>
                             <licenseMerge>
                                 The GNU General Public License (GPL), Version 2, With Classpath Exception |
-                                GPL2 w/ CPE
+                                GPL2 w/ CPE |
+                                GPL-2.0-with-classpath-exception |
+                                GNU General Public License, version 2 with the GNU Classpath Exception
                             </licenseMerge>
                             <licenseMerge>
                                 GNU Lesser General Public License (LGPL), Version 2.1 |
@@ -636,7 +654,7 @@ under the License.
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-simple</artifactId>
-                <version>${slf4j-simple.version}</version>
+                <version>${slf4j.version}</version>
                 <scope>test</scope>
             </dependency>
 
@@ -742,6 +760,58 @@ under the License.
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-secure-xml</artifactId>
                 <version>${commons.secure.xml.version}</version>
+            </dependency>
+
+            <!-- Versions pinned so that all modules agree on them, rather than each resolving
+                 whichever version its nearest dependency asks for -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons.io.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>commons-logging</groupId>
+                <artifactId>commons-logging</artifactId>
+                <version>${commons.logging.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.code.gson</groupId>
+                <artifactId>gson</artifactId>
+                <version>${gson.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.errorprone</groupId>
+                <artifactId>error_prone_annotations</artifactId>
+                <version>${error_prone_annotations.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.jspecify</groupId>
+                <artifactId>jspecify</artifactId>
+                <version>${jspecify.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
         </dependencies>
