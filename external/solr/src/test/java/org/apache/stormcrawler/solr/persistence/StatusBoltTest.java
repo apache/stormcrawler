@@ -29,6 +29,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.jetty.HttpJettySolrClient;
+import org.apache.solr.common.SolrDocument;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
@@ -39,12 +42,15 @@ import org.apache.stormcrawler.solr.SolrContainerTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 class StatusBoltTest extends SolrContainerTest {
     private StatusUpdaterBolt bolt;
     protected TestOutputCollector output;
+    private Map<String, Object> conf;
 
     private static final Logger LOG = LoggerFactory.getLogger(StatusBoltTest.class);
 
@@ -55,7 +61,7 @@ class StatusBoltTest extends SolrContainerTest {
         bolt = new StatusUpdaterBolt();
         output = new TestOutputCollector();
 
-        Map<String, Object> conf = new HashMap<>();
+        conf = new HashMap<>();
         conf.put("scheduler.class", "org.apache.stormcrawler.persistence.DefaultScheduler");
         conf.put("status.updater.cache.spec", "maximumSize=10000,expireAfterAccess=1h");
         conf.put("solr.status.url", getSolrBaseUrl() + "/status");
@@ -111,5 +117,59 @@ class StatusBoltTest extends SolrContainerTest {
         store(url, Status.ERROR, md).get(10, TimeUnit.SECONDS);
 
         assertEquals(1, output.getAckedTuples().size());
+    }
+
+    /** A URL discovered again must keep its status, see #2304. */
+    @ParameterizedTest
+    @EnumSource(
+            value = Status.class,
+            names = {"FETCHED", "FETCH_ERROR", "ERROR", "REDIRECTION"})
+    void discoveredDoesNotOverwriteKnownUrl(Status known) throws Exception {
+        String url = "https://www.url.net/known-" + known;
+        String newUrl = "https://www.url.net/new-" + known;
+
+        store(url, known, new Metadata()).get(10, TimeUnit.SECONDS);
+
+        try (SolrClient client = new HttpJettySolrClient.Builder(getSolrBaseUrl()).build()) {
+            await().atMost(30, TimeUnit.SECONDS).until(() -> client.getById("status", url) != null);
+            SolrDocument before = client.getById("status", url);
+
+            // a second bolt stands for a restarted topology, so that the status cache of the
+            // first one does not hold the URL
+            StatusUpdaterBolt restarted = new StatusUpdaterBolt();
+            TestOutputCollector restartedOutput = new TestOutputCollector();
+            restarted.prepare(
+                    conf,
+                    TestUtil.getMockedTopologyContext(),
+                    new OutputCollector(restartedOutput));
+            try {
+                execute(restarted, url, Status.DISCOVERED, new Metadata());
+                execute(restarted, newUrl, Status.DISCOVERED, new Metadata());
+                await().atMost(30, TimeUnit.SECONDS)
+                        .until(() -> restartedOutput.getAckedTuples().size() == 2);
+                // the new URL is added, so the update of the known one has been processed too
+                await().atMost(30, TimeUnit.SECONDS)
+                        .until(() -> client.getById("status", newUrl) != null);
+            } finally {
+                restarted.cleanup();
+            }
+
+            SolrDocument after = client.getById("status", url);
+            assertEquals(known.name(), after.getFieldValue("status"));
+            assertEquals(
+                    before.getFieldValue("nextFetchDate"), after.getFieldValue("nextFetchDate"));
+            assertEquals(
+                    Status.DISCOVERED.name(),
+                    client.getById("status", newUrl).getFieldValue("status"));
+        }
+    }
+
+    private static void execute(
+            StatusUpdaterBolt bolt, String url, Status status, Metadata metadata) {
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.getValueByField("status")).thenReturn(status);
+        when(tuple.getStringByField("url")).thenReturn(url);
+        when(tuple.getValueByField("metadata")).thenReturn(metadata);
+        bolt.execute(tuple);
     }
 }

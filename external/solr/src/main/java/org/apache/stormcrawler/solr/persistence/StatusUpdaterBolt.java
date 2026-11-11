@@ -125,6 +125,12 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
             doc.setField("nextFetchDate", nextFetch.get());
         }
 
+        // a discovered URL must not overwrite the status of a URL already in the collection,
+        // a negative version only adds the document if it does not exist yet
+        if (status == Status.DISCOVERED) {
+            doc.setField("_version_", -1L);
+        }
+
         connection.addAsync(doc);
 
         super.ack(t, url);
