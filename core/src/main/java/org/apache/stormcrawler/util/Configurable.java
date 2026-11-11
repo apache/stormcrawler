@@ -53,21 +53,6 @@ public interface Configurable {
             @NotNull String filterName) {}
 
     /**
-     * @deprecated Replace with {@link Configurable#createConfiguredInstance(Class, Class, Map,
-     *     JsonNode)} or {@link Configurable#createConfiguredInstance(String, Class, Map, JsonNode)}
-     */
-    @Deprecated
-    @NotNull
-    static <T extends Configurable> List<@NotNull T> configure(
-            @NotNull Map<String, Object> stormConf,
-            @NotNull JsonNode filtersConf,
-            @NotNull Class<T> filterClass,
-            @NotNull String callingClass) {
-        return ConfigurableHelper.createConfiguredInstance(
-                callingClass, filterClass, stormConf, filtersConf);
-    }
-
-    /**
      * Calls {@link Configurable#createConfiguredInstance(String, Class, Map, JsonNode)} with {@code
      * caller.getName()} for {@code configName}.
      *
