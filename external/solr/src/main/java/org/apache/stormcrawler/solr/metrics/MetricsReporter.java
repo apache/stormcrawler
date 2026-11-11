@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * <p>Configuration in storm.yaml:
  *
  * <pre>
- *   storm.metrics.reporters:
+ *   topology.metrics.reporters:
  *     - class: "org.apache.stormcrawler.solr.metrics.MetricsReporter"
  *       report.period: 10
  *       report.period.units: "SECONDS"
