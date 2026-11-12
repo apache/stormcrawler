@@ -29,7 +29,6 @@ to be used as a starting point for the crawl, e.g.
 You can start the crawl topology in local mode using the URLs in _seeds.txt_ as a starting point with
 
 ``` sh
-export STORM_JAR_JVM_OPTS="-Djdk.xml.maxGeneralEntitySizeLimit=0 -Djdk.xml.totalEntitySizeLimit=0"
 storm local target/${artifactId}-${version}.jar  org.apache.storm.flux.Flux injection.flux --local-ttl 3600
 ```
 
@@ -44,7 +43,13 @@ storm jar target/${artifactId}-${version}.jar  org.apache.storm.flux.Flux crawle
 ```
 
 Note that in the previous command, we ran the topology with `storm jar` to benefit from the Storm UI and logging. In that case, the topology runs continuously, as intended.
-If you don't have a Storm cluster set up and/or want to run in local mode, simply replace _jar_ with _local_, add _--local-ttl 3600_ and set `STORM_JAR_JVM_OPTS` as above.
+If you don't have a Storm cluster set up and/or want to run in local mode, simply replace _jar_ with _local_ and add _--local-ttl 3600_. In local mode, first run
+
+``` sh
+export STORM_JAR_JVM_OPTS="-Djdk.xml.maxGeneralEntitySizeLimit=0 -Djdk.xml.totalEntitySizeLimit=0"
+```
+
+`STORM_JAR_JVM_OPTS` lifts the limits of the JDK XML parser, which large sitemaps and feeds exceed. In local mode the topology runs in the JVM of the `storm` command, which does not apply the `topology.worker.childopts` of _crawler-conf.yaml_.
 
 
 Index definitions

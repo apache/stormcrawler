@@ -109,7 +109,7 @@ bolts:
           - ref: "WARCInfo"
 
 streams:
-  - from: "fetch"
+  - from: "fetcher"
     to: "warc"
     grouping:
       type: LOCAL_OR_SHUFFLE

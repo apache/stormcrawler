@@ -14,4 +14,4 @@ Check that you have specified a configuration file such as [sql-conf.yaml](https
         </dependency>
 ```
 
-You can either inject the seeds directly as done in the tutorial or reuse the injection topology from the opensearch module and specify the statusupdaterbolt from the mysql module instead. Another approach could be to simply to add a MemorySpout to the topology alongside the SQLSpout.
+You can either inject the seeds directly as done in the tutorial or reuse the injection topology from the opensearch module and specify the statusupdaterbolt from the SQL module instead. Another approach could be to add a MemorySpout to the topology alongside the SQLSpout.

@@ -30,7 +30,7 @@ The full user agent string is built from the concatenation of the configuration 
 
 Only `http.agent.name` is required. Empty elements are left out of the string, which has the form `name/version (description; url; email)`.
 
-Whereas StormCrawler used to provide a default value for these, this is not the case since version 2.11 and you will now be asked to provide a value.
+StormCrawler has not provided default values for these since version 2.11.
 
 You can specify the user agent verbatim with the config `http.agent` but you will still need to provide a `http.agent.name` for parsing robots.txt files.
 
@@ -185,7 +185,6 @@ as an ERROR. If true: the fetcher caps its local delay and emits the requested d
 | fetcher.max.urls.in.queues | -1 | Maximum number of URLs held by the FetcherBolt: URLs being fetched plus URLs waiting in all its queues. The bolt stops taking tuples while the limit is reached. -1 disables the limit.
 | fetcher.maxThreads.host/domain/ip | fetcher.threads.per.queue | Overwrites fetcher.threads.per.queue. Useful for crawling some domains/hosts/IPs more intensively.
 | fetcher.metrics.time.bucket.secs | 10 | Metrics events emitted every value seconds to the system stream.
-| stormcrawler.metrics.version | v1 | Storm metrics API used by StormCrawler components: `v1` (legacy), `v2` (V2 metrics API) or `both`.
 | fetcher.queue.mode | byHost | Possible values: byHost, byDomain, byIP. Determines queue grouping.
 | fetcher.server.delay | 1 | Delay between crawls in the same queue if no Crawl-delay
 is defined.
@@ -218,7 +217,7 @@ implementation.
 | http.proxy.rotation | ROUND_ROBIN | MultiProxyManager proxy rotation scheme when that manager is selected.
 | http.proxy.type | HTTP | SingleProxyManager component proxy type.
 | http.proxy.user | - | SingleProxyManager component proxy username, used with `http.proxy.pass`.
-| http.retry.on.connection.failure | true | (OkHttp only) Retry fetching on connection failure. See link:https://lysine.dev/okhttp/5.x/okhttp/okhttp3/-ok-http-client/-builder/retry-on-connection-failure.html[OkHttp docs].
+| http.retry.on.connection.failure | true | (OkHttp only) Retry fetching on connection failure. See link:https://okhttp.org/okhttp-connection-recovery/[OkHttp docs].
 | http.robots.403.allow | true | Allow crawling when robots.txt returns HTTP 403.
 | http.robots.5xx.allow | false | Allow crawling when robots.txt returns a server error (5xx).
 | http.robots.agents | '' | Additional user-agent strings for interpreting robots.txt.
@@ -228,7 +227,6 @@ implementation.
 | http.robots.meta.skip | false | Ignore robots directives from HTML meta tags.
 | http.robots.redirect.crossorigin.allow | false | Follow a robots.txt redirect pointing at a different scheme, host or port than the URL it was reached from. Redirects to schemes other than http and https are never followed. A redirect which only replaces http with https while staying on the same host and port is always followed, whatever this is set to. When enabled, the robots.txt is re-fetched from the host named in the `Location` header, for up to 5 hops, and each of these requests carries the headers configured through `http.custom.headers`, except for credential headers if the host is not listed in `http.custom.headers.hosts`, and those of `http.basicauth.*` if the host is listed in `http.basicauth.hosts`, as any other request does; see `http.filter.ipaddress.exclude` to restrict the addresses those fetches may reach.
 | http.robots.redirect.refused.allow | false | Allow crawling when a robots.txt redirect was not followed because of `http.robots.redirect.crossorigin.allow`. If false, nothing is crawled on that host until the redirect is followed or this is set to true.
-| http.skip.robots | false | Deprecated (replaced by http.robots.file.skip).
 | robots.noFollow.strict | true | If true, remove all outlinks from pages marked as noFollow.
 | http.store.headers | false | Whether to store response headers.
 | http.timeout | 10000 | Connection timeout (ms).
@@ -241,6 +239,7 @@ implementation.
 | http.allow.redirects | false | (OkHttp only) Follow HTTP redirects immediately in the HTTP protocol client. Note: if followed immediately, redirect target URLs are not emitted to the status stream, are not deduplicated and not checked against robots.txt, but each target runs through the URL filter chain before the hop is taken (up to `http.allow.redirects.max` hops; the final URL is recorded in the response metadata as `_redirectedTo`; credentials are not carried to another origin or to a server which is not authenticated, e.g. after an https to http downgrade).
 | http.allow.redirects.max | 5 | (OkHttp only) Maximum number of redirect hops followed when `http.allow.redirects` is enabled. A chain which does not end within this many hops returns its last redirect response, which is handled like a redirect that is not followed immediately.
 | sitemap.discovery | false | Enable automatic sitemap discovery.
+| stormcrawler.metrics.version | v1 | Storm metrics API used by StormCrawler components: `v1` (legacy), `v2` (V2 metrics API) or `both`.
 | urlbuffer.class | org.apache.stormcrawler.persistence.urlbuffer.SimpleURLBuffer | URL buffer implementation used by spouts.
 |===
 
