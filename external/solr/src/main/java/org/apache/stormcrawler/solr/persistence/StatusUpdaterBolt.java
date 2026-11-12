@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.common.params.CommonParams;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
@@ -123,6 +124,12 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt {
 
         if (nextFetch.isPresent()) {
             doc.setField("nextFetchDate", nextFetch.get());
+        }
+
+        // a discovered URL must not overwrite the status of a URL already in the collection,
+        // a negative version only adds the document if it does not exist yet
+        if (status == Status.DISCOVERED) {
+            doc.setField(CommonParams.VERSION_FIELD, -1L);
         }
 
         connection.addAsync(doc);

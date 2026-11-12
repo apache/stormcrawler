@@ -77,11 +77,17 @@ class CloudConnectionTest extends SolrCloudContainerTest {
 
         // Kill the leader node
         stopNode(leader);
+        try {
+            // Wait for recovery
+            await().atMost(30, TimeUnit.SECONDS).until(() -> getLiveLeader() != null);
 
-        // Wait for recovery
-        await().atMost(30, TimeUnit.SECONDS).until(() -> getLiveLeader() != null);
-
-        assertEquals(1, getNumFound());
+            assertEquals(1, getNumFound());
+        } finally {
+            // the cluster is shared with the other test classes
+            startNode(leader);
+            await().atMost(60, TimeUnit.SECONDS)
+                    .until(() -> client.getClusterState().getLiveNodes().size() == 2);
+        }
     }
 
     private Replica getLiveLeader() {

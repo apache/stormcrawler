@@ -44,6 +44,7 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
+import org.apache.solr.common.params.CommonParams;
 import org.apache.stormcrawler.util.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -201,7 +202,7 @@ public class SolrConnection {
             return;
         }
 
-        UpdateRequest updateRequest = new UpdateRequest();
+        UpdateRequest updateRequest = newUpdateRequest();
         if (!docs.isEmpty()) {
             updateRequest.add(docs);
         }
@@ -249,12 +250,24 @@ public class SolrConnection {
         return col.getRouter().getTargetSlice(null, doc, null, null, col);
     }
 
+    /**
+     * Documents with a negative {@code _version_} must not exist yet. If one does, Solr skips that
+     * document instead of failing the whole request.
+     */
+    private static UpdateRequest newUpdateRequest() {
+        UpdateRequest updateRequest = new UpdateRequest();
+        updateRequest.setParam(CommonParams.FAIL_ON_VERSION_CONFLICTS, "false");
+        return updateRequest;
+    }
+
     public void addAsync(SolrInputDocument doc) {
         if (cloud) {
             updateAsync(new DocUpdate(doc));
         } else {
             try {
-                updateClient.add(doc);
+                UpdateRequest updateRequest = newUpdateRequest();
+                updateRequest.add(doc);
+                updateRequest.process(updateClient);
             } catch (Exception e) {
                 LOG.error("Exception caught while updating", e);
             }

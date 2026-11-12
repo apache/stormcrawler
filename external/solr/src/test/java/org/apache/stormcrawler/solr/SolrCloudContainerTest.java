@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.ComposeContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.containers.wait.strategy.WaitStrategy;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.MountableFile;
 
@@ -36,15 +35,23 @@ public abstract class SolrCloudContainerTest {
     private static final WaitStrategy waitStrategy =
             Wait.forHttp("/solr/admin/cores?action=STATUS").forStatusCode(200);
 
-    @Container
+    // started once and shared by all test classes, a ComposeContainer cannot be started again
+    // after it was stopped. Testcontainers removes it when the JVM exits.
     static ComposeContainer environment =
             new ComposeContainer(new File("src/test/resources/docker-compose.yml"))
                     .withExposedService("solr", 8983, waitStrategy)
                     .withExposedService("zookeeper", 2181)
                     .withLocalCompose(true);
 
+    private static boolean started = false;
+
     @BeforeAll
-    static void before() {
+    static synchronized void before() {
+        if (started) {
+            return;
+        }
+        environment.start();
+        started = true;
         environment
                 .getContainerByServiceName("solr")
                 .ifPresent(
@@ -53,6 +60,12 @@ public abstract class SolrCloudContainerTest {
                                     MountableFile.forHostPath(configsetsPath),
                                     "/opt/solr/server/solr/configsets");
                         });
+    }
+
+    protected static String getZkConnect() {
+        return environment.getServiceHost("zookeeper", 2181)
+                + ":"
+                + environment.getServicePort("zookeeper", 2181);
     }
 
     protected static void createCollection(String collectionName, int shards, int replicas) {
