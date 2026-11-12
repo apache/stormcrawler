@@ -588,6 +588,7 @@ under the License.
                                 <exclude>.github/*.md</exclude>
                                 <exclude>.mvn/*.config</exclude>
                                 <exclude>.gitattributes</exclude>
+                                <exclude>.rat-excludes</exclude>
                                 <exclude>**/dependency-reduced-pom.xml</exclude>
                                 <exclude>.editorconfig</exclude>
                                 <exclude>**/.settings/**/*</exclude> <!-- Eclipse -->
