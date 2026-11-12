@@ -42,11 +42,11 @@ where _seeds.txt_ is a file containing URLs to inject, with one URL per line.
 You can now submit the flux topology using the storm command:
 
 ``` sh
+# Lift the JDK XML parser limits that sitemaps and feeds with many entity references exceed.
+# storm local runs the topology in the JVM of the storm command, which ignores the topology.worker.childopts of crawler-conf.yaml.
 export STORM_JAR_JVM_OPTS="-Djdk.xml.maxGeneralEntitySizeLimit=0 -Djdk.xml.totalEntitySizeLimit=0"
 storm local target/${artifactId}-${version}.jar  org.apache.storm.flux.Flux crawler.flux --local-ttl 3600
 ```
-
-`STORM_JAR_JVM_OPTS` lifts the limits of the JDK XML parser, which large sitemaps and feeds exceed. In local mode the topology runs in the JVM of the `storm` command, which does not apply the `topology.worker.childopts` of _crawler-conf.yaml_.
 
 Note that in local mode, Flux uses a default TTL for the topology of 20 secs. The command above runs the topology for 1 hour.
 

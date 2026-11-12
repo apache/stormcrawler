@@ -31,9 +31,9 @@ in <<Java and Storm>> and <<Project changes>>.
 <<Custom Java code>>.
 . Review the configuration against
 <<Crawler configuration and behaviour>>.
-. Start the topology. These fail at startup: an invalid IP filter rule, Tika
-configuration or jsoup XPath expression, and a `FastURLFilter` rule without a
-type. If `http.basicauth.hosts` or `http.custom.headers.hosts` is empty, those
+. Start the topology. It fails at startup when a filter file names a class
+removed in 4.0, and on an invalid IP filter rule, Tika configuration or jsoup
+XPath expression or a `FastURLFilter` rule without a type. If `http.basicauth.hosts` or `http.custom.headers.hosts` is empty, those
 credentials are not sent and a warning is logged.
 . After the first crawl, compare a few URLs from the cases below with their
 records from before the upgrade: fetch status, extracted content and stored
@@ -50,10 +50,9 @@ topology. The list is not complete.
 * Tika metadata keys, embedded documents and the MIME type whitelist
 * custom JSoupFilters, which now also run on Tika output
 * stored URL forms and host keys
-* text extracted by the AI module with its default prompt
+* text extracted by the AI module
 * `HostURLFilter` with `ignoreOutsideDomain: true`
 * custom URL filters which throw exceptions
-* overrides of the removed `addHeadersToRequest(Request.Builder, Metadata)`
 
 ==== Java and Storm
 
@@ -149,10 +148,11 @@ override the key, for instance with `""`. Setting only
 `http.filter.ipaddress.include` does not undo the default. An invalid rule now
 fails the topology at startup instead of being ignored. See
 xref:configuration.adoc#_ip_address_filtering[IP Address Filtering].
-* `protocols` now defaults to `http,https` instead of `http,https,file`. To
-crawl a local corpus, add `file` and set the new `file.protocol.root`. Without
-it, `file:` URLs end as `FETCH_ERROR` and a warning starting with
-`Refusing to read` is logged.
+* `protocols` now defaults to `http,https` instead of `http,https,file`. The
+querying spouts set stored URLs whose scheme is not listed to `ERROR`. To crawl
+a local corpus, add `file` before the first crawl with 4.0 and set the new
+`file.protocol.root`. Without `file.protocol.root`, `file:` URLs end as
+`FETCH_ERROR` and a warning starting with `Refusing to read` is logged.
 * `http.robots.content.limit` now defaults to 524288 bytes instead of no limit,
 so a robots.txt larger than 512 KiB is truncated. To read larger files, raise
 the limit. The value `-1`, which meant no limit in 3.x, now means the value of
@@ -199,9 +199,10 @@ Custom ParseFilters are covered in
 <<ParseFilters without a DOM>>.
 * Expressions of the removed `XPathFilter` must be rewritten for the jsoup one,
 which selects what to extract with a suffix of the expression instead of a
-wrapper function. `string(//X)` becomes
-`//X/tidyText()`, and `serialize(//X)` becomes `//X/html()`, which returns the
-inner HTML of the element. The suffixes `/allText()` and `/@attribute` are also
+wrapper function. `string(//X)` becomes `//X/tidyText()`, which returns one
+value per matching element instead of the first only. `serialize(//X)` becomes
+`//X/html()`, which returns the inner HTML of the element without its own
+tags. The suffixes `/allText()` and `/@attribute` are also
 available.
 * The jsoup `XPathFilter` now compiles its expressions at startup with the JDK
 XPath engine. An invalid expression fails the topology instead of being logged
@@ -266,7 +267,8 @@ The querying spouts of the OpenSearch, Solr, SQL and URLFrontier modules now
 mark rows whose URL scheme is not in `protocols` as `ERROR`. They send them on
 the `status` stream. Connect the spout to the status updater on that stream, as
 the 4.0 archetype `crawler.flux` files do. Without it, these rows are queried
-again and again.
+again and again, and the spout logs a warning starting with
+`The status stream reached no component`.
 
 [source,yaml]
 ----
@@ -306,9 +308,9 @@ now use the host lowercased, percent-decoded, without the trailing dot and in
 punycode. With `opensearch.status.routing` or with URLFrontier, the next update
 of such a URL can be stored under the new key, next to the old record.
 * URLs with a Unicode host. The OpenSearch `key` field and the value of
-`DomainParseFilter` are now in punycode. Crawls with `hostIDNtoASCII: true` in
-`BasicURLNormalizer`, as in the archetype configurations, already store
-punycode hosts for URLs added since it was set.
+`DomainParseFilter` are now in punycode. With `hostIDNtoASCII: true` in
+`BasicURLNormalizer`, as in the archetype configurations, URLs added after the
+setting was enabled are not affected.
 
 The SQL `StatusUpdaterBolt` now writes the metadata column in an escaped form
 behind a `v1` marker. Rows written by 3.x are read as before, so no migration is
@@ -348,8 +350,9 @@ values are replaced by spaces, and invalid keys in `warc.metadata.keys` are
 dropped with a warning. Tools which parse `WARC-Protocol` must accept a
 repeated header and lowercase values.
 * The LLM text extraction of the AI module has a new default prompt. The
-extractor now keeps only the `<content>` element of a reply which has one.
-Crawls with the default prompt get differently extracted text. See the
+extractor now keeps only the `<content>` element of a reply which has one and
+removes the markup outside fenced code blocks, whatever the prompt. The
+extracted text changes for every crawl which uses the module. See the
 link:https://github.com/apache/stormcrawler/blob/main/external/ai/README.md[AI module README]
 for the prompt placeholders.
 
@@ -384,7 +387,7 @@ it through. The log shows `URL filter <class> threw exception`.
 domains. To keep them, remove `ignoreOutsideDomain`.
 * `SelfURLFilter` now compares the path and query of a link with those of the
 page case-sensitively. A link or redirect which differs from the page URL only
-in their case, such as from `/a.html` to `/A.html`, is no longer dropped.
+in letter case, such as from `/a.html` to `/A.html`, is no longer dropped.
 
 === Custom Java code
 
@@ -412,7 +415,8 @@ as Playwright page actions declared in `playwright.page.actions.config.file`.
 * `ParseResult.get(String)` is removed. Use `getOrCreate(String)` to add a
 sub-document or `getIfPresent(String)` to read one. The parser bolts no longer
 emit a sub-document whose content, text and metadata are all empty.
-* Both overloads of `CookieConverter.getCookies(...)` now return immutable
+* `CookieConverter.getCookies(String[], URL)` and the new overload which also
+takes the URL that set the cookies return immutable
 `org.apache.stormcrawler.util.CookieConverter.Cookie` records instead of
 HttpClient cookies. Update the cookie type import and use the record accessors
 `name()`, `value()`, `domain()`, `path()`, `secure()` and `expiry()`. The expiry
@@ -432,7 +436,8 @@ argument: the prefix of the response headers in the metadata, with its
 separator. Pass `"protocol."`, for instance, or `""` when the headers are not
 prefixed.
 * `URLBuffer.getInstance(Map)` and the static
-`Configurable.configure(Map, JsonNode, Class, String)` are removed. Use `URLBuffer.createInstance(Map)` and
+`Configurable.configure(Map, JsonNode, Class, String)` are removed. Use
+`URLBuffer.createInstance(Map)` and
 `Configurable.createConfiguredInstance(String, Class, Map, JsonNode)`, which
 takes the name of the calling class first.
 * Code using Tika classes directly must follow the

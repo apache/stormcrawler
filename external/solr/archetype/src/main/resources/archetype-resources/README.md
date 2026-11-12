@@ -150,7 +150,7 @@ Note that in the previous command, we ran the topology with `storm jar` to benef
 If you don't have a Storm cluster set up and/or want to run in local mode, simply replace _jar_ with _local_ and add _--local-ttl 3600_. In local mode, first run
 
 ``` sh
+# Lift the JDK XML parser limits that sitemaps and feeds with many entity references exceed.
+# storm local runs the topology in the JVM of the storm command, which ignores the topology.worker.childopts of crawler-conf.yaml.
 export STORM_JAR_JVM_OPTS="-Djdk.xml.maxGeneralEntitySizeLimit=0 -Djdk.xml.totalEntitySizeLimit=0"
 ```
-
-`STORM_JAR_JVM_OPTS` lifts the limits of the JDK XML parser, which large sitemaps and feeds exceed. In local mode the topology runs in the JVM of the `storm` command, which does not apply the `topology.worker.childopts` of _crawler-conf.yaml_.
