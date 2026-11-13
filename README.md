@@ -23,11 +23,11 @@ Be sure to replace <CURRENT_VERSION> with the latest released version, which you
 
 You'll be asked to enter a groupId (e.g. com.mycompany.crawler), an artefactId (e.g. stormcrawler), a version, a package name and details about the user agent to use.
 
-This will not only create a fully formed project containing a POM with the dependency above but also the default resource files, a default CrawlTopology class and a configuration file. Enter the directory you just created (should be the same as the artefactId you specified earlier) and follow the instructions on the README file.
+This will not only create a fully formed project containing a POM with the dependency above but also the default resource files, a Flux topology definition (crawler.flux) and a configuration file (crawler-conf.yaml). Enter the directory you just created (should be the same as the artefactId you specified earlier) and follow the instructions on the README file.
 
-Alternatively if you can't or don't want to use the Maven archetype above, you can simply copy the files from [archetype-resources](https://github.com/apache/stormcrawler/tree/master/archetype/src/main/resources/archetype-resources).
+Alternatively if you can't or don't want to use the Maven archetype above, you can simply copy the files from [archetype-resources](https://github.com/apache/stormcrawler/tree/main/archetype/src/main/resources/archetype-resources).
 
-Have a look at [crawler.flux](https://github.com/apache/stormcrawler/blob/master/archetype/src/main/resources/archetype-resources/crawler.flux), the [crawler-conf.yaml](https://github.com/apache/stormcrawler/blob/master/archetype/src/main/resources/archetype-resources/crawler-conf.yaml) file as well as the files in [src/main/resources/](https://github.com/apache/stormcrawler/tree/master/archetype/src/main/resources/archetype-resources/src/main/resources), they are all that is needed to run a crawl topology : all the other components come from the core module.
+Have a look at [crawler.flux](https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/crawler.flux), the [crawler-conf.yaml](https://github.com/apache/stormcrawler/blob/main/archetype/src/main/resources/archetype-resources/crawler-conf.yaml) file as well as the files in [src/main/resources/](https://github.com/apache/stormcrawler/tree/main/archetype/src/main/resources/archetype-resources/src/main/resources), they are all that is needed to run a crawl topology : all the other components come from the core module.
 
 ## Getting help
 

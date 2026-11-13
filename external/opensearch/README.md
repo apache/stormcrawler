@@ -4,10 +4,10 @@ stormcrawler-opensearch
 A collection of resources for [OpenSearch](https://opensearch.org/) built on the
 [OpenSearch Java Client 3.x](https://opensearch.org/docs/latest/clients/java/) and
 Apache HttpClient 5:
-* [IndexerBolt](https://github.com/apache/stormcrawler/blob/master/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/bolt/IndexerBolt.java) for indexing documents crawled with StormCrawler
-* [Spouts](https://github.com/apache/stormcrawler/blob/master/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/persistence/AggregationSpout.java) and [StatusUpdaterBolt](https://github.com/apache/stormcrawler/blob/master/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/persistence/StatusUpdaterBolt.java) for persisting URL information in recursive crawls
-* [MetricsConsumer](https://github.com/apache/stormcrawler/blob/master/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/metrics/MetricsConsumer.java)
-* [StatusMetricsBolt](https://github.com/apache/stormcrawler/blob/master/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/metrics/StatusMetricsBolt.java) for sending the breakdown of URLs per status as metrics and display its evolution over time.
+* [IndexerBolt](https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/bolt/IndexerBolt.java) for indexing documents crawled with StormCrawler
+* [Spouts](https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/persistence/AggregationSpout.java) and [StatusUpdaterBolt](https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/persistence/StatusUpdaterBolt.java) for persisting URL information in recursive crawls
+* [MetricsConsumer](https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/metrics/MetricsConsumer.java)
+* [StatusMetricsBolt](https://github.com/apache/stormcrawler/blob/main/external/opensearch/src/main/java/org/apache/stormcrawler/opensearch/metrics/StatusMetricsBolt.java) for sending the breakdown of URLs per status as metrics and display its evolution over time.
 
 as well as resources for building basic real-time monitoring dashboards for the crawls, see below.
 
@@ -48,7 +48,7 @@ Be sure to replace <CURRENT_VERSION> with the latest released version, which you
 
 You'll be asked to enter a groupId (e.g. com.mycompany.crawler), an artefactId (e.g. stormcrawler), a version, a package name and details about the user agent to use.
 
-This will not only create a fully formed project containing a POM with a dependency on this module but also a set of resources, configuration files and a topology class. Enter the directory you just created (should be the same as the artefactId you specified earlier) and follow the instructions on the README file.
+This will not only create a fully formed project containing a POM with a dependency on this module but also a set of resources, configuration files and Flux topology definitions (crawler.flux, injection.flux). Enter the directory you just created (should be the same as the artefactId you specified earlier) and follow the instructions on the README file.
 
 You will of course need to have both Storm and OpenSearch installed. For the latter, the [OpenSearch documentation](https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/) contains resources for Docker.
 

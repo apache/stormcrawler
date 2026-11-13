@@ -14,10 +14,10 @@
 # limitations under the License.
 
 # Custom configuration for StormCrawler
-# This is used to override the default values from crawler-default.xml and provide additional ones
+# This is used to override the default values from crawler-default.yaml and provide additional ones
 # for your custom components.
-# Use this file with the parameter -conf when launching your extension of ConfigurableTopology.
-# This file does not contain all the key values but only the most frequently used ones. See crawler-default.xml for an extensive list.
+# crawler.flux loads this file after crawler-default.yaml (see its includes section).
+# This file does not contain all the key values but only the most frequently used ones. See crawler-default.yaml for an extensive list.
 
 config:
   topology.workers: 1

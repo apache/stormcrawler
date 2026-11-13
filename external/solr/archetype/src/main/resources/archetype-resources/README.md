@@ -147,4 +147,10 @@ storm jar target/${artifactId}-${version}.jar  org.apache.storm.flux.Flux crawle
 ```
 
 Note that in the previous command, we ran the topology with `storm jar` to benefit from the Storm UI and logging. In that case, the topology runs continuously, as intended.
-If you don't have a Storm cluster set up and/or want to run in local mode, simply replace _jar_ with _local_ and add _--local-ttl 3600_.
+If you don't have a Storm cluster set up and/or want to run in local mode, simply replace _jar_ with _local_ and add _--local-ttl 3600_. In local mode, first run
+
+``` sh
+# Lift the JDK XML parser limits that sitemaps and feeds with many entity references exceed.
+# storm local runs the topology in the JVM of the storm command, which ignores the topology.worker.childopts of crawler-conf.yaml.
+export STORM_JAR_JVM_OPTS="-Djdk.xml.maxGeneralEntitySizeLimit=0 -Djdk.xml.totalEntitySizeLimit=0"
+```
