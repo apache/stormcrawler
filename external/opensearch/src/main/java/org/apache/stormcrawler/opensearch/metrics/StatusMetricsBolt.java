@@ -17,6 +17,7 @@
 
 package org.apache.stormcrawler.opensearch.metrics;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -84,7 +85,7 @@ public class StatusMetricsBolt extends BaseRichBolt {
         }
 
         CrawlerMetrics.registerGauge(
-                context, stormConf, "status.count", () -> latestStatusCounts, freqStats);
+                context, stormConf, "status.count", this::statusCounts, freqStats);
 
         counters = new StatusCounter[6];
 
@@ -94,6 +95,15 @@ public class StatusMetricsBolt extends BaseRichBolt {
         counters[3] = new StatusCounter("REDIRECTION");
         counters[4] = new StatusCounter("ERROR");
         counters[5] = new StatusCounter("TOTAL");
+    }
+
+    /**
+     * The counts reported by the {@code status.count} metric. A V1 metrics consumer in another
+     * worker gets them through Kryo, which Storm only sets up for {@link HashMap}, not for the
+     * {@link ConcurrentHashMap} the counts are kept in.
+     */
+    Map<String, Long> statusCounts() {
+        return new HashMap<>(latestStatusCounts);
     }
 
     @Override
