@@ -2,7 +2,10 @@
 
 The following binaries are included in this project for testing purposes only:
 
-- `./core/src/test/resources/tripadvisor.sitemap.xml.gz`: A compressed sitemap for testing sitemap parsing.
+- `./core/src/test/resources/stormcrawler.sitemap.xml.gz`: A compressed sitemap for testing sitemap parsing.
+- `./core/src/test/resources/ssl/localhost.p12`: A PKCS12 keystore with a self-signed certificate for `localhost`, for testing HTTPS fetching.
+- `./core/src/test/resources/ssl/otherhost.p12`: A PKCS12 keystore with a self-signed certificate for another host name, for testing HTTPS fetching with a certificate that does not match the host.
+- `./external/tika/src/test/resources/test_recursive_embedded.docx`: A Word document with embedded documents for testing parsing with Tika.
 - `./external/warc/src/test/resources/test.warc.gz`: A WARC file for testing WARC functionality.
 - `./external/warc/src/test/resources/unparsable-date.warc.gz`: A WARC file with an unparseable date for testing WARC functionality.
 
@@ -12,5 +15,5 @@ These files are used to validate the functionality and reliability of Apache Sto
 
 The following binaries are included in this project for documentation purposes only:
 
-- `docs/src/main/asciidoc/images/stormcrawler.jpg`
-- `docs/src/main/asciidoc/images/stormcrawler.pdf`
+- `docs/src/main/asciidoc/images/stormcrawler.drawio.jpg`
+- `docs/src/main/asciidoc/images/stormcrawler.drawio.pdf`
