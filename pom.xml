@@ -620,6 +620,9 @@ under the License.
                                     <descriptors>
                                         <descriptor>assembly.xml</descriptor>
                                     </descriptors>
+                                    <!-- both archives come from assembly.xml, not from the
+                                         source-release descriptor of the ASF parent -->
+                                    <descriptorRefs combine.self="override" />
                                 </configuration>
                             </execution>
                         </executions>

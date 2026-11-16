@@ -22,6 +22,7 @@
     <id>source-release</id>
     <formats>
         <format>tar.gz</format>
+        <format>zip</format>
     </formats>
     <fileSets>
         <!-- main project directory structure -->
@@ -86,6 +87,16 @@
                 <exclude>%regex[(?!((?!${project.build.directory}/)[^/]+/)*src/)(.*/)?\.DS_Store]</exclude>
 
             </excludes>
+        </fileSet>
+        <fileSet>
+            <!-- the default excludes leave out every .gitignore; this one is a template the
+                 archetype copies into the projects it generates -->
+            <directory>archetype/src/main/resources/archetype-resources</directory>
+            <outputDirectory>archetype/src/main/resources/archetype-resources</outputDirectory>
+            <useDefaultExcludes>false</useDefaultExcludes>
+            <includes>
+                <include>.gitignore</include>
+            </includes>
         </fileSet>
         <!-- license, readme, etc. calculated at build time -->
         <fileSet>
