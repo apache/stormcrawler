@@ -90,7 +90,7 @@ under the License.
         <git-code-format-maven-plugin.version>6.2</git-code-format-maven-plugin.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <awaitility.version>4.3.0</awaitility.version>
-        <maven.mojo.license.plugin>2.7.1</maven.mojo.license.plugin>
+        <maven.mojo.license.plugin>2.9.0</maven.mojo.license.plugin>
         <checkstyle-maven-plugin.version>3.6.0</checkstyle-maven-plugin.version>
         <checkstyle.version>14.4.0</checkstyle.version>
         <jacoco.maven.plugin>0.8.16</jacoco.maven.plugin>
