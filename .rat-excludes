@@ -18,6 +18,7 @@ external/opensearch/dashboards/**
 external/solr/archetype/src/main/resources/archetype-resources/configsets/**
 THIRD-PARTY.properties
 .gitattributes
+**/.gitignore
 .editorconfig
 .mvn/*.config
 **/dependency-reduced-pom.xml
