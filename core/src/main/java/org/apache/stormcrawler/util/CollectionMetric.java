@@ -17,13 +17,13 @@
 
 package org.apache.stormcrawler.util;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.storm.metric.api.IMetric;
 
 public class CollectionMetric implements IMetric {
 
-    private List<Long> measurements = new LinkedList<>();
+    private List<Long> measurements = new ArrayList<>();
 
     public void addMeasurement(long l) {
         synchronized (measurements) {
@@ -31,10 +31,15 @@ public class CollectionMetric implements IMetric {
         }
     }
 
+    /**
+     * Returns the measurements taken since the last call as an {@link ArrayList}: a V1 metrics
+     * consumer in another worker gets them through Kryo, which Storm sets up for {@link ArrayList}
+     * but not for other lists.
+     */
     @Override
     public Object getValueAndReset() {
         synchronized (measurements) {
-            LinkedList<Long> copy = new LinkedList<>(measurements);
+            ArrayList<Long> copy = new ArrayList<>(measurements);
             measurements.clear();
             return copy;
         }
