@@ -86,7 +86,7 @@ under the License.
         <!-- the netty that the Storm distribution ships unshaded in lib-common, ahead of the topology
              jar on the worker classpath, so it is what the AWS SDK and Solr run with. Keep it in
              step with Storm -->
-        <netty.version>4.2.19.Final</netty.version>
+        <netty.version>4.2.20.Final</netty.version>
         <git-code-format-maven-plugin.version>6.2</git-code-format-maven-plugin.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <awaitility.version>4.3.0</awaitility.version>
