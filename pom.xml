@@ -81,7 +81,7 @@ under the License.
         <!-- transitive dependencies pinned so that all modules resolve the same version -->
         <commons.logging.version>1.4.0</commons.logging.version>
         <gson.version>2.15.0</gson.version>
-        <error_prone_annotations.version>2.52.0</error_prone_annotations.version>
+        <error_prone_annotations.version>2.53.0</error_prone_annotations.version>
         <jspecify.version>1.0.1</jspecify.version>
         <!-- the netty that the Storm distribution ships unshaded in lib-common, ahead of the topology
              jar on the worker classpath, so it is what the AWS SDK and Solr run with. Keep it in
